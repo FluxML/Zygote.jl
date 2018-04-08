@@ -1,5 +1,7 @@
 module Zygote
 
-# package code goes here
+using JSON
+
+include("ir.jl")
 
 end # module
