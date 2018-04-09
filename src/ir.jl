@@ -24,6 +24,8 @@ struct BasicBlock
   last ::Int
 end
 
+Base.range(b::BasicBlock) = b.first:b.last
+
 struct ControlFlowGraph
   blocks::Vector{BasicBlock}
   index::Vector{Int}
@@ -45,6 +47,14 @@ function Base.show(io::IO, code::IRCode)
     println(io, x)
   end
 end
+
+struct Block
+  ir::IRCode
+  n::Int
+end
+
+BasicBlock(b::Block) = b.ir.cfg.blocks[b.n]
+Base.range(b::Block) = range(BasicBlock(b))
 
 # IR manipulation
 
@@ -76,12 +86,16 @@ function bumpssa!(ir, idx)
   end
 end
 
-function Base.insert!(ir, idx, x)
+function Base.insert!(ir::IRCode, idx, x)
   insert!(ir.stmts, idx, x)
   bumpcfg!(ir, idx)
   bumpssa!(ir, idx)
   return ir
 end
+
+Base.push!(ir::IRCode, x) = insert!(ir, length(ir.stmts)+1, x)
+
+Base.insert!(b::Block, idx, x) = insert!(b.ir, range(b)[1]+idx-1, x)
 
 # Load IR from JSON
 
