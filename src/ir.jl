@@ -46,6 +46,43 @@ function Base.show(io::IO, code::IRCode)
   end
 end
 
+# IR manipulation
+
+function bumpcfg!(ir, idx)
+  bi = findlast(x -> x ≤ idx, ir.cfg.index)+1
+  b = ir.cfg.blocks[bi]
+  ir.cfg.blocks[bi] = BasicBlock(b.succs, b.preds, b.first, b.last+1)
+  @show ir.cfg.blocks[bi]
+  for i = bi+1:length(ir.cfg.blocks)
+    ir.cfg.index[i-1] += 1
+    b = ir.cfg.blocks[i]
+    ir.cfg.blocks[i] = BasicBlock(b.succs, b.preds, b.first+1, b.last+1)
+  end
+end
+
+bumpssa(x) = x
+bumpssa(x::SSAValue) = SSAValue(x.id+1)
+bumpssa(p::Phi) = Phi(p.edges, bumpssa.(p.values))
+
+function bumpssa(x::Expr)
+  y = Expr(x.head, bumpssa.(x.args)...)
+  y.typ = x.typ
+  return y
+end
+
+function bumpssa!(ir, idx)
+  for i = idx+1:length(ir.stmts)
+    ir.stmts[i] = bumpssa(ir.stmts[i])
+  end
+end
+
+function Base.insert!(ir, idx, x)
+  insert!(ir.stmts, idx, x)
+  bumpcfg!(ir, idx)
+  bumpssa!(ir, idx)
+  return ir
+end
+
 # Load IR from JSON
 
 function jsonblock(blk)
