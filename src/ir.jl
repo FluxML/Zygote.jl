@@ -6,13 +6,6 @@ end
 
 Base.show(io::IO, x::Argument) = print(io, "%%", x.n)
 
-struct GotoIfNot
-  cond
-  dest::Int
-end
-
-Base.show(io::IO, x::GotoIfNot) = print(io, x.cond, " || goto ", x.dest)
-
 struct Phi
   edges::Vector{Int}
   values::Vector{Any}
@@ -75,7 +68,7 @@ function jsonexpr(x::Associative)
   elseif haskey(x, "val")
     Expr(:return, jsonexpr(x["val"]))
   elseif haskey(x, "cond")
-    GotoIfNot(jsonexpr(x["cond"]), x["dest"])
+    Expr(:gotoifnot, jsonexpr(x["cond"]), x["dest"])
   elseif haskey(x, "label")
     GotoNode(x["label"])
   elseif haskey(x, "edges")
