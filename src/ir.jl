@@ -55,13 +55,14 @@ end
 
 BasicBlock(b::Block) = b.ir.cfg.blocks[b.n]
 Base.range(b::Block) = range(BasicBlock(b))
+blocks(ir::IRCode) = [Block(ir, n) for n = 1:length(ir.cfg.blocks)]
 
 # IR manipulation
 
-function newblock!(ir::IRCode, b = BasicBlock([], [], 1, 0))
+function newblock!(ir::IRCode; succs = [], preds = [])
   idx = length(ir.stmts) + 1
-  push!(ir.cfg.blocks, BasicBlock(b.succs, b.preds, idx, idx-1))
-  push!(ir.cfg.index, idx)
+  isempty(ir.cfg.blocks) || push!(ir.cfg.index, idx)
+  push!(ir.cfg.blocks, BasicBlock(succs, preds, idx, idx-1))
   return ir
 end
 
