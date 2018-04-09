@@ -81,5 +81,5 @@ end
 jsonexpr(x) = x
 
 function jsonir(ir)
-  IRCode(jsonexpr.(ir["smts"]), jsoncfg(ir["cfg"]))
+  IRCode(jsonexpr.(ir["stmts"]), jsoncfg(ir["cfg"]))
 end
