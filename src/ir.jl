@@ -58,11 +58,17 @@ Base.range(b::Block) = range(BasicBlock(b))
 
 # IR manipulation
 
+function newblock!(ir::IRCode, b = BasicBlock([], [], 1, 0))
+  idx = length(ir.stmts) + 1
+  push!(ir.cfg.blocks, BasicBlock(b.succs, b.preds, idx, idx-1))
+  push!(ir.cfg.index, idx)
+  return ir
+end
+
 function bumpcfg!(ir, idx)
   bi = findlast(x -> x ≤ idx, ir.cfg.index)+1
   b = ir.cfg.blocks[bi]
   ir.cfg.blocks[bi] = BasicBlock(b.succs, b.preds, b.first, b.last+1)
-  @show ir.cfg.blocks[bi]
   for i = bi+1:length(ir.cfg.blocks)
     ir.cfg.index[i-1] += 1
     b = ir.cfg.blocks[i]
