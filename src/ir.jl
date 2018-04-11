@@ -55,6 +55,7 @@ end
 
 BasicBlock(b::Block) = b.ir.cfg.blocks[b.n]
 Base.range(b::Block) = range(BasicBlock(b))
+Base.isempty(b::Block) = isempty(range(b))
 blocks(ir::IRCode) = [Block(ir, n) for n = 1:length(ir.cfg.blocks)]
 
 # IR manipulation
@@ -66,8 +67,10 @@ function newblock!(ir::IRCode; succs = [], preds = [])
   return ir
 end
 
+blockat(ir::IRCode, i::Integer) = findlast(x -> x <= i, ir.cfg.index)+1
+
 function bumpcfg!(ir, idx)
-  bi = findlast(x -> x ≤ idx, ir.cfg.index)+1
+  bi = blockat(ir, idx)
   b = ir.cfg.blocks[bi]
   ir.cfg.blocks[bi] = BasicBlock(b.succs, b.preds, b.first, b.last+1)
   for i = bi+1:length(ir.cfg.blocks)
@@ -77,6 +80,7 @@ function bumpcfg!(ir, idx)
   end
 end
 
+# FIXME
 bumpssa(x) = x
 bumpssa(x::SSAValue) = SSAValue(x.id+1)
 bumpssa(p::Phi) = Phi(p.edges, bumpssa.(p.values))
