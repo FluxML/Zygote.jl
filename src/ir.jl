@@ -56,6 +56,9 @@ end
 BasicBlock(b::Block) = b.ir.cfg.blocks[b.n]
 Base.range(b::Block) = range(BasicBlock(b))
 Base.isempty(b::Block) = isempty(range(b))
+preds(b::Block) = Block.(b.ir, BasicBlock(b).preds)
+succs(b::Block) = Block.(b.ir, BasicBlock(b).succs)
+
 blocks(ir::IRCode) = [Block(ir, n) for n = 1:length(ir.cfg.blocks)]
 
 # IR manipulation
@@ -67,10 +70,10 @@ function newblock!(ir::IRCode; succs = [], preds = [])
   return ir
 end
 
-blockat(ir::IRCode, i::Integer) = findlast(x -> x <= i, ir.cfg.index)+1
+blockat(ir::IRCode, i::Integer) = Block(ir, findlast(x -> x <= i, ir.cfg.index)+1)
 
 function bumpcfg!(ir, idx)
-  bi = blockat(ir, idx)
+  bi = blockat(ir, idx).n
   b = ir.cfg.blocks[bi]
   ir.cfg.blocks[bi] = BasicBlock(b.succs, b.preds, b.first, b.last+1)
   for i = bi+1:length(ir.cfg.blocks)
@@ -80,20 +83,19 @@ function bumpcfg!(ir, idx)
   end
 end
 
-# FIXME
-bumpssa(x) = x
-bumpssa(x::SSAValue) = SSAValue(x.id+1)
-bumpssa(p::Phi) = Phi(p.edges, bumpssa.(p.values))
+bumpssa(x, i) = x
+bumpssa(x::SSAValue, i) = SSAValue(x.id + (x.id > i))
+bumpssa(p::Phi, i) = Phi(p.edges, bumpssa.(p.values, i))
 
-function bumpssa(x::Expr)
-  y = Expr(x.head, bumpssa.(x.args)...)
+function bumpssa(x::Expr, i)
+  y = Expr(x.head, bumpssa.(x.args, i)...)
   y.typ = x.typ
   return y
 end
 
 function bumpssa!(ir, idx)
-  for i = idx+1:length(ir.stmts)
-    ir.stmts[i] = bumpssa(ir.stmts[i])
+  for i = 1:length(ir.stmts)
+    ir.stmts[i] = bumpssa(ir.stmts[i], idx)
   end
 end
 

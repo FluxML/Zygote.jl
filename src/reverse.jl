@@ -46,7 +46,7 @@ function grad_ex!(back, forw, i, grads)
     push!(back, Expr(:call, :∇, ex.args[1], Delta(i), alpha.(args)...))
     Δ = SSAValue(length(back.stmts))
     for (i, x) in enumerate(args)
-      push!(back, Expr(:call, GlobalRef(Main, :getindex), Δ, i))
+      push!(back, Expr(:call, GlobalRef(Base, :getindex), Δ, i))
       grad(x)
     end
   else
@@ -75,4 +75,53 @@ function reverse_blocks(forw::IRCode)
     isempty(blocks(back)[end]) && push!(back, nothing)
   end
   return back, grads
+end
+
+# TODO: need a much better reaching check here.
+# This assumes that all variable uses will occur in either the same BB
+# or an immediate successor.
+function reachinggrads(ir, grads, idx)
+  b = blockat(ir, idx)
+  gs = []
+  ps = [[] for p in preds(b)]
+  for grad in grads
+    if grad isa Argument || grad.id in range(b)[1]:idx
+      push!(gs, grad)
+    elseif all(p -> grad.id in range(p), preds(b))
+      push!(gs, grad)
+    elseif !any(p -> grad.id in range(p), preds(b))
+      error("$grad not found")
+    else
+      for (i, p) in enumerate(preds(b))
+        grad.id in range(p) && push!(ps[i], grad)
+      end
+    end
+  end
+  return gs, ps
+end
+
+# TODO: we only need `grads` here to keep SSAValue numbers in sync,
+# which seems pretty unclean.
+function fillphis!(ir, grads, ps, i)
+  # while any(!isempty, ps)
+  #   error("need phis")
+  # end
+  return []
+end
+
+function fill_deltas!(ir, grads)
+  function _fill_deltas(x, i)
+    haskey(grads, x) || return x
+    gs, ps = reachinggrads(ir, grads[x], i)
+    gs = [gs..., fillphis!(ir, grads, ps, i-1)...]
+    return reduce((a, b) -> :(accum($a, $b)), gs)
+  end
+  for i = 1:length(ir.stmts)
+    fill_deltas(x) = x
+    fill_deltas(x::Delta) = _fill_deltas(SSAValue(x.id), i)
+    fill_deltas(x::Expr) = isexpr(x, :call) ? Expr(:call, fill_deltas.(x.args)...) : x
+    ir.stmts[i] = fill_deltas(ir.stmts[i])
+  end
+  push!(ir, _fill_deltas(Argument(2), length(ir.stmts)))
+  return back
 end
