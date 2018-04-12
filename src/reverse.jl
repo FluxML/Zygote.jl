@@ -36,22 +36,47 @@ end
 
 newbi(ir, b) = length(ir.cfg.blocks)-b+1
 
-function reverse_blocks(ir::IRCode)
-  stmts = []
-  blocks = []
+function grad_ex!(stmts, grads, ex, i)
+  grad(x, Δ) = push!(get!(grads, x, []), Δ)
+  grad(x) = grad(x, SSAValue(length(stmts)))
+  if ex isa Union{GotoNode,GotoIfNot,Void}
+  elseif ex isa ReturnNode
+    grad(ex.val, Argument(2))
+  elseif ex isa PhiNode
+    push!(stmts, Delta(i))
+    grad.(ex.values)
+  elseif isexpr(ex, :call)
+    args = ex.args[2:end]
+    push!(stmts, Expr(:call, :∇, ex.args[1], Delta(i), alpha.(args)...))
+    Δ = SSAValue(length(stmts))
+    for (i, x) in enumerate(args)
+      push!(stmts, Expr(:call, GlobalRef(Base, :getindex), Δ, i))
+      grad(x)
+    end
+  else
+    error("Can't handle $ex")
+  end
+end
+
+function reverse_ir(ir::IRCode)
+  stmts, blocks, grads = [], [], Dict()
   for (i, b) in enumerate(reverse(ir.cfg.blocks))
-    preds = newbi.(ir, b.succs)
-    succs = newbi.(ir, b.preds)
+    preds, succs = newbi.(ir, b.succs), newbi.(ir, b.preds)
     st = length(stmts)+1
+    for i = reverse(range(b))
+      grad_ex!(stmts, grads, forw[SSAValue(i)], i)
+    end
     if isempty(succs)
       push!(stmts, nothing)
     elseif length(succs) == 1
       push!(stmts, GotoNode(succs[1]))
     else
-      push!(stmts, GotoIfNot(Alpha(1), succs[1]))
+      phi = range(b)[1]
+      push!(stmts, GotoIfNot(Alpha(phi), succs[1]))
       push!(stmts, GotoNode(succs[2]))
     end
     push!(blocks, BasicBlock(StmtRange(st,length(stmts)), preds, succs))
   end
-  return IRCode(ir, stmts, Any[Any for _ in stmts], [-1 for _ in stmts], CFG(blocks), NI.NewNode[])
+  rev = IRCode(ir, stmts, Any[Any for _ in stmts], [-1 for _ in stmts], CFG(blocks), NI.NewNode[])
+  return rev, grads
 end

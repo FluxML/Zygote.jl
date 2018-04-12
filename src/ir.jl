@@ -21,7 +21,7 @@ PhiNode(x, y) = PhiNode(Any[x...], Any[y...])
 CFG(bs) = CFG(bs, map(b -> b.stmts.first, bs[2:end]))
 
 function code_ir(f, T)
-  ci = code_typed(f, T)[1][1]
+  ci = code_typed(f, T, optimize=false)[1][1]
   ssa = compact!(NI.just_construct_ssa(ci, copy(ci.code), length(T.parameters), [NI.NullLineInfo]))
 end
 
@@ -40,7 +40,7 @@ end
 
 NI.BasicBlock(b::Block) = b.ir.cfg.blocks[b.n]
 
-Base.range(b::BasicBlock) = b.stmts
+Base.range(b::BasicBlock) = b.stmts.first:b.stmts.last
 Base.range(b::Block) = range(BasicBlock(b))
 
 insert_node!(b::Block, pos::Int, @nospecialize(typ), @nospecialize(val)) =
