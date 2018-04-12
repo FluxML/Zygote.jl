@@ -1,7 +1,7 @@
 using NotInferenceDontLookHere
 import NotInferenceDontLookHere: IRCode, CFG, BasicBlock, Argument, ReturnNode,
   GotoIfNot, PhiNode, StmtRange, IncrementalCompact, insert_node!, insert_node_here!,
-  compact!, finish
+  compact!, finish, DomTree, construct_domtree
 using InteractiveUtils: typesof
 
 Base.getindex(ir::IRCode, x) = NI.getindex(ir, x)
@@ -19,6 +19,10 @@ end
 PhiNode(x, y) = PhiNode(Any[x...], Any[y...])
 
 CFG(bs) = CFG(bs, map(b -> b.stmts.first, bs[2:end]))
+
+Base.show(io::IO, x::SSAValue) = print(io, "%", x.id)
+
+Base.show(io::IO, x::Argument) = print(io, "%%", x.n)
 
 function code_ir(f, T)
   ci = code_typed(f, T, optimize=false)[1][1]
@@ -38,7 +42,7 @@ struct Block
   n::Int
 end
 
-NI.BasicBlock(b::Block) = b.ir.cfg.blocks[b.n]
+BasicBlock(b::Block) = b.ir.cfg.blocks[b.n]
 
 Base.range(b::BasicBlock) = b.stmts.first:b.stmts.last
 Base.range(b::Block) = range(BasicBlock(b))
@@ -47,3 +51,21 @@ insert_node!(b::Block, pos::Int, @nospecialize(typ), @nospecialize(val)) =
   insert_node!(b.ir, pos + range(b)[1] - 1, typ, val)
 
 blocks(ir::IRCode) = [Block(ir, n) for n = 1:length(ir.cfg.blocks)]
+
+# Dominance frontiers
+
+function domfront(cfg, dt = construct_domtree(cfg))
+  fronts = [Set{Int}() for _ in cfg.blocks]
+  for b = 1:length(cfg.blocks)
+    length(cfg.blocks[b].preds) >= 2 || continue
+    for p in cfg.blocks[b].preds
+      runner = p
+      while runner != dt.idoms[b]
+        runner == b && break
+        push!(fronts[runner], b)
+        runner = dt.idoms[runner]
+      end
+    end
+  end
+  return fronts
+end
