@@ -3,8 +3,10 @@ import NotInferenceDontLookHere: IRCode, CFG, BasicBlock, Argument, ReturnNode,
   GotoIfNot, PhiNode, StmtRange, IncrementalCompact, insert_node!, insert_node_here!,
   compact!, finish, DomTree, construct_domtree
 using InteractiveUtils: typesof
+using Core: SSAValue, GotoNode
 
 Base.getindex(ir::IRCode, x) = NI.getindex(ir, x)
+Base.setindex!(ir::IRCode, x, i) = NI.setindex!(ir, x, i)
 Base.getindex(u::NI.UseRef) = NI.getindex(u)
 Base.getindex(r::StmtRange, i) = (r.first:r.last)[i]
 

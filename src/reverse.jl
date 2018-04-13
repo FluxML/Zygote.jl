@@ -20,7 +20,7 @@ validcfg(ir) =
   ir.stmts[end] isa ReturnNode &&
   !any(x -> x isa ReturnNode, ir.stmts[1:end-1])
 
-# # Insert Phi nodes which record branches taken
+# Insert Phi nodes which record branches taken
 function record_branches(ir::IRCode)
   ir = IncrementalCompact(ir)
   for (i, x) in ir
@@ -79,4 +79,20 @@ function reverse_ir(ir::IRCode)
   end
   rev = IRCode(ir, stmts, Any[Any for _ in stmts], [-1 for _ in stmts], CFG(blocks), NI.NewNode[])
   return rev, grads
+end
+
+function fill_deltas!(ir, grads)
+  function _fill_deltas(x, i)
+    haskey(grads, x) || return x
+    return reduce((a, b) -> :(accum($a, $b)), grads[x])
+  end
+  for i = 1:length(ir.stmts)
+    fill_deltas(x) = x
+    fill_deltas(x::Delta) = _fill_deltas(SSAValue(x.id), i)
+    fill_deltas(x::Expr) = isexpr(x, :call) ? Expr(:call, fill_deltas.(x.args)...) : x
+    ir[SSAValue(i)] = fill_deltas(ir[SSAValue(i)])
+  end
+  ret = ReturnNode(_fill_deltas(Argument(2), length(ir.stmts)))
+  insert_node!(ir, length(ir.stmts), Any, ret)
+  return ir
 end
