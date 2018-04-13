@@ -104,7 +104,7 @@ function fill_delta!(ir, grads, x, i)
   b, bs = blockidx(ir, i), blockidx.(ir, gs)
   if all(c -> c == b, bs)
     accum_symbolic(gs)
-  elseif all(c -> c in ir.cfg.blocks[b].preds, filter(x -> x != b, bs))
+  elseif all(c -> c in ir.cfg.blocks[b].preds, bs)
     # TODO: handle the more complex cases here
     @assert length(bs) == length(unique(bs)) == length(ir.cfg.blocks[b].preds)
     length(bs) == 1 ? gs[1] : PhiNode(bs, gs)

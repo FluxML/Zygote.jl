@@ -5,8 +5,12 @@ import NotInferenceDontLookHere: IRCode, CFG, BasicBlock, Argument, ReturnNode,
 using InteractiveUtils: typesof
 using Core: SSAValue, GotoNode
 
-Base.getindex(ir::IRCode, x) = NI.getindex(ir, x)
-Base.setindex!(ir::IRCode, x, i) = NI.setindex!(ir, x, i)
+for T in [:IRCode, :IncrementalCompact]
+  @eval begin
+    Base.getindex(ir::$T, x) = NI.getindex(ir, x)
+    Base.setindex!(ir::$T, x, i) = NI.setindex!(ir, x, i)
+  end
+end
 Base.getindex(u::NI.UseRef) = NI.getindex(u)
 Base.getindex(r::StmtRange, i) = (r.first:r.last)[i]
 
