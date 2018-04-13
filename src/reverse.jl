@@ -41,7 +41,7 @@ function grad_ex!(stmts, grads, ex, i)
   grad(x) = grad(x, SSAValue(length(stmts)))
   if ex isa Union{GotoNode,GotoIfNot,Void}
   elseif ex isa ReturnNode
-    grad(ex.val, Argument(2))
+    grad(ex.val, SSAValue(1))
   elseif ex isa PhiNode
     push!(stmts, Delta(i))
     grad.(ex.values)
@@ -63,6 +63,7 @@ function reverse_ir(ir::IRCode)
   for (i, b) in enumerate(reverse(ir.cfg.blocks))
     preds, succs = newbi.(ir, b.succs), newbi.(ir, b.preds)
     st = length(stmts)+1
+    i == 1 && push!(stmts, :(grad()))
     for i = reverse(range(b))
       grad_ex!(stmts, grads, forw[SSAValue(i)], i)
     end
