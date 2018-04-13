@@ -20,7 +20,7 @@ validcfg(ir) =
   !any(x -> x isa ReturnNode, ir.stmts[1:end-1])
 
 # Insert Phi nodes which record branches taken
-function record_branches(ir::IRCode)
+function record_branches!(ir::IRCode)
   ir = IncrementalCompact(ir)
   for (i, x) in ir
     bi = findfirst(x -> x == i+1, ir.ir.cfg.index)
@@ -32,8 +32,6 @@ function record_branches(ir::IRCode)
   end
   return finish(ir)
 end
-
-newbi(ir, b) = length(ir.cfg.blocks)-b+1
 
 function grad_ex!(stmts, grads, ex, i)
   grad(x, Δ) = push!(get!(grads, x, []), Δ)
@@ -58,17 +56,31 @@ function grad_ex!(stmts, grads, ex, i)
   end
 end
 
+function reverse_cfg(cfg, perm)
+  newidx(i) = perm[i]
+  CFG([BasicBlock(StmtRange(1,0),newidx.(b.succs),newidx.(b.preds)) for b in cfg.blocks[perm]])
+end
+
+function reverse_order(cfg)
+  n = length(cfg.blocks)
+  perm = n:-1:1
+  guess = reverse_cfg(cfg, perm)
+  dt = construct_domtree(guess)
+  perm[sortperm(1:n, by = x -> dt.nodes[x].level)]
+end
+
 function reverse_ir(ir::IRCode)
   stmts, blocks, grads = [], [], Dict()
-  for (i, b) in enumerate(reverse(ir.cfg.blocks))
-    preds, succs = newbi.(ir, b.succs), newbi.(ir, b.preds)
+  perm = reverse_order(ir.cfg)
+  newidx(i) = perm[i]
+  for (bi, b) in enumerate(ir.cfg.blocks[perm])
+    preds, succs = newidx.(b.succs), newidx.(b.preds)
     st = length(stmts)+1
-    i == 1 && push!(stmts, :(grad()))
+    bi == 1 && push!(stmts, Expr(:call, :Δ))
     for i = reverse(range(b))
-      grad_ex!(stmts, grads, forw[SSAValue(i)], i)
+      grad_ex!(stmts, grads, ir[SSAValue(i)], i)
     end
     if isempty(succs)
-      push!(stmts, nothing)
     elseif length(succs) == 1
       push!(stmts, GotoNode(succs[1]))
     else
@@ -76,6 +88,7 @@ function reverse_ir(ir::IRCode)
       push!(stmts, GotoIfNot(Alpha(phi), succs[1]))
       push!(stmts, GotoNode(succs[2]))
     end
+    bi == length(ir.cfg.blocks) && push!(stmts, ReturnNode(nothing))
     push!(blocks, BasicBlock(StmtRange(st,length(stmts)), preds, succs))
   end
   rev = IRCode(ir, stmts, Any[Any for _ in stmts], [-1 for _ in stmts], CFG(blocks), NI.NewNode[])
@@ -89,10 +102,12 @@ function fill_delta!(ir, grads, x, i)
   dt = construct_domtree(ir.cfg)
   gs = grads[x]
   b, bs = blockidx(ir, i), blockidx.(ir, gs)
-  if all(c -> c in ir.cfg.blocks[b].preds, filter(x -> x != b, bs))
+  if all(c -> c == b, bs)
+    accum_symbolic(gs)
+  elseif all(c -> c in ir.cfg.blocks[b].preds, filter(x -> x != b, bs))
     # TODO: handle the more complex cases here
     @assert length(bs) == length(unique(bs)) == length(ir.cfg.blocks[b].preds)
-    PhiNode(bs, gs)
+    length(bs) == 1 ? gs[1] : PhiNode(bs, gs)
   else
     # TODO: find a common dominator
     Δ = insert_node!(ir, 2, Any, Expr(:call, GlobalRef(Base, :similar), alpha(x)))
@@ -107,17 +122,16 @@ function fill_deltas!(ir, grads)
   for i = 1:length(ir.stmts)
     # TODO: use userefiterator stuff for this
     fill_deltas(x) = x
-    fill_deltas(x::Delta) = fill_delta!(ir, grads, SSAValue(x.id), i)
     fill_deltas(x::Expr) = isexpr(x, :call) ? Expr(:call, fill_deltas.(x.args)...) : x
+    fill_deltas(x::Delta) = fill_delta!(ir, grads, SSAValue(x.id), i)
+    fill_deltas(x::ReturnNode) = ReturnNode(fill_delta!(ir, grads, Argument(2), i))
     ir[SSAValue(i)] = fill_deltas(ir[SSAValue(i)])
   end
-  ret = ReturnNode(fill_delta!(ir, grads, Argument(2), length(ir.stmts)))
-  insert_node!(ir, length(ir.stmts), Any, ret)
-  return ir
+  return compact!(ir)
 end
 
 function grad_ir(ir)
-  forw = record_branches(ir)
+  forw = record_branches!(ir)
   rev, grads = reverse_ir(forw)
   return forw, fill_deltas!(rev, grads)
 end

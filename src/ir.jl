@@ -31,10 +31,14 @@ function code_ir(f, T)
   ssa = compact!(NI.just_construct_ssa(ci, copy(ci.code), length(T.parameters), [NI.NullLineInfo]))
 end
 
-macro code_ir(ex)
+function code_irm(ex)
   isexpr(ex, :call) || error("@code_ir f(args...)")
   f, args = ex.args[1], ex.args[2:end]
   :(code_ir($(esc(f)), typesof($(esc.(args)...))))
+end
+
+macro code_ir(ex)
+  code_irm(ex)
 end
 
 # Block wrapper
