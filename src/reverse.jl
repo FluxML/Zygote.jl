@@ -6,7 +6,6 @@ Base.show(io::IO, x::Alpha) = print(io, "@", x.id)
 
 alpha(x) = x
 alpha(x::SSAValue) = Alpha(x.id)
-alpha(x::Argument) = Argument(x.n+1)
 
 struct Delta
   id::Int
@@ -38,7 +37,8 @@ newbi(ir, b) = length(ir.cfg.blocks)-b+1
 
 function grad_ex!(stmts, grads, ex, i)
   grad(x, Δ) = push!(get!(grads, x, []), Δ)
-  grad(x) = grad(x, SSAValue(length(stmts)))
+  grad(x::Union{Argument,SSAValue}) = grad(x, SSAValue(length(stmts)))
+  grad(x) = return
   if ex isa Union{GotoNode,GotoIfNot,Void}
   elseif ex isa ReturnNode
     grad(ex.val, SSAValue(1))
@@ -82,18 +82,42 @@ function reverse_ir(ir::IRCode)
   return rev, grads
 end
 
-function fill_deltas!(ir, grads)
-  function _fill_deltas(x, i)
-    haskey(grads, x) || return x
-    return reduce((a, b) -> :(accum($a, $b)), grads[x])
+accum_symbolic(gs) = reduce((a,b) -> :($(GlobalRef(Base,:+))($a,$b)), gs)
+
+function fill_delta!(ir, grads, x, i)
+  haskey(grads, x) || return nothing
+  dt = construct_domtree(ir.cfg)
+  gs = grads[x]
+  b, bs = blockidx(ir, i), blockidx.(ir, gs)
+  if all(c -> c in ir.cfg.blocks[b].preds, filter(x -> x != b, bs))
+    # TODO: handle the more complex cases here
+    @assert length(bs) == length(unique(bs)) == length(ir.cfg.blocks[b].preds)
+    PhiNode(bs, gs)
+  else
+    # TODO: find a common dominator
+    Δ = insert_node!(ir, 2, Any, Expr(:call, GlobalRef(Base, :similar), alpha(x)))
+    for g in gs
+      insert_node!(ir, g.id+1, Any, Expr(:call, :accum!, Δ, g))
+    end
+    Δ
   end
+end
+
+function fill_deltas!(ir, grads)
   for i = 1:length(ir.stmts)
+    # TODO: use userefiterator stuff for this
     fill_deltas(x) = x
-    fill_deltas(x::Delta) = _fill_deltas(SSAValue(x.id), i)
+    fill_deltas(x::Delta) = fill_delta!(ir, grads, SSAValue(x.id), i)
     fill_deltas(x::Expr) = isexpr(x, :call) ? Expr(:call, fill_deltas.(x.args)...) : x
     ir[SSAValue(i)] = fill_deltas(ir[SSAValue(i)])
   end
-  ret = ReturnNode(_fill_deltas(Argument(2), length(ir.stmts)))
+  ret = ReturnNode(fill_delta!(ir, grads, Argument(2), length(ir.stmts)))
   insert_node!(ir, length(ir.stmts), Any, ret)
   return ir
+end
+
+function grad_ir(ir)
+  forw = record_branches(ir)
+  rev, grads = reverse_ir(forw)
+  return forw, fill_deltas!(rev, grads)
 end

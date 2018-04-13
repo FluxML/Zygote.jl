@@ -1,7 +1,7 @@
 using NotInferenceDontLookHere
 import NotInferenceDontLookHere: IRCode, CFG, BasicBlock, Argument, ReturnNode,
   GotoIfNot, PhiNode, StmtRange, IncrementalCompact, insert_node!, insert_node_here!,
-  compact!, finish, DomTree, construct_domtree
+  compact!, finish, DomTree, construct_domtree, dominates
 using InteractiveUtils: typesof
 using Core: SSAValue, GotoNode
 
@@ -53,6 +53,13 @@ insert_node!(b::Block, pos::Int, @nospecialize(typ), @nospecialize(val)) =
   insert_node!(b.ir, pos + range(b)[1] - 1, typ, val)
 
 blocks(ir::IRCode) = [Block(ir, n) for n = 1:length(ir.cfg.blocks)]
+
+function blockidx(ir, i::Integer)
+  i = findlast(x -> x <= i, ir.cfg.index)
+  i == nothing ? 1 : i+1
+end
+
+blockidx(ir, i::SSAValue) = blockidx(ir, i.id)
 
 # Dominance frontiers
 
