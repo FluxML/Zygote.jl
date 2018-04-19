@@ -13,13 +13,11 @@ end
 
 Base.show(io::IO, x::Delta) = print(io, "Δ", x.id)
 
-# Only the final BB can return (so we have a single entry point in reverse).
 # TODO: merge return nodes
 validcfg(ir) =
   ir.stmts[end] isa ReturnNode &&
   !any(x -> x isa ReturnNode, ir.stmts[1:end-1])
 
-# Insert Phi nodes which record branches taken
 function record_branches!(ir::IRCode)
   ir = IncrementalCompact(ir)
   for (i, x) in ir
@@ -31,6 +29,18 @@ function record_branches!(ir::IRCode)
     insert_node_here!(ir, PhiNode(preds, [false, true]), Bool, ir.result_lines[i])
   end
   return finish(ir)
+end
+
+function reachable(ir)
+  seen = SSAValue[]
+  stack = [SSAValue(length(ir.stmts))]
+  while !isempty(stack)
+    i = popfirst!(stack)
+    i ∈ seen && continue
+    push!(seen, i)
+    NI.foreachssa(x -> push!(stack, x), ir[i])
+  end
+  return seen
 end
 
 function grad_ex!(stmts, grads, ex, i)
@@ -71,6 +81,7 @@ end
 
 function reverse_ir(ir::IRCode)
   stmts, blocks, grads = [], [], Dict()
+  valid = reachable(ir)
   perm = reverse_order(ir.cfg)
   newidx(i) = perm[i]
   for (bi, b) in enumerate(ir.cfg.blocks[perm])
@@ -78,6 +89,7 @@ function reverse_ir(ir::IRCode)
     st = length(stmts)+1
     bi == 1 && push!(stmts, Expr(:call, :Δ))
     for i = reverse(range(b))
+      SSAValue(i) in valid || continue
       grad_ex!(stmts, grads, ir[SSAValue(i)], i)
     end
     if isempty(succs)
@@ -131,6 +143,7 @@ function fill_deltas!(ir, grads)
 end
 
 function grad_ir(ir)
+  validcfg(ir) || error("Multiple return not supported")
   forw = record_branches!(ir)
   rev, grads = reverse_ir(forw)
   return forw, fill_deltas!(rev, grads)
