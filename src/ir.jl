@@ -14,11 +14,11 @@ end
 Base.getindex(u::NI.UseRef) = NI.getindex(u)
 Base.getindex(r::StmtRange, i) = (r.first:r.last)[i]
 
-for T in [:(NI.UseRefIterator), :(NI.IncrementalCompact)]
+for T in :[UseRefIterator, IncrementalCompact, Pair].args
   @eval begin
-    Base.start(x::$T) = NI.start(x)
-    Base.next(x::$T, st) = NI.next(x, st)
-    Base.done(x::$T, st) = NI.done(x, st)
+    Base.start(x::NI.$T) = NI.start(x)
+    Base.next(x::NI.$T, st) = NI.next(x, st)
+    Base.done(x::NI.$T, st) = NI.done(x, st)
   end
 end
 
