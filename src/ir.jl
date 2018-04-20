@@ -30,6 +30,19 @@ Base.show(io::IO, x::SSAValue) = print(io, "%", x.id)
 
 Base.show(io::IO, x::Argument) = print(io, "%%", x.n)
 
+function _compact!(code::IRCode)
+  compact = IncrementalCompact(code)
+  state = start(compact)
+  while !done(compact, state)
+    _, state = next(compact, state)
+  end
+  return finish(compact), compact.ssa_rename
+end
+
+rename(x, m) = x
+rename(x::SSAValue, m) = m[x.id]
+rename(xs::AbstractVector, m) = map(x -> rename(x, m), xs)
+
 function code_ir(f, T)
   ci = code_typed(f, T, optimize=false)[1][1]
   ssa = compact!(NI.just_construct_ssa(ci, copy(ci.code), length(T.parameters), [NI.NullLineInfo]))

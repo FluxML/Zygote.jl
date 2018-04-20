@@ -7,6 +7,12 @@ Base.show(io::IO, x::Alpha) = print(io, "@", x.id)
 alpha(x) = x
 alpha(x::SSAValue) = Alpha(x.id)
 
+xgetindex(x, i...) = Expr(:call, GlobalRef(Base, :getindex), x, i...)
+
+xaccum!(x, Δ) = Expr(:call, GlobalRef(Zygote, :accum!), x, Δ)
+
+const x∇ = GlobalRef(Zygote, :∇)
+
 # TODO: merge return nodes
 validcfg(ir) =
   ir.stmts[end] isa ReturnNode &&
@@ -40,12 +46,22 @@ function reachable(ir)
   return seen
 end
 
-accumm!(x, Δ) = Expr(:call, GlobalRef(Zygote, :accum!), x, Δ)
+function record!(ir::IRCode)
+  xs = reachable(ir)
+  for i = 1:length(ir.stmts)
+    ex = ir[SSAValue(i)]
+    (SSAValue(i) ∈ xs && isexpr(ex, :call)) || continue
+    yJ = insert_node!(ir, i, Any, Expr(:call, x∇, ex.args...))
+    ir[SSAValue(i)] = xgetindex(yJ, 1)
+    insert_node!(ir, i+1, Any, xgetindex(yJ, 2), true)
+  end
+  ir, map = _compact!(ir)
+  return ir, rename(xs, map)
+end
 
 function grad_ex!(stmts, grads, ex, i)
-  if ex isa Union{GotoNode,GotoIfNot,Void}
-  elseif ex isa ReturnNode
-    push!(stmts, accumm!(grads[ex.val], SSAValue(1)))
+  if ex isa ReturnNode
+    push!(stmts, xaccum!(grads[ex.val], SSAValue(1)))
   elseif isexpr(ex, :call)
     args = ex.args[2:end]
     push!(stmts, Expr(:call, GlobalRef(Zygote, :∇), ex.args[1], grads[SSAValue(i)], alpha.(args)...))
@@ -53,7 +69,7 @@ function grad_ex!(stmts, grads, ex, i)
     for (i, x) in enumerate(args)
       haskey(grads, x) || continue
       push!(stmts, Expr(:call, GlobalRef(Base, :getindex), Δ, i))
-      push!(stmts, accumm!(grads[x], SSAValue(length(stmts))))
+      push!(stmts, xaccum!(grads[x], SSAValue(length(stmts))))
     end
   else
     error("Can't handle $ex")
@@ -89,7 +105,7 @@ function reverse_ir(ir::IRCode)
     for (from, to, x, Δ) in phis
       bi == to || continue
       @assert length(preds) == 1
-      push!(stmts, accumm!(grads[x], grads[Δ]))
+      push!(stmts, xaccum!(grads[x], grads[Δ]))
     end
     for i = reverse(range(b))
       i == length(ir.stmts) || haskey(grads, SSAValue(i)) || continue
