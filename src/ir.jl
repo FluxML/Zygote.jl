@@ -43,6 +43,14 @@ rename(x, m) = x
 rename(x::SSAValue, m) = m[x.id]
 rename(xs::AbstractVector, m) = map(x -> rename(x, m), xs)
 
+function usages(ir, xs)
+  us = Dict(x => [] for x in xs)
+  for i = 1:length(ir.stmts), u in userefs(ir.stmts[i])
+    u[] ∈ xs && push!(us[u[]], SSAValue(i))
+  end
+  return us
+end
+
 function code_ir(f, T)
   ci = code_typed(f, T, optimize=false)[1][1]
   ssa = compact!(NI.just_construct_ssa(ci, copy(ci.code), length(T.parameters), [NI.NullLineInfo]))
