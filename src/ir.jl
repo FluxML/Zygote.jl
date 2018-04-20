@@ -1,7 +1,7 @@
 using NotInferenceDontLookHere
 import NotInferenceDontLookHere: IRCode, CFG, BasicBlock, Argument, ReturnNode,
   GotoIfNot, PhiNode, StmtRange, IncrementalCompact, insert_node!, insert_node_here!,
-  compact!, finish, DomTree, construct_domtree, dominates
+  compact!, finish, DomTree, construct_domtree, dominates, userefs
 using InteractiveUtils: typesof
 using Core: SSAValue, GotoNode
 
