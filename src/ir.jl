@@ -66,23 +66,6 @@ macro code_ir(ex)
   code_irm(ex)
 end
 
-# Block wrapper
-
-struct Block
-  ir::IRCode
-  n::Int
-end
-
-BasicBlock(b::Block) = b.ir.cfg.blocks[b.n]
-
-Base.range(b::BasicBlock) = b.stmts.first:b.stmts.last
-Base.range(b::Block) = range(BasicBlock(b))
-
-insert_node!(b::Block, pos::Int, @nospecialize(typ), @nospecialize(val)) =
-  insert_node!(b.ir, pos + range(b)[1] - 1, typ, val)
-
-blocks(ir::IRCode) = [Block(ir, n) for n = 1:length(ir.cfg.blocks)]
-
 function blockidx(ir, i::Integer)
   i = findlast(x -> x <= i, ir.cfg.index)
   i == nothing ? 1 : i+1
