@@ -59,23 +59,6 @@ function record!(ir::IRCode)
   return ir, rename(xs, map)
 end
 
-function grad_ex!(stmts, grads, ex, i)
-  if ex isa ReturnNode
-    push!(stmts, xaccum!(grads[ex.val], SSAValue(1)))
-  elseif isexpr(ex, :call)
-    args = ex.args[2:end]
-    push!(stmts, Expr(:call, GlobalRef(Zygote, :∇), ex.args[1], grads[SSAValue(i)], alpha.(args)...))
-    Δ = SSAValue(length(stmts))
-    for (i, x) in enumerate(args)
-      haskey(grads, x) || continue
-      push!(stmts, Expr(:call, GlobalRef(Base, :getindex), Δ, i))
-      push!(stmts, xaccum!(grads[x], SSAValue(length(stmts))))
-    end
-  else
-    error("Can't handle $ex")
-  end
-end
-
 function reverse_cfg(cfg, perm)
   newidx(i) = perm[i]
   CFG([BasicBlock(StmtRange(1,0),newidx.(b.succs),newidx.(b.preds)) for b in cfg.blocks[perm]])
@@ -89,54 +72,55 @@ function reverse_order(cfg)
   perm[sortperm(1:n, by = x -> dt.nodes[x].level)]
 end
 
-function reverse_ir(ir::IRCode)
-  stmts, blocks, phis, grads = [], [], [], Dict()
-  perm = reverse_order(ir.cfg)
-  newidx(i) = perm[i]
-  push!(stmts, :(Δ()))
+struct ReverseIR
+  forw::IRCode
+  perm::Vector{Int}
+  stmts::Vector{Any}
+  blocks::Vector{BasicBlock}
+end
+
+ReverseIR(ir::IRCode) = ReverseIR(ir, reverse_order(ir.cfg), [], [])
+
+Base.push!(ir::ReverseIR, x) = push!(ir.stmts, x)
+
+function block!(ir::ReverseIR)
+  start = isempty(ir.blocks) ? 1 : ir.blocks[end].stmts.last+1
+  old = ir.forw.cfg.blocks[invperm(ir.perm)[length(ir.blocks)+1]]
+  newidx(i) = ir.perm[i]
+  preds, succs = newidx.(old.succs), newidx.(old.preds)
+  if isempty(succs)
+  elseif length(succs) == 1
+    push!(ir, GotoNode(succs[1]))
+  else
+    push!(ir, GotoIfNot(Alpha(range(old)[1]), succs[1]))
+    push!(ir, GotoNode(succs[2]))
+  end
+  push!(ir.blocks, BasicBlock(StmtRange(start,length(ir.stmts)), preds, succs))
+end
+
+IRCode(ir::ReverseIR) =
+  IRCode(ir.forw, ir.stmts, Any[Any for _ in ir.stmts], [-1 for _ in ir.stmts], CFG(ir.blocks), NI.NewNode[])
+
+function reverse_ir(ir::IRCode, xs)
+  ir, grads = ReverseIR(ir), Dict()
+  push!(ir, :(Δ()))
   # TODO: put these in the right block
-  for x in reachable(ir)
-    push!(stmts, Expr(:call, GlobalRef(Zygote, :grad), alpha(x)))
-    grads[x] = SSAValue(length(stmts))
+  for x in xs
+    push!(ir, Expr(:call, GlobalRef(Zygote, :grad), alpha(x)))
+    grads[x] = SSAValue(length(ir.stmts))
   end
-  for (bi, b) in enumerate(ir.cfg.blocks[perm])
-    preds, succs = newidx.(b.succs), newidx.(b.preds)
-    st = bi == 1 ? 1 : length(stmts)+1
-    for (from, to, x, Δ) in phis
-      bi == to || continue
-      @assert length(preds) == 1
-      push!(stmts, xaccum!(grads[x], grads[Δ]))
+  for (bi, b) in enumerate(ir.forw.cfg.blocks[ir.perm])
+    for i in reverse(range(b))
     end
-    for i = reverse(range(b))
-      i == length(ir.stmts) || haskey(grads, SSAValue(i)) || continue
-      ex = ir[SSAValue(i)]
-      if ex isa PhiNode
-        for (e, v) in zip(ex.edges, ex.values)
-          haskey(grads, v) || continue
-          push!(phis, (bi, newidx(e), v, SSAValue(i)))
-        end
-      else
-        grad_ex!(stmts, grads, ir[SSAValue(i)], i)
-      end
-    end
-    if isempty(succs)
-    elseif length(succs) == 1
-      push!(stmts, GotoNode(succs[1]))
-    else
-      phi = range(b)[1]
-      push!(stmts, GotoIfNot(Alpha(phi), succs[1]))
-      push!(stmts, GotoNode(succs[2]))
-    end
-    bi == length(ir.cfg.blocks) && push!(stmts, ReturnNode(grads[Argument(2)]))
-    push!(blocks, BasicBlock(StmtRange(st,length(stmts)), preds, succs))
+    bi == length(ir.forw.cfg.blocks) && push!(ir, ReturnNode(grads[Argument(2)]))
+    block!(ir)
   end
-  rev = IRCode(ir, stmts, Any[Any for _ in stmts], [-1 for _ in stmts], CFG(blocks), NI.NewNode[])
-  return rev
+  return IRCode(ir)
 end
 
 function grad_ir(ir)
   validcfg(ir) || error("Multiple return not supported")
-  forw = record_branches!(ir)
-  back = reverse_ir(forw)
+  forw, xs = record!(record_branches!(ir))
+  back = reverse_ir(forw, xs)
   return forw, back
 end
