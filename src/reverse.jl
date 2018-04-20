@@ -101,16 +101,30 @@ end
 IRCode(ir::ReverseIR) =
   IRCode(ir.forw, ir.stmts, Any[Any for _ in ir.stmts], [-1 for _ in ir.stmts], CFG(ir.blocks), NI.NewNode[])
 
+function grad!(ir::ReverseIR, grads, i)
+  ex = ir.forw.stmts[i]
+  (isexpr(ex, :call) && ex.args[1] == x∇) || return
+  Δ = grads[SSAValue(i+1)]
+  J = Alpha(i+2)
+  push!(ir, Expr(:call, J, Δ))
+  Δ = SSAValue(length(ir.stmts))
+  for (i, x) in enumerate(ex.args[3:end])
+    haskey(grads, x) || continue
+    push!(ir, xgetindex(Δ, i))
+    push!(ir, xaccum!(grads[x], SSAValue(length(ir.stmts))))
+  end
+end
+
 function reverse_ir(ir::IRCode, xs)
   ir, grads = ReverseIR(ir), Dict()
   push!(ir, :(Δ()))
-  # TODO: put these in the right block
-  for x in xs
+  for x in xs # TODO: put these in the right block
     push!(ir, Expr(:call, GlobalRef(Zygote, :grad), alpha(x)))
     grads[x] = SSAValue(length(ir.stmts))
   end
   for (bi, b) in enumerate(ir.forw.cfg.blocks[ir.perm])
     for i in reverse(range(b))
+      grad!(ir, grads, i)
     end
     bi == length(ir.forw.cfg.blocks) && push!(ir, ReturnNode(grads[Argument(2)]))
     block!(ir)
