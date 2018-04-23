@@ -1,26 +1,29 @@
-using NotInferenceDontLookHere
-import NotInferenceDontLookHere: IRCode, CFG, BasicBlock, Argument, ReturnNode,
+import Core: SSAValue, GotoNode, Compiler
+import Core.Compiler: IRCode, CFG, BasicBlock, Argument, ReturnNode,
+  NullLineInfo, just_construct_ssa, compact!, NewNode,
   GotoIfNot, PhiNode, StmtRange, IncrementalCompact, insert_node!, insert_node_here!,
   compact!, finish, DomTree, construct_domtree, dominates, userefs
 using InteractiveUtils: typesof
-using Core: SSAValue, GotoNode
 
 for T in [:IRCode, :IncrementalCompact]
   @eval begin
-    Base.getindex(ir::$T, x) = NI.getindex(ir, x)
-    Base.setindex!(ir::$T, x, i) = NI.setindex!(ir, x, i)
+    Base.getindex(ir::$T, x) = Compiler.getindex(ir, x)
+    Base.setindex!(ir::$T, x, i) = Compiler.setindex!(ir, x, i)
   end
 end
-Base.getindex(u::NI.UseRef) = NI.getindex(u)
+Base.getindex(u::Compiler.UseRef) = Compiler.getindex(u)
 Base.getindex(r::StmtRange, i) = (r.first:r.last)[i]
 
 for T in :[UseRefIterator, IncrementalCompact, Pair].args
   @eval begin
-    Base.start(x::NI.$T) = NI.start(x)
-    Base.next(x::NI.$T, st) = NI.next(x, st)
-    Base.done(x::NI.$T, st) = NI.done(x, st)
+    Base.start(x::Compiler.$T) = Compiler.start(x)
+    Base.next(x::Compiler.$T, st) = Compiler.next(x, st)
+    Base.done(x::Compiler.$T, st) = Compiler.done(x, st)
   end
 end
+
+@eval Core.Compiler import Base: Base, Sys
+@eval Core.Compiler include($(joinpath(Sys.BINDIR, "../../base/compiler/ssair/show.jl")))
 
 PhiNode(x, y) = PhiNode(Any[x...], Any[y...])
 
@@ -53,7 +56,7 @@ end
 
 function code_ir(f, T)
   ci = code_typed(f, T, optimize=false)[1][1]
-  ssa = compact!(NI.just_construct_ssa(ci, copy(ci.code), length(T.parameters), [NI.NullLineInfo]))
+  ssa = compact!(just_construct_ssa(ci, copy(ci.code), length(T.parameters), [NullLineInfo]))
 end
 
 function code_irm(ex)
@@ -72,6 +75,8 @@ function blockidx(ir, i::Integer)
 end
 
 blockidx(ir, i::SSAValue) = blockidx(ir, i.id)
+
+Base.range(b::BasicBlock) = b.stmts.first:b.stmts.last
 
 # Dominance frontiers
 
