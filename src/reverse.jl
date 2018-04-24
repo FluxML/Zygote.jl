@@ -77,9 +77,10 @@ struct ReverseIR
   perm::Vector{Int}
   stmts::Vector{Any}
   blocks::Vector{BasicBlock}
+  uses::Dict{Any,Any}
 end
 
-ReverseIR(ir::IRCode) = ReverseIR(ir, reverse_order(ir.cfg), [], [])
+ReverseIR(ir::IRCode) = ReverseIR(ir, reverse_order(ir.cfg), [], [], usages(ir))
 
 Base.push!(ir::ReverseIR, x) = push!(ir.stmts, x)
 
@@ -102,17 +103,37 @@ IRCode(ir::ReverseIR) =
   IRCode(ir.forw, ir.stmts, Any[Any for _ in ir.stmts], [-1 for _ in ir.stmts],
          [0x00 for _ in ir.stmts], CFG(ir.blocks), NewNode[])
 
+function dominates(ir::ReverseIR, def, use)
+  bdef, buse = blockidx.(ir.forw, (def, use))
+  bdef == buse && return def.id < use.id
+  error("bdef = $bdef, buse = $buse")
+end
+
+dominates(ir::ReverseIR, def::Argument, use) = true
+
+function xaccum_(ir::ReverseIR, grads, x, Δ)
+  if length(ir.uses[x]) == 1 && dominates(ir, x, ir.uses[x][1])
+    ir.stmts[grads[x].id] = nothing
+    grads[x] = Δ
+  else
+    push!(ir, xaccum!(grads[x], Δ))
+  end
+end
+
 function grad!(ir::ReverseIR, grads, i)
   ex = ir.forw.stmts[i]
-  (isexpr(ex, :call) && ex.args[1] == x∇) || return
-  Δ = grads[SSAValue(i+1)]
-  J = Alpha(i+2)
-  push!(ir, Expr(:call, J, Δ))
-  Δ = SSAValue(length(ir.stmts))
-  for (i, x) in enumerate(ex.args[3:end])
-    haskey(grads, x) || continue
-    push!(ir, xgetindex(Δ, i))
-    push!(ir, xaccum!(grads[x], SSAValue(length(ir.stmts))))
+  if ex isa ReturnNode
+    xaccum_(ir, grads, ex.val, SSAValue(1))
+  elseif isexpr(ex, :call) && ex.args[1] == x∇
+    Δ = grads[SSAValue(i+1)]
+    J = Alpha(i+2)
+    push!(ir, Expr(:call, J, Δ))
+    Δ = SSAValue(length(ir.stmts))
+    for (i, x) in enumerate(ex.args[3:end])
+      haskey(grads, x) || continue
+      push!(ir, xgetindex(Δ, i))
+      xaccum_(ir, grads, x, SSAValue(length(ir.stmts)))
+    end
   end
 end
 
@@ -137,5 +158,5 @@ function grad_ir(ir)
   validcfg(ir) || error("Multiple return not supported")
   forw, xs = record!(record_branches!(ir))
   back = reverse_ir(forw, xs)
-  return forw, back
+  return forw, compact!(back)
 end

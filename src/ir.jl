@@ -46,10 +46,10 @@ rename(x, m) = x
 rename(x::SSAValue, m) = m[x.id]
 rename(xs::AbstractVector, m) = map(x -> rename(x, m), xs)
 
-function usages(ir, xs)
-  us = Dict(x => [] for x in xs)
+function usages(ir)
+  us = Dict()
   for i = 1:length(ir.stmts), u in userefs(ir.stmts[i])
-    u[] ∈ xs && push!(us[u[]], SSAValue(i))
+    push!(get!(us, u[], []), SSAValue(i))
   end
   return us
 end
