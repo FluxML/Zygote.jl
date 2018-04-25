@@ -105,11 +105,13 @@ IRCode(ir::ReverseIR) =
 
 function dominates(ir::ReverseIR, def, use)
   bdef, buse = blockidx.(ir.forw, (def, use))
-  bdef == buse && return def.id < use.id
-  return false # TODO: block domination
+  bdef == buse && return def.id <= use.id
+  bdef, buse = ir.perm[[bdef, buse]]
+  dt = construct_domtree(reverse_cfg(ir.forw.cfg, ir.perm))
+  return dominates(dt, buse, bdef)
 end
 
-dominates(ir::ReverseIR, def::Argument, use) = true
+dominates(ir::ReverseIR, def::Argument, use) = dominates(ir, SSAValue(1), use)
 
 function xaccum_(ir::ReverseIR, grads, x, Δ)
   if length(ir.uses[x]) == 1 && dominates(ir, x, ir.uses[x][1])
@@ -123,12 +125,13 @@ end
 function phis!(ir::ReverseIR, grads, bi)
   succs = ir.forw.cfg.blocks[bi].succs
   for s in succs
-    i = range(ir.forw.cfg.blocks[s])[1]
-    while (ex = ir.forw.stmts[i]) isa PhiNode
-      @assert length(succs) == 1
+    for i in range(ir.forw.cfg.blocks[s])
+      (ex = ir.forw.stmts[i]) isa PhiNode || break
+      haskey(grads, SSAValue(i)) || continue
       x = ex.values[findfirst(e -> e == bi, ex.edges)]
+      haskey(grads, x) || continue
+      @assert length(succs) == 1
       xaccum_(ir, grads, x, grads[SSAValue(i)])
-      i += 1
     end
   end
 end
