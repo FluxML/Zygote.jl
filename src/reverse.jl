@@ -106,7 +106,7 @@ IRCode(ir::ReverseIR) =
 function dominates(ir::ReverseIR, def, use)
   bdef, buse = blockidx.(ir.forw, (def, use))
   bdef == buse && return def.id < use.id
-  error("bdef = $bdef, buse = $buse")
+  return false # TODO: block domination
 end
 
 dominates(ir::ReverseIR, def::Argument, use) = true
@@ -117,6 +117,19 @@ function xaccum_(ir::ReverseIR, grads, x, Δ)
     grads[x] = Δ
   else
     push!(ir, xaccum!(grads[x], Δ))
+  end
+end
+
+function phis!(ir::ReverseIR, grads, bi)
+  succs = ir.forw.cfg.blocks[bi].succs
+  for s in succs
+    i = range(ir.forw.cfg.blocks[s])[1]
+    while (ex = ir.forw.stmts[i]) isa PhiNode
+      @assert length(succs) == 1
+      x = ex.values[findfirst(e -> e == bi, ex.edges)]
+      xaccum_(ir, grads, x, grads[SSAValue(i)])
+      i += 1
+    end
   end
 end
 
@@ -145,6 +158,7 @@ function reverse_ir(ir::IRCode, xs)
     grads[x] = SSAValue(length(ir.stmts))
   end
   for (bi, b) in enumerate(ir.forw.cfg.blocks[ir.perm])
+    phis!(ir, grads, invperm(ir.perm)[bi])
     for i in reverse(range(b))
       grad!(ir, grads, i)
     end
