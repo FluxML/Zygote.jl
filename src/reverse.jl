@@ -168,12 +168,18 @@ function reverse_ir(ir::IRCode, xs)
     bi == length(ir.forw.cfg.blocks) && push!(ir, ReturnNode(grads[Argument(2)]))
     block!(ir)
   end
-  return IRCode(ir)
+  return IRCode(ir), ir.perm
+end
+
+struct Adjoint
+  forw::IRCode
+  back::IRCode
+  perm::Vector{Int}
 end
 
 function grad_ir(ir)
   validcfg(ir) || error("Multiple return not supported")
   forw, xs = record!(record_branches!(ir))
-  back = reverse_ir(forw, xs)
-  return forw, compact!(back)
+  back, perm = reverse_ir(forw, xs)
+  return Adjoint(forw, compact!(back), perm)
 end
