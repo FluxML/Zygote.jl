@@ -5,13 +5,13 @@ import Core.Compiler: IRCode, CFG, BasicBlock, Argument, ReturnNode,
   compact!, finish, DomTree, construct_domtree, dominates, userefs
 using InteractiveUtils: typesof
 
-for T in [:IRCode, :IncrementalCompact]
+for T in [:IRCode, :IncrementalCompact, :(Compiler.UseRef)]
   @eval begin
-    Base.getindex(ir::$T, x) = Compiler.getindex(ir, x)
-    Base.setindex!(ir::$T, x, i) = Compiler.setindex!(ir, x, i)
+    Base.getindex(ir::$T, a...) = Compiler.getindex(ir, a...)
+    Base.setindex!(ir::$T, a...) = Compiler.setindex!(ir, a...)
   end
 end
-Base.getindex(u::Compiler.UseRef) = Compiler.getindex(u)
+
 Base.getindex(r::StmtRange, i) = (r.first:r.last)[i]
 
 for T in :[UseRefIterator, IncrementalCompact, Pair].args
