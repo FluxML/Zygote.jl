@@ -38,6 +38,7 @@ function reachable(ir)
     i = popfirst!(stack)
     i ∈ seen && continue
     push!(seen, i)
+    i isa SSAValue || continue
     for x in userefs(ir[i])
       x[] isa SSAValue && push!(stack, x[])
       x[] isa Argument && x[] ∉ seen && push!(seen, x[])

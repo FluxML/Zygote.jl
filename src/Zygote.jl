@@ -2,13 +2,13 @@ module Zygote
 
 using Base.Meta
 
+export ∇
+
 include("ir.jl")
-include("reverse.jl")
 include("interpret.jl")
 
-macro code_grad(ex)
-  :(grad_ir($(code_irm(ex))))
-end
+include("reverse.jl")
 include("emit.jl")
+include("interface.jl")
 
 end # module

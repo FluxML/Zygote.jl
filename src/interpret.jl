@@ -11,7 +11,7 @@ assign!(i::Interpreter, x) = (i.locals[SSAValue(i.pc)] = lookup(i, x))
 
 lookup(i::Interpreter, x) = x
 lookup(i::Interpreter, x::GlobalRef) = getfield(x.mod, x.name)
-lookup(i::Interpreter, x::Argument) = i.args[x.n-1]
+lookup(i::Interpreter, x::Argument) = i.args[x.n]
 lookup(i::Interpreter, x::SSAValue) = i.locals[x]
 
 function phis!(i::Interpreter, blk)

@@ -1,5 +1,11 @@
 using Zygote
 using Base.Test
 
-# write your own tests here
-@test 1 == 2
+@testset "Zygote" begin
+
+y, J = ∇(identity, 1)
+dy = J(2)
+@test y == 1
+@test dy == 2
+
+end
