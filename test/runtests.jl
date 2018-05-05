@@ -6,6 +6,6 @@ using Base.Test
 y, J = ∇(identity, 1)
 dy = J(2)
 @test y == 1
-@test dy == 2
+@test dy == (2,)
 
 end

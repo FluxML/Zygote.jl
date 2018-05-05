@@ -154,8 +154,8 @@ function grad!(ir::ReverseIR, grads, i)
   end
 end
 
-function reverse_ir(ir::IRCode, xs)
-  ir, grads = ReverseIR(ir), Dict()
+function reverse_ir(forw::IRCode, xs)
+  ir, grads = ReverseIR(forw), Dict()
   push!(ir, :(Δ()))
   for x in xs # TODO: put these in the right block
     push!(ir, Expr(:call, GlobalRef(Zygote, :grad), alpha(x)))
@@ -166,7 +166,10 @@ function reverse_ir(ir::IRCode, xs)
     for i in reverse(range(b))
       grad!(ir, grads, i)
     end
-    bi == length(ir.forw.cfg.blocks) && push!(ir, ReturnNode(grads[Argument(2)]))
+    if bi == length(ir.forw.cfg.blocks)
+      push!(ir, xtuple(getindex.((grads,), [Argument(i) for i = 2:length(forw.argtypes)])...))
+      push!(ir, ReturnNode(SSAValue(length(ir.stmts))))
+    end
     block!(ir)
   end
   return IRCode(ir), ir.perm
