@@ -1,3 +1,8 @@
+using Base: RefValue
+
+grad(x) = Ref(zero(x))
+accum!(r::RefValue, x) = r.x += x
+
 macro code_grad(ex)
   :(grad_ir($(code_irm(ex))))
 end

@@ -11,6 +11,8 @@ xcall(f::Symbol, args...) = xcall(Base, f, args...)
 xstack(T) = xcall(:getindex, T)
 xtuple(xs...) = xcall(:tuple, xs...)
 
+afterphi(ir, loc) = ir.stmts[loc] isa PhiNode ? afterphi(ir, loc+1) : loc
+
 function forward_stacks!(adj)
   stks, recs = [], []
   for fb = 1:length(adj.perm)
@@ -18,7 +20,8 @@ function forward_stacks!(adj)
       stk = insert_node!(adj.forw, 1, Any, xstack(Any))
       push!(stks, (adj.perm[fb], alpha(α)))
       push!(recs, stk)
-      insert_node!(adj.forw, α.id+1, Any, xcall(:push!, stk, α), true)
+      loc = afterphi(adj.forw, α.id+1)
+      insert_node!(adj.forw, loc, Any, xcall(:push!, stk, α), true)
     end
   end
   args = [Argument(i) for i = 1:length(adj.forw.argtypes)]
