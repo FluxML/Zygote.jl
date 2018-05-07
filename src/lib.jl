@@ -5,6 +5,8 @@
 ∇(::typeof(+), a, b) = (a+b, Δ -> (Δ, Δ))
 ∇(::typeof(*), a, b) = (a*b, Δ -> (Δ*b', a'*Δ))
 
+∇(::typeof(getindex), xs::NTuple{N}, i::Integer) where N =
+  (xs[i], Δ -> (ntuple(j -> i == j ? Δ : nothing, Val{N}), nothing))
 
 #                        .-'''-.                               _..._
 #                       '   _    \         _______          .-'_..._''.
