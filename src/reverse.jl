@@ -117,7 +117,8 @@ dominates(ir::ReverseIR, def::Argument, use) = dominates(ir, SSAValue(1), use)
 function xaccum_(ir::ReverseIR, grads, x, Δ)
   if length(ir.uses[x]) == 1 && dominates(ir, x, ir.uses[x][1])
     ir.stmts[grads[x].id] = nothing
-    grads[x] = Δ
+    push!(ir, xcall(:Ref, Δ))
+    grads[x] = SSAValue(length(ir.stmts))
   else
     push!(ir, xaccum!(grads[x], Δ))
   end
@@ -143,6 +144,9 @@ function grad!(ir::ReverseIR, grads, i)
     xaccum_(ir, grads, ex.val, SSAValue(1))
   elseif isexpr(ex, :call) && ex.args[1] == x∇
     Δ = grads[SSAValue(i+1)]
+    push!(ir, Expr(:call, GlobalRef(Zygote, :deref), Δ))
+    push!(ir, Expr(:call, GlobalRef(Zygote, :zero!), Δ))
+    Δ = SSAValue(length(ir.stmts)-1)
     J = Alpha(i+2)
     push!(ir, Expr(:call, J, Δ))
     Δ = SSAValue(length(ir.stmts))
@@ -167,7 +171,16 @@ function reverse_ir(forw::IRCode, xs)
       grad!(ir, grads, i)
     end
     if bi == length(ir.forw.cfg.blocks)
-      push!(ir, xtuple(getindex.((grads,), [Argument(i) for i = 2:length(forw.argtypes)])...))
+      gs = []
+      for i = 2:length(forw.argtypes)
+        g = get(grads, Argument(i), nothing)
+        if g != nothing
+          push!(ir, Expr(:call, GlobalRef(Zygote, :deref), g))
+          push!(gs, SSAValue(length(ir.stmts)))
+        else push!(gs, g)
+        end
+      end
+      push!(ir, xtuple(gs...))
       push!(ir, ReturnNode(SSAValue(length(ir.stmts))))
     end
     block!(ir)

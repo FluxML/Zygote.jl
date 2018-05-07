@@ -25,7 +25,7 @@ dx = J(4)
 y, J = ∇(f, 3)
 dx = J(4)
 @test y == 6
-@test getindex.(dx) == (8,)
+dx == (8,)
 
 bool = false
 
@@ -38,5 +38,15 @@ y, J = ∇(broadcast, *, [1,2,3], [4,5,6])
 dxs = J([1,1,1])
 @test y == [4, 10, 18]
 @test dxs == ([4, 5, 6], [1, 2, 3])
+
+function pow(x, n)
+  r = 1
+  for _ = 1:n
+    r *= x
+  end
+  return r
+end
+
+@test gradient(pow, 2, 3) == (12, nothing)
 
 end
