@@ -1,5 +1,5 @@
-using Zygote
-using Base.Test
+using Zygote, Base.Test
+using Zygote: gradient
 
 bool = true
 function f(x)
@@ -19,6 +19,8 @@ y, J = ∇(mul, 2, 3)
 dx = J(4)
 @test y == 6
 @test dx == (12, 8)
+
+@test gradient(mul, 2, 3) == (3, 2)
 
 y, J = ∇(f, 3)
 dx = J(4)

@@ -15,3 +15,5 @@ function ∇(f, args...)
     interpret(back, J, Δ)
   end
 end
+
+gradient(f, args...) = ∇(f, args...)[2](1)
