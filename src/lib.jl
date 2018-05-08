@@ -47,6 +47,6 @@ function ∇(::typeof(broadcast), f, args::Vararg{Any,N}) where N
   out = broadcast(f, dargs...)
   (x -> x.value).(out), function (Δ)
     Δxs = ntuple(i -> getpartial.(Δ, out, i), Val{N})
-    unbroadcast.(args, Δxs)
+    (nothing, unbroadcast.(args, Δxs)...)
   end
 end
