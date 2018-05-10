@@ -1,3 +1,17 @@
+using Base: RefValue
+
+deref(x) = x
+deref(x::RefValue) = x[]
+gradref(x) = RefValue(grad(x))
+
+accum!(r::RefValue, x) = (r.x = accum(r.x, deref(x)))
+
+function backprop(J, Δx::RefValue)
+  Δy = J(Δx.x)
+  Δx.x = grad(Δx.x)
+  return Δy
+end
+
 struct Alpha
   id::Int
 end

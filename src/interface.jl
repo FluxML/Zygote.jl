@@ -1,29 +1,15 @@
-using Base: RefValue
-
 grad(x::Real) = zero(x)
 grad(x::Integer) = zero(float(x))
 grad(x::Tuple) = grad.(x)
 
 grad(x) = nothing
 
-deref(x) = x
-deref(x::RefValue) = x[]
-gradref(x) = RefValue(grad(x))
-
 accum(x, y) = x + y
 accum(x, ::Void) = x
 accum(::Void, _) = nothing
 accum(x::Tuple, y::Tuple) = accum.(x, y)
 
-accum!(r::RefValue, x) = (r.x = accum(r.x, deref(x)))
-
 backprop(J, Δx) = J(Δx)
-
-function backprop(J, Δx::RefValue)
-  Δy = J(Δx.x)
-  Δx.x = grad(Δx.x)
-  return Δy
-end
 
 macro code_grad(ex)
   :(grad_ir($(code_irm(ex))))
