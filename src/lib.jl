@@ -8,6 +8,15 @@
 ∇(::typeof(getindex), xs::NTuple{N}, i::Integer) where N =
   (xs[i], Δ -> (ntuple(j -> i == j ? Δ : nothing, Val{N}), nothing))
 
+# Non-numeric
+
+@generated nt_nothing(x) = Expr(:tuple, [:($f=nothing) for f in fieldnames(x)]...)
+
+@generated pair(::Val{k}, v) where k = :($k = v,)
+
+@inline ∇(::typeof(Base.getfield), x, f::Symbol) =
+  getfield(x, f), Δ -> ((;nt_nothing(x)...,pair(Val{f}(), Δ)...), nothing)
+
 #                        .-'''-.                               _..._
 #                       '   _    \         _______          .-'_..._''.
 #  /|                 /   /` '.   \        \  ___ `'.     .' .'      '.\

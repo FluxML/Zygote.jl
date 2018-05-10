@@ -53,4 +53,6 @@ end
 
 @test gradient(t -> t[1]*t[2], (2, 3)) == ((3, 2),)
 
+@test gradient(x -> x.re, 2+3im) == ((re = 1, im = nothing),)
+
 end
