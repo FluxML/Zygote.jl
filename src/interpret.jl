@@ -10,6 +10,7 @@ blockidx(i::Interpreter) = blockidx(i.ir, i.pc)
 assign!(i::Interpreter, x) = (i.locals[SSAValue(i.pc)] = lookup(i, x))
 
 lookup(i::Interpreter, x) = x
+lookup(i::Interpreter, x::QuoteNode) = x.value
 lookup(i::Interpreter, x::GlobalRef) = getfield(x.mod, x.name)
 lookup(i::Interpreter, x::Argument) = i.args[x.n]
 lookup(i::Interpreter, x::SSAValue) = i.locals[x]
