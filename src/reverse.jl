@@ -153,7 +153,7 @@ end
 
 function grad!(ir::ReverseIR, grads, i)
   ex = ir.forw.stmts[i]
-  if ex isa ReturnNode
+  if ex isa ReturnNode && (ex.val isa SSAValue || ex.val isa Argument)
     xaccum_(ir, grads, ex.val, SSAValue(1))
   elseif isexpr(ex, :call) && ex.args[1] == x∇
     Δ = grads[SSAValue(i+1)]

@@ -49,8 +49,8 @@ end
 
 @test gradient(pow, 2, 3) == (12, nothing)
 
-f(t) = t[1]*t[2]
+@test gradient(x -> 1, 2) == (nothing,)
 
-@test gradient(f, (2,3)) == ((3, 2),)
+@test gradient(t -> t[1]*t[2], (2, 3)) == ((3, 2),)
 
 end
