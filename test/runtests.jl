@@ -55,4 +55,6 @@ end
 
 @test gradient(x -> x.re, 2+3im) == ((re = 1, im = nothing),)
 
+@test gradient(x -> x.re*x.im, 2+3im) == ((re = 3, im = 2),)
+
 end

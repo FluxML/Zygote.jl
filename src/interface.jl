@@ -2,12 +2,20 @@ grad(x::Real) = zero(x)
 grad(x::Integer) = zero(float(x))
 grad(x::Tuple) = grad.(x)
 
-grad(x) = nothing
+@generated function grad(x)
+  (x.mutable || nfields(x) == 0) && return
+  Expr(:tuple, [:($f = grad(x.$f)) for f in fieldnames(x)]...)
+end
 
 accum(x, y) = x + y
 accum(x, ::Void) = x
 accum(::Void, _) = nothing
 accum(x::Tuple, y::Tuple) = accum.(x, y)
+
+@generated function accum(x::NamedTuple, y::NamedTuple)
+  grad(x) = x in fieldnames(y) ? :(y.$x) : :nothing
+  Expr(:tuple, [:($f=accum(x.$f, $(grad(f)))) for f in fieldnames(x)]...)
+end
 
 backprop(J, Δx) = J(Δx)
 
