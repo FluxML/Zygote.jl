@@ -4,11 +4,11 @@ using MacroTools
 
 export forward, @code_grad
 
-include("ir.jl")
-include("interpret.jl")
+include("compiler/ir.jl")
+include("compiler/interpret.jl")
+include("compiler/reverse.jl")
+include("compiler/emit.jl")
 
-include("reverse.jl")
-include("emit.jl")
 include("interface.jl")
 
 include("lib.jl")
