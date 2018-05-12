@@ -65,13 +65,13 @@ function f(a, b)
   c.a * c.b
 end
 
-gradient(f, 2, 3) == (3, 2)
+@test gradient(f, 2, 3) == (3, 2)
 
 function f(x, y)
   f = z -> x * z
   f(y)
 end
 
-gradient(f, 2, 3) == (3, 2)
+@test gradient(f, 2, 3) == (3, 2)
 
 end
