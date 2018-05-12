@@ -64,11 +64,16 @@ end
 function record!(ir::IRCode)
   xs = reachable(ir)
   for i = 1:length(ir.stmts)
+    SSAValue(i) ∈ xs || continue
     ex = ir[SSAValue(i)]
-    (SSAValue(i) ∈ xs && isexpr(ex, :call)) || continue
-    yJ = insert_node!(ir, i, Any, Expr(:call, x∇, ex.args...))
-    ir[SSAValue(i)] = xgetindex(yJ, 1)
-    insert_node!(ir, i+1, Any, xgetindex(yJ, 2), true)
+    isexpr(ex, :new) && (ex = ir[SSAValue(i)] = xcall(Zygote, :__new__, ex.args...))
+    if isexpr(ex, :call)
+      yJ = insert_node!(ir, i, Any, Expr(:call, x∇, ex.args...))
+      ir[SSAValue(i)] = xgetindex(yJ, 1)
+      insert_node!(ir, i+1, Any, xgetindex(yJ, 2), true)
+    elseif ex isa PhiNode
+    else error("Unrecognised $(ex.head) expr")
+    end
   end
   ir, map = _compact!(ir)
   return ir, rename(xs, map)

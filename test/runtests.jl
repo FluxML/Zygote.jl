@@ -7,6 +7,9 @@ function f(x)
   return y
 end
 
+# TODO: use Complex when static params work in the interpreter
+struct Foo a; b end
+
 @testset "Zygote" begin
 
 y, J = ∇(identity, 1)
@@ -56,5 +59,12 @@ end
 @test gradient(x -> x.re, 2+3im) == ((re = 1, im = nothing),)
 
 @test gradient(x -> x.re*x.im, 2+3im) == ((re = 3, im = 2),)
+
+function f(a, b)
+  c = Foo(a, b)
+  c.a * c.b
+end
+
+gradient(f, 2, 3) == (3, 2)
 
 end

@@ -17,6 +17,21 @@
 @inline ∇(::typeof(Base.getfield), x, f::Symbol) =
   getfield(x, f), Δ -> ((;nt_nothing(x)...,pair(Val{f}(), Δ)...), nothing)
 
+@generated function __new__(T, args...)
+  quote
+    Base.@_inline_meta
+    $(Expr(:new, :T, [:(args[$i]) for i = 1:length(args)]...))
+  end
+end
+
+struct Jnew{T} end
+
+∇(::typeof(__new__), T, args...) = __new__(T, args...), Jnew{T}()
+
+@generated function (::Jnew{T})(Δ) where T
+  Expr(:tuple, nothing, map(f -> :(Δ.$f), fieldnames(T))...)
+end
+
 #                        .-'''-.                               _..._
 #                       '   _    \         _______          .-'_..._''.
 #  /|                 /   /` '.   \        \  ___ `'.     .' .'      '.\
