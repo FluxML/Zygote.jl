@@ -1,6 +1,6 @@
 module Zygote
 
-using Base.Meta
+using MacroTools
 
 export forward, @code_grad
 

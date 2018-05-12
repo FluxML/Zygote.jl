@@ -1,20 +1,20 @@
 # TODO: DiffRules
-_forward(::typeof(sin), x) = (sin(x), Δ -> (cos(x)*Δ,))
-_forward(::typeof(cos), x) = (cos(x), Δ -> (-sin(x)*Δ,))
+@grad sin(x) = sin(x), Δ -> (cos(x)*Δ,)
+@grad cos(x) = cos(x), Δ -> (-sin(x)*Δ,)
 
-_forward(::typeof(+), a, b) = (a+b, Δ -> (Δ, Δ))
-_forward(::typeof(*), a, b) = (a*b, Δ -> (Δ*b', a'*Δ))
+@grad a + b = a+b, Δ -> (Δ, Δ)
+@grad a * b = a*b, Δ -> (Δ*b', a'*Δ)
 
-_forward(::typeof(getindex), xs::NTuple{N}, i::Integer) where N =
+@grad getindex(xs::NTuple{N}, i::Integer) where N =
   (xs[i], Δ -> (ntuple(j -> i == j ? Δ : nothing, Val{N}), nothing))
 
-# Non-numeric
+# Structs
 
 @generated nt_nothing(x) = Expr(:tuple, [:($f=nothing) for f in fieldnames(x)]...)
 
 @generated pair(::Val{k}, v) where k = :($k = v,)
 
-@inline _forward(::typeof(Base.getfield), x, f::Symbol) =
+@grad Base.getfield(x, f::Symbol) =
   getfield(x, f), Δ -> ((;nt_nothing(x)...,pair(Val{f}(), Δ)...), nothing)
 
 @generated function __new__(T, args...)
@@ -26,7 +26,7 @@ end
 
 struct Jnew{T} end
 
-_forward(::typeof(__new__), T, args...) = __new__(T, args...), Jnew{T}()
+@grad __new__(T, args...) = __new__(T, args...), Jnew{T}()
 
 @generated function (::Jnew{T})(Δ) where T
   Expr(:tuple, nothing, map(f -> :(Δ.$f), fieldnames(T))...)
@@ -65,7 +65,7 @@ function getpartial(Δ, x, i)
   return Δ * p
 end
 
-function _forward(::typeof(broadcast), f, args::Vararg{Any,N}) where N
+@grad function broadcast(f, args::Vararg{Any,N}) where N
   dargs = map((x,i) -> dualify(x, ntuple(j -> i==j, Val{N})),
               args, ntuple(identity, Val{N}))
   out = broadcast(f, dargs...)

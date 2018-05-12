@@ -17,6 +17,15 @@ accum(x::Tuple, y::Tuple) = accum.(x, y)
   Expr(:tuple, [:($f=accum(x.$f, $(grad(f)))) for f in fieldnames(x)]...)
 end
 
+using MacroTools: combinedef
+
+macro grad(ex)
+  def = splitdef(ex)
+  pushfirst!(def[:args], :(::typeof($(def[:name]))))
+  def[:name] = :_forward
+  combinedef(def)
+end
+
 backprop(J, Δx) = J(Δx)
 
 macro code_grad(ex)
