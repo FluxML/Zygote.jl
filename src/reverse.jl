@@ -163,7 +163,7 @@ function grad!(ir::ReverseIR, grads, i)
     J = Alpha(i+2)
     push!(ir, Expr(:call, GlobalRef(Zygote, :backprop), J, Δ))
     Δ = SSAValue(length(ir.stmts))
-    for (i, x) in enumerate(ex.args[3:end])
+    for (i, x) in enumerate(ex.args[2:end])
       haskey(grads, x) || continue
       push!(ir, xgetindex(Δ, i))
       xaccum_(ir, grads, x, SSAValue(length(ir.stmts)))
@@ -185,7 +185,7 @@ function reverse_ir(forw::IRCode, xs)
     end
     if bi == length(ir.forw.cfg.blocks)
       gs = []
-      for i = 2:length(forw.argtypes)
+      for i = 1:length(forw.argtypes)
         haskey(grads, Argument(i)) || (push!(gs, nothing); continue)
         push!(ir, Expr(:call, GlobalRef(Zygote, :deref), grads[Argument(i)]))
         push!(gs, SSAValue(length(ir.stmts)))

@@ -23,6 +23,11 @@ macro grad(ex)
   def = splitdef(ex)
   pushfirst!(def[:args], :(::typeof($(def[:name]))))
   def[:name] = :_forward
+  def[:body] = quote
+    Base.@_inline_meta
+    y, back = $(def[:body])
+    y, Δ -> (Base.@_inline_meta; (nothing, back(Δ)::Tuple...))
+  end
   combinedef(def)
 end
 
@@ -44,6 +49,9 @@ function _forward(f, args...)
   end
 end
 
-forward(f, args...) = _forward(f, args...)
+function forward(f, args...)
+  y, back = _forward(f, args...)
+  y, Δ -> Base.tail(back(Δ))
+end
 
 gradient(f, args...) = forward(f, args...)[2](1)
