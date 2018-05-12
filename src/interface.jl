@@ -25,7 +25,7 @@ end
 
 isprimitive(f) = f isa Core.Builtin || f isa Core.IntrinsicFunction
 
-function ∇(f, args...)
+function _forward(f, args...)
   isprimitive(f) && return (f(args...), Δ -> map(_ -> nothing, args))
   ir = code_ir(f, typesof(args...))
   forw, back = stacks!(grad_ir(ir))
@@ -35,4 +35,6 @@ function ∇(f, args...)
   end
 end
 
-gradient(f, args...) = ∇(f, args...)[2](1)
+forward(f, args...) = _forward(f, args...)
+
+gradient(f, args...) = forward(f, args...)[2](1)

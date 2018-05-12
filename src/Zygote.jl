@@ -2,7 +2,7 @@ module Zygote
 
 using Base.Meta
 
-export ∇, @code_grad
+export forward, @code_grad
 
 include("ir.jl")
 include("interpret.jl")

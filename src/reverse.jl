@@ -25,8 +25,6 @@ xgetindex(x, i...) = Expr(:call, GlobalRef(Base, :getindex), x, i...)
 
 xaccum!(x, Δ) = Expr(:call, GlobalRef(Zygote, :accum!), x, Δ)
 
-const x∇ = GlobalRef(Zygote, :∇)
-
 # TODO: merge return nodes
 validcfg(ir) =
   ir.stmts[end] isa ReturnNode &&
@@ -68,7 +66,7 @@ function record!(ir::IRCode)
     ex = ir[SSAValue(i)]
     isexpr(ex, :new) && (ex = ir[SSAValue(i)] = xcall(Zygote, :__new__, ex.args...))
     if isexpr(ex, :call)
-      yJ = insert_node!(ir, i, Any, Expr(:call, x∇, ex.args...))
+      yJ = insert_node!(ir, i, Any, xcall(Zygote, :_forward, ex.args...))
       ir[SSAValue(i)] = xgetindex(yJ, 1)
       insert_node!(ir, i+1, Any, xgetindex(yJ, 2), true)
     elseif ex isa PhiNode
@@ -160,7 +158,7 @@ function grad!(ir::ReverseIR, grads, i)
   ex = ir.forw.stmts[i]
   if ex isa ReturnNode && (ex.val isa SSAValue || ex.val isa Argument)
     xaccum_(ir, grads, ex.val, SSAValue(1))
-  elseif isexpr(ex, :call) && ex.args[1] == x∇
+  elseif isexpr(ex, :call) && ex.args[1] == GlobalRef(Zygote, :_forward)
     Δ = grads[SSAValue(i+1)]
     J = Alpha(i+2)
     push!(ir, Expr(:call, GlobalRef(Zygote, :backprop), J, Δ))
