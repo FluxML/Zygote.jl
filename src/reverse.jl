@@ -69,7 +69,7 @@ function record!(ir::IRCode)
       yJ = insert_node!(ir, i, Any, xcall(Zygote, :_forward, ex.args...))
       ir[SSAValue(i)] = xgetindex(yJ, 1)
       insert_node!(ir, i+1, Any, xgetindex(yJ, 2), true)
-    elseif ex isa PhiNode
+    elseif isexpr(ex, PhiNode, GlobalRef)
     else error("Unrecognised $(ex.head) expr")
     end
   end
