@@ -1,11 +1,11 @@
-grad(x::Real) = zero(x)
-grad(x::Integer) = zero(float(x))
-grad(x::Tuple) = grad.(x)
+# Interfaces
 
 @generated function grad(x)
   (x.mutable || nfields(x) == 0) && return
   Expr(:tuple, [:($f = grad(x.$f)) for f in fieldnames(x)]...)
 end
+
+grad(x::Tuple) = grad.(x)
 
 accum(x, y) = x + y
 accum(x, ::Void) = x
@@ -31,27 +31,31 @@ macro grad(ex)
   combinedef(def)
 end
 
-backprop(J, Δx) = J(Δx)
+# Tuples
 
-macro code_grad(ex)
-  :(grad_ir($(code_irm(ex))))
-end
+@grad getindex(xs::NTuple{N}, i::Integer) where N =
+  (xs[i], Δ -> (ntuple(j -> i == j ? Δ : nothing, Val{N}), nothing))
 
-isprimitive(f) = f isa Core.Builtin || f isa Core.IntrinsicFunction
+# Structs
 
-function _forward(f, args...)
-  isprimitive(f) && return (f(args...), Δ -> map(_ -> nothing, args))
-  ir = code_ir(f, typesof(args...))
-  forw, back = stacks!(grad_ir(ir))
-  y, J = interpret(forw, f, args...)
-  return y, function (Δ)
-    interpret(back, J, Δ)
+@generated nt_nothing(x) = Expr(:tuple, [:($f=nothing) for f in fieldnames(x)]...)
+
+@generated pair(::Val{k}, v) where k = :($k = v,)
+
+@grad Base.getfield(x, f::Symbol) =
+  getfield(x, f), Δ -> ((;nt_nothing(x)...,pair(Val{f}(), Δ)...), nothing)
+
+@generated function __new__(T, args...)
+  quote
+    Base.@_inline_meta
+    $(Expr(:new, :T, [:(args[$i]) for i = 1:length(args)]...))
   end
 end
 
-function forward(f, args...)
-  y, back = _forward(f, args...)
-  y, Δ -> Base.tail(back(Δ))
-end
+struct Jnew{T} end
 
-gradient(f, args...) = forward(f, args...)[2](1)
+@grad __new__(T, args...) = __new__(T, args...), Jnew{T}()
+
+@generated function (::Jnew{T})(Δ) where T
+  Expr(:tuple, nothing, map(f -> :(Δ.$f), fieldnames(T))...)
+end

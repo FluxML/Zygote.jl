@@ -8,9 +8,10 @@ include("compiler/ir.jl")
 include("compiler/interpret.jl")
 include("compiler/reverse.jl")
 include("compiler/emit.jl")
+include("compiler/interface.jl")
 
-include("interface.jl")
-
-include("lib.jl")
+include("lib/lib.jl")
+include("lib/real.jl")
+include("lib/array.jl")
 
 end # module

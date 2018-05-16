@@ -1,37 +1,3 @@
-# TODO: DiffRules
-@grad sin(x) = sin(x), Δ -> (cos(x)*Δ,)
-@grad cos(x) = cos(x), Δ -> (-sin(x)*Δ,)
-
-@grad a + b = a+b, Δ -> (Δ, Δ)
-@grad a * b = a*b, Δ -> (Δ*b', a'*Δ)
-
-@grad getindex(xs::NTuple{N}, i::Integer) where N =
-  (xs[i], Δ -> (ntuple(j -> i == j ? Δ : nothing, Val{N}), nothing))
-
-# Structs
-
-@generated nt_nothing(x) = Expr(:tuple, [:($f=nothing) for f in fieldnames(x)]...)
-
-@generated pair(::Val{k}, v) where k = :($k = v,)
-
-@grad Base.getfield(x, f::Symbol) =
-  getfield(x, f), Δ -> ((;nt_nothing(x)...,pair(Val{f}(), Δ)...), nothing)
-
-@generated function __new__(T, args...)
-  quote
-    Base.@_inline_meta
-    $(Expr(:new, :T, [:(args[$i]) for i = 1:length(args)]...))
-  end
-end
-
-struct Jnew{T} end
-
-@grad __new__(T, args...) = __new__(T, args...), Jnew{T}()
-
-@generated function (::Jnew{T})(Δ) where T
-  Expr(:tuple, nothing, map(f -> :(Δ.$f), fieldnames(T))...)
-end
-
 #                        .-'''-.                               _..._
 #                       '   _    \         _______          .-'_..._''.
 #  /|                 /   /` '.   \        \  ___ `'.     .' .'      '.\
