@@ -173,6 +173,8 @@ function grad!(ir::ReverseIR, grads, i)
   end
 end
 
+deref_tuple(xs...) = (deref.(xs)...,)
+
 function reverse_ir(forw::IRCode, xs)
   ir, grads = ReverseIR(forw), Dict()
   push!(ir, :(Δ()))
@@ -186,13 +188,8 @@ function reverse_ir(forw::IRCode, xs)
       grad!(ir, grads, i)
     end
     if bi == length(ir.forw.cfg.blocks)
-      gs = []
-      for i = 1:length(forw.argtypes)
-        haskey(grads, Argument(i)) || (push!(gs, nothing); continue)
-        push!(ir, Expr(:call, GlobalRef(Zygote, :deref), grads[Argument(i)]))
-        push!(gs, SSAValue(length(ir.stmts)))
-      end
-      push!(ir, xtuple(gs...))
+      gs = [get(grads, Argument(i), nothing) for i = 1:length(forw.argtypes)]
+      push!(ir, xcall(Zygote, :deref_tuple, gs...))
       push!(ir, ReturnNode(SSAValue(length(ir.stmts))))
     end
     block!(ir)
