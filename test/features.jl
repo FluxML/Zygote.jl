@@ -64,6 +64,13 @@ end
 
 @test gradient(f, 2, 3) == (3, 2)
 
+function f(a, b)
+  c = (a, b)
+  c[1] * c[2]
+end
+
+@test gradient(f, 2, 3) == (3, 2)
+
 function f(x, y)
   f = z -> x * z
   f(y)
