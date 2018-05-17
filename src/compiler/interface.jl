@@ -19,4 +19,8 @@ function forward(f, args...)
   y, Δ -> Base.tail(back(Δ))
 end
 
-gradient(f, args...) = forward(f, args...)[2](1)
+function gradient(f, args...)
+  y, J = forward(f, args...)
+  y isa Real || error("Function output is not scalar")
+  return J(1)
+end
