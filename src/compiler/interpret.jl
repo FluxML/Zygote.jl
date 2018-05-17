@@ -14,6 +14,7 @@ lookup(i::Interpreter, x::QuoteNode) = x.value
 lookup(i::Interpreter, x::GlobalRef) = getfield(x.mod, x.name)
 lookup(i::Interpreter, x::Argument) = i.args[x.n]
 lookup(i::Interpreter, x::SSAValue) = i.locals[x]
+lookup(i::Interpreter, x::Expr) = error("Can't lookup $(x.head) expr")
 
 function phis!(i::Interpreter, blk)
   while (phi = i.ir.stmts[i.pc]) isa PhiNode
@@ -40,6 +41,8 @@ function step!(i::Interpreter)
     i.pc += 1
   elseif isexpr(ex, GlobalRef)
     assign!(i, getfield(ex.mod, ex.name))
+    i.pc += 1
+  elseif isexpr(ex, :throw_undef_if_not)
     i.pc += 1
   else
     error("can't handle $ex")
