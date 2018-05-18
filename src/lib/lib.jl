@@ -33,7 +33,7 @@ end
 
 # Tuples
 
-@grad tuple(xs...) = xs, identity
+@grad tuple(xs...) = xs, Δ -> Δ == nothing ? map(_ -> nothing, xs) : Δ
 
 @grad getindex(xs::NTuple{N}, i::Integer) where N =
   (xs[i], Δ -> (ntuple(j -> i == j ? Δ : nothing, Val{N}), nothing))

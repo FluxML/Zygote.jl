@@ -1,3 +1,6 @@
+using Zygote, Base.Test
+using Zygote: gradient
+
 bool = true
 function f(x)
   y = bool ? 2x : x

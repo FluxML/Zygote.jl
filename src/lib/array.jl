@@ -1,3 +1,9 @@
+@grad a::AbstractVecOrMat * b::AbstractVecOrMat =
+  a * b, Δ -> (A_mul_Bt(Δ, b), At_mul_B(a, Δ))
+
+@grad sum(xs::AbstractArray, dim...) =
+  sum(xs, dim...), Δ -> (similar(xs) .= Δ, map(_->nothing, dim)...)
+
 #                        .-'''-.                               _..._
 #                       '   _    \         _______          .-'_..._''.
 #  /|                 /   /` '.   \        \  ___ `'.     .' .'      '.\
