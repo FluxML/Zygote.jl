@@ -56,7 +56,7 @@ end
 
 function code_ir(f, T)
   ci = code_typed(f, T, optimize=false)[1][1]
-  ssa = compact!(just_construct_ssa(ci, copy(ci.code), length(T.parameters), [NullLineInfo]))
+  ssa = compact!(just_construct_ssa(ci, copy(ci.code), Int(which(f, T).nargs)-1, [NullLineInfo]))
 end
 
 function code_irm(ex)

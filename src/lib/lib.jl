@@ -38,6 +38,24 @@ end
 @grad getindex(xs::NTuple{N}, i::Integer) where N =
   (xs[i], Δ -> (ntuple(j -> i == j ? Δ : nothing, Val{N}), nothing))
 
+# TODO faster version
+function unapply(xs, Δs)
+  Δs′ = []
+  for x in xs
+    push!(Δs′, Δs[1:length(x)])
+    Δs = Δs[length(x)+1:end]
+  end
+  return (Δs′...,)
+end
+
+@grad function Core._apply(f, args...)
+  y, J = Core._apply(_forward, (f,), args...)
+  y, function (Δ)
+    Δ = J(Δ)
+    (first(Δ), unapply(args, Base.tail(Δ))...)
+ end
+end
+
 # Structs
 
 @generated nt_nothing(x) = Expr(:tuple, [:($f=nothing) for f in fieldnames(x)]...)

@@ -173,9 +173,11 @@ function grad!(ir::ReverseIR, grads, i)
   end
 end
 
-deref_tuple(xs...) = (deref.(xs)...,)
+deref_tuple(xs...) = deref.(xs)
+@inline deref_tuple_va(xs) = deref(xs)
+@inline deref_tuple_va(x, xs...) = (deref(x), deref_tuple_va(xs...)...)
 
-function reverse_ir(forw::IRCode, xs)
+function reverse_ir(forw::IRCode, xs; varargs = false)
   ir, grads = ReverseIR(forw), Dict()
   push!(ir, :(Δ()))
   for x in xs # TODO: put these in the right block
@@ -189,7 +191,7 @@ function reverse_ir(forw::IRCode, xs)
     end
     if bi == length(ir.forw.cfg.blocks)
       gs = [get(grads, Argument(i), nothing) for i = 1:length(forw.argtypes)]
-      push!(ir, xcall(Zygote, :deref_tuple, gs...))
+      push!(ir, xcall(Zygote, varargs ? :deref_tuple_va : :deref_tuple, gs...))
       push!(ir, ReturnNode(SSAValue(length(ir.stmts))))
     end
     block!(ir)
@@ -203,9 +205,9 @@ struct Adjoint
   perm::Vector{Int}
 end
 
-function grad_ir(ir)
+function grad_ir(ir; varargs = false)
   validcfg(ir) || error("Multiple return not supported")
   forw, xs = record!(record_branches!(ir))
-  back, perm = reverse_ir(forw, xs)
+  back, perm = reverse_ir(forw, xs, varargs = varargs)
   return Adjoint(forw, compact!(back), perm)
 end

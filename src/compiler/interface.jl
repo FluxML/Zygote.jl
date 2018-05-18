@@ -1,5 +1,6 @@
 macro code_grad(ex)
-  :(grad_ir($(code_irm(ex))))
+  # TODO fix escaping
+  :(grad_ir($(code_irm(ex)), varargs = $(esc(:(@which $ex))).isva))
 end
 
 isprimitive(f) = f isa Core.Builtin || f isa Core.IntrinsicFunction
@@ -13,7 +14,7 @@ end
 function _forward(f, args...)
   isprimitive(f) && return (f(args...), Δ -> map(_ -> nothing, args))
   ir = code_ir(f, typesof(args...))
-  forw, back = stacks!(grad_ir(ir))
+  forw, back = stacks!(grad_ir(ir, varargs = which(f, typesof(args...)).isva))
   y, J = interpret(forw, f, unsplat(f, args...)...)
   return y, Δ -> interpret(back, J, Δ)
 end

@@ -78,4 +78,6 @@ end
 
 @test gradient(f, 2, 3) == (3, 2)
 
+gradient((a, b...) -> *(a, b...), 2, 3)
+
 end
