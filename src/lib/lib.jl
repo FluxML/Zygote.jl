@@ -26,14 +26,14 @@ macro grad(ex)
   def[:body] = quote
     Base.@_inline_meta
     y, back = $(def[:body])
-    y, Δ -> (Base.@_inline_meta; (nothing, back(Δ)::Tuple...))
+    y, Δ -> (Base.@_inline_meta; (nothing, back(Δ)::Union{Tuple,Nothing}...))
   end
   combinedef(def)
 end
 
 # Tuples
 
-@grad tuple(xs...) = xs, Δ -> Δ == nothing ? map(_ -> nothing, xs) : Δ
+@grad tuple(xs...) = xs, identity
 
 @grad getindex(xs::NTuple{N}, i::Integer) where N =
   (xs[i], Δ -> (ntuple(j -> i == j ? Δ : nothing, Val{N}), nothing))

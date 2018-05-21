@@ -7,6 +7,7 @@ gradref(x) = RefValue(grad(x))
 accum!(r::RefValue, x) = (r.x = accum(r.x, deref(x)))
 
 backprop(J, Δx) = J(Δx)
+backprop(_, ::Nothing) = nothing
 
 function backprop(J, Δx::RefValue)
   Δy = J(Δx.x)
@@ -23,7 +24,10 @@ Base.show(io::IO, x::Alpha) = print(io, "@", x.id)
 alpha(x) = x
 alpha(x::SSAValue) = Alpha(x.id)
 
+gradindex(x, i) = x[i]
+gradindex(::Nothing, i) = nothing
 xgetindex(x, i...) = Expr(:call, GlobalRef(Base, :getindex), x, i...)
+xgradindex(x, i) = xcall(Zygote, :gradindex, x, i)
 
 xaccum!(x, Δ) = Expr(:call, GlobalRef(Zygote, :accum!), x, Δ)
 
@@ -167,7 +171,7 @@ function grad!(ir::ReverseIR, grads, i)
     Δ = SSAValue(length(ir.stmts))
     for (i, x) in enumerate(ex.args[2:end])
       haskey(grads, x) || continue
-      push!(ir, xgetindex(Δ, i))
+      push!(ir, xgradindex(Δ, i))
       xaccum_(ir, grads, x, SSAValue(length(ir.stmts)))
     end
   end
