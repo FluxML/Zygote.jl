@@ -30,7 +30,7 @@ function _forward(args...)
   (g = _lookup_grad(T)) == nothing && return args[1](args[2:end]...), Δ -> map(_ -> nothing, args)
   forw, _, isva, nargs, sparams = g
   isva && (args = (args[1:nargs-1]...,args[nargs:end]))
-  y, c = interpret(forw, args...)
+  y, c = interpret(forw, args..., sparams = sparams)
   return y, J{T}(c)
 end
 

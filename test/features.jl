@@ -7,8 +7,10 @@ function f(x)
   return y
 end
 
-# TODO: use Complex when static params work in the interpreter
-struct Foo a; b end
+struct Foo{T}
+  a::T
+  b::T
+end
 
 @testset "Features" begin
 
