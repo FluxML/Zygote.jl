@@ -206,8 +206,13 @@ struct Adjoint
 end
 
 function grad_ir(ir; varargs = false)
-  validcfg(ir) || error("Multiple return not supported")
+  validcfg(ir) || error("Only single return supported")
   forw, xs = record!(record_branches!(ir))
   back, perm = reverse_ir(forw, xs, varargs = varargs)
   return Adjoint(forw, compact!(back), perm)
+end
+
+macro code_grad(ex)
+  # TODO fix escaping
+  :(grad_ir($(code_irm(ex)), varargs = $(esc(:(@which $ex))).isva))
 end

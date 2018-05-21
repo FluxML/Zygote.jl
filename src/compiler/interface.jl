@@ -1,22 +1,43 @@
-macro code_grad(ex)
-  # TODO fix escaping
-  :(grad_ir($(code_irm(ex)), varargs = $(esc(:(@which $ex))).isva))
+function lookup(T, world = ccall(:jl_get_world_counter, UInt, ()); optimize = false)
+  F = T.parameters[1]
+  (F.name.module === Core.Compiler || F <: Core.Builtin || F <: Core.Builtin) && return nothing
+  _methods = Base._methods_by_ftype(T, -1, world)
+  length(_methods) == 1 || return nothing
+  type_signature, static_params, method = first(_methods)
+  params = Core.Compiler.Params(world)
+  (_, ci, ty) = Core.Compiler.typeinf_code(method, type_signature, static_params, optimize, optimize, params)
+  ir = compact!(just_construct_ssa(ci, copy(ci.code), Int(method.nargs)-1, [NullLineInfo]))
+  ir, collect(static_params), method.nargs, method.isva
 end
 
-isprimitive(f) = f isa Core.Builtin || f isa Core.IntrinsicFunction
-
-function unsplat(f, args...)
-  m = which(f, typesof(args...))
-  m.isva || return args
-  (args[1:m.nargs-2]...,args[m.nargs-1:end])
+function _lookup_grad(T)
+  (func = lookup(T)) == nothing && return
+  ir, sparams, nargs, isva = func
+  forw, back = stacks!(grad_ir(ir, varargs = isva))
+  forw, back, isva, nargs, sparams
 end
 
-function _forward(f, args...)
-  isprimitive(f) && return (f(args...), Δ -> map(_ -> nothing, args))
-  ir = code_ir(f, typesof(args...))
-  forw, back = stacks!(grad_ir(ir, varargs = which(f, typesof(args...)).isva))
-  y, J = interpret(forw, f, unsplat(f, args...)...)
-  return y, Δ -> interpret(back, J, Δ)
+struct J{S,T}
+  t::T
+end
+
+J{S}(x) where S = J{S,typeof(x)}(x)
+
+Base.show(io::IO, j::J{S}) where S = print(io, "J{$(S.parameters[1])}(...)")
+
+function _forward(args...)
+  T = typesof(args...)
+  (g = _lookup_grad(T)) == nothing && return args[1](args[2:end]...), Δ -> map(_ -> nothing, args)
+  forw, _, isva, nargs, sparams = g
+  isva && (args = (args[1:nargs-1]...,args[nargs:end]))
+  y, c = interpret(forw, args...)
+  return y, J{T}(c)
+end
+
+function (j::J{T})(Δ) where T
+  (g = _lookup_grad(T)) == nothing && return map(_ -> nothing, j.t)
+  _, back, = g
+  return interpret(back, j.t, Δ)
 end
 
 function forward(f, args...)
