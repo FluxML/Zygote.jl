@@ -85,4 +85,14 @@ end
 
 gradient((a, b...) -> *(a, b...), 2, 3)
 
+function mysum(xs)
+  s = 0
+  for x in xs
+    s += x
+  end
+  return s
+end
+
+@test gradient(mysum, (1,2,3)) == ((1,1,1),)
+
 end
