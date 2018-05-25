@@ -31,6 +31,13 @@ macro grad(ex)
   combinedef(def)
 end
 
+macro nograd(f)
+  :(@inline _forward(::typeof($(esc(f))), args...) = $(esc(f))(args...), Δ -> nothing)
+end
+
+@nograd Core.apply_type
+@inline _forward(::Type{T}, args...) where T<:Array = T(args...), Δ -> nothing
+
 # Tuples
 
 @grad tuple(xs...) = xs, identity
