@@ -27,7 +27,8 @@ Base.show(io::IO, j::J{S}) where S = print(io, "J{$(S.parameters[1])}(...)")
 
 function _forward(args...)
   T = typesof(args...)
-  (g = _lookup_grad(T)) == nothing && return args[1](args[2:end]...), Δ -> map(_ -> nothing, args)
+  (g = _lookup_grad(T)) == nothing &&
+    return args[1](args[2:end]...), Δ -> error("Undifferentiable function $(args[1])")
   forw, _, isva, nargs, sparams = g
   isva && (args = (args[1:nargs-1]...,args[nargs:end]))
   y, c = interpret(forw, args..., sparams = sparams)
