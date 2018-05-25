@@ -15,6 +15,32 @@ function backprop(J, Δx::RefValue)
   return Δy
 end
 
+function merge_returns(ir)
+  rs = find(x -> x isa ReturnNode, ir.stmts)
+  length(rs) <= 1 && return ir
+  bs = blockidx.(ir, rs)
+  xs = []
+  bb = length(ir.cfg.blocks)+1
+  @assert length(unique(bs)) == length(bs)
+  for r in rs
+    push!(xs, ir.stmts[r].val)
+    ir.stmts[r] = GotoNode(bb)
+  end
+  ir = IncrementalCompact(ir)
+  for _ in ir end
+  r = insert_node_here!(ir, PhiNode(bs, xs), Any, ir.result_lines[end])
+  insert_node_here!(ir, ReturnNode(r), Any, ir.result_lines[end])
+  ir = finish(ir)
+  b = ir.cfg.blocks[end]
+  ir.cfg.blocks[end] = BasicBlock(StmtRange(b.stmts.first, b.stmts.last-2), b.preds, b.succs)
+  push!(ir.cfg.blocks, BasicBlock(StmtRange(length(ir.stmts)-1, length(ir.stmts)), bs, []))
+  push!(ir.cfg.index, length(ir.stmts)-1)
+  for b in bs
+    push!(ir.cfg.blocks[b].succs, bb)
+  end
+  return ir
+end
+
 struct Alpha
   id::Int
 end
@@ -210,7 +236,7 @@ struct Adjoint
 end
 
 function grad_ir(ir; varargs = false)
-  validcfg(ir) || error("Only single return supported")
+  ir = merge_returns(ir)
   forw, xs = record!(record_branches!(ir))
   back, perm = reverse_ir(forw, xs, varargs = varargs)
   return Adjoint(forw, compact!(back), perm)

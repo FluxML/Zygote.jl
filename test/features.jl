@@ -2,10 +2,7 @@ using Zygote, Base.Test
 using Zygote: gradient
 
 bool = true
-function f(x)
-  y = bool ? 2x : x
-  return y
-end
+f(x) = bool ? 2x : x
 
 struct Foo{T}
   a::T
