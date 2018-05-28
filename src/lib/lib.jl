@@ -26,7 +26,10 @@ macro grad(ex)
   def[:body] = quote
     Base.@_inline_meta
     y, back = $(def[:body])
-    y, Δ -> (Base.@_inline_meta; (nothing, back(Δ)::Union{Tuple,Nothing}...))
+    y, @inline function (Δ)
+      Δ = back(Δ)::Union{Tuple,Nothing}
+      Δ == nothing ? Δ : (nothing, Δ...)
+    end
   end
   combinedef(def)
 end
@@ -36,7 +39,6 @@ macro nograd(f)
 end
 
 @nograd Core.apply_type
-@inline _forward(::Type{T}, args...) where T<:Array = T(args...), Δ -> nothing
 
 # Tuples
 

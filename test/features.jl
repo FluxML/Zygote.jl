@@ -92,4 +92,11 @@ end
 
 @test gradient(mysum, (1,2,3)) == ((1,1,1),)
 
+function f(a, b)
+  xs = [a, b]
+  xs[1] * xs[2]
+end
+
+@test gradient(f, 2, 3) == (3, 2)
+
 end

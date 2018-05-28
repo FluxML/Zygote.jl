@@ -1,3 +1,17 @@
+grad(xs::Array) = grad.(xs)
+
+@inline _forward(::Type{T}, args...) where T<:Array = T(args...), Δ -> nothing
+
+@grad Base.vect(xs...) = Base.vect(xs...), Δ -> (Δ...,)
+
+@grad function getindex(xs::Array, i...)
+  xs[i...], function (Δ)
+    Δ′ = zeros(xs)
+    Δ′[i...] = Δ
+    (Δ′, map(_ -> nothing, i)...)
+  end
+end
+
 @grad a::AbstractVecOrMat * b::AbstractVecOrMat =
   a * b, Δ -> (A_mul_Bt(Δ, b), At_mul_B(a, Δ))
 
