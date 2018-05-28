@@ -45,8 +45,6 @@ function step!(i::Interpreter)
   elseif isexpr(ex, GlobalRef)
     assign!(i, getfield(ex.mod, ex.name))
     i.pc += 1
-  elseif isexpr(ex, :throw_undef_if_not)
-    i.pc += 1
   else
     error("can't handle $ex")
   end
