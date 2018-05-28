@@ -27,7 +27,7 @@ dx = back(4)
 y, back = forward(f, 3)
 dx = back(4)
 @test y == 6
-dx == (8,)
+@test dx == (8,)
 
 bool = false
 
@@ -43,7 +43,8 @@ dxs = back([1,1,1])
 
 function pow(x, n)
   r = 1
-  for _ = 1:n
+  while n > 0
+    n -= 1
     r *= x
   end
   return r
@@ -80,7 +81,7 @@ end
 
 @test gradient(f, 2, 3) == (3, 2)
 
-gradient((a, b...) -> *(a, b...), 2, 3)
+@test gradient((a, b...) -> *(a, b...), 2, 3) == (3, 2)
 
 function mysum(xs)
   s = 0

@@ -27,6 +27,7 @@ macro grad(ex)
     Base.@_inline_meta
     y, back = $(def[:body])
     y, @inline function (Δ)
+      Δ == nothing && return nothing
       Δ = back(Δ)::Union{Tuple,Nothing}
       Δ == nothing ? Δ : (nothing, Δ...)
     end
@@ -34,11 +35,25 @@ macro grad(ex)
   combinedef(def)
 end
 
-macro nograd(f)
-  :(@inline _forward(::typeof($(esc(f))), args...) = $(esc(f))(args...), Δ -> nothing)
+macro nograd(ex)
+  isexpr(ex, :tuple) || (ex = Expr(:tuple, ex))
+  blk = :(;)
+  for f in ex.args
+    push!(blk.args, :(@inline Zygote._forward(::typeof($(esc(f))), args...) = $(esc(f))(args...), Δ -> nothing))
+  end
+  return blk
 end
 
-@nograd Core.apply_type
+# Core functions
+
+@nograd Core.apply_type, Core.typeof, nfields,
+  (==), (===), (>=), (<)
+
+@grad Base.select_value(cond::Bool, t, f) =
+  Base.select_value(cond, t, f),
+  Δ -> cond ? (Δ, nothing) : (nothing, Δ)
+
+@grad Base.typeassert(x, T) = Base.typeassert(x, T), Δ -> (Δ, nothing)
 
 # Tuples
 

@@ -7,7 +7,6 @@ gradref(x) = RefValue(grad(x))
 accum!(r::RefValue, x) = (r.x = accum(r.x, deref(x)))
 
 backprop(J, Δx) = J(Δx)
-backprop(_, ::Nothing) = nothing
 
 function backprop(J, Δx::RefValue)
   Δy = J(Δx.x)
@@ -94,15 +93,13 @@ end
 function record!(ir::IRCode)
   xs = reachable(ir)
   for i = 1:length(ir.stmts)
-    SSAValue(i) ∈ xs || continue
     ex = ir[SSAValue(i)]
     isexpr(ex, :new) && (ex = ir[SSAValue(i)] = xcall(Zygote, :__new__, ex.args...))
     if isexpr(ex, :call)
+      ex.args[1] == GlobalRef(Base, :not_int) && continue
       yJ = insert_node!(ir, i, Any, xcall(Zygote, :_forward, ex.args...))
       ir[SSAValue(i)] = xgetindex(yJ, 1)
       insert_node!(ir, i+1, Any, xgetindex(yJ, 2), true)
-    elseif isexpr(ex, PhiNode, GlobalRef)
-    else error("Unrecognised $(ex.head) expr")
     end
   end
   ir, map = _compact!(ir)
@@ -163,6 +160,7 @@ end
 
 dominates(ir::ReverseIR, def::Argument, use) = dominates(ir, SSAValue(1), use)
 
+# TODO don't have special semantics here
 function xaccum_(ir::ReverseIR, grads, x, Δ)
   if length(ir.uses[x]) == 1 && dominates(ir, x, ir.uses[x][1])
     ir.stmts[grads[x].id] = nothing
@@ -191,7 +189,7 @@ function grad!(ir::ReverseIR, grads, i)
   if ex isa ReturnNode && (ex.val isa SSAValue || ex.val isa Argument)
     xaccum_(ir, grads, ex.val, SSAValue(1))
   elseif isexpr(ex, :call) && ex.args[1] == GlobalRef(Zygote, :_forward)
-    Δ = grads[SSAValue(i+1)]
+    Δ = get(grads, SSAValue(i+1), nothing)
     J = Alpha(i+2)
     push!(ir, Expr(:call, GlobalRef(Zygote, :backprop), J, Δ))
     Δ = SSAValue(length(ir.stmts))

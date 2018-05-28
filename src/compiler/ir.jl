@@ -45,6 +45,7 @@ end
 rename(x, m) = x
 rename(x::SSAValue, m) = m[x.id]
 rename(xs::AbstractVector, m) = map(x -> rename(x, m), xs)
+rename(xs::AbstractSet, m) = map(x -> rename(x, m), xs)
 
 function usages(ir)
   us = Dict()

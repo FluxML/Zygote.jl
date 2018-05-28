@@ -43,7 +43,11 @@ end
 
 function forward(f, args...)
   y, back = _forward(f, args...)
-  y, Δ -> Base.tail(back(Δ))
+  y, function (Δ)
+    Δ = back(Δ)
+    Δ == nothing && return
+    Base.tail(Δ)
+  end
 end
 
 function gradient(f, args...)
