@@ -5,7 +5,7 @@ import Core.Compiler: IRCode, CFG, BasicBlock, Argument, ReturnNode,
   compact!, finish, DomTree, construct_domtree, dominates, userefs
 using InteractiveUtils: typesof
 
-for T in [:IRCode, :IncrementalCompact, :(Compiler.UseRef)]
+for T in [:IRCode, :IncrementalCompact, :(Compiler.UseRef), :(Compiler.UseRefIterator)]
   @eval begin
     Base.getindex(ir::$T, a...) = Compiler.getindex(ir, a...)
     Base.setindex!(ir::$T, a...) = Compiler.setindex!(ir, a...)
@@ -40,6 +40,17 @@ function _compact!(code::IRCode)
     _, state = next(compact, state)
   end
   return finish(compact), compact.ssa_rename
+end
+
+function argmap(f, @nospecialize(stmt))
+    urs = userefs(stmt)
+    for op in urs
+        val = op[]
+        if isa(val, Argument)
+            op[] = f(val)
+        end
+    end
+    return urs[]
 end
 
 rename(x, m) = x

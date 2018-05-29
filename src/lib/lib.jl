@@ -22,6 +22,7 @@ using MacroTools: combinedef
 macro grad(ex)
   def = splitdef(ex)
   pushfirst!(def[:args], :(::typeof($(def[:name]))))
+  pushfirst!(def[:args], :(::Context))
   def[:name] = :_forward
   def[:body] = quote
     Base.@_inline_meta
@@ -39,7 +40,7 @@ macro nograd(ex)
   isexpr(ex, :tuple) || (ex = Expr(:tuple, ex))
   blk = :(;)
   for f in ex.args
-    push!(blk.args, :(@inline Zygote._forward(::typeof($(esc(f))), args...) = $(esc(f))(args...), Δ -> nothing))
+    push!(blk.args, :(@inline Zygote._forward(::Context, ::typeof($(esc(f))), args...) = $(esc(f))(args...), Δ -> nothing))
   end
   return blk
 end
@@ -76,11 +77,11 @@ function unapply(xs, Δs)
   return (Δs′...,)
 end
 
-@grad function Core._apply(f, args...)
-  y, J = Core._apply(_forward, (f,), args...)
+function _forward(ctx::Context, ::typeof(Core._apply), f, args...)
+  y, J = Core._apply(_forward, (ctx, f), args...)
   y, function (Δ)
     Δ = J(Δ)
-    (first(Δ), unapply(args, Base.tail(Δ))...)
+    (nothing, first(Δ), unapply(args, Base.tail(Δ))...)
  end
 end
 

@@ -93,17 +93,19 @@ end
 function record!(ir::IRCode)
   xs = reachable(ir)
   for i = 1:length(ir.stmts)
-    ex = ir[SSAValue(i)]
+    ex = argmap(x -> Argument(x.n+2), ir[SSAValue(i)])
     isexpr(ex, :new) && (ex = ir[SSAValue(i)] = xcall(Zygote, :__new__, ex.args...))
     if isexpr(ex, :call)
       ex.args[1] == GlobalRef(Base, :not_int) && continue
-      yJ = insert_node!(ir, i, Any, xcall(Zygote, :_forward, ex.args...))
+      yJ = insert_node!(ir, i, Any, xcall(Zygote, :_forward, Argument(2), ex.args...))
       ir[SSAValue(i)] = xgetindex(yJ, 1)
       insert_node!(ir, i+1, Any, xgetindex(yJ, 2), true)
+    else
+      ir[SSAValue(i)] = ex
     end
   end
-  ir, map = _compact!(ir)
-  return ir, rename(xs, map)
+  ir, m = _compact!(ir)
+  return ir, map(x -> x isa Argument ? Argument(x.n+2) : x, rename(xs, m))
 end
 
 function reverse_cfg(cfg, perm)
@@ -193,7 +195,7 @@ function grad!(ir::ReverseIR, grads, i)
     J = Alpha(i+2)
     push!(ir, Expr(:call, GlobalRef(Zygote, :backprop), J, Δ))
     Δ = SSAValue(length(ir.stmts))
-    for (i, x) in enumerate(ex.args[2:end])
+    for (i, x) in enumerate(ex.args[3:end])
       haskey(grads, x) || continue
       push!(ir, xgradindex(Δ, i))
       xaccum_(ir, grads, x, SSAValue(length(ir.stmts)))
@@ -218,7 +220,7 @@ function reverse_ir(forw::IRCode, xs; varargs = false)
       grad!(ir, grads, i)
     end
     if bi == length(ir.forw.cfg.blocks)
-      gs = [get(grads, Argument(i), nothing) for i = 1:length(forw.argtypes)]
+      gs = [get(grads, Argument(i+2), nothing) for i = 1:length(forw.argtypes)]
       push!(ir, xcall(Zygote, varargs ? :deref_tuple_va : :deref_tuple, gs...))
       push!(ir, ReturnNode(SSAValue(length(ir.stmts))))
     end

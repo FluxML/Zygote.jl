@@ -1,3 +1,6 @@
+struct Context
+end
+
 function lookup(T, world = ccall(:jl_get_world_counter, UInt, ()); optimize = false)
   F = T.parameters[1]
   (F.name.module === Core.Compiler || F <: Core.Builtin || F <: Core.Builtin) && return nothing
@@ -25,15 +28,17 @@ J{S}(x) where S = J{S,typeof(x)}(x)
 
 Base.show(io::IO, j::J{S}) where S = print(io, "J{$(S.parameters[1])}(...)")
 
-function _forward(args...)
-  T = typesof(args...)
+function _forward(ctx::Context, f, args...)
+  T = typesof(f, args...)
   (g = _lookup_grad(T)) == nothing &&
-    return args[1](args[2:end]...), Δ -> error("Undifferentiable function $(args[1])")
+    return f(args...), Δ -> error("Undifferentiable function $f")
   forw, _, isva, nargs, sparams = g
-  isva && (args = (args[1:nargs-1]...,args[nargs:end]))
-  y, c = interpret(forw, args..., sparams = sparams)
+  isva && (args = (args[1:nargs-2]...,args[nargs-1:end]))
+  y, c = interpret(forw, _forward, ctx, f, args..., sparams = sparams)
   return y, J{T}(c)
 end
+
+_forward(args...) = _forward(Context(), args...)
 
 function (j::J{T})(Δ) where T
   (g = _lookup_grad(T)) == nothing && return map(_ -> nothing, j.t)

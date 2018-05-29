@@ -1,6 +1,6 @@
 grad(xs::Array) = grad.(xs)
 
-@inline _forward(::Type{T}, args...) where T<:Array = T(args...), Δ -> nothing
+@inline _forward(::Context, ::Type{T}, args...) where T<:Array = T(args...), Δ -> nothing
 
 @grad Base.vect(xs...) = Base.vect(xs...), Δ -> (Δ...,)
 
