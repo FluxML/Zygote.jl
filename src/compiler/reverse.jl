@@ -56,11 +56,6 @@ xgradindex(x, i) = xcall(Zygote, :gradindex, x, i)
 
 xaccum!(x, Δ) = Expr(:call, GlobalRef(Zygote, :accum!), x, Δ)
 
-# TODO: merge return nodes
-validcfg(ir) =
-  ir.stmts[end] isa ReturnNode &&
-  !any(x -> x isa ReturnNode, ir.stmts[1:end-1])
-
 function record_branches!(ir::IRCode)
   ir = IncrementalCompact(ir)
   for (i, x) in ir
