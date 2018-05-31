@@ -1,4 +1,4 @@
-using Zygote, Base.Test
+using Zygote, Test
 using Zygote: gradient
 
 @testset "Zygote" begin

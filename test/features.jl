@@ -1,8 +1,8 @@
-using Zygote, Base.Test
+using Zygote, Test
 using Zygote: gradient
 
 bool = true
-f(x) = bool ? 2x : x
+b(x) = bool ? 2x : x
 
 struct Foo{T}
   a::T
@@ -24,14 +24,14 @@ dx = back(4)
 
 @test gradient(mul, 2, 3) == (3, 2)
 
-y, back = forward(f, 3)
+y, back = forward(b, 3)
 dx = back(4)
 @test y == 6
 @test dx == (8,)
 
-bool = false
+global bool = false
 
-y, back = forward(f, 3)
+y, back = forward(b, 3)
 dx = back(4)
 @test y == 3
 @test getindex.(dx) == (4,)
@@ -75,8 +75,8 @@ end
 @test gradient(f, 2, 3) == (3, 2)
 
 function f(x, y)
-  f = z -> x * z
-  f(y)
+  g = z -> x * z
+  g(y)
 end
 
 @test gradient(f, 2, 3) == (3, 2)

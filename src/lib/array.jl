@@ -6,14 +6,14 @@ grad(xs::Array) = grad.(xs)
 
 @grad function getindex(xs::Array, i...)
   xs[i...], function (Δ)
-    Δ′ = zeros(xs)
+    Δ′ = zero(xs)
     Δ′[i...] = Δ
     (Δ′, map(_ -> nothing, i)...)
   end
 end
 
 @grad a::AbstractVecOrMat * b::AbstractVecOrMat =
-  a * b, Δ -> (A_mul_Bt(Δ, b), At_mul_B(a, Δ))
+  a * b, Δ -> (Δ * transpose(b), transpose(a) * Δ)
 
 @grad sum(xs::AbstractArray, dim...) =
   sum(xs, dim...), Δ -> (similar(xs) .= Δ, map(_->nothing, dim)...)
@@ -52,11 +52,11 @@ function getpartial(Δ, x, i)
 end
 
 @grad function broadcast(f, args::Vararg{Any,N}) where N
-  dargs = map((x,i) -> dualify(x, ntuple(j -> i==j, Val{N})),
-              args, ntuple(identity, Val{N}))
+  dargs = map((x,i) -> dualify(x, ntuple(j -> i==j, Val(N))),
+              args, ntuple(identity, Val(N)))
   out = broadcast(f, dargs...)
   (x -> x.value).(out), function (Δ)
-    Δxs = ntuple(i -> getpartial.(Δ, out, i), Val{N})
+    Δxs = ntuple(i -> getpartial.(Δ, out, i), Val(N))
     (nothing, unbroadcast.(args, Δxs)...)
   end
 end

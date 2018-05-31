@@ -15,7 +15,7 @@ function backprop(J, Δx::RefValue)
 end
 
 function merge_returns(ir)
-  rs = find(x -> x isa ReturnNode, ir.stmts)
+  rs = findall(x -> x isa ReturnNode, ir.stmts)
   length(rs) <= 1 && return ir
   bs = blockidx.(ir, rs)
   xs = []

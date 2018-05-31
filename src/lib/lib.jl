@@ -1,15 +1,15 @@
 # Interfaces
 
 @generated function grad(x)
-  (x.mutable || nfields(x) == 0) && return
+  (x.mutable || fieldcount(x) == 0) && return
   Expr(:tuple, [:($f = grad(x.$f)) for f in fieldnames(x)]...)
 end
 
 grad(x::Tuple) = grad.(x)
 
 accum(x, y) = x + y
-accum(x, ::Void) = x
-accum(::Void, _) = nothing
+accum(x, ::Nothing) = x
+accum(::Nothing, _) = nothing
 accum(x::Tuple, y::Tuple) = accum.(x, y)
 
 @generated function accum(x::NamedTuple, y::NamedTuple)
@@ -61,11 +61,11 @@ end
 @grad tuple(xs...) = xs, identity
 
 @grad getindex(xs::NTuple{N}, i::Integer) where N =
-  (xs[i], Δ -> (ntuple(j -> i == j ? Δ : nothing, Val{N}), nothing))
+  (xs[i], Δ -> (ntuple(j -> i == j ? Δ : nothing, Val(N)), nothing))
 
 # Needed for iteration lowering
 @grad Core.getfield(xs::NTuple{N}, i::Integer) where N =
-  (xs[i], Δ -> (ntuple(j -> i == j ? Δ : nothing, Val{N}), nothing))
+  (xs[i], Δ -> (ntuple(j -> i == j ? Δ : nothing, Val(N)), nothing))
 
 # TODO faster version
 function unapply(xs, Δs)

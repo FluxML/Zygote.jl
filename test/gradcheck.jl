@@ -1,8 +1,8 @@
-using Zygote, Base.Test
+using Zygote, Test
 using Zygote: gradient
 
 function ngradient(f, xs::AbstractArray...)
-  grads = zeros.(xs)
+  grads = zero.(xs)
   for (x, Δ) in zip(xs, grads), i in 1:length(x)
     δ = sqrt(eps())
     tmp = x[i]
