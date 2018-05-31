@@ -50,7 +50,7 @@ end
 @nograd Core.apply_type, Core.typeof, nfields,
   (==), (===), (>=), (<)
 
-@grad Base.select_value(cond::Bool, t, f) =
+@grad ifelse(cond::Bool, t, f) =
   Base.select_value(cond, t, f),
   Δ -> cond ? (Δ, nothing) : (nothing, Δ)
 

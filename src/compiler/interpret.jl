@@ -45,6 +45,9 @@ function step!(i::Interpreter)
   elseif isexpr(ex, GlobalRef)
     assign!(i, getfield(ex.mod, ex.name))
     i.pc += 1
+  elseif ex isa PiNode
+    assign!(i, lookup(i, ex.val))
+    i.pc += 1
   else
     error("can't handle $ex")
   end

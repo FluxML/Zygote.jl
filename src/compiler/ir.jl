@@ -1,11 +1,11 @@
 import Core: SSAValue, GotoNode, Compiler
 import Core.Compiler: IRCode, CFG, BasicBlock, Argument, ReturnNode,
   NullLineInfo, just_construct_ssa, compact!, NewNode,
-  GotoIfNot, PhiNode, StmtRange, IncrementalCompact, insert_node!, insert_node_here!,
+  GotoIfNot, PhiNode, PiNode, StmtRange, IncrementalCompact, insert_node!, insert_node_here!,
   compact!, finish, DomTree, construct_domtree, dominates, userefs
 using InteractiveUtils: typesof
 
-for T in [:IRCode, :IncrementalCompact, :(Compiler.UseRef), :(Compiler.UseRefIterator)]
+for T in :[IRCode, IncrementalCompact, Compiler.UseRef, Compiler.UseRefIterator].args
   @eval begin
     Base.getindex(ir::$T, a...) = Compiler.getindex(ir, a...)
     Base.setindex!(ir::$T, a...) = Compiler.setindex!(ir, a...)
@@ -15,15 +15,8 @@ end
 Base.getindex(r::StmtRange, i) = (r.first:r.last)[i]
 
 for T in :[UseRefIterator, IncrementalCompact, Pair].args
-  @eval begin
-    Base.start(x::Compiler.$T) = Compiler.start(x)
-    Base.next(x::Compiler.$T, st) = Compiler.next(x, st)
-    Base.done(x::Compiler.$T, st) = Compiler.done(x, st)
-  end
+  @eval Base.iterate(x::Compiler.$T, a...) = Compiler.iterate(x, a...)
 end
-
-@eval Core.Compiler import Base: Base, Sys
-@eval Core.Compiler include($(joinpath(Sys.BINDIR, "../../base/compiler/ssair/show.jl")))
 
 PhiNode(x, y) = PhiNode(Any[x...], Any[y...])
 
@@ -33,13 +26,15 @@ Base.show(io::IO, x::SSAValue) = print(io, "%", x.id)
 
 Base.show(io::IO, x::Argument) = print(io, "%%", x.n)
 
+function finish_dc(ic::IncrementalCompact)
+  Compiler.non_dce_finish!(ic)
+  return Compiler.complete(ic)
+end
+
 function _compact!(code::IRCode)
-  compact = IncrementalCompact(code)
-  state = start(compact)
-  while !done(compact, state)
-    _, state = next(compact, state)
-  end
-  return finish(compact), compact.ssa_rename
+    compact = IncrementalCompact(code)
+    foreach(x -> nothing, compact)
+    return finish_dc(compact), compact.ssa_rename
 end
 
 function argmap(f, @nospecialize(stmt))

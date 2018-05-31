@@ -25,18 +25,16 @@ function merge_returns(ir)
     push!(xs, ir.stmts[r].val)
     ir.stmts[r] = GotoNode(bb)
   end
+  push!(ir.cfg.blocks, BasicBlock(StmtRange(length(ir.stmts), length(ir.stmts)-1), bs, []))
+  push!(ir.cfg.index, length(ir.stmts))
+  for b in bs
+    push!(ir.cfg.blocks[b].succs, bb)
+  end
   ir = IncrementalCompact(ir)
   for _ in ir end
   r = insert_node_here!(ir, PhiNode(bs, xs), Any, ir.result_lines[end])
   insert_node_here!(ir, ReturnNode(r), Any, ir.result_lines[end])
   ir = finish(ir)
-  b = ir.cfg.blocks[end]
-  ir.cfg.blocks[end] = BasicBlock(StmtRange(b.stmts.first, b.stmts.last-2), b.preds, b.succs)
-  push!(ir.cfg.blocks, BasicBlock(StmtRange(length(ir.stmts)-1, length(ir.stmts)), bs, []))
-  push!(ir.cfg.index, length(ir.stmts)-1)
-  for b in bs
-    push!(ir.cfg.blocks[b].succs, bb)
-  end
   return ir
 end
 
@@ -66,7 +64,7 @@ function record_branches!(ir::IRCode)
     @assert length(preds) <= 2
     insert_node_here!(ir, PhiNode(preds, [false, true]), Bool, ir.result_lines[i])
   end
-  return finish(ir)
+  return finish_dc(ir)
 end
 
 function reachable(ir)
@@ -85,16 +83,20 @@ function reachable(ir)
   return seen
 end
 
+ignored(f) = f in (GlobalRef(Base, :not_int), GlobalRef(Core.Intrinsics, :not_int), GlobalRef(Core, :(===)))
+ignored(ir, f) = ignored(f)
+ignored(ir, f::SSAValue) = ignored(ir[f])
+
 function record!(ir::IRCode)
   xs = reachable(ir)
   for i = 1:length(ir.stmts)
     ex = argmap(x -> Argument(x.n+2), ir[SSAValue(i)])
     isexpr(ex, :new) && (ex = ir[SSAValue(i)] = xcall(Zygote, :__new__, ex.args...))
     if isexpr(ex, :call)
-      ex.args[1] == GlobalRef(Base, :not_int) && continue
+      ignored(ir, ex.args[1]) && continue
       yJ = insert_node!(ir, i, Any, xcall(Zygote, :_forward, Argument(2), ex.args...))
       ir[SSAValue(i)] = xgetindex(yJ, 1)
-      insert_node!(ir, i+1, Any, xgetindex(yJ, 2), true)
+      insert_node!(ir, i, Any, xgetindex(yJ, 2), true)
     else
       ir[SSAValue(i)] = ex
     end
@@ -144,7 +146,7 @@ function block!(ir::ReverseIR)
 end
 
 IRCode(ir::ReverseIR) =
-  IRCode(ir.forw, ir.stmts, Any[Any for _ in ir.stmts], [-1 for _ in ir.stmts],
+  IRCode(ir.forw, ir.stmts, Any[Any for _ in ir.stmts], [1 for _ in ir.stmts],
          [0x00 for _ in ir.stmts], CFG(ir.blocks), NewNode[])
 
 function dominates(ir::ReverseIR, def, use)

@@ -21,7 +21,7 @@ function forward_stacks!(adj)
       push!(stks, (adj.perm[fb], alpha(α)))
       push!(recs, stk)
       loc = afterphi(adj.forw, α.id+1)
-      insert_node!(adj.forw, loc, Any, xcall(:push!, stk, α), true)
+      insert_node!(adj.forw, loc-1, Any, xcall(:push!, stk, α), true)
     end
   end
   args = [Argument(i+2) for i = 1:length(adj.forw.argtypes)]
