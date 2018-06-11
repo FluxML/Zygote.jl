@@ -22,10 +22,6 @@ PhiNode(x, y) = PhiNode(Any[x...], Any[y...])
 
 CFG(bs) = CFG(bs, map(b -> b.stmts.first, bs[2:end]))
 
-Base.show(io::IO, x::SSAValue) = print(io, "%", x.id)
-
-Base.show(io::IO, x::Argument) = print(io, "%%", x.n)
-
 function finish_dc(ic::IncrementalCompact)
   Compiler.non_dce_finish!(ic)
   return Compiler.complete(ic)
@@ -63,7 +59,7 @@ end
 
 function code_ir(f, T)
   ci = code_typed(f, T, optimize=false)[1][1]
-  ssa = compact!(just_construct_ssa(ci, copy(ci.code), Int(which(f, T).nargs)-1, [NullLineInfo]))
+  ssa = compact!(just_construct_ssa(ci, copy(ci.code), Int(which(f, T).nargs)-1))
 end
 
 function code_irm(ex)
