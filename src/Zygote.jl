@@ -8,6 +8,7 @@ include("compiler/ir.jl")
 include("compiler/interpret.jl")
 include("compiler/reverse.jl")
 include("compiler/emit.jl")
+include("compiler/reflection.jl")
 include("compiler/interface.jl")
 
 include("lib/lib.jl")
