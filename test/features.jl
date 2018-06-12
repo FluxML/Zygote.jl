@@ -1,5 +1,5 @@
 using Zygote, Test
-using Zygote: gradient
+using Zygote: gradient, roundtrip
 
 bool = true
 b(x) = bool ? 2x : x
@@ -10,6 +10,12 @@ struct Foo{T}
 end
 
 @testset "Features" begin
+
+add(a, b) = a+b
+relu(x) = x > 0 ? x : 0
+
+@test roundtrip(add, 1, 2) == 3
+@test roundtrip(relu, 1) == 1
 
 y, back = forward(identity, 1)
 dx = back(2)
