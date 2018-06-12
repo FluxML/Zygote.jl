@@ -29,7 +29,23 @@ function typed_meta(T; world = ccall(:jl_get_world_counter, UInt, ()), optimize 
 end
 
 function IRCode(meta::Meta)
-  Core.Compiler.just_construct_ssa(meta.code, deepcopy(meta.code.code), Int(meta.method.nargs)-1)
+  just_construct_ssa(meta.code, deepcopy(meta.code.code),
+                     Int(meta.method.nargs)-1, meta.static_params)
+end
+
+function code_ir(f, T)
+  meta = typed_meta(Tuple{typeof(f),T.parameters...})
+  return compact!(IRCode(meta))
+end
+
+function code_irm(ex)
+  isexpr(ex, :call) || error("@code_ir f(args...)")
+  f, args = ex.args[1], ex.args[2:end]
+  :(code_ir($(esc(f)), typesof($(esc.(args)...))))
+end
+
+macro code_ir(ex)
+  code_irm(ex)
 end
 
 function spliceargs!(meta::Meta, ir::IRCode, args...)

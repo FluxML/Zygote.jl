@@ -57,21 +57,6 @@ function usages(ir)
   return us
 end
 
-function code_ir(f, T)
-  ci = code_typed(f, T, optimize=false)[1][1]
-  ssa = compact!(just_construct_ssa(ci, copy(ci.code), Int(which(f, T).nargs)-1))
-end
-
-function code_irm(ex)
-  isexpr(ex, :call) || error("@code_ir f(args...)")
-  f, args = ex.args[1], ex.args[2:end]
-  :(code_ir($(esc(f)), typesof($(esc.(args)...))))
-end
-
-macro code_ir(ex)
-  code_irm(ex)
-end
-
 function blockidx(ir, i::Integer)
   i = findlast(x -> x <= i, ir.cfg.index)
   i == nothing ? 1 : i+1

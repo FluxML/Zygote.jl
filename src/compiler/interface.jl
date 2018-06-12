@@ -9,7 +9,7 @@ function lookup(T, world = ccall(:jl_get_world_counter, UInt, ()); optimize = fa
   type_signature, static_params, method = first(_methods)
   params = Core.Compiler.Params(world)
   (_, ci, ty) = Core.Compiler.typeinf_code(method, type_signature, static_params, optimize, optimize, params)
-  ir = compact!(just_construct_ssa(ci, copy(ci.code), Int(method.nargs)-1))
+  ir = compact!(just_construct_ssa(ci, copy(ci.code), Int(method.nargs)-1, static_params))
   ir, collect(static_params), method.nargs, method.isva
 end
 
