@@ -13,7 +13,7 @@ xtuple(xs...) = xcall(:tuple, xs...)
 
 afterphi(ir, loc) = ir.stmts[loc] isa PhiNode ? afterphi(ir, loc+1) : loc
 
-function forward_stacks!(adj)
+function forward_stacks!(adj, T)
   stks, recs = [], []
   for fb = 1:length(adj.perm)
     for α in alphauses(adj.back, adj.perm[fb])
@@ -27,6 +27,8 @@ function forward_stacks!(adj)
   args = [Argument(i+2) for i = 1:length(adj.forw.argtypes)]
   rec = insert_node!(adj.forw, length(adj.forw.stmts), Any,
                      xtuple(args..., recs...))
+  rec = insert_node!(adj.forw, length(adj.forw.stmts), Any,
+                     Expr(:call, J{T}, rec))
   ret = xtuple(adj.forw.stmts[end].val, rec)
   ret = insert_node!(adj.forw, length(adj.forw.stmts), Any, ret)
   adj.forw.stmts[end] = ReturnNode(ret)
@@ -60,8 +62,8 @@ function reverse_stacks!(ir, stks, nargs)
   return compact!(ir)
 end
 
-function stacks!(adj)
-  forw, stks = forward_stacks!(adj)
+function stacks!(adj, T)
+  forw, stks = forward_stacks!(adj, T)
   back = reverse_stacks!(adj.back, stks, length(forw.argtypes))
   return forw, back
 end
