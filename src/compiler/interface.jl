@@ -16,24 +16,20 @@ J{S}(x) where S = J{S,typeof(x)}(x)
 
 Base.show(io::IO, j::J{S}) where S = print(io, "J{$(S.parameters[1])}(...)")
 
+# Interpreted mode
+
 function _forward(ctx::Context, f, args...)
   T = typesof(f, args...)
   (g = _lookup_grad(T)) == nothing &&
     return f(args...), Δ -> error("Undifferentiable function $f")
-  meta, forw, _ = g
+  meta, forw, back = g
   nargs = meta.method.nargs
   meta.method.isva && (args = (args[1:nargs-2]...,args[nargs-1:end]))
   y, c = interpret(forw, _forward, ctx, f, args..., sparams = [meta.static_params...])
-  return y, J{T}(c)
+  return y, Δ -> interpret(back, c.t, Δ)
 end
 
 _forward(args...) = _forward(Context(), args...)
-
-function (j::J{T})(Δ) where T
-  (g = _lookup_grad(T)) == nothing && return map(_ -> nothing, j.t)
-  _, _, back = g
-  return interpret(back, j.t, Δ)
-end
 
 function forward(f, args...)
   y, back = _forward(f, args...)
