@@ -25,17 +25,21 @@ function typed_meta(T; world = ccall(:jl_get_world_counter, UInt, ()), optimize 
   type_signature, sps, method = first(_methods)
   params = Core.Compiler.Params(world)
   (_, ci, ty) = Core.Compiler.typeinf_code(method, type_signature, sps, optimize, true, params)
+  if ci.ssavaluetypes == 0 # constant return; IRCode doesn't like this
+    ci.ssavaluetypes = Any[Any]
+    ci.slottypes = Any[Any for i = 1:method.nargs]
+  end
   return Meta(method, ci, sps)
 end
 
 function IRCode(meta::Meta)
   just_construct_ssa(meta.code, deepcopy(meta.code.code),
-                     Int(meta.method.nargs)-1, meta.static_params)
+                     Int(meta.method.nargs)-1, meta.static_params) |> compact!
 end
 
 function code_ir(f, T)
   meta = typed_meta(Tuple{typeof(f),T.parameters...})
-  return compact!(IRCode(meta))
+  return IRCode(meta)
 end
 
 function code_irm(ex)
