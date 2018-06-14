@@ -37,12 +37,13 @@ function forward_stacks!(adj, T)
 end
 
 function reverse_stacks!(ir, stks, nargs)
+  t = insert_node!(ir, 1, Any, xcall(Base, :getfield, Argument(1), QuoteNode(:t)))
   for b = 1:length(ir.cfg.blocks)
     repl = Dict()
     for (i, (b′, α)) in enumerate(stks)
       b == b′ || continue
       loc = max(2,range(ir.cfg.blocks[b])[1])
-      stk = insert_node!(ir, loc, Any, xcall(:getindex, Argument(1), i+nargs))
+      stk = insert_node!(ir, loc, Any, xcall(:getindex, t, i+nargs))
       val = insert_node!(ir, loc, Any, xcall(:pop!, stk))
       repl[α] = val
     end
@@ -50,7 +51,7 @@ function reverse_stacks!(ir, stks, nargs)
       if u.stmt == Expr(:call, :Δ)
         u.stmt = Argument(2)
       elseif u[] isa Argument
-        x = insert_node!(ir, i, Any, xcall(:getindex, Argument(1), u[].n-2))
+        x = insert_node!(ir, i, Any, xcall(:getindex, t, u[].n-2))
         u[] = x
       elseif haskey(repl, u[])
         u[] = repl[u[]]
