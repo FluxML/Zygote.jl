@@ -65,16 +65,16 @@ function spliceargs!(meta::Meta, ir::IRCode, args...)
 end
 
 # Behave as if the function signature is f(args...)
-# TODO varargs functions
-function varargs!(meta::Meta, ir::IRCode)
-  Ts = ir.argtypes[2:end]
-  meta.code.slotnames = [:f, :args]
-  meta.code.slottypes = Any[meta.code.slottypes[1], Tuple{Ts...}]
-  empty!(ir.argtypes); append!(ir.argtypes, meta.code.slottypes)
+function varargs!(meta::Meta, ir::IRCode, n = 1)
+  @assert !meta.method.isva # TODO
+  Ts = ir.argtypes[n+1:end]
+  argtypes = Any[ir.argtypes[1:n]..., Tuple{Ts...}]
+  meta.code.slottypes = argtypes
+  empty!(ir.argtypes); append!(ir.argtypes, argtypes)
   ir = IncrementalCompact(ir)
   map = Dict{Argument,SSAValue}()
   for i = 1:length(Ts)
-    map[Argument(i+1)] = insert_node_here!(ir, xcall(Base, :getfield, Argument(2), i), Ts[i], 0)
+    map[Argument(i+n)] = insert_node_here!(ir, xcall(Base, :getfield, Argument(n+1), i), Ts[i], 0)
   end
   for (i, x) in ir
     ir[i] = argmap(a -> get(map, a, a), x)
