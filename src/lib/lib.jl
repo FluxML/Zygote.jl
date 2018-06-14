@@ -19,6 +19,10 @@ end
 
 using MacroTools: combinedef
 
+_gradtuple(::Nothing) = nothing
+_gradtuple(x::Tuple) = (nothing, x...)
+_gradtuple(x) = error("Gradient $x should be a tuple")
+
 macro grad(ex)
   def = splitdef(ex)
   pushfirst!(def[:args], :(::typeof($(def[:name]))))
@@ -27,11 +31,10 @@ macro grad(ex)
   def[:body] = quote
     Base.@_inline_meta
     y, back = $(def[:body])
-    y, @inline function (Δ)
-      Δ == nothing && return nothing
-      Δ = back(Δ)::Union{Tuple,Nothing}
-      Δ == nothing ? Δ : (nothing, Δ...)
-    end
+    back2(::Nothing) = nothing
+    # return needed for type inference
+    back2(Δ) = return _gradtuple(back(Δ))
+    y, back2
   end
   combinedef(def)
 end

@@ -53,13 +53,12 @@ end
 
 _forward(args...) = _forward(Context(), args...)
 
+tailmemaybe(::Nothing) = nothing
+tailmemaybe(x::Tuple) = Base.tail(x)
+
 function forward(f, args...)
   y, back = _forward(f, args...)
-  y, function (Δ)
-    Δ = back(Δ)
-    Δ == nothing && return
-    Base.tail(Δ)
-  end
+  y, Δ -> tailmemaybe(back(Δ))
 end
 
 function gradient(f, args...)
