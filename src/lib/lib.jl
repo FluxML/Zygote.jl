@@ -1,5 +1,7 @@
 # Interfaces
 
+grad(::Type) = nothing
+
 @generated function grad(x)
   (x.mutable || fieldcount(x) == 0) && return
   Expr(:tuple, [:($f = grad(x.$f)) for f in fieldnames(x)]...)

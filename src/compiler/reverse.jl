@@ -83,7 +83,10 @@ function reachable(ir)
   return seen
 end
 
-ignored(f) = f in (GlobalRef(Base, :not_int), GlobalRef(Core.Intrinsics, :not_int), GlobalRef(Core, :(===)))
+ignored(f) = f in (GlobalRef(Base, :not_int),
+                   GlobalRef(Core.Intrinsics, :not_int),
+                   GlobalRef(Core, :(===)),
+                   GlobalRef(Core, :apply_type))
 ignored(ir, f) = ignored(f)
 ignored(ir, f::SSAValue) = ignored(ir[f])
 
@@ -98,8 +101,7 @@ function record!(ir::IRCode)
   for i = 1:length(ir.stmts)
     ex = argmap(x -> Argument(x.n+2), ir[SSAValue(i)])
     isexpr(ex, :new) && (ex = ir[SSAValue(i)] = xcall(Zygote, :__new__, ex.args...))
-    if isexpr(ex, :call)
-      ignored(ir, ex.args[1]) && continue
+    if isexpr(ex, :call) && !ignored(ir, ex.args[1])
       T = _forward_type(exprtype.(Ref(ir), ex.args))
       yJ = insert_node!(ir, i, T, xcall(Zygote, :_forward, Argument(2), ex.args...))
       ir[SSAValue(i)] = xgetindex(yJ, 1)
