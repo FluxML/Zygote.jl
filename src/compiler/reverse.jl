@@ -17,7 +17,7 @@ end
 function merge_returns(ir)
   rs = findall(x -> x isa ReturnNode, ir.stmts)
   length(rs) <= 1 && return ir
-  bs = blockidx.(ir, rs)
+  bs = blockidx.(Ref(ir), rs)
   xs = []
   bb = length(ir.cfg.blocks)+1
   @assert length(unique(bs)) == length(bs)
@@ -151,7 +151,7 @@ IRCode(ir::ReverseIR) =
          [0x00 for _ in ir.stmts], CFG(ir.blocks), NewNode[])
 
 function dominates(ir::ReverseIR, def, use)
-  bdef, buse = blockidx.(ir.forw, (def, use))
+  bdef, buse = blockidx.(Ref(ir.forw), (def, use))
   bdef == buse && return def.id <= use.id
   bdef, buse = ir.perm[[bdef, buse]]
   dt = construct_domtree(reverse_cfg(ir.forw.cfg, ir.perm))
@@ -239,6 +239,8 @@ function grad_ir(ir; varargs = false)
   back, perm = reverse_ir(forw, xs, varargs = varargs)
   return Adjoint(forw, compact!(back), perm)
 end
+
+using InteractiveUtils: @which
 
 macro code_grad(ex)
   # TODO fix escaping

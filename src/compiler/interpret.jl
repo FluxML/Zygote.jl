@@ -40,7 +40,7 @@ function step!(i::Interpreter)
   elseif ex == nothing
     i.pc += 1
   elseif isexpr(ex, :call)
-    assign!(i, call(lookup.(i,ex.args)...))
+    assign!(i, call(lookup.(Ref(i),ex.args)...))
     i.pc += 1
   elseif isexpr(ex, GlobalRef)
     assign!(i, getfield(ex.mod, ex.name))

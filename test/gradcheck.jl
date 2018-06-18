@@ -21,12 +21,12 @@ gradcheck(f, xs...) =
                 gradient(f, xs...), rtol = 1e-5, atol = 1e-5))
 
 gradtest(f, xs::AbstractArray...) = gradcheck((xs...) -> sum(broadcast(sin, f(xs...))), xs...)
-gradtest(f, dims...) = gradtest(f, rand.(dims)...)
+gradtest(f, dims...) = gradtest(f, rand.(Float64, dims)...)
 
 @testset "Gradients" begin
 
 @test gradtest(*, (2,5), 5)
 
-@test gradtest(x -> sum(x, (2, 3)), rand(3,4,5))
+@test gradtest(x -> sum(x, (2, 3)), rand(Float64,3,4,5))
 
 end
