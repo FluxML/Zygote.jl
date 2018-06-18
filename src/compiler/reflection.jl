@@ -32,9 +32,20 @@ function typed_meta(T; world = ccall(:jl_get_world_counter, UInt, ()), optimize 
   return Meta(method, ci, sps)
 end
 
+function inline_sparams!(ir::IRCode, sps)
+  ir = IncrementalCompact(ir)
+  for (i, x) in ir
+    for x in userefs(x)
+      isexpr(x[], :static_parameter) && (x[] = sps[x[].args[1]])
+    end
+  end
+  return finish(ir)
+end
+
 function IRCode(meta::Meta)
-  just_construct_ssa(meta.code, deepcopy(meta.code.code),
-                     Int(meta.method.nargs)-1, meta.static_params) |> compact!
+  ir = just_construct_ssa(meta.code, deepcopy(meta.code.code),
+                          Int(meta.method.nargs)-1, meta.static_params)
+  return inline_sparams!(ir, meta.static_params)
 end
 
 function code_ir(f, T)

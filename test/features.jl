@@ -16,6 +16,7 @@ relu(x) = x > 0 ? x : 0
 
 @test roundtrip(add, 1, 2) == 3
 @test roundtrip(relu, 1) == 1
+@test roundtrip(Complex, 1, 2) == 1+2im
 
 y, back = forward(identity, 1)
 dx = back(2)
