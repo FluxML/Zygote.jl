@@ -88,6 +88,7 @@ ignored(ir, f) = ignored(f)
 ignored(ir, f::SSAValue) = ignored(ir[f])
 
 function record!(ir::IRCode)
+  pushfirst!(ir.argtypes, typeof(_forward), Context)
   xs = reachable(ir)
   for i = 1:length(ir.stmts)
     ex = argmap(x -> Argument(x.n+2), ir[SSAValue(i)])
@@ -217,7 +218,7 @@ function reverse_ir(forw::IRCode, xs; varargs = false)
       grad!(ir, grads, i)
     end
     if bi == length(ir.forw.cfg.blocks)
-      gs = [get(grads, Argument(i+2), nothing) for i = 1:length(forw.argtypes)]
+      gs = [get(grads, Argument(i), nothing) for i = 3:length(forw.argtypes)]
       push!(ir, xcall(Zygote, varargs ? :deref_tuple_va : :deref_tuple, gs...))
       push!(ir, ReturnNode(SSAValue(length(ir.stmts))))
     end

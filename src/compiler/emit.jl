@@ -24,7 +24,7 @@ function forward_stacks!(adj, T)
       insert_node!(adj.forw, loc-1, Any, xcall(:push!, stk, α), true)
     end
   end
-  args = [Argument(i+2) for i = 1:length(adj.forw.argtypes)]
+  args = [Argument(i) for i = 3:length(adj.forw.argtypes)]
   rec = insert_node!(adj.forw, length(adj.forw.stmts), Any,
                      xtuple(args..., recs...))
   rec = insert_node!(adj.forw, length(adj.forw.stmts), Any,
@@ -65,6 +65,6 @@ end
 
 function stacks!(adj, T)
   forw, stks = forward_stacks!(adj, T)
-  back = reverse_stacks!(adj.back, stks, length(forw.argtypes))
+  back = reverse_stacks!(adj.back, stks, length(forw.argtypes)-2)
   return forw, back
 end

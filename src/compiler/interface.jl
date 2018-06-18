@@ -20,7 +20,6 @@ Base.show(io::IO, j::J{S}) where S = print(io, "J{$(S.parameters[1])}(...)")
   T = Tuple{f,args...}
   (g = _lookup_grad(T)) == nothing && return :(f(args...), J{$T}(()))
   meta, forw, _ = g
-  pushfirst!(forw.argtypes, typeof(_forward), Context)
   forw = varargs!(meta, forw, 3)
   update!(meta, forw)
   meta.code.slotnames = [Symbol("#self#"), :ctx, :f, :args]
