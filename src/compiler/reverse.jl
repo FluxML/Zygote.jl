@@ -87,6 +87,11 @@ ignored(f) = f in (GlobalRef(Base, :not_int), GlobalRef(Core.Intrinsics, :not_in
 ignored(ir, f) = ignored(f)
 ignored(ir, f::SSAValue) = ignored(ir[f])
 
+# TODO: error out when return type is not consistent
+# TODO: remove this once we don't mess with type inference
+_forward_type(Ts) =
+  Core.Compiler.return_type(_forward, Tuple{Context,Ts...})
+
 function record!(ir::IRCode)
   pushfirst!(ir.argtypes, typeof(_forward), Context)
   xs = reachable(ir)
@@ -95,9 +100,10 @@ function record!(ir::IRCode)
     isexpr(ex, :new) && (ex = ir[SSAValue(i)] = xcall(Zygote, :__new__, ex.args...))
     if isexpr(ex, :call)
       ignored(ir, ex.args[1]) && continue
-      yJ = insert_node!(ir, i, Any, xcall(Zygote, :_forward, Argument(2), ex.args...))
+      T = _forward_type(exprtype.(Ref(ir), ex.args))
+      yJ = insert_node!(ir, i, T, xcall(Zygote, :_forward, Argument(2), ex.args...))
       ir[SSAValue(i)] = xgetindex(yJ, 1)
-      insert_node!(ir, i, Any, xgetindex(yJ, 2), true)
+      insert_node!(ir, i, T.parameters[2], xgetindex(yJ, 2), true)
     else
       ir[SSAValue(i)] = ex
     end

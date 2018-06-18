@@ -44,6 +44,13 @@ function argmap(f, @nospecialize(stmt))
     return urs[]
 end
 
+exprtype(ir::IRCode, x::Argument) = ir.argtypes[x.n]
+exprtype(ir::IRCode, x::SSAValue) = ir.types[x.id]
+exprtype(ir::IRCode, x::GlobalRef) = isconst(x.mod, x.name) ? typeof(getfield(x.mod, x.name)) : Any
+exprtype(ir::IRCode, x::QuoteNode) = typeof(x.value)
+# probably can fall back to any here
+exprtype(ir::IRCode, x::Union{Type,Number}) = Core.Typeof(x)
+
 rename(x, m) = x
 rename(x::SSAValue, m) = m[x.id]
 rename(xs::AbstractVector, m) = map(x -> rename(x, m), xs)
