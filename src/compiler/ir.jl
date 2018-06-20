@@ -5,7 +5,7 @@ import Core.Compiler: IRCode, CFG, BasicBlock, Argument, ReturnNode,
   compact!, finish, DomTree, construct_domtree, dominates, userefs
 using InteractiveUtils: typesof
 
-for T in :[IRCode, IncrementalCompact, Compiler.UseRef, Compiler.UseRefIterator].args
+for T in :[IRCode, IncrementalCompact, Compiler.UseRef, Compiler.UseRefIterator, Compiler.TypesView].args
   @eval begin
     Base.getindex(ir::$T, a...) = Compiler.getindex(ir, a...)
     Base.setindex!(ir::$T, a...) = Compiler.setindex!(ir, a...)
@@ -45,7 +45,7 @@ function argmap(f, @nospecialize(stmt))
 end
 
 exprtype(ir::IRCode, x::Argument) = ir.argtypes[x.n]
-exprtype(ir::IRCode, x::SSAValue) = ir.types[x.id]
+exprtype(ir::IRCode, x::SSAValue) = Compiler.types(ir)[x]
 exprtype(ir::IRCode, x::GlobalRef) = isconst(x.mod, x.name) ? typeof(getfield(x.mod, x.name)) : Any
 exprtype(ir::IRCode, x::QuoteNode) = typeof(x.value)
 # probably can fall back to any here
