@@ -6,8 +6,6 @@ function alphauses(ir, bi)
   return us
 end
 
-xcall(mod::Module, f::Symbol, args...) = Expr(:call, GlobalRef(mod, f), args...)
-xcall(f::Symbol, args...) = xcall(Base, f, args...)
 xstack(T) = (Vector{T}, Expr(:call, Vector{T}))
 xtuple(xs...) = xcall(:tuple, xs...)
 
