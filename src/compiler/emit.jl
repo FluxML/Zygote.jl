@@ -1,3 +1,23 @@
+# Stacks
+
+mutable struct Stack{T}
+  idx::Int
+  data::Vector{T}
+end
+
+Stack(data::Vector{T}) where T =
+  Stack{T}(length(data), data)
+
+function Base.pop!(stk::Stack)
+  i = stk.idx
+  stk.idx = i == 1 ? length(stk.data) : i-1
+  @inbounds return stk.data[i]
+end
+
+xstack(T) = (Vector{T}, Expr(:call, Vector{T}))
+
+# Emit
+
 function alphauses(ir, bi)
   us = []
   for i = range(ir.cfg.blocks[bi]), u in userefs(ir.stmts[i])
@@ -6,7 +26,6 @@ function alphauses(ir, bi)
   return us
 end
 
-xstack(T) = (Vector{T}, Expr(:call, Vector{T}))
 xtuple(xs...) = xcall(:tuple, xs...)
 
 afterphi(ir, loc) = ir.stmts[loc] isa PhiNode ? afterphi(ir, loc+1) : loc
@@ -44,7 +63,8 @@ function reverse_stacks!(ir, stks, nargs)
     for (i, (b′, α)) in enumerate(stks)
       b == b′ || continue
       loc = max(2,range(ir.cfg.blocks[b])[1])
-      stk = insert_node!(ir, loc, Any, xcall(:getindex, t, i+nargs))
+      stk = insert_node!(ir, 1, Any, xcall(:getindex, t, i+nargs))
+      stk = insert_node!(ir, 1, Any, xcall(Zygote, :Stack, stk))
       val = insert_node!(ir, loc, Any, xcall(:pop!, stk))
       repl[α] = val
     end
