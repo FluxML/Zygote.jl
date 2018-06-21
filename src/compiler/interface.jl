@@ -27,7 +27,7 @@ function _forward(ctx::Context, f, args...)
   meta, forw, back = g
   nargs = meta.method.nargs
   meta.method.isva && (args = (args[1:nargs-2]...,args[nargs-1:end]))
-  y, c = interpret(forw, _forward, ctx, f, args..., sparams = [meta.static_params...])
+  y, c = interpret(forw, _forward, ctx, f, args...)
   return y, Δ -> interpret(back, c, Δ)
 end
 

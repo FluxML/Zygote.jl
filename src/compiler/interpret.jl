@@ -1,10 +1,9 @@
 mutable struct Interpreter
   ir::IRCode
   args::Vector{Any}
-  sparams::Vector{Any}
   locals::Dict{SSAValue,Any}
   pc::Int
-  Interpreter(ir::IRCode, args...; sparams = []) = new(ir, Any[args...], sparams, Dict(), 1)
+  Interpreter(ir::IRCode, args...) = new(ir, Any[args...], Dict(), 1)
 end
 
 blockidx(i::Interpreter) = blockidx(i.ir, i.pc)
@@ -16,7 +15,6 @@ lookup(i::Interpreter, x::GlobalRef) = getfield(x.mod, x.name)
 lookup(i::Interpreter, x::Argument) = i.args[x.n]
 lookup(i::Interpreter, x::SSAValue) = i.locals[x]
 lookup(i::Interpreter, x::Expr) =
-  isexpr(x, :static_parameter) ? i.sparams[x.args[1]] :
   error("Can't lookup $(x.head) expr")
 
 function phis!(i::Interpreter, blk)
@@ -62,4 +60,4 @@ function run!(i::Interpreter)
   return lookup(i, i.ir.stmts[i.pc].val)
 end
 
-interpret(ir, args...; sparams = []) = run!(Interpreter(ir, args...; sparams = sparams))
+interpret(ir, args...) = run!(Interpreter(ir, args...))
