@@ -53,7 +53,7 @@ end
 # Core functions
 
 @nograd Core.apply_type, Core.typeof, nfields,
-  (==), (===), (>=), (<)
+  (==), (===), (>=), (<), (>)
 
 @grad ifelse(cond::Bool, t, f) =
   Base.select_value(cond, t, f),
