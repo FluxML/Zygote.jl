@@ -10,6 +10,7 @@ end
 
 @generated function (j::J{T})(Δ) where T
   meta, _, back = _lookup_grad(T)
+  resize!(back.argtypes, 2)
   meta.code.slottypes = Any[j, Δ]
   meta.code.slotnames = Any[Symbol("#self#"), :Δ]
   update!(meta, back)
