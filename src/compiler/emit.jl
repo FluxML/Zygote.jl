@@ -34,12 +34,16 @@ function forward_stacks!(adj, F)
   stks, recs = [], []
   for fb = 1:length(adj.perm)
     for α in alphauses(adj.back, adj.perm[fb])
-      T = exprtype(adj.forw, α)
-      stk = insert_node!(adj.forw, 1, xstack(T)...)
+      if fb == 1
+        push!(recs, α)
+      else
+        T = exprtype(adj.forw, α)
+        stk = insert_node!(adj.forw, 1, xstack(T)...)
+        push!(recs, stk)
+        loc = afterphi(adj.forw, α.id+1)
+        insert_node!(adj.forw, loc-1, Any, xcall(:push!, stk, α), true)
+      end
       push!(stks, (adj.perm[fb], alpha(α)))
-      push!(recs, stk)
-      loc = afterphi(adj.forw, α.id+1)
-      insert_node!(adj.forw, loc-1, Any, xcall(:push!, stk, α), true)
     end
   end
   args = [Argument(i) for i = 3:length(adj.forw.argtypes)]
@@ -63,9 +67,13 @@ function reverse_stacks!(ir, stks, nargs)
     for (i, (b′, α)) in enumerate(stks)
       b == b′ || continue
       loc = max(2,range(ir.cfg.blocks[b])[1])
-      stk = insert_node!(ir, 1, Any, xcall(:getindex, t, i+nargs))
-      stk = insert_node!(ir, 1, Any, xcall(Zygote, :Stack, stk))
-      val = insert_node!(ir, loc, Any, xcall(:pop!, stk))
+      if b′ == length(ir.cfg.blocks)
+        val = insert_node!(ir, loc, Any, xcall(:getindex, t, i+nargs))
+      else
+        stk = insert_node!(ir, 1, Any, xcall(:getindex, t, i+nargs))
+        stk = insert_node!(ir, 1, Any, xcall(Zygote, :Stack, stk))
+        val = insert_node!(ir, loc, Any, xcall(:pop!, stk))
+      end
       repl[α] = val
     end
     for i in range(ir.cfg.blocks[b]), u in userefs(ir.stmts[i])
