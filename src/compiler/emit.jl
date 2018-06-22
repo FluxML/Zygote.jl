@@ -16,6 +16,12 @@ end
 
 xstack(T) = (Vector{T}, Expr(:call, Vector{T}))
 
+function _push!(a::Vector{T}, x::T) where T
+  Base._growend!(a, 1)
+  @inbounds a[end] = x
+  return
+end
+
 # Emit
 
 function alphauses(ir, bi)
@@ -41,7 +47,7 @@ function forward_stacks!(adj, F)
         stk = insert_node!(adj.forw, 1, xstack(T)...)
         push!(recs, stk)
         loc = afterphi(adj.forw, α.id+1)
-        insert_node!(adj.forw, loc-1, Any, xcall(:push!, stk, α), true)
+        insert_node!(adj.forw, loc-1, Any, xcall(Zygote, :_push!, stk, α), true)
       end
       push!(stks, (adj.perm[fb], alpha(α)))
     end
