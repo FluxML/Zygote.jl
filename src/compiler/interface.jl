@@ -43,7 +43,7 @@ function forward_(f, args::Tuple)
   y, Δ -> tailmemaybe(back(Δ))
 end
 
-function gradient_(f, args::Tuple)
+function gradient_(f::F, args::Tuple) where F
   y, J = forward_(f, args)
   y isa Real || error("Function output is not scalar")
   return J(1)

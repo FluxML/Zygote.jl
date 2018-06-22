@@ -14,6 +14,7 @@ end
   resize!(back.argtypes, 2)
   meta.code.slottypes = Any[j, Δ]
   meta.code.slotnames = Any[Symbol("#self#"), :Δ]
+  back = inlineable!(back)
   update!(meta, back)
   # Enable type inference
   meta.code.inferred = false
