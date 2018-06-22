@@ -3,6 +3,7 @@
   (g = _lookup_grad(T)) == nothing && return :(f(args...), J{$T}(()))
   meta, forw, _ = g
   forw = varargs!(meta, forw, 3)
+  forw = inlineable!(forw)
   update!(meta, forw)
   meta.code.slotnames = [Symbol("#self#"), :ctx, :f, :args]
   return meta.code

@@ -105,3 +105,8 @@ end
   update!(meta, ir)
   return meta.code
 end
+
+function inlineable!(ir)
+  insert_node!(ir, 1, Any, Expr(:meta, :inline))
+  compact!(ir)
+end
