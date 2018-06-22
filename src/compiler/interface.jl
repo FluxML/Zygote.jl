@@ -20,7 +20,7 @@ Base.show(io::IO, j::J{S}) where S = print(io, "J{$(S.parameters[1])}(...)")
 
 # Interpreted mode
 
-function _forward(ctx::Context, f, args...)
+function _forward(ctx::Context, f, args::Tuple)
   T = typesof(f, args...)
   (g = _lookup_grad(T)) == nothing &&
     return f(args...), Δ -> error("Undifferentiable function $f")
@@ -33,18 +33,21 @@ end
 
 # Wrappers
 
-_forward(f::F, args...) where F = _forward(Context(), f, args...)
+_forward(f, args::Tuple) = _forward(Context(), f, args)
 
 tailmemaybe(::Nothing) = nothing
 tailmemaybe(x::Tuple) = Base.tail(x)
 
-function forward(f::F, args...) where F
-  y, back = _forward(f, args...)
+function forward_(f, args::Tuple)
+  y, back = _forward(f, args)
   y, Δ -> tailmemaybe(back(Δ))
 end
 
-function gradient(f::F, args...) where F
-  y, J = forward(f, args...)
+function gradient_(f, args::Tuple)
+  y, J = forward_(f, args)
   y isa Real || error("Function output is not scalar")
   return J(1)
 end
+
+forward(f, args...) = forward_(f, args)
+gradient(f, args...) = gradient_(f, args)

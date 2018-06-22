@@ -1,5 +1,5 @@
-@generated function _forward(ctx::Context, f, args...)
-  T = Tuple{f,args...}
+@generated function _forward(ctx::Context, f, args::Tuple)
+  T = Tuple{f,args.parameters...}
   (g = _lookup_grad(T)) == nothing && return :(f(args...), J{$T}(()))
   meta, forw, _ = g
   forw = varargs!(meta, forw, 3)

@@ -92,8 +92,8 @@ ignored(ir, f::SSAValue) = ignored(ir[f])
 
 # TODO: error out when return type is not consistent
 # TODO: remove this once we don't mess with type inference
-_forward_type(Ts) =
-  Core.Compiler.return_type(_forward, Tuple{Context,Ts...})
+_forward_type(f, a...) =
+  Core.Compiler.return_type(_forward, Tuple{Context,f,Tuple{a...}})
 
 function record!(ir::IRCode)
   pushfirst!(ir.argtypes, typeof(_forward), Context)
@@ -102,9 +102,12 @@ function record!(ir::IRCode)
     ex = argmap(x -> Argument(x.n+2), ir[SSAValue(i)])
     isexpr(ex, :new) && (ex = ir[SSAValue(i)] = xcall(Zygote, :__new__, ex.args...))
     if isexpr(ex, :call) && !ignored(ir, ex.args[1])
-      T = _forward_type(exprtype.(Ref(ir), ex.args))
-      T == Any && error("Couldn't infer type for $((exprtype.(Ref(ir), ex.args)...,))")
-      yJ = insert_node!(ir, i, T, xcall(Zygote, :_forward, Argument(2), ex.args...))
+      Ts = exprtype.(Ref(ir), ex.args)
+      T = _forward_type(Ts...)
+      (T <: Tuple && T != Union{}) || error("Couldn't infer type for $((exprtype.(Ref(ir), ex.args)...,))")
+      args = insert_node!(ir, i, Tuple{Ts[2:end]...}, xtuple(ex.args[2:end]...))
+      yJ = insert_node!(ir, i, T, xcall(Zygote, :_forward, Argument(2), ex.args[1], args))
+      # yJ = insert_node!(ir, i, T, xcall(Zygote, :_forward, Argument(2), ex.args...))
       ir[SSAValue(i)] = xgetindex(yJ, 1)
       insert_node!(ir, i, T.parameters[2], xgetindex(yJ, 2), true)
     else
@@ -202,7 +205,8 @@ function grad!(ir::ReverseIR, grads, i)
     J = Alpha(i+2)
     push!(ir, Expr(:call, GlobalRef(Zygote, :backprop), J, Δ))
     Δ = SSAValue(length(ir.stmts))
-    for (i, x) in enumerate(ex.args[3:end])
+    args = [ex.args[3], ir.forw[ex.args[4]].args[2:end]...]
+    for (i, x) in enumerate(args)
       haskey(grads, x) || continue
       push!(ir, xgradindex(Δ, i))
       xaccum_(ir, grads, x, SSAValue(length(ir.stmts)))

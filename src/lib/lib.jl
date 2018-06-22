@@ -25,27 +25,45 @@ _gradtuple(::Nothing) = nothing
 _gradtuple(x::Tuple) = (nothing, x...)
 _gradtuple(x) = error("Gradient $x should be a tuple")
 
+argtype(x) =
+  isexpr(x, :(...)) ? :(Vararg{$(argtype(x.args[1]))}) :
+  isexpr(x, :(::)) ? x.args[2] : Any
+
+argtypes(xs) = :(Tuple{$(argtype.(xs)...)})
+
+_drop(xs, n) = reduce((xs, _) -> :(Base.tail($xs)), xs, 1:n)
+
+_destructure(args, xs) =
+  isempty(args) ? nothing :
+  isexpr(args[end], :(...)) || @capture(argtype(args[end]), Vararg{__}) ?
+    :($(_destructure(args[1:end-1], xs)); $(namify(args[end])) = $(_drop(xs, length(args)-1))) :
+  :(($(namify.(args)...),) = $xs)
+
 macro grad(ex)
   def = splitdef(ex)
+  args = def[:args]
+  T = argtypes(def[:args])
+  def[:args] = [:(args::$T)]
   pushfirst!(def[:args], :(::typeof($(def[:name]))))
   pushfirst!(def[:args], :(::Context))
-  def[:name] = :_forward
+  def[:name] = GlobalRef(Zygote, :_forward)
   def[:body] = quote
     Base.@_inline_meta
+    $(_destructure(args, :args))
     y, back = $(def[:body])
     back2(::Nothing) = nothing
     # return needed for type inference
     back2(Δ) = return _gradtuple(back(Δ))
     y, back2
   end
-  combinedef(def)
+  combinedef(def) |> esc
 end
 
 macro nograd(ex)
   isexpr(ex, :tuple) || (ex = Expr(:tuple, ex))
   blk = :(;)
   for f in ex.args
-    push!(blk.args, :(@inline Zygote._forward(::Context, ::typeof($(esc(f))), args...) = $(esc(f))(args...), Δ -> nothing))
+    push!(blk.args, :(@inline Zygote._forward(::Context, ::typeof($(esc(f))), args::Tuple) = $(esc(f))(args...), Δ -> nothing))
   end
   return blk
 end
@@ -82,12 +100,17 @@ function unapply(xs, Δs)
   return (Δs′...,)
 end
 
-function _forward(ctx::Context, ::typeof(Core._apply), f, args...)
-  y, J = Core._apply(_forward, (ctx, f), args...)
+tcat(x) = (x...,)
+tcat(x, y, zs...) = tcat((x..., y...), zs...)
+
+function _forward(ctx::Context, ::typeof(Core._apply), args::Tuple)
+  f, = args
+  args = Base.tail(args)
+  y, J = _forward(ctx, f, tcat(args...))
   y, function (Δ)
-    Δ = J(Δ)
-    (nothing, first(Δ), unapply(args, Base.tail(Δ))...)
- end
+    d = J(Δ)
+    (nothing, first(d), unapply(args, Base.tail(d))...)
+  end
 end
 
 # Structs
