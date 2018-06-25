@@ -156,7 +156,7 @@ function block!(ir::ReverseIR)
 end
 
 IRCode(ir::ReverseIR) =
-  IRCode(ir.forw, ir.stmts, Any[Any for _ in ir.stmts], [1 for _ in ir.stmts],
+  IRCode(ir.forw, ir.stmts, Any[Any for _ in ir.stmts], Int32[1 for _ in ir.stmts],
          [0x00 for _ in ir.stmts], CFG(ir.blocks), NewNode[])
 
 function dominates(ir::ReverseIR, def, use)

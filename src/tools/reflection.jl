@@ -24,7 +24,8 @@ function typed_meta(T; world = ccall(:jl_get_world_counter, UInt, ()), optimize 
   length(_methods) == 1 || return nothing
   type_signature, sps, method = first(_methods)
   params = Core.Compiler.Params(world)
-  (_, ci, ty) = Core.Compiler.typeinf_code(method, type_signature, sps, optimize, true, params)
+  (ci, ty) = Core.Compiler.typeinf_code(method, type_signature, sps, optimize, params)
+  ci.inferred = true
   if ci.ssavaluetypes == 0 # constant return; IRCode doesn't like this
     ci.ssavaluetypes = Any[Any]
     ci.slottypes = Any[Any for i = 1:method.nargs]
@@ -79,13 +80,13 @@ end
 function varargs!(meta::Meta, ir::IRCode, n = 1)
   @assert !meta.method.isva # TODO
   Ts = ir.argtypes[n+1:end]
-  argtypes = Any[ir.argtypes[1:n]..., Tuple{Ts...}]
+  argtypes = Any[ir.argtypes[1:n]..., Tuple{widenconst.(Ts)...}]
   meta.code.slottypes = argtypes
   empty!(ir.argtypes); append!(ir.argtypes, argtypes)
   ir = IncrementalCompact(ir)
   map = Dict{Argument,SSAValue}()
   for i = 1:length(Ts)
-    map[Argument(i+n)] = insert_node_here!(ir, xcall(Base, :getfield, Argument(n+1), i), Ts[i], 0)
+    map[Argument(i+n)] = insert_node_here!(ir, xcall(Base, :getfield, Argument(n+1), i), Ts[i], Int32(0))
   end
   for (i, x) in ir
     ir[i] = argmap(a -> get(map, a, a), x)
