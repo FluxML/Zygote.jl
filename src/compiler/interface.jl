@@ -33,17 +33,17 @@ end
 
 # Wrappers
 
-_forward(f::F, args...) where F = _forward(Context(), f, args...)
+_forward(f, args...) = _forward(Context(), f, args...)
 
 tailmemaybe(::Nothing) = nothing
 tailmemaybe(x::Tuple) = Base.tail(x)
 
-function forward(f::F, args...) where F
+function forward(f, args...)
   y, back = _forward(f, args...)
   y, Δ -> tailmemaybe(back(Δ))
 end
 
-function gradient(f::F, args...) where F
+function gradient(f, args...)
   y, J = forward(f, args...)
   y isa Real || error("Function output is not scalar")
   return J(1)
