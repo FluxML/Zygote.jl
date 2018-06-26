@@ -9,6 +9,15 @@ struct Foo{T}
   b::T
 end
 
+function pow(x, n)
+  r = 1
+  while n > 0
+    n -= 1
+    r *= x
+  end
+  return r
+end
+
 @testset "Features" begin
 
 add(a, b) = a+b
@@ -47,15 +56,6 @@ y, back = forward(broadcast, *, [1,2,3], [4,5,6])
 dxs = back([1,1,1])
 @test y == [4, 10, 18]
 @test dxs == (nothing, [4, 5, 6], [1, 2, 3])
-
-function pow(x, n)
-  r = 1
-  while n > 0
-    n -= 1
-    r *= x
-  end
-  return r
-end
 
 @test gradient(pow, 2, 3) == (12, nothing)
 
