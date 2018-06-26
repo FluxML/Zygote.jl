@@ -50,7 +50,7 @@ function IRCode(meta::Meta)
 end
 
 function code_ir(f, T)
-  meta = typed_meta(Tuple{Core.Typeof(f),T.parameters...})
+  meta = typed_meta(Tuple{Typeof(f),T.parameters...})
   return IRCode(meta)
 end
 
