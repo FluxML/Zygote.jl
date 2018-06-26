@@ -5,6 +5,6 @@ using Zygote: gradient
 
 include("features.jl")
 include("gradcheck.jl")
-include("perf.jl")
+include("compiler.jl")
 
 end
