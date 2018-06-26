@@ -1,18 +1,14 @@
 using Base: RefValue
 
-deref(x) = x
-deref(x::RefValue) = x[]
 gradref(x) = RefValue(grad(x))
 
 accum!(r::RefValue, x) = (r.x = accum(r.x, deref(x)))
 
-backprop(J, Δx) = J(Δx)
+reset!(_) = nothing
+reset!(r::RefValue) = (r.x = grad(r.x))
 
-function backprop(J, Δx::RefValue)
-  Δy = J(Δx.x)
-  Δx.x = grad(Δx.x)
-  return Δy
-end
+deref(x) = x
+deref(x::RefValue) = x[]
 
 function merge_returns(ir)
   rs = findall(x -> x isa ReturnNode, ir.stmts)
@@ -142,7 +138,7 @@ ReverseIR(ir::IRCode) = ReverseIR(ir, reverse_order(ir.cfg), [], [], [], usages(
 function Base.push!(ir::ReverseIR, x, i = 0)
   push!(ir.stmts, x)
   push!(ir.lines, i)
-  return ir
+  return SSAValue(length(ir.stmts))
 end
 
 function block!(ir::ReverseIR)
@@ -203,11 +199,12 @@ function grad!(ir::ReverseIR, grads, i)
   if ex isa ReturnNode && (ex.val isa SSAValue || ex.val isa Argument)
     xaccum_(ir, grads, ex.val, SSAValue(1))
   elseif isexpr(ex, :call) && ex.args[1] == GlobalRef(Zygote, :_forward)
-    Δ = get(grads, SSAValue(i+1), nothing)
     J = Alpha(i+2)
     line = ir.forw.lines[i]
-    push!(ir, Expr(:call, GlobalRef(Zygote, :backprop), J, Δ), line)
-    Δ = SSAValue(length(ir.stmts))
+    Δref = get(grads, SSAValue(i+1), nothing)
+    Δ = Δref == nothing ? nothing : push!(ir, xcall(Zygote, :deref, Δref), line)
+    Δ = push!(ir, Expr(:call, J, Δ), line)
+    Δref == nothing || push!(ir, xcall(Zygote, :reset!, Δref))
     for (i, x) in enumerate(ex.args[3:end])
       haskey(grads, x) || continue
       push!(ir, xgradindex(Δ, i), line)
