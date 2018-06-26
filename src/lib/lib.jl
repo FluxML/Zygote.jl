@@ -26,19 +26,19 @@ _gradtuple(x::Tuple) = (nothing, x...)
 _gradtuple(x) = error("Gradient $x should be a tuple")
 
 macro grad(ex)
-  def = splitdef(ex)
-  pushfirst!(def[:args], :(::typeof($(def[:name]))))
-  pushfirst!(def[:args], :(::Context))
-  def[:name] = :_forward
-  def[:body] = quote
+  @capture(shortdef(ex), (name_(args__) = body_) |
+                         (name_(args__) where {T__} = body_)) || error("Need a function definition")
+  T == nothing && (T = [])
+  pushfirst!(args, :(::Zygote.Context), :(::typeof($name)))
+  body = quote
     Base.@_inline_meta
-    y, back = $(def[:body])
+    y, back = $body
     back2(::Nothing) = nothing
     # return needed for type inference
     back2(Δ) = return _gradtuple(back(Δ))
     y, back2
   end
-  combinedef(def)
+  :(Zygote._forward($(args...)) where $(T...) = $body) |> esc
 end
 
 macro nograd(ex)
