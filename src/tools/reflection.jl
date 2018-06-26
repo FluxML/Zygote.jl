@@ -78,15 +78,26 @@ end
 
 # Behave as if the function signature is f(args...)
 function varargs!(meta::Meta, ir::IRCode, n = 1)
-  @assert !meta.method.isva # TODO
-  Ts = ir.argtypes[n+1:end]
-  argtypes = Any[ir.argtypes[1:n]..., Tuple{widenconst.(Ts)...}]
+  isva = meta.method.isva
+  Ts = widenconst.(ir.argtypes[n+1:end])
+  argtypes = !isva ?
+    Any[ir.argtypes[1:n]..., Tuple{Ts...}] :
+    Any[ir.argtypes[1:n]..., Tuple{Ts[1:end-1]...,Ts[end].parameters...}]
   meta.code.slottypes = argtypes
   empty!(ir.argtypes); append!(ir.argtypes, argtypes)
   ir = IncrementalCompact(ir)
-  map = Dict{Argument,SSAValue}()
-  for i = 1:length(Ts)
+  map = Dict{Argument,Any}()
+  for i = 1:(length(Ts)-isva)
     map[Argument(i+n)] = insert_node_here!(ir, xcall(Base, :getfield, Argument(n+1), i), Ts[i], Int32(0))
+  end
+  if isva
+    i = length(Ts)
+    xs, T = Argument(n+1), argtypes[end]
+    for _ = 1:i-1
+      T = Tuple{T.parameters[2:end]...}
+      xs = insert_node_here!(ir, xcall(Base, :tail, xs), T, Int32(0))
+    end
+    map[Argument(i+n)] = xs
   end
   for (i, x) in ir
     ir[i] = argmap(a -> get(map, a, a), x)
