@@ -1,8 +1,6 @@
 using Zygote, Test
 using Zygote: forward
 
-Zygote.compiled()
-
 @testset "Performance" begin
 
 y, back = @inferred forward(*, 2, 3)

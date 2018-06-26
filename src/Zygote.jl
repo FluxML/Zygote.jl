@@ -16,10 +16,9 @@ include("lib/lib.jl")
 include("lib/real.jl")
 include("lib/array.jl")
 
-# 1. we need to define this late, so that the genfuncs see lib.jl
-# 2. we make it optional until more tests pass in compiled mode
-function compiled()
-  include(joinpath(@__DIR__, "compiler/interface2.jl"))
-end
+# we need to define this late, so that the genfuncs see lib.jl
+include("compiler/interface2.jl")
+# helps to work around 265-y issues
+compiled() = include(joinpath(@__DIR__, "compiler/interface2.jl"))
 
 end # module
