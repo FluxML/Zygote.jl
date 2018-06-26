@@ -132,13 +132,18 @@ struct ReverseIR
   forw::IRCode
   perm::Vector{Int}
   stmts::Vector{Any}
+  lines::Vector{Int32}
   blocks::Vector{BasicBlock}
   uses::Dict{Any,Any}
 end
 
-ReverseIR(ir::IRCode) = ReverseIR(ir, reverse_order(ir.cfg), [], [], usages(ir))
+ReverseIR(ir::IRCode) = ReverseIR(ir, reverse_order(ir.cfg), [], [], [], usages(ir))
 
-Base.push!(ir::ReverseIR, x) = push!(ir.stmts, x)
+function Base.push!(ir::ReverseIR, x, i = 0)
+  push!(ir.stmts, x)
+  push!(ir.lines, i)
+  return ir
+end
 
 function block!(ir::ReverseIR)
   start = isempty(ir.blocks) ? 1 : ir.blocks[end].stmts.last+1
@@ -156,7 +161,7 @@ function block!(ir::ReverseIR)
 end
 
 IRCode(ir::ReverseIR) =
-  IRCode(ir.forw, ir.stmts, Any[Any for _ in ir.stmts], Int32[1 for _ in ir.stmts],
+  IRCode(ir.forw, ir.stmts, Any[Any for _ in ir.stmts], ir.lines,
          [0x00 for _ in ir.stmts], CFG(ir.blocks), NewNode[])
 
 function dominates(ir::ReverseIR, def, use)
@@ -170,12 +175,12 @@ end
 dominates(ir::ReverseIR, def::Argument, use) = dominates(ir, SSAValue(1), use)
 
 # TODO don't have special semantics here
-function xaccum_(ir::ReverseIR, grads, x, Δ)
+function xaccum_(ir::ReverseIR, grads, x, Δ, line = 0)
   if length(ir.uses[x]) == 1 && dominates(ir, x, ir.uses[x][1])
     ir.stmts[grads[x].id] = nothing
     grads[x] = Δ
   else
-    push!(ir, xaccum!(grads[x], Δ))
+    push!(ir, xaccum!(grads[x], Δ), line)
   end
 end
 
@@ -200,12 +205,13 @@ function grad!(ir::ReverseIR, grads, i)
   elseif isexpr(ex, :call) && ex.args[1] == GlobalRef(Zygote, :_forward)
     Δ = get(grads, SSAValue(i+1), nothing)
     J = Alpha(i+2)
-    push!(ir, Expr(:call, GlobalRef(Zygote, :backprop), J, Δ))
+    line = ir.forw.lines[i]
+    push!(ir, Expr(:call, GlobalRef(Zygote, :backprop), J, Δ), line)
     Δ = SSAValue(length(ir.stmts))
     for (i, x) in enumerate(ex.args[3:end])
       haskey(grads, x) || continue
-      push!(ir, xgradindex(Δ, i))
-      xaccum_(ir, grads, x, SSAValue(length(ir.stmts)))
+      push!(ir, xgradindex(Δ, i), line)
+      xaccum_(ir, grads, x, SSAValue(length(ir.stmts)), line)
     end
   end
 end
