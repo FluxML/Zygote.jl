@@ -96,6 +96,7 @@ end
 
 @generated pair(::Val{k}, v) where k = :($k = v,)
 
+# TODO make this inferrable
 @grad Base.getfield(x, f::Symbol) =
   getfield(x, f), Δ -> ((;nt_nothing(x)...,pair(Val{f}(), Δ)...), nothing)
 

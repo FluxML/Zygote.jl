@@ -86,10 +86,14 @@ ignored(f) = f in (GlobalRef(Base, :not_int),
 ignored(ir, f) = ignored(f)
 ignored(ir, f::SSAValue) = ignored(ir[f])
 
-# TODO: error out when return type is not consistent
 # TODO: remove this once we don't mess with type inference
-_forward_type(Ts) =
-  Core.Compiler.return_type(_forward, Tuple{Context,Ts...})
+function _forward_type(Ts)
+  typed_meta(Tuple{Ts...}) == nothing && return Any
+  T = Core.Compiler.return_type(_forward, Tuple{Context,Ts...})
+  return T == Union{} ? Any : T
+end
+
+isvalidtype(jT, yT) = jT <: Tuple && length(jT.parameters) == 2 && jT.parameters[1] <: yT
 
 function record!(ir::IRCode)
   pushfirst!(ir.argtypes, typeof(_forward), Context)
@@ -98,11 +102,18 @@ function record!(ir::IRCode)
     ex = argmap(x -> Argument(x.n+2), ir[SSAValue(i)])
     isexpr(ex, :new) && (ex = ir[SSAValue(i)] = xcall(Zygote, :__new__, ex.args...))
     if isexpr(ex, :call) && !ignored(ir, ex.args[1])
+      yT = widenconst(types(ir)[i])
       T = _forward_type(exprtype.(Ref(ir), ex.args))
-      T == Any && error("Couldn't infer type for $((exprtype.(Ref(ir), ex.args)...,))")
-      yJ = insert_node!(ir, i, T, xcall(Zygote, :_forward, Argument(2), ex.args...))
-      ir[SSAValue(i)] = xgetindex(yJ, 1)
-      insert_node!(ir, i, T.parameters[2], xgetindex(yJ, 2), true)
+      if isvalidtype(T, yT)
+        yJ = insert_node!(ir, i, T, xcall(Zygote, :_forward, Argument(2), ex.args...))
+        ir[SSAValue(i)] = xgetindex(yJ, 1)
+        insert_node!(ir, i, T.parameters[2], xgetindex(yJ, 2), true)
+      else
+        yJ = insert_node!(ir, i, Any, xcall(Zygote, :_forward, Argument(2), ex.args...))
+        y =  insert_node!(ir, i, Any, xgetindex(yJ, 1))
+        J =  insert_node!(ir, i, Any, xgetindex(yJ, 2))
+        ir[SSAValue(i)] = xcall(Zygote, :typeassert, y, yT)
+      end
     else
       ir[SSAValue(i)] = ex
     end
@@ -194,6 +205,11 @@ function phis!(ir::ReverseIR, grads, bi)
   end
 end
 
+function isassert(ir, i)
+  ex = ir.stmts[i+3]
+  isexpr(ex, :call) && ex.args[1] == GlobalRef(Zygote, :typeassert)
+end
+
 function grad!(ir::ReverseIR, grads, i)
   ex = ir.forw.stmts[i]
   if ex isa ReturnNode && (ex.val isa SSAValue || ex.val isa Argument)
@@ -201,7 +217,9 @@ function grad!(ir::ReverseIR, grads, i)
   elseif isexpr(ex, :call) && ex.args[1] == GlobalRef(Zygote, :_forward)
     J = Alpha(i+2)
     line = ir.forw.lines[i]
-    Δref = get(grads, SSAValue(i+1), nothing)
+    # TODO remove with type hacks above
+    y = isassert(ir.forw, i) ? SSAValue(i+3) : SSAValue(i+1)
+    Δref = get(grads, y, nothing)
     Δ = Δref == nothing ? nothing : push!(ir, xcall(Zygote, :deref, Δref), line)
     Δ = push!(ir, Expr(:call, J, Δ), line)
     Δref == nothing || push!(ir, xcall(Zygote, :reset!, Δref))

@@ -4,6 +4,9 @@ using Zygote: gradient, roundtrip
 bool = true
 b(x) = bool ? 2x : x
 
+fglobal = x -> 5x
+gglobal = x -> fglobal(x)
+
 struct Foo{T}
   a::T
   b::T
@@ -46,6 +49,8 @@ y, back = forward(b, 3)
 dx = back(4)
 @test y == 6
 @test dx == (8,)
+
+@test gradient(gglobal, 2) == (5,)
 
 global bool = false
 

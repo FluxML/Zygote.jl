@@ -3,7 +3,7 @@ import Core: Typeof
 import Core.Compiler: IRCode, CFG, BasicBlock, Argument, ReturnNode,
   NullLineInfo, just_construct_ssa, compact!, NewNode,
   GotoIfNot, PhiNode, PiNode, StmtRange, IncrementalCompact, insert_node!, insert_node_here!,
-  compact!, finish, DomTree, construct_domtree, dominates, userefs, widenconst
+  compact!, finish, DomTree, construct_domtree, dominates, userefs, widenconst, types
 using InteractiveUtils: typesof
 
 for T in :[IRCode, IncrementalCompact, Compiler.UseRef, Compiler.UseRefIterator, Compiler.TypesView].args
@@ -46,7 +46,7 @@ function argmap(f, @nospecialize(stmt))
 end
 
 exprtype(ir::IRCode, x::Argument) = widenconst(ir.argtypes[x.n])
-exprtype(ir::IRCode, x::SSAValue) = widenconst(Compiler.types(ir)[x])
+exprtype(ir::IRCode, x::SSAValue) = widenconst(types(ir)[x])
 exprtype(ir::IRCode, x::GlobalRef) = isconst(x.mod, x.name) ? Typeof(getfield(x.mod, x.name)) : Any
 exprtype(ir::IRCode, x::QuoteNode) = Typeof(x.value)
 # probably can fall back to any here
