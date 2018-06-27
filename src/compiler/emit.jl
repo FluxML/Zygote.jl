@@ -57,7 +57,7 @@ function forward_stacks!(adj, F)
   rec = insert_node!(adj.forw, length(adj.forw.stmts), T,
                      xtuple(args..., recs...))
   rec = insert_node!(adj.forw, length(adj.forw.stmts), J{F,T},
-                     Expr(:call, J{F}, rec))
+                     Expr(:new, J{F,T}, rec))
   ret = xtuple(adj.forw.stmts[end].val, rec)
   R = exprtype(adj.forw, adj.forw.stmts[end].val)
   ret = insert_node!(adj.forw, length(adj.forw.stmts), Tuple{R,J{F,T}}, ret)
