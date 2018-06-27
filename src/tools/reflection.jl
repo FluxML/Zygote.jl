@@ -4,6 +4,7 @@ struct Meta
   method::Method
   code::CodeInfo
   static_params
+  ret
 end
 
 function untyped_meta(T, world = ccall(:jl_get_world_counter, UInt, ()))
@@ -14,7 +15,7 @@ function untyped_meta(T, world = ccall(:jl_get_world_counter, UInt, ()))
   type_signature, sps, method = first(_methods)
   linfo = Core.Compiler.code_for_method(method, T, sps, world)
   ci = Core.Compiler.retrieve_code_info(linfo)
-  return Meta(method, ci, sps)
+  return Meta(method, ci, sps, Any)
 end
 
 function typed_meta(T; world = ccall(:jl_get_world_counter, UInt, ()), optimize = false)
@@ -30,7 +31,7 @@ function typed_meta(T; world = ccall(:jl_get_world_counter, UInt, ()), optimize 
     ci.ssavaluetypes = Any[Any]
     ci.slottypes = Any[Any for i = 1:method.nargs]
   end
-  return Meta(method, ci, sps)
+  return Meta(method, ci, sps, ty)
 end
 
 function inline_sparams!(ir::IRCode, sps)

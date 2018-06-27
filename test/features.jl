@@ -109,4 +109,8 @@ end
 
 @test gradient(f, 2, 3) == (3, 2)
 
+f(x) = throw(DimensionMismatch("fubar"))
+
+@test_throws DimensionMismatch gradient(f, 1)
+
 end

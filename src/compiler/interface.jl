@@ -1,5 +1,6 @@
 function _lookup_grad(T)
   (meta = typed_meta(T)) == nothing && return
+  meta.ret == Union{} && return
   grad_ir(IRCode(meta), varargs = meta.method.isva)
   forw, back = stacks!(grad_ir(IRCode(meta), varargs = meta.method.isva), T)
   meta, forw, back
