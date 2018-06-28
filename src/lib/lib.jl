@@ -35,7 +35,7 @@ macro grad(ex)
     y, back = $body
     back2(::Nothing) = nothing
     # return needed for type inference
-    back2(Δ) = return _gradtuple(back(Δ))
+    back2(Δ) = return Zygote._gradtuple(back(Δ))
     y, back2
   end
   :(Zygote._forward($(args...)) where $(T...) = $body) |> esc
