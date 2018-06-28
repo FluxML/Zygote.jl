@@ -65,11 +65,11 @@ end
 
 @grad tuple(xs...) = xs, identity
 
-@grad getindex(xs::NTuple{N}, i::Integer) where N =
+@grad getindex(xs::NTuple{N,Any}, i::Integer) where N =
   (xs[i], Δ -> (ntuple(j -> i == j ? Δ : nothing, Val(N)), nothing))
 
 # Needed for iteration lowering
-@grad Core.getfield(xs::NTuple{N}, i::Integer) where N =
+@grad Core.getfield(xs::NTuple{N,Any}, i::Integer) where N =
   (xs[i], Δ -> (ntuple(j -> i == j ? Δ : nothing, Val(N)), nothing))
 
 # TODO faster version
