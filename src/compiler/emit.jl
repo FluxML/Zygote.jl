@@ -36,6 +36,9 @@ xtuple(xs...) = xcall(:tuple, xs...)
 
 afterphi(ir, loc) = ir.stmts[loc] isa PhiNode ? afterphi(ir, loc+1) : loc
 
+concrete(T::DataType) = T
+concrete(::Type{Type{T}}) where T = typeof(T)
+
 function forward_stacks!(adj, F)
   stks, recs = [], []
   for fb = 1:length(adj.perm)
@@ -53,7 +56,7 @@ function forward_stacks!(adj, F)
     end
   end
   args = [Argument(i) for i = 3:length(adj.forw.argtypes)]
-  T = Tuple{exprtype.(Ref(adj.forw), (args..., recs...))...}
+  T = Tuple{concrete.(exprtype.(Ref(adj.forw), (args..., recs...)))...}
   rec = insert_node!(adj.forw, length(adj.forw.stmts), T,
                      xtuple(args..., recs...))
   rec = insert_node!(adj.forw, length(adj.forw.stmts), J{F,T},
