@@ -3,7 +3,7 @@ import Core: Typeof
 import Core.Compiler: IRCode, CFG, BasicBlock, Argument, ReturnNode,
   NullLineInfo, just_construct_ssa, compact!, NewNode,
   GotoIfNot, PhiNode, PiNode, StmtRange, IncrementalCompact, insert_node!, insert_node_here!,
-  compact!, finish, DomTree, construct_domtree, dominates, userefs, widenconst, types
+  compact!, finish, DomTree, construct_domtree, dominates, userefs, widenconst, types, verify_ir
 using InteractiveUtils: typesof
 
 for T in :[IRCode, IncrementalCompact, Compiler.UseRef, Compiler.UseRefIterator, Compiler.TypesView].args
@@ -50,7 +50,8 @@ exprtype(ir::IRCode, x::SSAValue) = widenconst(types(ir)[x])
 exprtype(ir::IRCode, x::GlobalRef) = isconst(x.mod, x.name) ? Typeof(getfield(x.mod, x.name)) : Any
 exprtype(ir::IRCode, x::QuoteNode) = Typeof(x.value)
 # probably can fall back to any here
-exprtype(ir::IRCode, x::Union{Type,Number}) = Typeof(x)
+exprtype(ir::IRCode, x::Union{Type,Number,Nothing}) = Typeof(x)
+exprtype(ir::IRCode, x::Expr) = error(x)
 
 rename(x, m) = x
 rename(x::SSAValue, m) = m[x.id]
@@ -76,6 +77,8 @@ Base.range(b::BasicBlock) = b.stmts.first:b.stmts.last
 
 xcall(mod::Module, f::Symbol, args...) = Expr(:call, GlobalRef(mod, f), args...)
 xcall(f::Symbol, args...) = xcall(Base, f, args...)
+
+const unreachable = ReturnNode()
 
 # Dominance frontiers
 

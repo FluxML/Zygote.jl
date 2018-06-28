@@ -21,6 +21,12 @@ function pow(x, n)
   return r
 end
 
+# For nested AD, until we support errors
+function grad(f, args...)
+  y, J = forward(f, args...)
+  return J(1)
+end
+
 @testset "Features" begin
 
 add(a, b) = a+b
@@ -113,6 +119,8 @@ function f(a, b)
 end
 
 @test gradient(f, 2, 3) == (3, 2)
+
+@test grad(x -> grad(sin, x)[1], 0.5) == (-sin(0.5),)
 
 f(x) = throw(DimensionMismatch("fubar"))
 

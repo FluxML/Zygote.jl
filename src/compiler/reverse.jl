@@ -11,6 +11,7 @@ deref(x) = x
 deref(x::RefValue) = x[]
 
 function merge_returns(ir)
+  any(x -> x == unreachable, ir.stmts) && error("`throw` not supported")
   rs = findall(x -> x isa ReturnNode, ir.stmts)
   length(rs) <= 1 && return ir
   bs = blockidx.(Ref(ir), rs)
@@ -28,6 +29,7 @@ function merge_returns(ir)
   end
   ir = IncrementalCompact(ir)
   for _ in ir end
+  # TODO preserve types
   r = insert_node_here!(ir, PhiNode(bs, xs), Any, ir.result_lines[end])
   insert_node_here!(ir, ReturnNode(r), Any, ir.result_lines[end])
   ir = finish(ir)
