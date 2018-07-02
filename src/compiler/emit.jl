@@ -57,6 +57,7 @@ function forward_stacks!(adj, F)
   end
   args = [Argument(i) for i = 3:length(adj.forw.argtypes)]
   T = Tuple{concrete.(exprtype.(Ref(adj.forw), (args..., recs...)))...}
+  isconcretetype(T) || (T = Any)
   rec = insert_node!(adj.forw, length(adj.forw.stmts), T,
                      xtuple(args..., recs...))
   rec = insert_node!(adj.forw, length(adj.forw.stmts), J{F,T},
