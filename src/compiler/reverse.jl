@@ -234,7 +234,7 @@ function grad!(ir::ReverseIR, grads, i)
   end
 end
 
-deref_tuple(xs...) = deref.(xs)
+deref_tuple(xs...) = map(deref,xs)
 @inline deref_tuple_va(xs) = deref(xs)
 @inline deref_tuple_va(x, xs...) = (deref(x), deref_tuple_va(xs...)...)
 
