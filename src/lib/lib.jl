@@ -10,8 +10,9 @@ end
 grad(x::Tuple) = grad.(x)
 
 accum(x, y) = x + y
-accum(x, ::Nothing) = x
-accum(::Nothing, _) = nothing
+accum(x, _::Nothing) = x
+accum(x::Nothing, _) = x
+accum(x::Nothing, _::Nothing) = x
 accum(x::Tuple, y::Tuple) = accum.(x, y)
 
 @generated function accum(x::NamedTuple, y::NamedTuple)
