@@ -20,7 +20,9 @@ end
 
 function typed_meta(T; world = ccall(:jl_get_world_counter, UInt, ()), optimize = false)
   F = T.parameters[1]
-  (F.name.module === Core.Compiler || F <: Core.Builtin || F <: Core.Builtin) && return nothing
+  F isa DataType && (F.name.module === Core.Compiler ||
+                     F <: Core.Builtin ||
+                     F <: Core.Builtin) && return nothing
   _methods = Base._methods_by_ftype(T, -1, world)
   length(_methods) == 1 || return nothing
   type_signature, sps, method = first(_methods)

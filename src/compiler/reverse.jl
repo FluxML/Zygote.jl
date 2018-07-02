@@ -91,6 +91,7 @@ ignored(ir, f::SSAValue) = ignored(ir[f])
 
 # TODO: remove this once we don't mess with type inference
 function _forward_type(Ts)
+  isconcretetype(Tuple{Ts...}) || return Any
   typed_meta(Tuple{Ts...}) == nothing && return Any
   T = Core.Compiler.return_type(_forward, Tuple{Context,Ts...})
   return T == Union{} ? Any : T

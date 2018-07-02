@@ -122,6 +122,10 @@ end
 
 @test grad(x -> grad(sin, x)[1], 0.5) == (-sin(0.5),)
 
+# Look ma, no perturbation confusion!
+@test grad(x -> x*grad(y -> x+y, 1)[1], 1) == (1,)
+@test grad(x -> x*grad(y -> x*y, 1)[1], 4) == (8,)
+
 f(x) = throw(DimensionMismatch("fubar"))
 
 @test_throws DimensionMismatch gradient(f, 1)
