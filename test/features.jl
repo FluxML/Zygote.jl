@@ -27,6 +27,8 @@ function grad(f, args...)
   return J(1)
 end
 
+D(f, x) = gradient(f, x)[1]
+
 @testset "Features" begin
 
 add(a, b) = a+b
@@ -120,11 +122,11 @@ end
 
 @test gradient(f, 2, 3) == (3, 2)
 
-@test grad(x -> grad(sin, x)[1], 0.5) == (-sin(0.5),)
+@test D(x -> D(sin, x), 0.5) == -sin(0.5)
 
 # Look ma, no perturbation confusion!
-@test grad(x -> x*grad(y -> x+y, 1)[1], 1) == (1,)
-@test grad(x -> x*grad(y -> x*y, 1)[1], 4) == (8,)
+@test D(x -> x*D(y -> x+y, 1), 1) == 1
+@test D(x -> x*D(y -> x*y, 1), 4) == 8
 
 f(x) = throw(DimensionMismatch("fubar"))
 
