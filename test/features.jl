@@ -27,7 +27,7 @@ function grad(f, args...)
   return J(1)
 end
 
-D(f, x) = gradient(f, x)[1]
+D(f, x) = grad(f, x)[1]
 
 @testset "Features" begin
 
