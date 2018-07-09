@@ -30,16 +30,18 @@ macro grad(ex)
   @capture(shortdef(ex), (name_(args__) = body_) |
                          (name_(args__) where {T__} = body_)) || error("Need a function definition")
   T == nothing && (T = [])
-  pushfirst!(args, :(::Zygote.Context), :(::typeof($name)))
+  args = esc.(args)
+  T = esc.(T)
+  pushfirst!(args, :(::Context), :(::typeof($(esc(name)))))
   body = quote
     Base.@_inline_meta
-    y, back = $body
+    y, back = $(esc(body))
     back2(::Nothing) = nothing
     # return needed for type inference
-    back2(Δ) = return Zygote._gradtuple(back(Δ))
+    back2(Δ) = return _gradtuple(back(Δ))
     y, back2
   end
-  :(Zygote._forward($(args...)) where $(T...) = $body) |> esc
+  :(_forward($(args...)) where $(T...) = $body)
 end
 
 macro nograd(ex)
