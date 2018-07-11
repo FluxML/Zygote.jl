@@ -67,10 +67,10 @@ dx = back(4)
 @test y == 3
 @test getindex.(dx) == (4,)
 
-y, back = forward(broadcast, *, [1,2,3], [4,5,6])
-dxs = back([1,1,1])
-@test y == [4, 10, 18]
-@test dxs == (nothing, [4, 5, 6], [1, 2, 3])
+y, back = forward(x -> sum(x.*x), [1, 2, 3])
+dxs = back(1)
+@test y == 14
+@test dxs == ([2,4,6],)
 
 @test gradient(pow, 2, 3) == (12, nothing)
 

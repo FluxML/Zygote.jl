@@ -20,7 +20,7 @@ gradcheck(f, xs...) =
   all(isapprox.(ngradient(f, xs...),
                 gradient(f, xs...), rtol = 1e-5, atol = 1e-5))
 
-gradtest(f, xs::AbstractArray...) = gradcheck((xs...) -> sum(broadcast(sin, f(xs...))), xs...)
+gradtest(f, xs::AbstractArray...) = gradcheck((xs...) -> sum(sin.(f(xs...))), xs...)
 gradtest(f, dims...) = gradtest(f, rand.(Float64, dims)...)
 
 @testset "Gradients" begin

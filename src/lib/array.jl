@@ -32,6 +32,9 @@ end
 #  '  `'-'`  |_|                 \ \._,\ '/                          `  \ \._,\ '/.'   \_.'   |   /
 #                                 `--'  `"                               `--'  `"             `'-'
 
+using Base: tail
+using Base.Broadcast
+using Base.Broadcast: Broadcasted, DefaultArrayStyle, broadcasted, materialize, instantiate
 using ForwardDiff: Dual, partials
 
 dualify(x, ps) = x
@@ -51,12 +54,39 @@ function getpartial(Δ, x, i)
   return Δ * p
 end
 
-@grad function broadcast(f, args::Vararg{Any,N}) where N
+function ∇broadcast(f, args::NTuple{N,Any}) where N
   dargs = map((x,i) -> dualify(x, ntuple(j -> i==j, Val(N))),
               args, ntuple(identity, Val(N)))
   out = broadcast(f, dargs...)
   (x -> x.value).(out), function (Δ)
     Δxs = ntuple(i -> getpartial.(Δ, out, i), Val(N))
-    (nothing, unbroadcast.(args, Δxs)...)
+    unbroadcast.(args, Δxs)
   end
+end
+
+_unflatten(x, xs) = first(xs), tail(xs)
+
+_unflatten(x::Tuple{}, xs) = (), xs
+
+function _unflatten(x::Tuple, xs)
+  t1, xs1 = _unflatten(first(x), xs)
+  t2, xs2 = _unflatten(tail(x), xs1)
+  (t1, t2...), xs2
+end
+
+function _unflatten(bc::Broadcasted, xs)
+  t, xs′ = _unflatten(bc.args, xs)
+  (args=t,f=nothing,axes=nothing), xs′
+end
+
+unflatten(x, xs) = _unflatten(x, xs)[1]
+
+@grad function broadcasted(f, args...)
+  broadcasted(f, args...), Δ -> (nothing, Δ.args...)
+end
+
+@grad function materialize(bc::Broadcasted{<:DefaultArrayStyle})
+  bc′ = instantiate(Broadcast.flatten(bc))
+  y, back = ∇broadcast(bc′.f, bc′.args)
+  y, Δ -> (unflatten(bc, back(Δ)),)
 end
