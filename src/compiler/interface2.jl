@@ -1,5 +1,6 @@
 @generated function _forward(ctx::Context, f, args...)
   T = Tuple{f,args...}
+  ignore(T) && return :(f(args...), J{$T}(()))
   g = try _lookup_grad(T) catch e e end
   !(g isa Tuple) && return :(f(args...), J{$T}((f,)))
   meta, forw, _ = g
@@ -11,6 +12,7 @@
 end
 
 @generated function (j::J{T})(Δ) where T
+  ignore(T) && return map(_ -> nothing, T.parameters)
   g = _lookup_grad(T)
   g == nothing && return :(error("Non-differentiable function $(j.t[1])"))
   meta, _, back = g

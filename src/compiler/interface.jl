@@ -8,8 +8,13 @@ function _lookup_grad(T)
   meta, forw, back
 end
 
+ignore(T) = all(T -> T <: Type, T.parameters)
+
 struct Context
+  grads::IdDict{Any,Any}
 end
+
+Context() = Context(IdDict())
 
 struct J{S,T}
   t::T
