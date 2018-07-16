@@ -18,6 +18,12 @@ end
 @grad sum(xs::AbstractArray, dim...) =
   sum(xs, dim...), Δ -> (similar(xs) .= Δ, map(_->nothing, dim)...)
 
+@grad prod(xs) = prod(xs), Δ -> (prod(xs) ./ xs .* Δ,)
+
+@grad prod(xs, dim) = prod(xs, dim),
+  Δ -> (reshape(.*(circshift.([reshape(xs, length(xs))], 1:length(xs)-1)...), size(xs)) .* Δ,
+        nothing)
+
 #                        .-'''-.                               _..._
 #                       '   _    \         _______          .-'_..._''.
 #  /|                 /   /` '.   \        \  ___ `'.     .' .'      '.\

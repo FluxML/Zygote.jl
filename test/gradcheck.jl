@@ -1,4 +1,4 @@
-using Zygote, Test
+using Zygote, NNlib, Test
 using Zygote: gradient
 
 function ngradient(f, xs::AbstractArray...)
@@ -25,8 +25,15 @@ gradtest(f, dims...) = gradtest(f, rand.(Float64, dims)...)
 
 @testset "Gradients" begin
 
-@test gradtest(*, (2,5), 5)
+srand(0)
 
-@test gradtest(x -> sum(x, (2, 3)), rand(Float64,3,4,5))
+@test gradtest((x, W, b) -> σ.(W*x .+ b), 5, (2,5), 2)
+@test gradtest((x, W, b) -> σ.(W*x .+ b), (5,3), (2,5), 2)
+@test gradtest((x, W, b) -> logσ.(W*x .+ b), 5, (2,5), 2)
+@test gradtest((x, W, b) -> logσ.(W*x .+ b), (5,3), (2,5), 2)
+
+@test gradtest(x -> sum(x, (2, 3)), (3,4,5))
+@test gradtest(x -> prod(x, (2, 3)), (3,4,5))
+@test gradtest(x -> prod(x), (3,4,5))
 
 end
