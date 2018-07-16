@@ -7,7 +7,7 @@
   forw = varargs!(meta, forw, 3)
   forw = inlineable!(forw)
   update!(meta, forw)
-  meta.code.slotnames = [Symbol("#self#"), :ctx, :f, :args]
+  argnames!(meta, Symbol("#self#"), :ctx, :f, :args)
   return meta.code
 end
 
@@ -17,8 +17,7 @@ end
   g == nothing && return :(error("Non-differentiable function $(j.t[1])"))
   meta, _, back = g
   resize!(back.argtypes, 2)
-  meta.code.slottypes = Any[j, Δ]
-  meta.code.slotnames = Any[Symbol("#self#"), :Δ]
+  argnames!(meta, Symbol("#self#"), :Δ)
   back = inlineable!(back)
   update!(meta, back)
   # Enable type inference

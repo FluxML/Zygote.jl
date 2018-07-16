@@ -1,7 +1,7 @@
 import Core: SSAValue, GotoNode, Compiler
 import Core: Typeof
 import Core.Compiler: IRCode, CFG, BasicBlock, Argument, ReturnNode,
-  NullLineInfo, just_construct_ssa, compact!, NewNode,
+  NullLineInfo, just_construct_ssa, compact!, NewNode, InferenceState, OptimizationState,
   GotoIfNot, PhiNode, PiNode, StmtRange, IncrementalCompact, insert_node!, insert_node_here!,
   compact!, finish, DomTree, construct_domtree, dominates, userefs, widenconst, types, verify_ir
 using InteractiveUtils: typesof

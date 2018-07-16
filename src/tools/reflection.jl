@@ -1,21 +1,27 @@
 using Core: CodeInfo
 
 struct Meta
+  frame::InferenceState
   method::Method
   code::CodeInfo
-  static_params
   ret
 end
 
-function untyped_meta(T, world = ccall(:jl_get_world_counter, UInt, ()))
-  F = T.parameters[1]
-  (F.name.module === Core.Compiler || F <: Core.Builtin || F <: Core.Builtin) && return nothing
-  _methods = Base._methods_by_ftype(T, -1, world)
-  length(_methods) == 1 || return nothing
-  type_signature, sps, method = first(_methods)
-  linfo = Core.Compiler.code_for_method(method, T, sps, world)
-  ci = Core.Compiler.retrieve_code_info(linfo)
-  return Meta(method, ci, sps, Any)
+@eval Core.Compiler function typeinf_code3(method::Method, @nospecialize(atypes), sparams::SimpleVector, run_optimizer::Bool, params::Params)
+    code = code_for_method(method, atypes, sparams, params.world)
+    code === nothing && return (nothing, Any)
+    ccall(:jl_typeinf_begin, Cvoid, ())
+    result = InferenceResult(code)
+    frame = InferenceState(result, false, params)
+    frame === nothing && return (nothing, Any)
+    if typeinf(frame) && run_optimizer
+        opt = OptimizationState(frame)
+        optimize(opt, result.result)
+        opt.src.inferred = true
+    end
+    ccall(:jl_typeinf_end, Cvoid, ())
+    frame.inferred || return (nothing, Any)
+    return frame
 end
 
 function typed_meta(T; world = ccall(:jl_get_world_counter, UInt, ()), optimize = false)
@@ -27,13 +33,13 @@ function typed_meta(T; world = ccall(:jl_get_world_counter, UInt, ()), optimize 
   length(_methods) == 1 || return nothing
   type_signature, sps, method = first(_methods)
   params = Core.Compiler.Params(world)
-  (ci, ty) = Core.Compiler.typeinf_code(method, type_signature, sps, optimize, params)
+  frame = Core.Compiler.typeinf_code3(method, type_signature, sps, optimize, params)
+  ci = frame.src
   ci.inferred = true
   if ci.ssavaluetypes == 0 # constant return; IRCode doesn't like this
     ci.ssavaluetypes = Any[Any]
-    ci.slottypes = Any[Any for i = 1:method.nargs]
   end
-  return Meta(method, ci, sps, ty)
+  return Meta(frame, method, ci, widenconst(frame.result.result))
 end
 
 function inline_sparams!(ir::IRCode, sps)
@@ -47,9 +53,10 @@ function inline_sparams!(ir::IRCode, sps)
 end
 
 function IRCode(meta::Meta)
+  opt = OptimizationState(meta.frame)
   ir = just_construct_ssa(meta.code, deepcopy(meta.code.code),
-                          Int(meta.method.nargs)-1, meta.static_params)
-  return inline_sparams!(ir, meta.static_params)
+                          Int(meta.method.nargs)-1, opt)
+  return inline_sparams!(ir, opt.sp)
 end
 
 function code_ir(f, T)
@@ -67,13 +74,16 @@ macro code_ir(ex)
   code_irm(ex)
 end
 
+function argnames!(meta::Meta, names...)
+  meta.code.slotnames = [names...]
+end
+
 function spliceargs!(meta::Meta, ir::IRCode, args...)
   for i = 1:length(ir.stmts)
     ir[SSAValue(i)] = argmap(x -> Argument(x.n+length(args)), ir[SSAValue(i)])
   end
   for (name, T) in reverse(args)
     pushfirst!(ir.argtypes, T)
-    pushfirst!(meta.code.slottypes, T)
     pushfirst!(meta.code.slotnames, name)
   end
   return ir
@@ -86,7 +96,6 @@ function varargs!(meta::Meta, ir::IRCode, n = 1)
   argtypes = !isva ?
     Any[ir.argtypes[1:n]..., Tuple{Ts...}] :
     Any[ir.argtypes[1:n]..., Tuple{Ts[1:end-1]...,Ts[end].parameters...}]
-  meta.code.slottypes = argtypes
   empty!(ir.argtypes); append!(ir.argtypes, argtypes)
   ir = IncrementalCompact(ir)
   map = Dict{Argument,Any}()
@@ -116,7 +125,8 @@ end
   meta = typed_meta(Tuple{f,args...})
   ir = IRCode(meta)
   ir = varargs!(meta, ir)
-  ir = spliceargs!(meta, ir, (:self, typeof(roundtrip)))
+  argnames!(meta, :f, :args)
+  ir = spliceargs!(meta, ir, (Symbol("#self#"), typeof(roundtrip)))
   update!(meta, ir)
   return meta.code
 end
