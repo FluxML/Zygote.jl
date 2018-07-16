@@ -21,6 +21,15 @@ function pow(x, n)
   return r
 end
 
+function pow_mut(x, n)
+  r = Ref(one(x))
+  while n > 0
+    n -= 1
+    r[] = r[] * x
+  end
+  return r[]
+end
+
 # For nested AD, until we support errors
 function grad(f, args...)
   y, J = forward(f, args...)
@@ -72,7 +81,9 @@ dxs = back(1)
 @test y == 14
 @test dxs == ([2,4,6],)
 
-@test gradient(pow, 2, 3) == (12, nothing)
+@test gradient(pow, 2, 3) == (12, 0)
+
+@test gradient(pow_mut, 2, 3) == (12, 0)
 
 @test gradient(x -> 1, 2) == (nothing,)
 

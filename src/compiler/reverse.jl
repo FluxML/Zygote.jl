@@ -4,8 +4,13 @@ gradref(x) = RefValue(grad(x))
 
 accum!(r::RefValue, x) = (r.x = accum(r.x, deref(x)))
 
-reset!(_) = nothing
-reset!(r::RefValue) = (r.x = grad(r.x))
+reset!(x) = x
+
+function reset!(r::RefValue)
+  y = r.x
+  r.x = grad(y)
+  return y
+end
 
 deref(x) = x
 deref(x::RefValue) = x[]
@@ -65,22 +70,6 @@ function record_branches!(ir::IRCode)
   return finish_dc(ir)
 end
 
-function reachable(ir)
-  seen = []
-  stack = [ir.stmts[end].val]
-  while !isempty(stack)
-    i = popfirst!(stack)
-    i ∈ seen && continue
-    push!(seen, i)
-    i isa SSAValue || continue
-    for x in userefs(ir[i])
-      x[] isa SSAValue && push!(stack, x[])
-      x[] isa Argument && x[] ∉ seen && push!(seen, x[])
-    end
-  end
-  return seen
-end
-
 ignored(f) = f in (GlobalRef(Base, :not_int),
                    GlobalRef(Core.Intrinsics, :not_int),
                    GlobalRef(Core, :(===)),
@@ -88,6 +77,14 @@ ignored(f) = f in (GlobalRef(Base, :not_int),
                    GlobalRef(Core, :typeof))
 ignored(ir, f) = ignored(f)
 ignored(ir, f::SSAValue) = ignored(ir[f])
+
+function reachable(ir)
+  us = usages(ir)
+  ignored_(i) = true
+  ignored_(i::Union{SSAValue,Argument}) =
+    haskey(us, i) == 0 || all(i -> ignored(ir, i), us[i])
+  filter(!ignored_, keys(us))
+end
 
 # TODO: remove this once we don't mess with type inference
 function _forward_type(Ts)

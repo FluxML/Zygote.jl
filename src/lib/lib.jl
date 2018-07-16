@@ -55,7 +55,7 @@ end
 
 # Core functions
 
-@nograd Core.apply_type, Core.typeof, nfields,
+@nograd Core.apply_type, Core.typeof, nfields, fieldtype,
   (==), (===), (>=), (<), (>)
 
 @grad ifelse(cond::Bool, t, f) =
@@ -100,8 +100,41 @@ end
 @generated pair(::Val{k}, v) where k = :($k = v,)
 
 # TODO make this inferrable
-@grad Base.getfield(x, f::Symbol) =
-  getfield(x, f), Δ -> ((;nt_nothing(x)...,pair(Val{f}(), Δ)...), nothing)
+function _forward(cx::Context, ::typeof(getfield), x, f::Symbol)
+  getfield(x, f), function (Δ)
+    Δ == nothing && return
+    if isimmutable(x)
+      (nothing, (;nt_nothing(x)...,pair(Val{f}(), Δ)...), nothing)
+    else
+      accum!(getfield(grad_mut(cx, x), f), Δ)
+      return
+    end
+  end
+end
+
+@generated function grad_mut(x)
+  Expr(:tuple, [:($f = Ref(grad(x.$f))) for f in fieldnames(x)]...)
+end
+
+function grad_mut(cx::Context, x)
+  T = Core.Compiler.return_type(grad_mut, Tuple{typeof(x)})
+  if haskey(cx.grads, x)
+    cx.grads[x]::T
+  else
+    cx.grads[x] = grad_mut(x)
+  end
+end
+
+function _forward(cx::Context, ::typeof(setfield!), x, f, val)
+  y = setfield!(x, f, val)
+  g = grad_mut(cx::Context, x)
+  y, function (_)
+    r = getfield(g, f)
+    Δ = deref(r)
+    reset!(r)
+    (nothing, nothing, nothing, Δ)
+  end
+end
 
 @generated function __new__(T, args...)
   quote
@@ -110,10 +143,21 @@ end
   end
 end
 
-struct Jnew{T} end
+struct Jnew{T,G}
+  g::G
+end
 
-@grad __new__(T, args...) = __new__(T, args...), Jnew{T}()
+Jnew{T}(g) where T = Jnew{T,typeof(g)}(g)
 
-@generated function (::Jnew{T})(Δ) where T
-  Expr(:tuple, nothing, map(f -> :(Δ.$f), fieldnames(T))...)
+function _forward(cx::Context, ::typeof(__new__), T, args...)
+  x = __new__(T, args...)
+  g = !T.mutable || fieldcount(T) == 0 ? nothing : grad_mut(cx, x)
+  x, Jnew{T}(g)
+end
+
+# TODO captured mutables + multiple calls to `back`
+@generated function (back::Jnew{T,G})(Δ) where {T,G}
+  !T.mutable && Δ == Nothing && return :nothing
+  Δ = G == Nothing ? :Δ  : :(back.g)
+  :(nothing, nothing, $(map(f -> :(reset!($Δ.$f)), fieldnames(T))...))
 end
