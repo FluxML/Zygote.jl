@@ -15,6 +15,9 @@ end
 @grad a::AbstractVecOrMat * b::AbstractVecOrMat =
   a * b, Δ -> (Δ * transpose(b), transpose(a) * Δ)
 
+@grad transpose(x) = transpose(x), Δ -> (transpose(Δ),)
+@grad adjoint(x) = adjoint(x), Δ -> (adjoint(Δ),)
+
 @grad sum(xs::AbstractArray, dim...) =
   sum(xs, dim...), Δ -> (similar(xs) .= Δ, map(_->nothing, dim)...)
 

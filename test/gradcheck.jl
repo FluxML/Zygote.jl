@@ -32,6 +32,9 @@ srand(0)
 @test gradtest((x, W, b) -> logσ.(W*x .+ b), 5, (2,5), 2)
 @test gradtest((x, W, b) -> logσ.(W*x .+ b), (5,3), (2,5), 2)
 
+@test gradtest((w, x) -> w'*x, randn(10, 2), randn(10))
+@test gradtest((w, x) -> transpose(w)*x, randn(5,5), randn(5,5))
+
 @test gradtest(x -> sum(x, (2, 3)), (3,4,5))
 @test gradtest(x -> prod(x, (2, 3)), (3,4,5))
 @test gradtest(x -> prod(x), (3,4,5))
