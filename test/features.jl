@@ -124,6 +124,7 @@ function mysum(xs)
   return s
 end
 
+# TODO control flow handling is broken
 # @test gradient(mysum, (1,2,3)) == ((1,1,1),)
 
 function f(a, b)

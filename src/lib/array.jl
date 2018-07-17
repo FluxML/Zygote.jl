@@ -27,6 +27,15 @@ end
   Δ -> (reshape(.*(circshift.([reshape(xs, length(xs))], 1:length(xs)-1)...), size(xs)) .* Δ,
         nothing)
 
+# NNlib
+
+using NNlib
+import NNlib: softmax, ∇softmax, logsoftmax, ∇logsoftmax, conv, maxpool, meanpool
+
+@grad softmax(xs) = softmax(xs), Δ -> (∇softmax(Δ, xs),)
+
+@grad logsoftmax(xs) = logsoftmax(xs), Δ -> (∇logsoftmax(Δ, xs),)
+
 #                        .-'''-.                               _..._
 #                       '   _    \         _______          .-'_..._''.
 #  /|                 /   /` '.   \        \  ___ `'.     .' .'      '.\
