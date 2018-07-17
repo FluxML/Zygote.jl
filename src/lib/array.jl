@@ -12,6 +12,9 @@ grad(xs::Array) = grad.(xs)
   end
 end
 
+@grad permutedims(xs, dims) = permutedims(xs, dims),
+  Δ -> (permutedims(Δ, invperm(dims)),nothing)
+
 @grad a::AbstractVecOrMat * b::AbstractVecOrMat =
   a * b, Δ -> (Δ * transpose(b), transpose(a) * Δ)
 
