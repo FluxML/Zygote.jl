@@ -19,6 +19,6 @@ include("lib/array.jl")
 # we need to define this late, so that the genfuncs see lib.jl
 include("compiler/interface2.jl")
 # helps to work around 265-y issues
-compiled() = include(joinpath(@__DIR__, "compiler/interface2.jl"))
+refresh() = include(joinpath(@__DIR__, "compiler/interface2.jl"))
 
 end # module
