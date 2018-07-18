@@ -273,7 +273,7 @@ end
 
 using InteractiveUtils: @which
 
-macro code_grad(ex)
+macro adjoint(ex)
   # TODO fix escaping
   :(grad_ir($(code_irm(ex)), varargs = $(esc(:(@which $ex))).isva))
 end
