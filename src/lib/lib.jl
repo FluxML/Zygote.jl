@@ -130,8 +130,7 @@ function _forward(cx::Context, ::typeof(setfield!), x, f, val)
   g = grad_mut(cx::Context, x)
   y, function (_)
     r = getfield(g, f)
-    Δ = deref(r)
-    reset!(r)
+    Δ = deref!(r)
     (nothing, nothing, nothing, Δ)
   end
 end
@@ -159,5 +158,5 @@ end
 @generated function (back::Jnew{T,G})(Δ) where {T,G}
   !T.mutable && Δ == Nothing && return :nothing
   Δ = G == Nothing ? :Δ  : :(back.g)
-  :(nothing, nothing, $(map(f -> :(reset!($Δ.$f)), fieldnames(T))...))
+  :(nothing, nothing, $(map(f -> :(deref!($Δ.$f)), fieldnames(T))...))
 end

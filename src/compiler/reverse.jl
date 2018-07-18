@@ -4,16 +4,13 @@ gradref(x) = RefValue(grad(x))
 
 accum!(r::RefValue, x) = (r.x = accum(r.x, deref(x)))
 
-reset!(x) = x
+deref!(x) = x
 
-function reset!(r::RefValue)
+function deref!(r::RefValue)
   y = r.x
   r.x = grad(y)
   return y
 end
-
-deref(x) = x
-deref(x::RefValue) = x[]
 
 function merge_returns(ir)
   any(x -> x == unreachable, ir.stmts) && error("`throw` not supported")
@@ -221,9 +218,8 @@ function grad!(ir::ReverseIR, grads, i)
     # TODO remove with type hacks above
     y = isassert(ir.forw, i) ? SSAValue(i+3) : SSAValue(i+1)
     Δref = get(grads, y, nothing)
-    Δ = Δref == nothing ? nothing : push!(ir, xcall(Zygote, :deref, Δref), line)
+    Δ = Δref == nothing ? nothing : push!(ir, xcall(Zygote, :deref!, Δref), line)
     Δ = push!(ir, Expr(:call, J, Δ), line)
-    Δref == nothing || push!(ir, xcall(Zygote, :reset!, Δref))
     for (i, x) in enumerate(ex.args[3:end])
       haskey(grads, x) || continue
       push!(ir, xgradindex(Δ, i), line)
@@ -231,6 +227,9 @@ function grad!(ir::ReverseIR, grads, i)
     end
   end
 end
+
+deref(x) = x
+deref(x::RefValue) = x[]
 
 deref_tuple(xs...) = map(deref,xs)
 @inline deref_tuple_va(xs) = deref(xs)
