@@ -167,7 +167,7 @@ function block!(ir::ReverseIR)
   start = isempty(ir.blocks) ? 1 : ir.blocks[end].stmts.last+1
   old = ir.forw.cfg.blocks[ir.perm[length(ir.blocks)+1]]
   newidx(i) = invperm(ir.perm)[i]
-  preds, succs = newidx.(old.succs), newidx.(old.preds)
+  preds, succs = newidx.(old.succs), newidx.(sort(old.preds))
   if isempty(succs)
   elseif length(succs) == 1
     push!(ir, GotoNode(succs[1]))
