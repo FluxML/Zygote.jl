@@ -116,16 +116,16 @@ end
 
 @test gradient((a, b...) -> *(a, b...), 2, 3) == (3, 2)
 
-function mysum(xs)
-  s = 0
-  for x in xs
-    s += x
+# FIXME
+function myprod(xs)
+  s = 1
+  for i in [1, 2, 3]
+    s *= xs[i]
   end
   return s
 end
 
-# TODO control flow handling is broken
-# @test gradient(mysum, (1,2,3)) == ((1,1,1),)
+@test gradient(myprod, [1,2,3])[1] == [6,3,2]
 
 function f(a, b)
   xs = [a, b]

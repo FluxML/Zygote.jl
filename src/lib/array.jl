@@ -1,5 +1,7 @@
 grad(xs::Array) = grad.(xs)
 
+@nograd size, length, eachindex
+
 @inline _forward(::Context, ::Type{T}, args...) where T<:Array = T(args...), Δ -> nothing
 
 @grad Base.vect(xs...) = Base.vect(xs...), Δ -> (Δ...,)
