@@ -124,7 +124,7 @@ function record!(ir::IRCode)
 end
 
 function reverse_cfg(cfg, perm)
-  newidx(i) = perm[i]
+  newidx(i) = invperm(perm)[i]
   CFG([BasicBlock(StmtRange(1,0),newidx.(b.succs),newidx.(b.preds)) for b in cfg.blocks[perm]])
 end
 
@@ -155,8 +155,8 @@ end
 
 function block!(ir::ReverseIR)
   start = isempty(ir.blocks) ? 1 : ir.blocks[end].stmts.last+1
-  old = ir.forw.cfg.blocks[invperm(ir.perm)[length(ir.blocks)+1]]
-  newidx(i) = ir.perm[i]
+  old = ir.forw.cfg.blocks[ir.perm[length(ir.blocks)+1]]
+  newidx(i) = invperm(ir.perm)[i]
   preds, succs = newidx.(old.succs), newidx.(old.preds)
   if isempty(succs)
   elseif length(succs) == 1
@@ -175,7 +175,7 @@ IRCode(ir::ReverseIR) =
 function dominates(ir::ReverseIR, def, use)
   bdef, buse = blockidx.(Ref(ir.forw), (def, use))
   bdef == buse && return def.id <= use.id
-  bdef, buse = ir.perm[[bdef, buse]]
+  bdef, buse = invperm(ir.perm)[[bdef, buse]]
   dt = construct_domtree(reverse_cfg(ir.forw.cfg, ir.perm))
   return dominates(dt, buse, bdef)
 end
@@ -198,7 +198,7 @@ function phis!(ir::ReverseIR, grads, bi)
     for i in range(ir.forw.cfg.blocks[s])
       (ex = ir.forw.stmts[i]) isa PhiNode || break
       haskey(grads, SSAValue(i)) || continue
-      x = ex.values[findfirst(e -> e == bi, ex.edges)]
+      x = ex.values[findfirst(==(bi), ex.edges)]
       haskey(grads, x) || continue
       @assert length(succs) == 1
       xaccum_(ir, grads, x, grads[SSAValue(i)])
@@ -244,7 +244,7 @@ function reverse_ir(forw::IRCode, xs; varargs = false)
     grads[x] = SSAValue(length(ir.stmts))
   end
   for (bi, b) in enumerate(ir.forw.cfg.blocks[ir.perm])
-    phis!(ir, grads, invperm(ir.perm)[bi])
+    phis!(ir, grads, ir.perm[bi])
     for i in reverse(range(b))
       grad!(ir, grads, i)
     end
