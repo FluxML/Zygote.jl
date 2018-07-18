@@ -5,7 +5,6 @@ using MacroTools
 export forward, @code_grad
 
 include("tools/ir.jl")
-include("tools/interpret.jl")
 include("tools/reflection.jl")
 
 include("compiler/reverse.jl")
