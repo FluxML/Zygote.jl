@@ -4,6 +4,11 @@ gradref(x) = RefValue(grad(x))
 
 accum!(r::RefValue, x) = (r.x = accum(r.x, deref(x)))
 
+function accumif!(c::Bool, r::RefValue, x)
+  c && accum!(r, x)
+  return
+end
+
 deref!(x) = x
 
 function deref!(r::RefValue)
@@ -21,7 +26,10 @@ function merge_returns(ir)
   bb = length(ir.cfg.blocks)+1
   @assert length(unique(bs)) == length(bs)
   for r in rs
-    push!(xs, ir.stmts[r].val)
+    x = ir.stmts[r].val
+    x == GlobalRef(Base, :nothing) && (x = nothing)
+    @assert !(x isa Union{GlobalRef,Expr})
+    push!(xs, x)
     ir.stmts[r] = GotoNode(bb)
   end
   push!(ir.cfg.blocks, BasicBlock(StmtRange(length(ir.stmts), length(ir.stmts)-1), bs, []))
@@ -52,17 +60,22 @@ gradindex(::Nothing, i) = nothing
 xgetindex(x, i...) = Expr(:call, GlobalRef(Base, :getindex), x, i...)
 xgradindex(x, i) = xcall(Zygote, :gradindex, x, i)
 
-xaccum!(x, Δ) = Expr(:call, GlobalRef(Zygote, :accum!), x, Δ)
+xaccum!(x, Δ; cond = nothing) =
+  cond == nothing ?
+    xcall(Zygote, :accum!, x, Δ) :
+    xcall(Zygote, :accumif!, cond, x, Δ)
 
 function record_branches!(ir::IRCode)
   ir = IncrementalCompact(ir)
+  offset = 0
   for (i, x) in ir
-    bi = findfirst(x -> x == i+1, ir.ir.cfg.index)
+    bi = findfirst(x -> x == i+1-offset, ir.ir.cfg.index)
     bi == nothing && continue
     preds = ir.ir.cfg.blocks[bi+1].preds
     length(preds) > 1 || continue
     @assert length(preds) <= 2
-    insert_node_here!(ir, PhiNode(preds, [false, true]), Bool, ir.result_lines[i])
+    insert_node_here!(ir, PhiNode(sort(preds), [false, true]), Bool, ir.result_lines[i])
+    offset += 1
   end
   return finish_dc(ir)
 end
@@ -179,27 +192,15 @@ end
 
 dominates(ir::ReverseIR, def::Argument, use) = dominates(ir, SSAValue(1), use)
 
+isdirect(ir::ReverseIR, x) = length(ir.uses[x]) == 1 && dominates(ir, x, ir.uses[x][1])
+
 # TODO don't have special semantics here
-function xaccum_(ir::ReverseIR, grads, x, Δ, line = 0)
-  if length(ir.uses[x]) == 1 && dominates(ir, x, ir.uses[x][1])
+function xaccum_(ir::ReverseIR, grads, x, Δ; line = 0, cond = nothing)
+  if isdirect(ir, x)
     ir.stmts[grads[x].id] = nothing
     grads[x] = Δ
   else
-    push!(ir, xaccum!(grads[x], Δ), line)
-  end
-end
-
-function phis!(ir::ReverseIR, grads, bi)
-  succs = ir.forw.cfg.blocks[bi].succs
-  for s in succs
-    for i in range(ir.forw.cfg.blocks[s])
-      (ex = ir.forw.stmts[i]) isa PhiNode || break
-      haskey(grads, SSAValue(i)) || continue
-      x = ex.values[findfirst(==(bi), ex.edges)]
-      haskey(grads, x) || continue
-      @assert length(succs) == 1
-      xaccum_(ir, grads, x, grads[SSAValue(i)])
-    end
+    push!(ir, xaccum!(grads[x], Δ, cond = cond), line)
   end
 end
 
@@ -212,6 +213,15 @@ function grad!(ir::ReverseIR, grads, i)
   ex = ir.forw.stmts[i]
   if ex isa ReturnNode && (ex.val isa SSAValue || ex.val isa Argument)
     xaccum_(ir, grads, ex.val, SSAValue(1))
+  elseif ex isa PhiNode
+    haskey(grads, SSAValue(i)) || return
+    Δ = grads[SSAValue(i)]
+    @assert length(ex.edges) == 2
+    rec = Alpha(range(ir.forw.cfg.blocks[blockidx(ir.forw, i)])[1])
+    notrec = push!(ir, xcall(Base, :not_int, rec))
+    x1, x2 = ex.values[sortperm(ex.edges)]
+    haskey(grads, x1) && xaccum_(ir, grads, x1, Δ, cond = notrec)
+    haskey(grads, x2) && xaccum_(ir, grads, x2, Δ, cond = rec)
   elseif isexpr(ex, :call) && ex.args[1] == GlobalRef(Zygote, :_forward)
     J = Alpha(i+2)
     line = ir.forw.lines[i]
@@ -223,7 +233,7 @@ function grad!(ir::ReverseIR, grads, i)
     for (i, x) in enumerate(ex.args[3:end])
       haskey(grads, x) || continue
       push!(ir, xgradindex(Δ, i), line)
-      xaccum_(ir, grads, x, SSAValue(length(ir.stmts)), line)
+      xaccum_(ir, grads, x, SSAValue(length(ir.stmts)), line = line)
     end
   end
 end
@@ -243,11 +253,10 @@ function reverse_ir(forw::IRCode, xs; varargs = false)
     grads[x] = SSAValue(length(ir.stmts))
   end
   for (bi, b) in enumerate(ir.forw.cfg.blocks[ir.perm])
-    phis!(ir, grads, ir.perm[bi])
     for i in reverse(range(b))
       grad!(ir, grads, i)
     end
-    if bi == length(ir.forw.cfg.blocks)
+    if ir.perm[bi] == 1
       gs = [get(grads, Argument(i), nothing) for i = 3:length(forw.argtypes)]
       push!(ir, xcall(Zygote, varargs ? :deref_tuple_va : :deref_tuple, gs...))
       push!(ir, ReturnNode(SSAValue(length(ir.stmts))))

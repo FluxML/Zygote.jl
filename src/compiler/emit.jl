@@ -29,7 +29,7 @@ function alphauses(ir, bi)
   for i = range(ir.cfg.blocks[bi]), u in userefs(ir.stmts[i])
     u[] isa Alpha && push!(us, SSAValue(u[].id))
   end
-  return us
+  return unique(us)
 end
 
 xtuple(xs...) = xcall(:tuple, xs...)
@@ -42,7 +42,7 @@ concrete(::Type{Type{T}}) where T = typeof(T)
 function forward_stacks!(adj, F)
   stks, recs = [], []
   for fb = 1:length(adj.perm)
-    for α in alphauses(adj.back, adj.perm[fb])
+    for α in alphauses(adj.back, invperm(adj.perm)[fb])
       if fb == 1
         push!(recs, α)
       else
@@ -52,7 +52,7 @@ function forward_stacks!(adj, F)
         loc = afterphi(adj.forw, α.id+1)
         insert_node!(adj.forw, loc-1, Any, xcall(Zygote, :_push!, stk, α), true)
       end
-      push!(stks, (adj.perm[fb], alpha(α)))
+      push!(stks, (invperm(adj.perm)[fb], alpha(α)))
     end
   end
   args = [Argument(i) for i = 3:length(adj.forw.argtypes)]
@@ -70,14 +70,15 @@ function forward_stacks!(adj, F)
   return forw, stks
 end
 
-function reverse_stacks!(ir, stks, nargs)
+function reverse_stacks!(adj, stks, nargs)
+  ir = adj.back
   t = insert_node!(ir, 1, Any, xcall(Base, :getfield, Argument(1), QuoteNode(:t)))
   for b = 1:length(ir.cfg.blocks)
     repl = Dict()
     for (i, (b′, α)) in enumerate(stks)
       b == b′ || continue
       loc = max(2,range(ir.cfg.blocks[b])[1])
-      if b′ == length(ir.cfg.blocks)
+      if adj.perm[b′] == 1
         val = insert_node!(ir, loc, Any, xcall(:getindex, t, i+nargs))
       else
         stk = insert_node!(ir, 1, Any, xcall(:getindex, t, i+nargs))
@@ -104,6 +105,6 @@ end
 
 function stacks!(adj, T)
   forw, stks = forward_stacks!(adj, T)
-  back = reverse_stacks!(adj.back, stks, length(forw.argtypes)-2)
+  back = reverse_stacks!(adj, stks, length(forw.argtypes)-2)
   return forw, back
 end
