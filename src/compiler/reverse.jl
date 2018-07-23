@@ -80,21 +80,28 @@ function record_branches!(ir::IRCode)
   return finish_dc(ir)
 end
 
-ignored(f) = f in (GlobalRef(Base, :not_int),
-                   GlobalRef(Core.Intrinsics, :not_int),
-                   GlobalRef(Core, :(===)),
-                   GlobalRef(Core, :apply_type),
-                   GlobalRef(Core, :typeof))
-ignored(ir, f) = ignored(f)
-ignored(ir, f::SSAValue) = ignored(ir[f])
+ignored_f(f) = f in (GlobalRef(Base, :not_int),
+                     GlobalRef(Core.Intrinsics, :not_int),
+                     GlobalRef(Core, :(===)),
+                     GlobalRef(Core, :apply_type),
+                     GlobalRef(Core, :typeof))
+ignored_f(ir, f) = ignored_f(f)
+ignored_f(ir, f::SSAValue) = ignored_f(ir[f])
 
-function reachable(ir)
-  us = usages(ir)
-  ignored_(i) = true
-  ignored_(i::Union{SSAValue,Argument}) =
-    haskey(us, i) == 0 || all(i -> ignored(ir, i), us[i])
-  filter(!ignored_, keys(us))
+ignored(ir, ex) = isexpr(ex, :call) && ignored_f(ir, ex.args[1])
+ignored(ir, ex::SSAValue) = ignored(ir, ir[ex])
+
+function valid_usages(ir)
+  r = Dict()
+  for (x, us) in usages(ir)
+    x isa Union{SSAValue,Argument} || continue
+    us′ = filter(i -> !ignored(ir, i), us)
+    isempty(us′) || (r[x] = us′)
+  end
+  return r
 end
+
+reachable(ir) = keys(valid_usages(ir))
 
 # TODO: remove this once we don't mess with type inference
 function _forward_type(Ts)
@@ -112,7 +119,7 @@ function record!(ir::IRCode)
   for i = 1:length(ir.stmts)
     ex = argmap(x -> Argument(x.n+2), ir[SSAValue(i)])
     isexpr(ex, :new) && (ex = ir[SSAValue(i)] = xcall(Zygote, :__new__, ex.args...))
-    if isexpr(ex, :call) && !ignored(ir, ex.args[1])
+    if isexpr(ex, :call) && !ignored(ir, ex)
       yT = widenconst(types(ir)[i])
       T = _forward_type(exprtype.(Ref(ir), ex.args))
       if isvalidtype(T, yT)
