@@ -16,6 +16,7 @@ function deref!(r::RefValue)
   r.x = nothing
   return y
 end
+iscall(x, m::Module, n::Symbol) = isexpr(x, :call) && x.args[1] == GlobalRef(m, n)
 
 function merge_returns(ir)
   any(x -> x == unreachable, ir.stmts) && error("`throw` not supported")
@@ -212,7 +213,7 @@ end
 
 function isassert(ir, i)
   ex = ir.stmts[i+3]
-  isexpr(ex, :call) && ex.args[1] == GlobalRef(Zygote, :typeassert)
+  iscall(ex, Zygote, :typeassert)
 end
 
 function grad!(ir::ReverseIR, grads, i)
@@ -232,7 +233,7 @@ function grad!(ir::ReverseIR, grads, i)
     x1, x2 = ex.values[sortperm(ex.edges)]
     haskey(grads, x1) && xaccum_(ir, grads, x1, Δ, cond = notrec)
     haskey(grads, x2) && xaccum_(ir, grads, x2, Δ, cond = rec)
-  elseif isexpr(ex, :call) && ex.args[1] == GlobalRef(Zygote, :_forward)
+  elseif iscall(ex, Zygote, :_forward)
     J = Alpha(i+2)
     line = ir.forw.lines[i]
     # TODO remove with type hacks above
