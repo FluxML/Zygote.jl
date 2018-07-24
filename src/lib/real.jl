@@ -1,8 +1,5 @@
 using DiffRules, SpecialFunctions, NaNMath
 
-grad(x::Real) = zero(x)
-grad(x::Integer) = zero(float(x))
-
 for (M, f, arity) in DiffRules.diffrules()
   arity == 1 || continue
   @eval begin

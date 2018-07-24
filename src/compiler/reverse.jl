@@ -1,6 +1,6 @@
 using Base: RefValue
 
-gradref(x) = RefValue(grad(x))
+gradref() = Ref{Any}(nothing)
 
 accum!(r::RefValue, x) = (r.x = accum(r.x, deref(x)))
 
@@ -13,7 +13,7 @@ deref!(x) = x
 
 function deref!(r::RefValue)
   y = r.x
-  r.x = grad(y)
+  r.x = nothing
   return y
 end
 
@@ -201,7 +201,6 @@ dominates(ir::ReverseIR, def::Argument, use) = dominates(ir, SSAValue(1), use)
 
 isdirect(ir::ReverseIR, x) = length(ir.uses[x]) == 1 && dominates(ir, x, ir.uses[x][1])
 
-# TODO don't have special semantics here
 function xaccum_(ir::ReverseIR, grads, x, Δ; line = 0, cond = nothing)
   if isdirect(ir, x)
     ir.stmts[grads[x].id] = nothing
@@ -220,6 +219,10 @@ function grad!(ir::ReverseIR, grads, i)
   ex = ir.forw.stmts[i]
   if ex isa ReturnNode && (ex.val isa SSAValue || ex.val isa Argument)
     xaccum_(ir, grads, ex.val, SSAValue(1))
+  elseif ex isa PiNode
+    haskey(grads, SSAValue(i)) || return
+    Δ = push!(ir, xcall(Zygote, :deref!, grads[SSAValue(i)]))
+    xaccum_(ir, grads, ex.val, Δ)
   elseif ex isa PhiNode
     haskey(grads, SSAValue(i)) || return
     Δ = grads[SSAValue(i)]
@@ -255,8 +258,8 @@ deref_tuple(xs...) = map(deref,xs)
 function reverse_ir(forw::IRCode, xs; varargs = false)
   ir, grads = ReverseIR(forw), Dict()
   push!(ir, :(Δ()))
-  for x in xs # TODO: put these in the right block
-    push!(ir, Expr(:call, GlobalRef(Zygote, :gradref), alpha(x)))
+  for x in xs
+    push!(ir, Expr(:call, GlobalRef(Zygote, :gradref)))
     grads[x] = SSAValue(length(ir.stmts))
   end
   for (bi, b) in enumerate(ir.forw.cfg.blocks[ir.perm])

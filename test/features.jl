@@ -81,9 +81,9 @@ dxs = back(1)
 @test y == 14
 @test dxs == ([2,4,6],)
 
-@test gradient(pow, 2, 3) == (12, 0)
+@test gradient(pow, 2, 3) == (12, nothing)
 
-@test gradient(pow_mut, 2, 3) == (12, 0)
+@test gradient(pow_mut, 2, 3) == (12, nothing)
 
 @test gradient(x -> 1, 2) == (nothing,)
 
@@ -116,11 +116,10 @@ end
 
 @test gradient((a, b...) -> *(a, b...), 2, 3) == (3, 2)
 
-# FIXME
 function myprod(xs)
   s = 1
-  for i in [1, 2, 3]
-    s *= xs[i]
+  for x in xs
+    s *= x
   end
   return s
 end

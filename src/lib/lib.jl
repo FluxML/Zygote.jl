@@ -1,18 +1,9 @@
 # Interfaces
 
-grad(::Type) = nothing
-
-@generated function grad(x)
-  (x.mutable || fieldcount(x) == 0) && return
-  Expr(:tuple, [:($f = grad(x.$f)) for f in fieldnames(x)]...)
-end
-
-grad(x::Tuple) = grad.(x)
-
 accum(x, y) = x + y
-accum(x, _::Nothing) = x
-accum(x::Nothing, _) = x
-accum(x::Nothing, _::Nothing) = x
+accum(x, ::Nothing) = x
+accum(::Nothing, x) = x
+accum(::Nothing, ::Nothing) = nothing
 accum(x::Tuple, y::Tuple) = accum.(x, y)
 
 @generated function accum(x::NamedTuple, y::NamedTuple)
@@ -113,7 +104,7 @@ function _forward(cx::Context, ::typeof(getfield), x, f::Symbol)
 end
 
 @generated function grad_mut(x)
-  Expr(:tuple, [:($f = Ref(grad(x.$f))) for f in fieldnames(x)]...)
+  Expr(:tuple, [:($f = gradref()) for f in fieldnames(x)]...)
 end
 
 function grad_mut(cx::Context, x)

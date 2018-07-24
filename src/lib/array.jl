@@ -1,5 +1,3 @@
-grad(xs::Array) = grad.(xs)
-
 @nograd size, length, eachindex
 
 @inline _forward(::Context, ::Type{T}, args...) where T<:Array = T(args...), Δ -> nothing
