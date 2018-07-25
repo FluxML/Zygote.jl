@@ -55,6 +55,10 @@ end
 
 @grad Base.typeassert(x, T) = Base.typeassert(x, T), Δ -> (Δ, nothing)
 
+unwrap(x) = x
+
+@grad unwrap(x) = unwrap(x), Δ -> nothing
+
 # Tuples
 
 @grad tuple(xs...) = xs, identity

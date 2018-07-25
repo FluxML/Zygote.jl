@@ -1,6 +1,6 @@
 module Zygote
 
-using MacroTools
+using MacroTools, Requires
 
 export forward, @code_grad
 
@@ -15,9 +15,14 @@ include("lib/lib.jl")
 include("lib/real.jl")
 include("lib/array.jl")
 
-# we need to define this late, so that the genfuncs see lib.jl
 include("compiler/interface2.jl")
-# helps to work around 265-y issues
+
+@init @require Flux="587475ba-b771-5e3f-ad9e-33799f191a9c" include("flux.jl")
+
+# we need to define this late, so that the genfuncs see lib.jl
+# also helps to work around 265-y issues
 refresh() = include(joinpath(@__DIR__, "compiler/interface2.jl"))
+
+@init refresh()
 
 end # module

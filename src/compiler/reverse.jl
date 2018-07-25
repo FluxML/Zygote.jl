@@ -79,6 +79,24 @@ function record_branches!(ir::IRCode)
   return finish_dc(ir)
 end
 
+istrackable(x) =
+  x isa GlobalRef && x.mod ∉ (Base, Core) &&
+  !(isconst(x.mod, x.name) && typeof(getfield(x.mod, x.name)) <: Function)
+
+function record_globals!(ir::IRCode)
+  for i = 1:length(ir.stmts)
+    ex = ir[SSAValue(i)]
+    # TODO general globalrefs
+    if isexpr(ex, :call)
+      for j = 1:length(ex.args)
+        istrackable(ex.args[j]) || continue
+        ex.args[j] = insert_node!(ir, i, Any, xcall(Zygote, :unwrap, ex.args[j]))
+      end
+    end
+  end
+  return compact!(ir)
+end
+
 ignored_f(f) = f in (GlobalRef(Base, :not_int),
                      GlobalRef(Core.Intrinsics, :not_int),
                      GlobalRef(Core, :(===)),
@@ -289,7 +307,7 @@ end
 
 function grad_ir(ir; varargs = false)
   ir = merge_returns(ir)
-  forw, xs = record!(record_branches!(ir))
+  forw, xs = record!(record_branches!(record_globals!(ir)))
   back, perm = reverse_ir(forw, xs, varargs = varargs)
   return Adjoint(forw, compact!(back), perm)
 end
