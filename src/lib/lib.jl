@@ -96,7 +96,8 @@ end
 
 # TODO make this inferrable
 function _forward(cx::Context, ::typeof(getfield), x, f::Symbol)
-  getfield(x, f), function (Δ)
+  val = getfield(x, f)
+  unwrap(val), function (Δ)
     Δ == nothing && return
     if isimmutable(x)
       (nothing, (;nt_nothing(x)...,pair(Val{f}(), Δ)...), nothing)

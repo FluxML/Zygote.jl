@@ -1,3 +1,4 @@
 using .Flux.Tracker: TrackedArray, TrackedReal
 
-unwrap(x::Union{TrackedArray,TrackedReal}) = Flux.data(x)
+# TODO: enable this once we can work on typed IR
+# unwrap(x::Union{TrackedArray,TrackedReal}) = Flux.data(x)
