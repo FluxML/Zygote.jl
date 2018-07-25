@@ -12,9 +12,12 @@
 end
 
 @generated function (j::J{T})(Δ) where T
-  ignore(T) && return map(_ -> nothing, T.parameters)
+  ignore(T) && return :nothing
   g = _lookup_grad(T)
-  g == nothing && return :(error("Non-differentiable function $(j.t[1])"))
+  if g == nothing
+    Δ == Nothing && return :nothing
+    return :(error("Non-differentiable function $(j.t[1])"))
+  end
   meta, _, back = g
   resize!(back.argtypes, 2)
   argnames!(meta, Symbol("#self#"), :Δ)
