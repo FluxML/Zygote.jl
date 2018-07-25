@@ -34,6 +34,36 @@ function gradient(f, args...)
   return J(1)
 end
 
+# Param-style wrappers
+
+# TODO store ids only
+struct Params
+  params::IdSet{Any}
+  Params(xs) = new(IdSet(xs))
+end
+
+@forward Params.params Base.iterate
+
+struct Grads
+  grads::IdDict{Any,Any}
+end
+
+Base.show(io::IO, ps::Grads) = println(io, "Grads(...)")
+
+@forward Grads.grads Base.setindex!, Base.getindex, Base.haskey
+
+function forward(f, ps::Params)
+  cx = Context()
+  y, back = _forward(cx, f)
+  y, function (Δ)
+    for p in ps
+      cache(cx)[p] = nothing
+    end
+    back(Δ)
+    Grads(cx.cache) # TODO make a copy
+  end
+end
+
 # Reflection
 
 function code_grad(f, T)

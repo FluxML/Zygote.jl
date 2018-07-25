@@ -1,5 +1,5 @@
 using Zygote, Test
-using Zygote: gradient, roundtrip
+using Zygote: Params, gradient, roundtrip
 
 add(a, b) = a+b
 _relu(x) = x > 0 ? x : 0
@@ -140,3 +140,24 @@ D(f, x) = grad(f, x)[1]
 f(x) = throw(DimensionMismatch("fubar"))
 
 @test_throws DimensionMismatch gradient(f, 1)
+
+struct Layer{T}
+  W::T
+end
+
+(f::Layer)(x) = f.W * x
+
+W = [1 0; 0 1]
+x = [1, 2]
+
+y, back = forward(() -> W * x, Params([W]))
+@test y == [1, 2]
+@test back([1, 1])[W] == [1 2; 1 2]
+
+layer = Layer(W)
+
+y, back = forward(() -> layer(x), Params([W]))
+@test y == [1, 2]
+@test back([1, 1])[W] == [1 2; 1 2]
+
+@test gradient(() -> sum(W * x), Params([W]))[W] == [1 2; 1 2]

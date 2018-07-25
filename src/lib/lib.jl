@@ -55,9 +55,16 @@ end
 
 @grad Base.typeassert(x, T) = Base.typeassert(x, T), Δ -> (Δ, nothing)
 
+function accum_param(cx::Context, x, Δ)
+  haskey(cache(cx), x) && (cache(cx)[x] = accum(cache(cx)[x],Δ))
+  return
+end
+
 unwrap(x) = x
 
-@grad unwrap(x) = unwrap(x), Δ -> nothing
+function _forward(cx::Context, ::typeof(unwrap), x)
+  unwrap(x), Δ -> accum_param(cx, x, Δ)
+end
 
 # Tuples
 
@@ -99,6 +106,7 @@ function _forward(cx::Context, ::typeof(getfield), x, f::Symbol)
   val = getfield(x, f)
   unwrap(val), function (Δ)
     Δ == nothing && return
+    accum_param(cx, val, Δ)
     if isimmutable(x)
       (nothing, (;nt_nothing(x)...,pair(Val{f}(), Δ)...), nothing)
     else
