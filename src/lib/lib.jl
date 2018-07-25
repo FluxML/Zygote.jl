@@ -113,10 +113,11 @@ end
 
 function grad_mut(cx::Context, x)
   T = Core.Compiler.return_type(grad_mut, Tuple{typeof(x)})
-  if haskey(cx.grads, x)
-    cx.grads[x]::T
+  ch = cache(cx)
+  if haskey(ch, x)
+    ch[x]::T
   else
-    cx.grads[x] = grad_mut(x)
+    ch[x] = grad_mut(x)
   end
 end
 

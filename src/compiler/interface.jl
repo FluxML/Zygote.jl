@@ -1,8 +1,10 @@
-struct Context
-  grads::IdDict{Any,Any}
+mutable struct Context
+  cache::Union{IdDict{Any,Any},Nothing}
 end
 
-Context() = Context(IdDict())
+Context() = Context(nothing)
+
+cache(cx::Context) = cx.cache == nothing ? (cx.cache = IdDict()) : cx.cache
 
 struct J{S,T}
   t::T
