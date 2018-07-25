@@ -3,7 +3,10 @@ using Zygote: gradient
 
 @testset "Zygote" begin
 
-include("features.jl")
+@testset "Features" begin
+  include("features.jl")
+end
+
 include("gradcheck.jl")
 include("compiler.jl")
 

@@ -1,51 +1,12 @@
 using Zygote, Test
 using Zygote: gradient, roundtrip
 
-bool = true
-b(x) = bool ? 2x : x
-
-fglobal = x -> 5x
-gglobal = x -> fglobal(x)
-
-struct Foo{T}
-  a::T
-  b::T
-end
-
-function pow(x, n)
-  r = 1
-  while n > 0
-    n -= 1
-    r *= x
-  end
-  return r
-end
-
-function pow_mut(x, n)
-  r = Ref(one(x))
-  while n > 0
-    n -= 1
-    r[] = r[] * x
-  end
-  return r[]
-end
-
-# For nested AD, until we support errors
-function grad(f, args...)
-  y, J = forward(f, args...)
-  return J(1)
-end
-
-D(f, x) = grad(f, x)[1]
-
-@testset "Features" begin
-
 add(a, b) = a+b
-relu(x) = x > 0 ? x : 0
+_relu(x) = x > 0 ? x : 0
 f(a, b...) = +(a, b...)
 
 @test roundtrip(add, 1, 2) == 3
-@test roundtrip(relu, 1) == 1
+@test roundtrip(_relu, 1) == 1
 @test roundtrip(Complex, 1, 2) == 1+2im
 @test roundtrip(f, 1, 2, 3) == 6
 
@@ -62,10 +23,16 @@ dx = back(4)
 
 @test gradient(mul, 2, 3) == (3, 2)
 
+bool = true
+b(x) = bool ? 2x : x
+
 y, back = forward(b, 3)
 dx = back(4)
 @test y == 6
 @test dx == (8,)
+
+fglobal = x -> 5x
+gglobal = x -> fglobal(x)
 
 @test gradient(gglobal, 2) == (5,)
 
@@ -81,7 +48,25 @@ dxs = back(1)
 @test y == 14
 @test dxs == ([2,4,6],)
 
+function pow(x, n)
+  r = 1
+  while n > 0
+    n -= 1
+    r *= x
+  end
+  return r
+end
+
 @test gradient(pow, 2, 3) == (12, 0)
+
+function pow_mut(x, n)
+  r = Ref(one(x))
+  while n > 0
+    n -= 1
+    r[] = r[] * x
+  end
+  return r[]
+end
 
 @test gradient(pow_mut, 2, 3) == (12, 0)
 
@@ -92,6 +77,11 @@ dxs = back(1)
 @test gradient(x -> x.re, 2+3im) == ((re = 1, im = nothing),)
 
 @test gradient(x -> x.re*x.im, 2+3im) == ((re = 3, im = 2),)
+
+struct Foo{T}
+  a::T
+  b::T
+end
 
 function f(a, b)
   c = Foo(a, b)
@@ -133,6 +123,14 @@ end
 
 @test gradient(f, 2, 3) == (3, 2)
 
+# For nested AD, until we support errors
+function grad(f, args...)
+  y, J = forward(f, args...)
+  return J(1)
+end
+
+D(f, x) = grad(f, x)[1]
+
 @test D(x -> D(sin, x), 0.5) == -sin(0.5)
 
 # FIXME segfaults on beta2 for some reason
@@ -142,5 +140,3 @@ end
 f(x) = throw(DimensionMismatch("fubar"))
 
 @test_throws DimensionMismatch gradient(f, 1)
-
-end
