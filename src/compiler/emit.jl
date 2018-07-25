@@ -108,3 +108,13 @@ function stacks!(adj, T)
   back = reverse_stacks!(adj, stks, length(forw.argtypes)-2)
   return forw, back
 end
+
+function _lookup_grad(T)
+  (meta = typed_meta(T)) == nothing && return
+  meta.ret == Union{} && return
+  grad_ir(IRCode(meta), varargs = meta.method.isva)
+  forw, back = stacks!(grad_ir(IRCode(meta), varargs = meta.method.isva), T)
+  verify_ir(forw)
+  verify_ir(back)
+  meta, forw, back
+end

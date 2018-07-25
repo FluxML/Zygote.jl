@@ -1,3 +1,5 @@
+ignore(T) = all(T -> T <: Type, T.parameters)
+
 @generated function _forward(ctx::Context, f, args...)
   T = Tuple{f,args...}
   ignore(T) && return :(f(args...), J{$T}(()))

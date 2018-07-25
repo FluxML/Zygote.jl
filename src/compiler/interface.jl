@@ -1,15 +1,3 @@
-function _lookup_grad(T)
-  (meta = typed_meta(T)) == nothing && return
-  meta.ret == Union{} && return
-  grad_ir(IRCode(meta), varargs = meta.method.isva)
-  forw, back = stacks!(grad_ir(IRCode(meta), varargs = meta.method.isva), T)
-  verify_ir(forw)
-  verify_ir(back)
-  meta, forw, back
-end
-
-ignore(T) = all(T -> T <: Type, T.parameters)
-
 struct Context
   grads::IdDict{Any,Any}
 end
