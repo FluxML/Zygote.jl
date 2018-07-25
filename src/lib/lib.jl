@@ -104,7 +104,7 @@ function _forward(cx::Context, ::typeof(getfield), x, f::Symbol)
 end
 
 @generated function grad_mut(x)
-  Expr(:tuple, [:($f = gradref()) for f in fieldnames(x)]...)
+  Expr(:tuple, [:($f = Ref{Any}(nothing)) for f in fieldnames(x)]...)
 end
 
 function grad_mut(cx::Context, x)

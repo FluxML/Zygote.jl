@@ -22,10 +22,10 @@ y, back = @test_inferred forward(_sincos, 0.5)
 @test_inferred back(1)
 
 y, back = @test_inferred forward(pow, 2, 3)
-# @test_inferred back(1)
+@test_inferred back(1)
 
 cube(x) = pow(x, 3)
 y, back = @test_inferred forward(cube, 2)
-# @test_inferred back(1)
+@test_inferred back(1)
 
 end

@@ -1,7 +1,5 @@
 using Base: RefValue
 
-gradref() = Ref{Any}(nothing)
-
 accum!(r::RefValue, x) = (r.x = accum(r.x, deref(x)))
 
 function accumif!(c::Bool, r::RefValue, x)
@@ -256,11 +254,17 @@ deref_tuple(xs...) = map(deref,xs)
 @inline deref_tuple_va(xs) = deref(xs)
 @inline deref_tuple_va(x, xs...) = (deref(x), deref_tuple_va(xs...)...)
 
+# TODO: another type hack. We should be using phis on the backward pass
+gradtype(_) = Any
+gradtype(T::Type{<:Real}) = float(T)
+Base.convert(T::Type{<:Real}, ::Nothing) = zero(T)
+
 function reverse_ir(forw::IRCode, xs; varargs = false)
   ir, grads = ReverseIR(forw), Dict()
   push!(ir, :(Δ()))
   for x in xs
-    push!(ir, Expr(:call, GlobalRef(Zygote, :gradref)))
+    T = gradtype(exprtype(forw, x))
+    push!(ir, Expr(:call, Ref{T}, nothing))
     grads[x] = SSAValue(length(ir.stmts))
   end
   for (bi, b) in enumerate(ir.forw.cfg.blocks[ir.perm])
