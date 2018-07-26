@@ -23,7 +23,7 @@ macro grad(ex)
   T == nothing && (T = [])
   args = esc.(args)
   T = esc.(T)
-  pushfirst!(args, :(::Context), :(::typeof($(esc(name)))))
+  pushfirst!(args, :($(esc(:__context__))::Context), :(::typeof($(esc(name)))))
   body = quote
     Base.@_inline_meta
     y, back = $(esc(body))
@@ -62,9 +62,7 @@ end
 
 unwrap(x) = x
 
-function _forward(cx::Context, ::typeof(unwrap), x)
-  unwrap(x), Δ -> accum_param(cx, x, Δ)
-end
+@grad unwrap(x) = unwrap(x), Δ -> accum_param(__context__, x, Δ)
 
 # Tuples
 
@@ -87,12 +85,12 @@ function unapply(xs, Δs)
   return (Δs′...,)
 end
 
-function _forward(ctx::Context, ::typeof(Core._apply), f, args...)
-  y, J = Core._apply(_forward, (ctx, f), args...)
+@grad function Core._apply(f, args...)
+  y, J = Core._apply(_forward, (__context__, f), args...)
   y, function (Δ)
     Δ = J(Δ)
-    (nothing, first(Δ), unapply(args, Base.tail(Δ))...)
- end
+    (first(Δ), unapply(args, Base.tail(Δ))...)
+  end
 end
 
 # Structs
@@ -102,15 +100,14 @@ end
 @generated pair(::Val{k}, v) where k = :($k = v,)
 
 # TODO make this inferrable
-function _forward(cx::Context, ::typeof(getfield), x, f::Symbol)
+@grad function getfield(x, f::Symbol)
   val = getfield(x, f)
   unwrap(val), function (Δ)
-    Δ == nothing && return
-    accum_param(cx, val, Δ)
+    accum_param(__context__, val, Δ)
     if isimmutable(x)
-      (nothing, (;nt_nothing(x)...,pair(Val{f}(), Δ)...), nothing)
+      ((;nt_nothing(x)...,pair(Val{f}(), Δ)...), nothing)
     else
-      accum!(getfield(grad_mut(cx, x), f), Δ)
+      accum!(getfield(grad_mut(__context__, x), f), Δ)
       return
     end
   end
