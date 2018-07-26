@@ -81,7 +81,7 @@ end
 
 istrackable(x) =
   x isa GlobalRef && x.mod ∉ (Base, Core) &&
-  !(isconst(x.mod, x.name) && typeof(getfield(x.mod, x.name)) <: Function)
+  !(isconst(x.mod, x.name) && typeof(getfield(x.mod, x.name)) <: Union{Function,Type})
 
 function record_globals!(ir::IRCode)
   for i = 1:length(ir.stmts)

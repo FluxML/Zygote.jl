@@ -123,6 +123,12 @@ end
 
 @test gradient(f, 2, 3) == (3, 2)
 
+@test gradient(2) do x
+  d = Dict()
+  d[:x] = x
+  x * d[:x]
+end == (4,)
+
 # For nested AD, until we support errors
 function grad(f, args...)
   y, J = forward(f, args...)

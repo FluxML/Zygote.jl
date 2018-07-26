@@ -15,6 +15,7 @@ include("compiler/interface.jl")
 
 include("lib/lib.jl")
 include("lib/real.jl")
+include("lib/base.jl")
 include("lib/array.jl")
 
 include("compiler/interface2.jl")
