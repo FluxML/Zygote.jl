@@ -34,6 +34,8 @@ function gradient(f, args...)
   return J(1)
 end
 
+derivative(f, x) = gradient(f, x)[1]
+
 # Param-style wrappers
 
 # TODO store ids only
@@ -48,7 +50,7 @@ struct Grads
   grads::IdDict{Any,Any}
 end
 
-Base.show(io::IO, ps::Grads) = println(io, "Grads(...)")
+Base.show(io::IO, ps::Grads) = print(io, "Grads(...)")
 
 @forward Grads.grads Base.setindex!, Base.getindex, Base.haskey
 
