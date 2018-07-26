@@ -1,5 +1,7 @@
 using Base: @get!
 
+@nograd readline
+
 grad_mut(d::AbstractDict) = Dict()
 
 @grad function getindex(d::AbstractDict, k)
