@@ -269,15 +269,18 @@ deref(x) = x
 deref(x::RefValue) = x[]
 
 deref_tuple(xs...) = map(deref,xs)
-@inline deref_tuple_va(xs) = deref(xs)
-@inline deref_tuple_va(x, xs...) = (deref(x), deref_tuple_va(xs...)...)
+
+@inline deref_tuple_va(N, xs) = xs
+@inline deref_tuple_va(N, x, xs...) = (deref(x), deref_tuple_va(N, xs...)...)
+@inline deref_tuple_va(N, xs::Ref) = deref_tuple_va(N, deref(xs))
+@inline deref_tuple_va(::Val{N}, ::Nothing) where N = ntuple(_ -> nothing, Val{N})
 
 # TODO: another type hack. We should be using phis on the backward pass
 gradtype(_) = Any
 gradtype(T::Type{<:Real}) = float(T)
 Base.convert(T::Type{<:Real}, ::Nothing) = zero(T)
 
-function reverse_ir(forw::IRCode, xs; varargs = false)
+function reverse_ir(forw::IRCode, xs; varargs = nothing)
   ir, grads = ReverseIR(forw), Dict()
   push!(ir, :(Δ()))
   for x in xs
@@ -291,7 +294,11 @@ function reverse_ir(forw::IRCode, xs; varargs = false)
     end
     if ir.perm[bi] == 1
       gs = [get(grads, Argument(i), nothing) for i = 3:length(forw.argtypes)]
-      push!(ir, xcall(Zygote, varargs ? :deref_tuple_va : :deref_tuple, gs...))
+      if varargs == nothing
+        push!(ir, xcall(Zygote, :deref_tuple, gs...))
+      else
+        push!(ir, xcall(Zygote, :deref_tuple_va, Val(varargs), gs...))
+      end
       push!(ir, ReturnNode(SSAValue(length(ir.stmts))))
     end
     block!(ir)
@@ -305,7 +312,7 @@ struct Adjoint
   perm::Vector{Int}
 end
 
-function grad_ir(ir; varargs = false)
+function grad_ir(ir; varargs = nothing)
   ir = merge_returns(ir)
   forw, xs = record!(record_branches!(record_globals!(ir)))
   back, perm = reverse_ir(forw, xs, varargs = varargs)
@@ -316,5 +323,5 @@ using InteractiveUtils: @which
 
 macro adjoint(ex)
   # TODO fix escaping
-  :(grad_ir($(code_irm(ex)), varargs = $(esc(:(@which $ex))).isva))
+  :(grad_ir($(code_irm(ex)), varargs = varargs($(esc(:(@which $ex))), length(($(ex.args...),)))))
 end

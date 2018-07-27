@@ -109,11 +109,13 @@ function stacks!(adj, T)
   return forw, back
 end
 
+varargs(m::Method, n) = m.isva ? n - m.nargs + 1 : nothing
+
 function _lookup_grad(T)
   (meta = typed_meta(T)) == nothing && return
   meta.ret == Union{} && return
-  grad_ir(IRCode(meta), varargs = meta.method.isva)
-  forw, back = stacks!(grad_ir(IRCode(meta), varargs = meta.method.isva), T)
+  va = varargs(meta.method, length(T.parameters))
+  forw, back = stacks!(grad_ir(IRCode(meta), varargs = va), T)
   verify_ir(forw)
   verify_ir(back)
   meta, forw, back

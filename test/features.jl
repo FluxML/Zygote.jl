@@ -106,6 +106,11 @@ end
 
 @test gradient((a, b...) -> *(a, b...), 2, 3) == (3, 2)
 
+@test gradient((x, a...) -> x, 1) == (1,)
+@test gradient((x, a...) -> x, 1, 1) == (1,nothing)
+@test gradient((x, a...) -> x == a, 1) == (nothing,)
+@test gradient((x, a...) -> x == a, 1, 2) == (nothing,nothing)
+
 function myprod(xs)
   s = 1
   for x in xs
