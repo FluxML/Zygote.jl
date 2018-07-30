@@ -58,11 +58,12 @@ using Base.Broadcast
 using Base.Broadcast: Broadcasted, DefaultArrayStyle, broadcasted, materialize, instantiate
 using ForwardDiff: Dual, partials
 
-trim(x, Δ) = reshape(Δ, ntuple(i -> size(Δ, i), Val{ndims(x)}))
+trim(x, Δ) = reshape(Δ, ntuple(i -> size(Δ, i), Val(ndims(x))))
 
 unbroadcast(x::AbstractArray, Δ) =
   size(x) == size(Δ) ? Δ :
-    trim(x, sum(Δ, filter(n -> size(x, n) == 1, 1:ndims(Δ))))
+  length(x) == length(Δ) ? trim(x, Δ) :
+    trim(x, sum(Δ, dims = ntuple(i -> size(x, i) == 1 ? i : ndims(Δ)+1, Val(ndims(Δ)))))
 
 unbroadcast(x::Number, Δ) = sum(Δ)
 
