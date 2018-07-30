@@ -108,6 +108,7 @@ end
 
 @grad function materialize(bc::Broadcasted{<:DefaultArrayStyle})
   bc′ = instantiate(Broadcast.flatten(bc))
-  y, back = ∇broadcast(bc′.f, bc′.args)
-  y, Δ -> (unflatten(bc, back(Δ)),)
+  let (y, back) = ∇broadcast(bc′.f, bc′.args)
+    y, Δ -> (unflatten(bc, back(Δ)),)
+  end
 end
