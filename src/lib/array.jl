@@ -58,10 +58,6 @@ using Base.Broadcast
 using Base.Broadcast: Broadcasted, DefaultArrayStyle, broadcasted, materialize, instantiate
 using ForwardDiff: Dual, partials
 
-dualify(x, ps) = x
-dualify(x::Real, ps) = Dual(x, ps)
-dualify(xs::AbstractArray{<:Real}, ps) = dualify.(xs, (ps,))
-
 trim(x, Δ) = reshape(Δ, ntuple(i -> size(Δ, i), Val{ndims(x)}))
 
 unbroadcast(x::AbstractArray, Δ) =
@@ -70,19 +66,21 @@ unbroadcast(x::AbstractArray, Δ) =
 
 unbroadcast(x::Number, Δ) = sum(Δ)
 
-function getpartial(Δ, x, i)
-  @inbounds p = getindex(partials(x), i)
-  return Δ * p
+dual(x, p) = x
+dual(x::Real, p) = Dual(x, p)
+
+function partial(f::F, Δ, i, args::Vararg{Any,N}) where {F,N}
+  dargs = ntuple(j -> dual(args[j], i==j), Val(N))
+  return Δ * f(dargs...).partials[1]
 end
 
-function ∇broadcast(f, args::NTuple{N,Any}) where N
-  dargs = map((x,i) -> dualify(x, ntuple(j -> i==j, Val(N))),
-              args, ntuple(identity, Val(N)))
-  out = broadcast(f, dargs...)
-  (x -> x.value).(out), function (Δ)
-    Δxs = ntuple(i -> getpartial.(Δ, out, i), Val(N))
-    unbroadcast.(args, Δxs)
+@inline function ∇broadcast(f::F, args::Vararg{Any,N}) where {F,N}
+  y = broadcast(f, args...)
+  function back(Δ)
+    Δargs = ntuple(i -> partial.(f, Δ, i, args...), Val(N))
+    return unbroadcast.(args, Δargs)
   end
+  return y, back
 end
 
 _unflatten(x, xs) = first(xs), tail(xs)
@@ -108,7 +106,7 @@ end
 
 @grad function materialize(bc::Broadcasted{<:DefaultArrayStyle})
   bc′ = instantiate(Broadcast.flatten(bc))
-  let (y, back) = ∇broadcast(bc′.f, bc′.args)
+  let (y, back) = ∇broadcast(bc′.f, bc′.args...)
     y, Δ -> (unflatten(bc, back(Δ)),)
   end
 end
