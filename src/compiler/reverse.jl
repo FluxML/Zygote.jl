@@ -322,6 +322,5 @@ end
 using InteractiveUtils: @which
 
 macro adjoint(ex)
-  # TODO fix escaping
-  :(grad_ir($(code_irm(ex)), varargs = varargs($(esc(:(@which $ex))), length(($(ex.args...),)))))
+  :(grad_ir($(code_irm(ex)), varargs = varargs($(esc(:(@which $ex))), length(($(esc.(ex.args)...),)))))
 end
