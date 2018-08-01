@@ -5,6 +5,7 @@ accum(x, ::Nothing) = x
 accum(::Nothing, x) = x
 accum(::Nothing, ::Nothing) = nothing
 accum(x::Tuple, y::Tuple) = accum.(x, y)
+accum(x::AbstractArray, y::AbstractArray) = accum.(x, y)
 
 @generated function accum(x::NamedTuple, y::NamedTuple)
   grad(x) = x in fieldnames(y) ? :(y.$x) : :nothing

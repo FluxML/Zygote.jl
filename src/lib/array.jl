@@ -4,6 +4,8 @@
 
 @grad Base.vect(xs...) = Base.vect(xs...), Δ -> (Δ...,)
 
+Base.zero(xs::AbstractArray{Any}) = fill!(similar(xs), nothing)
+
 @grad function getindex(xs::Array, i...)
   xs[i...], function (Δ)
     Δ′ = zero(xs)
