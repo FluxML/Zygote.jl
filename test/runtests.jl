@@ -7,7 +7,12 @@ using Zygote: gradient
   include("features.jl")
 end
 
-include("gradcheck.jl")
-include("compiler.jl")
+@testset "Gradients" begin
+  include("gradcheck.jl")
+end
+
+@testset "Compiler" begin
+  include("compiler.jl")
+end
 
 end

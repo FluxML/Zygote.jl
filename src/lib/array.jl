@@ -23,14 +23,16 @@ end
 @grad transpose(x) = transpose(x), Δ -> (transpose(Δ),)
 @grad adjoint(x) = adjoint(x), Δ -> (adjoint(Δ),)
 
-@grad sum(xs::AbstractArray, dim...) =
-  sum(xs, dim...), Δ -> (similar(xs) .= Δ, map(_->nothing, dim)...)
+@grad sum(xs::AbstractArray) = sum(xs), Δ -> (similar(xs) .= Δ,)
+
+# @grad sum(xs::AbstractArray, dim...) =
+#   sum(xs, dim...), Δ -> (similar(xs) .= Δ, map(_->nothing, dim)...)
 
 @grad prod(xs) = prod(xs), Δ -> (prod(xs) ./ xs .* Δ,)
 
-@grad prod(xs, dim) = prod(xs, dim),
-  Δ -> (reshape(.*(circshift.([reshape(xs, length(xs))], 1:length(xs)-1)...), size(xs)) .* Δ,
-        nothing)
+# @grad prod(xs, dim) = prod(xs, dim),
+#   Δ -> (reshape(.*(circshift.([reshape(xs, length(xs))], 1:length(xs)-1)...), size(xs)) .* Δ,
+#         nothing)
 
 # NNlib
 

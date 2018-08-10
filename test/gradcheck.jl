@@ -1,5 +1,6 @@
 using Zygote, NNlib, Test
 using Zygote: gradient
+import Random: srand
 
 function ngradient(f, xs::AbstractArray...)
   grads = zero.(xs)
@@ -23,8 +24,6 @@ gradcheck(f, xs...) =
 gradtest(f, xs::AbstractArray...) = gradcheck((xs...) -> sum(sin.(f(xs...))), xs...)
 gradtest(f, dims...) = gradtest(f, rand.(Float64, dims)...)
 
-@testset "Gradients" begin
-
 srand(0)
 
 @test gradtest((x, W, b) -> σ.(W*x .+ b), 5, (2,5), 2)
@@ -35,8 +34,8 @@ srand(0)
 @test gradtest((w, x) -> w'*x, randn(10, 2), randn(10))
 @test gradtest((w, x) -> transpose(w)*x, randn(5,5), randn(5,5))
 
-@test gradtest(x -> sum(x, (2, 3)), (3,4,5))
-@test gradtest(x -> prod(x, (2, 3)), (3,4,5))
+# @test gradtest(x -> sum(x, (2, 3)), (3,4,5))
+# @test gradtest(x -> prod(x, (2, 3)), (3,4,5))
 @test gradtest(x -> prod(x), (3,4,5))
 
 # TODO using 1:3 here segfaults
@@ -46,5 +45,3 @@ srand(0)
 @test gradtest(x -> logsoftmax(x).*[1,2,3], (3,5))
 
 @test gradtest(x -> permutedims(x, [3,1,2]), rand(4,5,6))
-
-end

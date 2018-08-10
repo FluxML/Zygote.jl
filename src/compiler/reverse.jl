@@ -154,7 +154,7 @@ function record!(ir::IRCode)
     end
   end
   ir, m = _compact!(ir)
-  return ir, map(x -> x isa Argument ? Argument(x.n+2) : x, rename(xs, m))
+  return ir, Set(x isa Argument ? Argument(x.n+2) : x for x in rename(xs, m))
 end
 
 function reverse_cfg(cfg, perm)
@@ -273,7 +273,7 @@ deref_tuple(xs...) = map(deref,xs)
 @inline deref_tuple_va(N, xs) = xs
 @inline deref_tuple_va(N, x, xs...) = (deref(x), deref_tuple_va(N, xs...)...)
 @inline deref_tuple_va(N, xs::Ref) = deref_tuple_va(N, deref(xs))
-@inline deref_tuple_va(::Val{N}, ::Nothing) where N = ntuple(_ -> nothing, Val{N})
+@inline deref_tuple_va(::Val{N}, ::Nothing) where N = ntuple(_ -> nothing, Val(N))
 
 # TODO: another type hack. We should be using phis on the backward pass
 gradtype(_) = Any
