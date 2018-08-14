@@ -1,6 +1,6 @@
 using Core: CodeInfo
 
-struct Meta
+struct TypedMeta
   frame::InferenceState
   method::Method
   code::CodeInfo
@@ -39,7 +39,7 @@ function typed_meta(T; world = ccall(:jl_get_world_counter, UInt, ()), optimize 
   if ci.ssavaluetypes == 0 # constant return; IRCode doesn't like this
     ci.ssavaluetypes = Any[Any]
   end
-  return Meta(frame, method, ci, widenconst(frame.result.result))
+  return TypedMeta(frame, method, ci, widenconst(frame.result.result))
 end
 
 function inline_sparams!(ir::IRCode, sps)
@@ -52,7 +52,7 @@ function inline_sparams!(ir::IRCode, sps)
   return finish(ir)
 end
 
-function IRCode(meta::Meta)
+function IRCode(meta::TypedMeta)
   opt = OptimizationState(meta.frame)
   ir = just_construct_ssa(meta.code, deepcopy(meta.code.code),
                           Int(meta.method.nargs)-1, opt)
@@ -74,11 +74,11 @@ macro code_ir(ex)
   code_irm(ex)
 end
 
-function argnames!(meta::Meta, names...)
+function argnames!(meta::TypedMeta, names...)
   meta.code.slotnames = [names...]
 end
 
-function spliceargs!(meta::Meta, ir::IRCode, args...)
+function spliceargs!(meta::TypedMeta, ir::IRCode, args...)
   for i = 1:length(ir.stmts)
     ir[SSAValue(i)] = argmap(x -> Argument(x.n+length(args)), ir[SSAValue(i)])
   end
@@ -90,7 +90,7 @@ function spliceargs!(meta::Meta, ir::IRCode, args...)
 end
 
 # Behave as if the function signature is f(args...)
-function varargs!(meta::Meta, ir::IRCode, n = 1)
+function varargs!(meta::TypedMeta, ir::IRCode, n = 1)
   isva = meta.method.isva
   Ts = widenconst.(ir.argtypes[n+1:end])
   argtypes = !isva ?
@@ -117,7 +117,7 @@ function varargs!(meta::Meta, ir::IRCode, n = 1)
   return finish_dc(ir)
 end
 
-function update!(meta::Meta, ir::IRCode)
+function update!(meta::TypedMeta, ir::IRCode)
   Core.Compiler.replace_code_newstyle!(meta.code, ir, length(ir.argtypes)-1)
 end
 
