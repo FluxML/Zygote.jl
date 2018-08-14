@@ -1,3 +1,5 @@
+__precompile__(false)
+
 module Zygote
 
 using MacroTools, Requires

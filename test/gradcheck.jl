@@ -1,6 +1,6 @@
 using Zygote, NNlib, Test
 using Zygote: gradient
-import Random: srand
+import Random
 
 function ngradient(f, xs::AbstractArray...)
   grads = zero.(xs)
@@ -24,7 +24,7 @@ gradcheck(f, xs...) =
 gradtest(f, xs::AbstractArray...) = gradcheck((xs...) -> sum(sin.(f(xs...))), xs...)
 gradtest(f, dims...) = gradtest(f, rand.(Float64, dims)...)
 
-srand(0)
+Random.seed!(0)
 
 @test gradtest((x, W, b) -> σ.(W*x .+ b), 5, (2,5), 2)
 @test gradtest((x, W, b) -> σ.(W*x .+ b), (5,3), (2,5), 2)

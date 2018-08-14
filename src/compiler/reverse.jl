@@ -189,7 +189,8 @@ end
 
 function block!(ir::ReverseIR)
   start = isempty(ir.blocks) ? 1 : ir.blocks[end].stmts.last+1
-  old = ir.forw.cfg.blocks[ir.perm[length(ir.blocks)+1]]
+  block = length(ir.blocks)+1
+  old = ir.forw.cfg.blocks[ir.perm[block]]
   newidx(i) = invperm(ir.perm)[i]
   preds, succs = newidx.(old.succs), newidx.(sort(old.preds))
   if isempty(succs)
@@ -197,7 +198,7 @@ function block!(ir::ReverseIR)
     push!(ir, GotoNode(succs[1]))
   else
     push!(ir, GotoIfNot(Alpha(range(old)[1]), succs[1]))
-    push!(ir, GotoNode(succs[2]))
+    block+1 != succs[2] && push!(ir, GotoNode(succs[2]))
   end
   push!(ir.blocks, BasicBlock(StmtRange(start,length(ir.stmts)), preds, succs))
 end

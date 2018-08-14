@@ -116,7 +116,7 @@ function _lookup_grad(T)
   meta.ret == Union{} && return
   va = varargs(meta.method, length(T.parameters))
   forw, back = stacks!(grad_ir(IRCode(meta), varargs = va), T)
-  verify_ir(forw)
-  verify_ir(back)
+  # verify_ir(forw)
+  # verify_ir(back)
   meta, forw, back
 end

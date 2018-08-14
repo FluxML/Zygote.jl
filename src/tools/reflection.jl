@@ -114,7 +114,7 @@ function varargs!(meta::Meta, ir::IRCode, n = 1)
   for (i, x) in ir
     ir[i] = argmap(a -> get(map, a, a), x)
   end
-  return finish(ir)
+  return finish_dc(ir)
 end
 
 function update!(meta::Meta, ir::IRCode)
