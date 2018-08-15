@@ -1,5 +1,9 @@
 using Core: CodeInfo
 
+const usetyped = isdefined(Core.Compiler, :zygote)
+
+worldcounter() = ccall(:jl_get_world_counter, UInt, ())
+
 struct TypedMeta
   frame::InferenceState
   method::Method
@@ -24,7 +28,7 @@ end
     return frame
 end
 
-function typed_meta(T; world = ccall(:jl_get_world_counter, UInt, ()), optimize = false)
+function typed_meta(T; world = worldcounter(), optimize = false)
   F = T.parameters[1]
   F isa DataType && (F.name.module === Core.Compiler ||
                      F <: Core.Builtin ||
@@ -41,6 +45,30 @@ function typed_meta(T; world = ccall(:jl_get_world_counter, UInt, ()), optimize 
   end
   return TypedMeta(frame, method, ci, widenconst(frame.result.result))
 end
+
+struct Meta
+  method::Method
+  code::CodeInfo
+  sparams
+end
+
+function untyped_meta(T; world = worldcounter())
+  F = T.parameters[1]
+  F isa DataType && (F.name.module === Core.Compiler ||
+                     F <: Core.Builtin ||
+                     F <: Core.Builtin) && return nothing
+  _methods = Base._methods_by_ftype(T, -1, world)
+  length(_methods) == 1 || return nothing
+  type_signature, sps, method = first(_methods)
+  mi = Core.Compiler.code_for_method(method, type_signature, sps, world, false)
+  ci = Base.isgenerated(mi) ? Base.get_staged(mi) : Base.uncompressed_ast(mi)
+  Meta(method, ci, sps)
+end
+
+meta(T; world = worldcounter()) =
+  usetyped ?
+      typed_meta(T, world = world) :
+    untyped_meta(T, world = world)
 
 function inline_sparams!(ir::IRCode, sps)
   ir = IncrementalCompact(ir)
@@ -64,6 +92,12 @@ function code_ir(f, T)
   return IRCode(meta)
 end
 
+function IRCode(meta::Meta)
+  ir = just_construct_ssa(meta.code, deepcopy(meta.code.code),
+                          Int(meta.method.nargs)-1, meta.sparams)
+  return ir
+end
+
 function code_irm(ex)
   isexpr(ex, :call) || error("@code_ir f(args...)")
   f, args = ex.args[1], ex.args[2:end]
@@ -74,11 +108,11 @@ macro code_ir(ex)
   code_irm(ex)
 end
 
-function argnames!(meta::TypedMeta, names...)
+function argnames!(meta, names...)
   meta.code.slotnames = [names...]
 end
 
-function spliceargs!(meta::TypedMeta, ir::IRCode, args...)
+function spliceargs!(meta, ir::IRCode, args...)
   for i = 1:length(ir.stmts)
     ir[SSAValue(i)] = argmap(x -> Argument(x.n+length(args)), ir[SSAValue(i)])
   end
@@ -90,7 +124,7 @@ function spliceargs!(meta::TypedMeta, ir::IRCode, args...)
 end
 
 # Behave as if the function signature is f(args...)
-function varargs!(meta::TypedMeta, ir::IRCode, n = 1)
+function varargs!(meta, ir::IRCode, n = 1)
   isva = meta.method.isva
   Ts = widenconst.(ir.argtypes[n+1:end])
   argtypes = !isva ?
@@ -117,18 +151,21 @@ function varargs!(meta::TypedMeta, ir::IRCode, n = 1)
   return finish_dc(ir)
 end
 
-function update!(meta::TypedMeta, ir::IRCode)
+function update!(meta, ir::IRCode)
+  usetyped || (ir = slots!(ir))
   Core.Compiler.replace_code_newstyle!(meta.code, ir, length(ir.argtypes)-1)
+  usetyped || (meta.code.ssavaluetypes = length(meta.code.code))
+  slots!(meta.code)
 end
 
 @generated function roundtrip(f, args...)
-  meta = typed_meta(Tuple{f,args...})
-  ir = IRCode(meta)
-  ir = varargs!(meta, ir)
-  argnames!(meta, :f, :args)
-  ir = spliceargs!(meta, ir, (Symbol("#self#"), typeof(roundtrip)))
-  update!(meta, ir)
-  return meta.code
+  m = meta(Tuple{f,args...})
+  ir = IRCode(m)
+  ir = varargs!(m, ir)
+  argnames!(m, :f, :args)
+  ir = spliceargs!(m, ir, (Symbol("#self#"), typeof(roundtrip)))
+  update!(m, ir)
+  return m.code
 end
 
 function inlineable!(ir)
