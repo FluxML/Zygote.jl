@@ -95,7 +95,7 @@ end
 function IRCode(meta::Meta)
   ir = just_construct_ssa(meta.code, deepcopy(meta.code.code),
                           Int(meta.method.nargs)-1, meta.sparams)
-  return ir
+  return inline_sparams!(ir, meta.sparams)
 end
 
 function code_irm(ex)
