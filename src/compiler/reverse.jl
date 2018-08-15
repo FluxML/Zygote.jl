@@ -1,12 +1,5 @@
 using Base: RefValue
 
-accum!(r::RefValue, x) = (r.x = accum(r.x, deref(x)))
-
-function accumif!(c::Bool, r::RefValue, x)
-  c && accum!(r, x)
-  return
-end
-
 deref!(x) = x
 
 function deref!(r::RefValue)
@@ -14,6 +7,14 @@ function deref!(r::RefValue)
   r.x = nothing
   return y
 end
+
+accum!(r::RefValue, x) = (r.x = accum(r.x, deref!(x)))
+
+function accumif!(c::Bool, r::RefValue, x)
+  c && accum!(r, x)
+  return
+end
+
 iscall(x, m::Module, n::Symbol) = isexpr(x, :call) && x.args[1] == GlobalRef(m, n)
 
 function merge_returns(ir)

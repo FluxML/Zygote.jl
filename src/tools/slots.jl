@@ -2,6 +2,8 @@ struct Slot
   id::Symbol
 end
 
+Base.show(io::IO, s::Slot) = print(io, s.id)
+
 function insert_blockend!(ir::IRCode, pos, typ, val)
   i = first(ir.cfg.blocks[pos].stmts)
   j = last(ir.cfg.blocks[pos].stmts)
