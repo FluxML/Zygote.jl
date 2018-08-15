@@ -6,7 +6,7 @@
 
 Zygote is a working prototype for source-to-source automatic differentiation (AD) in Julia.
 
-Zygote currently requires a source build of Julia. In particular, you need to check out the [mji/zygote](https://github.com/JuliaLang/julia/tree/mji/zygote) branch of Julia for things to work properly. This is also very much in beta; lots of things work, many more things break. Beta testing and issue reports are welcome.
+Zygote is in an early stage and may break, but issue reports and beta testing are welcome. Note that due to current compiler limitations it may be faster on [this branch](https://github.com/JuliaLang/julia/tree/mji/zygote) of Julia.
 
 ```julia
 julia> using Zygote: derivative
