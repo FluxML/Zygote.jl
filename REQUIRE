@@ -1,0 +1,11 @@
+julia 0.7
+DiffRules
+ForwardDiff
+InteractiveUtils
+MacroTools
+NNlib
+NaNMath
+Random
+Requires
+SpecialFunctions
+Test
