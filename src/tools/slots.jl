@@ -3,11 +3,12 @@ struct Slot
 end
 
 function insert_blockend!(ir::IRCode, pos, typ, val)
-  i = last(ir.cfg.blocks[pos].stmts)
-  while ir.stmts[i] isa Union{GotoNode,GotoIfNot}
-    i -= 1
+  i = first(ir.cfg.blocks[pos].stmts)
+  j = last(ir.cfg.blocks[pos].stmts)
+  while j > i && ir.stmts[j] isa Union{GotoNode,GotoIfNot}
+    j -= 1
   end
-  insert_node!(ir, i, typ, val, true)
+  insert_node!(ir, j, typ, val, j != i)
 end
 
 function slots!(ir::IRCode)

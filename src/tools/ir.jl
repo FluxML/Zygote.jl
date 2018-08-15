@@ -101,7 +101,7 @@ end
 # SSA contruction (forked from Base for untyped code)
 
 import Core.Compiler: normalize, strip_trailing_junk!, compute_basic_blocks,
-  scan_slot_def_use, LineInfoNode, construct_ssa!
+  scan_slot_def_use, LineInfoNode, construct_ssa!, IR_FLAG_INBOUNDS
 
 function just_construct_ssa(ci::CodeInfo, code::Vector{Any}, nargs::Int, sp)
   ci.ssavaluetypes = Any[Any for _ = 1:length(code)]

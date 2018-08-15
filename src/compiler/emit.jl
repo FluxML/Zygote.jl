@@ -112,11 +112,11 @@ end
 varargs(m::Method, n) = m.isva ? n - m.nargs + 1 : nothing
 
 function _lookup_grad(T)
-  (meta = typed_meta(T)) == nothing && return
-  meta.ret == Union{} && return
-  va = varargs(meta.method, length(T.parameters))
-  forw, back = stacks!(grad_ir(IRCode(meta), varargs = va), T)
+  (m = meta(T)) == nothing && return
+  usetyped && m.ret == Union{} && return
+  va = varargs(m.method, length(T.parameters))
+  forw, back = stacks!(grad_ir(IRCode(m), varargs = va), T)
   # verify_ir(forw)
   # verify_ir(back)
-  meta, forw, back
+  m, forw, back
 end

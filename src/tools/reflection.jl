@@ -87,15 +87,15 @@ function IRCode(meta::TypedMeta)
   return inline_sparams!(ir, opt.sp)
 end
 
-function code_ir(f, T)
-  meta = typed_meta(Tuple{Typeof(f),T.parameters...})
-  return IRCode(meta)
-end
-
 function IRCode(meta::Meta)
   ir = just_construct_ssa(meta.code, deepcopy(meta.code.code),
                           Int(meta.method.nargs)-1, meta.sparams)
   return inline_sparams!(ir, meta.sparams)
+end
+
+function code_ir(f, T)
+  m = meta(Tuple{Typeof(f),T.parameters...})
+  return IRCode(m)
 end
 
 function code_irm(ex)
