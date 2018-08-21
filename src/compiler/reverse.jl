@@ -1,21 +1,11 @@
 using Base: RefValue
 
-deref!(x) = x
-
-function deref!(r::RefValue)
-  y = r.x
-  r.x = nothing
-  return y
-end
-
-accum!(r::RefValue, x) = (r.x = accum(r.x, deref!(x)))
-
-function accumif!(c::Bool, r::RefValue, x)
-  c && accum!(r, x)
-  return
-end
-
 iscall(x, m::Module, n::Symbol) = isexpr(x, :call) && x.args[1] == GlobalRef(m, n)
+
+function isassert(ir, i)
+  ex = ir.stmts[i+3]
+  iscall(ex, Zygote, :typeassert)
+end
 
 function merge_returns(ir)
   any(x -> x == unreachable, ir.stmts) && error("`throw` not supported")
@@ -59,11 +49,6 @@ gradindex(x, i) = x[i]
 gradindex(::Nothing, i) = nothing
 xgetindex(x, i...) = Expr(:call, GlobalRef(Base, :getindex), x, i...)
 xgradindex(x, i) = xcall(Zygote, :gradindex, x, i)
-
-xaccum!(x, Δ; cond = nothing) =
-  cond == nothing ?
-    xcall(Zygote, :accum!, x, Δ) :
-    xcall(Zygote, :accumif!, cond, x, Δ)
 
 function record_branches!(ir::IRCode)
   ir = IncrementalCompact(ir)
@@ -158,6 +143,8 @@ function record!(ir::IRCode)
   return ir, Set(x isa Argument ? Argument(x.n+2) : x for x in rename(xs, m))
 end
 
+# Backwards Pass
+
 function reverse_cfg(cfg, perm)
   newidx(i) = invperm(perm)[i]
   CFG([BasicBlock(StmtRange(1,0),newidx.(b.succs),newidx.(b.preds)) for b in cfg.blocks[perm]])
@@ -171,158 +158,114 @@ function reverse_order(cfg)
   perm[sortperm(1:n, by = x -> dt.nodes[x].level)]
 end
 
-struct ReverseIR
+struct Primal
   forw::IRCode
   perm::Vector{Int}
-  stmts::Vector{Any}
-  lines::Vector{Int32}
-  blocks::Vector{BasicBlock}
-  uses::Dict{Any,Any}
+  wrt::Set{Any}
+  varargs::Union{Int,Nothing}
 end
 
-ReverseIR(ir::IRCode) = ReverseIR(ir, reverse_order(ir.cfg), [], [], [], usages(ir))
+Primal(ir::IRCode, xs, vs) = Primal(ir, reverse_order(ir.cfg), xs, vs)
 
-function Base.push!(ir::ReverseIR, x, i = 0)
-  push!(ir.stmts, x)
-  push!(ir.lines, i)
-  return SSAValue(length(ir.stmts))
-end
-
-function block!(ir::ReverseIR)
-  start = isempty(ir.blocks) ? 1 : ir.blocks[end].stmts.last+1
-  block = length(ir.blocks)+1
-  old = ir.forw.cfg.blocks[ir.perm[block]]
-  newidx(i) = invperm(ir.perm)[i]
-  preds, succs = newidx.(old.succs), newidx.(sort(old.preds))
-  if isempty(succs)
-  elseif length(succs) == 1
-    push!(ir, GotoNode(succs[1]))
-  else
-    push!(ir, GotoIfNot(Alpha(range(old)[1]), succs[1]))
-    block+1 != succs[2] && push!(ir, GotoNode(succs[2]))
-  end
-  push!(ir.blocks, BasicBlock(StmtRange(start,length(ir.stmts)), preds, succs))
-end
-
-IRCode(ir::ReverseIR) =
-  IRCode(ir.forw, ir.stmts, Any[Any for _ in ir.stmts], ir.lines,
-         [0x00 for _ in ir.stmts], CFG(ir.blocks), NewNode[])
-
-function dominates(ir::ReverseIR, def, use)
-  bdef, buse = blockidx.(Ref(ir.forw), (def, use))
-  bdef == buse && return def.id <= use.id
-  bdef, buse = invperm(ir.perm)[[bdef, buse]]
-  dt = construct_domtree(reverse_cfg(ir.forw.cfg, ir.perm))
-  return dominates(dt, buse, bdef)
-end
-
-dominates(ir::ReverseIR, def::Argument, use) = dominates(ir, SSAValue(1), use)
-
-isdirect(ir::ReverseIR, x) = length(ir.uses[x]) == 1 && dominates(ir, x, ir.uses[x][1])
-
-function xaccum_(ir::ReverseIR, grads, x, Δ; line = 0, cond = nothing)
-  if isdirect(ir, x)
-    ir.stmts[grads[x].id] = nothing
-    grads[x] = Δ
-  else
-    push!(ir, xaccum!(grads[x], Δ, cond = cond), line)
-  end
-end
-
-function isassert(ir, i)
-  ex = ir.stmts[i+3]
-  iscall(ex, Zygote, :typeassert)
-end
-
-function grad!(ir::ReverseIR, grads, i)
-  ex = ir.forw.stmts[i]
-  if ex isa ReturnNode && (ex.val isa SSAValue || ex.val isa Argument)
-    xaccum_(ir, grads, ex.val, SSAValue(1))
-  elseif ex isa PiNode
-    haskey(grads, SSAValue(i)) || return
-    Δ = push!(ir, xcall(Zygote, :deref!, grads[SSAValue(i)]))
-    xaccum_(ir, grads, ex.val, Δ)
-  elseif ex isa PhiNode
-    haskey(grads, SSAValue(i)) || return
-    Δ = grads[SSAValue(i)]
-    @assert length(ex.edges) == 2
-    rec = Alpha(range(ir.forw.cfg.blocks[blockidx(ir.forw, i)])[1])
-    notrec = push!(ir, xcall(Base, :not_int, rec))
-    x1, x2 = ex.values[sortperm(ex.edges)]
-    haskey(grads, x1) && xaccum_(ir, grads, x1, Δ, cond = notrec)
-    haskey(grads, x2) && xaccum_(ir, grads, x2, Δ, cond = rec)
-  elseif iscall(ex, Zygote, :_forward)
-    J = Alpha(i+2)
-    line = ir.forw.lines[i]
-    # TODO remove with type hacks above
-    y = isassert(ir.forw, i) ? SSAValue(i+3) : SSAValue(i+1)
-    Δref = get(grads, y, nothing)
-    Δ = Δref == nothing ? nothing : push!(ir, xcall(Zygote, :deref!, Δref), line)
-    Δ = push!(ir, Expr(:call, J, Δ), line)
-    for (i, x) in enumerate(ex.args[3:end])
-      haskey(grads, x) || continue
-      push!(ir, xgradindex(Δ, i), line)
-      xaccum_(ir, grads, x, SSAValue(length(ir.stmts)), line = line)
-    end
-  end
-end
-
-deref(x) = x
-deref(x::RefValue) = x[]
-
-deref_tuple(xs...) = map(deref,xs)
-
-@inline deref_tuple_va(N, xs) = xs
-@inline deref_tuple_va(N, x, xs...) = (deref(x), deref_tuple_va(N, xs...)...)
-@inline deref_tuple_va(N, xs::Ref) = deref_tuple_va(N, deref(xs))
-@inline deref_tuple_va(::Val{N}, ::Nothing) where N = ntuple(_ -> nothing, Val(N))
-
-# TODO: another type hack. We should be using phis on the backward pass
-gradtype(_) = Any
-gradtype(T::Type{<:Real}) = float(T)
-Base.convert(T::Type{<:Real}, ::Nothing) = zero(T)
-
-function reverse_ir(forw::IRCode, xs; varargs = nothing)
-  ir, grads = ReverseIR(forw), Dict()
-  push!(ir, :(Δ()))
-  for x in xs
-    T = gradtype(exprtype(forw, x))
-    push!(ir, Expr(:call, Ref{T}, nothing))
-    grads[x] = SSAValue(length(ir.stmts))
-  end
-  for (bi, b) in enumerate(ir.forw.cfg.blocks[ir.perm])
-    for i in reverse(range(b))
-      grad!(ir, grads, i)
-    end
-    if ir.perm[bi] == 1
-      gs = [get(grads, Argument(i), nothing) for i = 3:length(forw.argtypes)]
-      if varargs == nothing
-        push!(ir, xcall(Zygote, :deref_tuple, gs...))
-      else
-        push!(ir, xcall(Zygote, :deref_tuple_va, Val(varargs), gs...))
-      end
-      push!(ir, ReturnNode(SSAValue(length(ir.stmts))))
-    end
-    block!(ir)
-  end
-  return IRCode(ir), ir.perm
-end
-
-struct Adjoint
-  forw::IRCode
-  back::IRCode
-  perm::Vector{Int}
-end
-
-function grad_ir(ir; varargs = nothing)
+function Primal(ir::IRCode; varargs = nothing)
   ir = merge_returns(ir)
   forw, xs = record!(record_branches!(record_globals!(ir)))
-  back, perm = reverse_ir(forw, xs, varargs = varargs)
-  return Adjoint(forw, compact!(back), perm)
+  Primal(forw, xs, varargs)
 end
+
+function IRCode(ir::Primal)
+  stmts = []
+  blocks = []
+  newidx(i) = invperm(ir.perm)[i]
+  for block in ir.perm
+    old = ir.forw.cfg.blocks[block]
+    start = length(stmts)+1
+    block == length(ir.perm) && push!(stmts, :(Δ()))
+    preds, succs = newidx.(old.succs), newidx.(sort(old.preds))
+    if isempty(succs)
+      push!(stmts, nothing)
+    elseif length(succs) == 1
+      push!(stmts, GotoNode(succs[1]))
+    else
+      push!(stmts, GotoIfNot(Alpha(range(old)[1]), succs[1]))
+      block+1 != succs[2] && push!(stmts, GotoNode(succs[2]))
+    end
+    push!(blocks, BasicBlock(StmtRange(start,length(stmts)), preds, succs))
+  end
+  ir = IRCode(ir.forw, stmts, Any[Any for _ in stmts], Int32[0 for _ in stmts],
+              [0x00 for _ in stmts], CFG(blocks), NewNode[])
+end
+
+function reverse_ir(pr::Primal)
+  ir = IRCode(pr)
+  grads = Dict()
+  partials = Dict(x => [] for x in pr.wrt)
+  for b in pr.perm
+    for i in reverse(pr.forw.cfg.blocks[b].stmts)
+      j = ir.cfg.blocks[invperm(pr.perm)[b]].stmts[1]
+      j = max(j, 2)
+      ex = pr.forw[SSAValue(i)]
+      if ex isa ReturnNode
+        push!(partials[ex.val], SSAValue(1))
+      elseif ex isa PhiNode
+        any(x -> x in pr.wrt, ex.values) || continue
+        Δ = insert_node!(ir, j, Any, xcall(Zygote, :accum))
+        grads[SSAValue(i)] = Δ
+        for x in ex.values
+          x in pr.wrt || continue
+          push!(partials[x], Δ)
+        end
+      elseif iscall(ex, Zygote, :_forward)
+        # TODO remove with type hacks above
+        y = isassert(pr.forw, i) ? SSAValue(i+3) : SSAValue(i+1)
+        y in pr.wrt || continue
+        J = Alpha(i+2)
+        Δ = insert_node!(ir, j, Any, xcall(Zygote, :accum))
+        insert_node!(ir, j, Any, Expr(:call, J, Δ))
+        grads[y] = Δ
+        for (i, x) in enumerate(ex.args[3:end])
+          x in pr.wrt || continue
+          dx = insert_node!(ir, j, Any, xgradindex(Δ, i))
+          push!(partials[x], dx)
+        end
+      end
+    end
+  end
+  ir, m = _compact!(ir)
+  return ir, rename(grads, m), rename(partials, m)
+end
+
+# Primal(@code_ir myabs(2)).forw
+# reverse_ir(Primal(@code_ir myabs(2)))
+
+@inline tuple_va(N, xs) = xs
+@inline tuple_va(N, x, xs...) = (x, tuple_va(N, xs...)...)
+@inline tuple_va(::Val{N}, ::Nothing) where N = ntuple(_ -> nothing, Val(N))
+
+# struct Adjoint
+#   forw::IRCode
+#   back::IRCode
+#   perm::Vector{Int}
+# end
 
 using InteractiveUtils: @which
 
 macro adjoint(ex)
   :(grad_ir($(code_irm(ex)), varargs = varargs($(esc(:(@which $ex))), length(($(esc.(ex.args)...),)))))
+end
+
+function pow(x, n)
+  r = 1
+  while n > 0
+    n -= 1
+    r *= x
+  end
+  return r
+end
+
+function myabs(x)
+  if x < 0
+    x = -x
+  end
+  return x
 end
