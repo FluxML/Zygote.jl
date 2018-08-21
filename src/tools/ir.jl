@@ -23,6 +23,15 @@ PhiNode(x, y) = PhiNode(Any[x...], Any[y...])
 
 CFG(bs) = CFG(bs, map(b -> b.stmts.first, bs[2:end]))
 
+function insert_blockend!(ir::IRCode, pos, typ, val)
+  i = first(ir.cfg.blocks[pos].stmts)
+  j = last(ir.cfg.blocks[pos].stmts)
+  while j > i && ir.stmts[j] isa Union{GotoNode,GotoIfNot}
+    j -= 1
+  end
+  insert_node!(ir, j, typ, val, j != i)
+end
+
 function finish_dc(ic::IncrementalCompact)
   Compiler.non_dce_finish!(ic)
   return Compiler.complete(ic)
