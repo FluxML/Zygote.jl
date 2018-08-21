@@ -58,7 +58,7 @@ function record_branches!(ir::IRCode)
     bi == nothing && continue
     preds = ir.ir.cfg.blocks[bi+1].preds
     length(preds) > 1 || continue
-    @assert length(preds) <= 2
+    @assert length(preds) <= 2 "> 2 predecessors not implemented"
     insert_node_here!(ir, PhiNode(sort(preds), [false, true]), Bool, ir.result_lines[i])
     offset += 1
   end
@@ -173,6 +173,33 @@ function Primal(ir::IRCode; varargs = nothing)
   Primal(forw, xs, varargs)
 end
 
+function blockinfo(pr::Primal)
+  info = Dict(b => (phis=Dict(),partials=[],grads=[]) for b in 1:length(pr.forw.cfg.blocks))
+  for b in 1:length(pr.forw.cfg.blocks), i in pr.forw.cfg.blocks[b].stmts
+    ex = pr.forw[SSAValue(i)]
+    if ex isa PhiNode
+      for (c, x) in zip(ex.edges, ex.values)
+        x in pr.wrt && push!(@get!(info[b].phis, c, []), x)
+      end
+    elseif iscall(ex, Zygote, :_forward)
+      push!(info[b].grads, SSAValue(i+1))
+      for x in ex.args[3:end]
+        x in pr.wrt && push!(info[b].partials, x)
+      end
+    end
+  end
+  worklist = collect(1:length(pr.forw.cfg.blocks))
+  while !isempty(worklist)
+    b = pop!(worklist)
+    for c in pr.forw.cfg.blocks[b].preds
+      in = union(get(info[b].phis, c, []), setdiff(info[b].partials, info[b].grads))
+      out = union(info[c].partials, info[c].grads)
+      @assert isempty(setdiff(in, out))
+    end
+  end
+  return info
+end
+
 function IRCode(ir::Primal)
   stmts = []
   blocks = []
@@ -233,39 +260,19 @@ function reverse_ir(pr::Primal)
   return ir, rename(grads, m), rename(partials, m)
 end
 
-function flow(pr::Primal, ir::IRCode, grads, partials)
-  info = Dict(b => (phis=Dict(),partials=[],grads=[]) for b in 1:length(ir.cfg.blocks))
-  for b in 1:length(ir.cfg.blocks), i in pr.forw.cfg.blocks[b].stmts
-    ex = pr.forw[SSAValue(i)]
-    if ex isa PhiNode
-      for (c, x) in zip(ex.edges, ex.values)
-        x in pr.wrt && push!(@get!(info[b].phis, c, []), x)
-      end
-    elseif iscall(ex, Zygote, :_forward)
-      push!(info[b].grads, SSAValue(i+1))
-      for x in ex.args[3:end]
-        x in pr.wrt && push!(info[b].partials, x)
-      end
-    end
+function accumulators!(pr::Primal, ir::IRCode, grads, partials)
+  blockpartials(b, x) = filter(x -> x.id in ir.cfg.blocks[b].stmts, partials[x])
+  info = blockinfo(pr)
+  for b = 1:length(ir.cfg.blocks), x in setdiff(info[b].partials, info[b].grads)
+    ps = blockpartials(pr.perm[b], x)
+    @show ps
   end
-  worklist = collect(1:length(ir.cfg.blocks))
-  while !isempty(worklist)
-    b = pop!(worklist)
-    for c in pr.forw.cfg.blocks[b].preds
-      in = union(get(info[b].phis, c, []), setdiff(info[b].partials, info[b].grads))
-      out = union(info[c].partials, info[c].grads)
-      @assert isempty(setdiff(in, out))
-    end
-  end
-  return info
+  return ir, partials
 end
-
-# Primal(@code_ir myabs(2)).forw
 
 # let
 #   pr = Primal(@code_ir myabs(2))
-#   ir, grads, partials = reverse_ir(pr)
-#   flow(pr, ir, grads, partials)
+#   accumulators!(pr, reverse_ir(pr)...)
 # end
 
 @inline tuple_va(N, xs) = xs
