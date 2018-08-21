@@ -262,12 +262,40 @@ end
 
 function accumulators!(pr::Primal, ir::IRCode, grads, partials)
   blockpartials(b, x) = filter(x -> x.id in ir.cfg.blocks[b].stmts, partials[x])
+  accums = Dict()
   info = blockinfo(pr)
   for b = 1:length(ir.cfg.blocks), x in setdiff(info[b].partials, info[b].grads)
     ps = blockpartials(pr.perm[b], x)
-    @show ps
+    p = insert_blockend!(ir, pr.perm[b], Any, xcall(Zygote, :accum, ps...))
+    setdiff!(partials[x], ps)
+    push!(partials[x], p)
+    accums[(pr.perm[b],x)] = p
   end
-  return ir, partials
+  blockpartial(b, x) = haskey(accums, (b, x)) ? accums[(b, x)] : get(blockpartials(b, x), 1, nothing)
+  for ((b, x), p) in accums
+    preds = ir.cfg.blocks[b].preds
+    ps = map(b -> blockpartial(b, x), preds)
+    if length(preds) > 1
+      p = insert_blockstart!(ir, b, Any, PhiNode(preds, ps))
+    else
+      p = ps[1]
+    end
+  end
+  for (x, dx) in grads
+    b = blockidx(ir, dx)
+    append!(ir[dx].args, blockpartials(b, x))
+    preds = ir.cfg.blocks[b].preds
+    length(preds) > 0 || continue
+    ps = map(b -> blockpartial(b, x), preds)
+    any(x -> x != nothing, ps) || continue
+    if length(preds) > 1
+      p = insert_blockstart!(ir, b, Any, PhiNode(preds, ps))
+    else
+      p = ps[1]
+    end
+    push!(ir[dx].args, blockpartials(b, x)..., p)
+  end
+  return compact!(ir)
 end
 
 # let

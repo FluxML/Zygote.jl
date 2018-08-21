@@ -34,8 +34,6 @@ end
 
 xtuple(xs...) = xcall(:tuple, xs...)
 
-afterphi(ir, loc) = ir.stmts[loc] isa PhiNode ? afterphi(ir, loc+1) : loc
-
 concrete(T::DataType) = T
 concrete(::Type{Type{T}}) where T = typeof(T)
 

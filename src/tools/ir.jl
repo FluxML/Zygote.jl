@@ -23,6 +23,11 @@ PhiNode(x, y) = PhiNode(Any[x...], Any[y...])
 
 CFG(bs) = CFG(bs, map(b -> b.stmts.first, bs[2:end]))
 
+afterphi(ir, loc) = ir.stmts[loc] isa PhiNode ? afterphi(ir, loc+1) : loc
+
+insert_blockstart!(ir::IRCode, pos, typ, val) =
+  insert_node!(ir, afterphi(ir, ir.cfg.blocks[pos].stmts[1]), typ, val)
+
 function insert_blockend!(ir::IRCode, pos, typ, val)
   i = first(ir.cfg.blocks[pos].stmts)
   j = last(ir.cfg.blocks[pos].stmts)
