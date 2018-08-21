@@ -175,6 +175,7 @@ end
 
 function blockinfo(pr::Primal)
   info = Dict(b => (phis=Dict(),partials=[],grads=[]) for b in 1:length(pr.forw.cfg.blocks))
+  append!(info[1].grads, filter(x -> x isa Argument, pr.wrt))
   for b in 1:length(pr.forw.cfg.blocks), i in pr.forw.cfg.blocks[b].stmts
     ex = pr.forw[SSAValue(i)]
     if ex isa PhiNode
@@ -223,37 +224,54 @@ function IRCode(ir::Primal)
               [0x00 for _ in stmts], CFG(blocks), NewNode[])
 end
 
-function reverse_ir(pr::Primal)
+function reverse_ir(pr::Primal; varargs = nothing)
   ir = IRCode(pr)
   grads = Dict()
   partials = Dict(x => [] for x in pr.wrt)
-  for b in pr.perm, i in reverse(pr.forw.cfg.blocks[b].stmts)
+  for b in pr.perm
     j = ir.cfg.blocks[invperm(pr.perm)[b]].stmts[1]
-    j = max(j, 2)
-    ex = pr.forw[SSAValue(i)]
-    if ex isa ReturnNode
-      push!(partials[ex.val], SSAValue(1))
-    elseif ex isa PhiNode
-      any(x -> x in pr.wrt, ex.values) || continue
-      Δ = insert_node!(ir, j, Any, xcall(Zygote, :accum))
-      grads[SSAValue(i)] = Δ
-      for x in ex.values
-        x in pr.wrt || continue
-        push!(partials[x], Δ)
+    for i in reverse(pr.forw.cfg.blocks[b].stmts)
+      j = max(j, 2)
+      ex = pr.forw[SSAValue(i)]
+      if ex isa ReturnNode
+        push!(partials[ex.val], SSAValue(1))
+      elseif ex isa PhiNode
+        any(x -> x in pr.wrt, ex.values) || continue
+        Δ = insert_node!(ir, j, Any, xcall(Zygote, :accum))
+        grads[SSAValue(i)] = Δ
+        for x in ex.values
+          x in pr.wrt || continue
+          push!(partials[x], Δ)
+        end
+      elseif iscall(ex, Zygote, :_forward)
+        # TODO remove with type hacks above
+        y = isassert(pr.forw, i) ? SSAValue(i+3) : SSAValue(i+1)
+        y in pr.wrt || continue
+        J = Alpha(i+2)
+        Δ = insert_node!(ir, j, Any, xcall(Zygote, :accum))
+        insert_node!(ir, j, Any, Expr(:call, J, Δ))
+        grads[y] = Δ
+        for (i, x) in enumerate(ex.args[3:end])
+          x in pr.wrt || continue
+          dx = insert_node!(ir, j, Any, xgradindex(Δ, i))
+          push!(partials[x], dx)
+        end
       end
-    elseif iscall(ex, Zygote, :_forward)
-      # TODO remove with type hacks above
-      y = isassert(pr.forw, i) ? SSAValue(i+3) : SSAValue(i+1)
-      y in pr.wrt || continue
-      J = Alpha(i+2)
-      Δ = insert_node!(ir, j, Any, xcall(Zygote, :accum))
-      insert_node!(ir, j, Any, Expr(:call, J, Δ))
-      grads[y] = Δ
-      for (i, x) in enumerate(ex.args[3:end])
-        x in pr.wrt || continue
-        dx = insert_node!(ir, j, Any, xgradindex(Δ, i))
-        push!(partials[x], dx)
+    end
+    if b == 1
+      gs = []
+      for i = 3:length(pr.forw.argtypes)
+        Argument(i) in pr.wrt || (push!(gs, nothing); continue)
+        dx = insert_node!(ir, j, Any, xcall(Zygote, :accum))
+        grads[Argument(i)] = dx
+        push!(gs, dx)
       end
+      if varargs == nothing
+        Δ = insert_node!(ir, j, Any, xcall(Zygote, :tuple, gs...))
+      else
+        Δ = insert_node!(ir, j, Any, xcall(Zygote, :tuple_va, Val(varargs), gs...))
+      end
+      insert_node!(ir, j, Any, ReturnNode(Δ))
     end
   end
   ir, m = _compact!(ir)
@@ -271,35 +289,31 @@ function accumulators!(pr::Primal, ir::IRCode, grads, partials)
     push!(partials[x], p)
     accums[(pr.perm[b],x)] = p
   end
-  blockpartial(b, x) = haskey(accums, (b, x)) ? accums[(b, x)] : get(blockpartials(b, x), 1, nothing)
-  for ((b, x), p) in accums
+
+  function predpartial(b, x)
+    blockpartial(b, x) = haskey(accums, (b, x)) ? accums[(b, x)] : get(blockpartials(b, x), 1, nothing)
     preds = ir.cfg.blocks[b].preds
+    isempty(preds) && return
     ps = map(b -> blockpartial(b, x), preds)
-    if length(preds) > 1
-      p = insert_blockstart!(ir, b, Any, PhiNode(preds, ps))
-    else
-      p = ps[1]
-    end
+    all(==(nothing), ps) && return
+    length(ps) == 1 ? ps[1] : insert_blockstart!(ir, b, Any, PhiNode(preds, ps))
+  end
+
+  for ((b, x), p) in accums
+    push!(ir[p].args, predpartial(b, x))
   end
   for (x, dx) in grads
     b = blockidx(ir, dx)
     append!(ir[dx].args, blockpartials(b, x))
-    preds = ir.cfg.blocks[b].preds
-    length(preds) > 0 || continue
-    ps = map(b -> blockpartial(b, x), preds)
-    any(x -> x != nothing, ps) || continue
-    if length(preds) > 1
-      p = insert_blockstart!(ir, b, Any, PhiNode(preds, ps))
-    else
-      p = ps[1]
-    end
-    push!(ir[dx].args, blockpartials(b, x)..., p)
+    push!(ir[dx].args, predpartial(b, x))
   end
   return compact!(ir)
 end
 
 # let
 #   pr = Primal(@code_ir myabs(2))
+#   # pr.forw
+#   # reverse_ir(pr)
 #   accumulators!(pr, reverse_ir(pr)...)
 # end
 
