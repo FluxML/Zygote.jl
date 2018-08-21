@@ -1,4 +1,4 @@
-using Base: RefValue
+using Base: @get!
 
 iscall(x, m::Module, n::Symbol) = isexpr(x, :call) && x.args[1] == GlobalRef(m, n)
 
@@ -200,34 +200,32 @@ function reverse_ir(pr::Primal)
   ir = IRCode(pr)
   grads = Dict()
   partials = Dict(x => [] for x in pr.wrt)
-  for b in pr.perm
-    for i in reverse(pr.forw.cfg.blocks[b].stmts)
-      j = ir.cfg.blocks[invperm(pr.perm)[b]].stmts[1]
-      j = max(j, 2)
-      ex = pr.forw[SSAValue(i)]
-      if ex isa ReturnNode
-        push!(partials[ex.val], SSAValue(1))
-      elseif ex isa PhiNode
-        any(x -> x in pr.wrt, ex.values) || continue
-        Δ = insert_node!(ir, j, Any, xcall(Zygote, :accum))
-        grads[SSAValue(i)] = Δ
-        for x in ex.values
-          x in pr.wrt || continue
-          push!(partials[x], Δ)
-        end
-      elseif iscall(ex, Zygote, :_forward)
-        # TODO remove with type hacks above
-        y = isassert(pr.forw, i) ? SSAValue(i+3) : SSAValue(i+1)
-        y in pr.wrt || continue
-        J = Alpha(i+2)
-        Δ = insert_node!(ir, j, Any, xcall(Zygote, :accum))
-        insert_node!(ir, j, Any, Expr(:call, J, Δ))
-        grads[y] = Δ
-        for (i, x) in enumerate(ex.args[3:end])
-          x in pr.wrt || continue
-          dx = insert_node!(ir, j, Any, xgradindex(Δ, i))
-          push!(partials[x], dx)
-        end
+  for b in pr.perm, i in reverse(pr.forw.cfg.blocks[b].stmts)
+    j = ir.cfg.blocks[invperm(pr.perm)[b]].stmts[1]
+    j = max(j, 2)
+    ex = pr.forw[SSAValue(i)]
+    if ex isa ReturnNode
+      push!(partials[ex.val], SSAValue(1))
+    elseif ex isa PhiNode
+      any(x -> x in pr.wrt, ex.values) || continue
+      Δ = insert_node!(ir, j, Any, xcall(Zygote, :accum))
+      grads[SSAValue(i)] = Δ
+      for x in ex.values
+        x in pr.wrt || continue
+        push!(partials[x], Δ)
+      end
+    elseif iscall(ex, Zygote, :_forward)
+      # TODO remove with type hacks above
+      y = isassert(pr.forw, i) ? SSAValue(i+3) : SSAValue(i+1)
+      y in pr.wrt || continue
+      J = Alpha(i+2)
+      Δ = insert_node!(ir, j, Any, xcall(Zygote, :accum))
+      insert_node!(ir, j, Any, Expr(:call, J, Δ))
+      grads[y] = Δ
+      for (i, x) in enumerate(ex.args[3:end])
+        x in pr.wrt || continue
+        dx = insert_node!(ir, j, Any, xgradindex(Δ, i))
+        push!(partials[x], dx)
       end
     end
   end
@@ -235,8 +233,40 @@ function reverse_ir(pr::Primal)
   return ir, rename(grads, m), rename(partials, m)
 end
 
+function flow(pr::Primal, ir::IRCode, grads, partials)
+  info = Dict(b => (phis=Dict(),partials=[],grads=[]) for b in 1:length(ir.cfg.blocks))
+  for b in 1:length(ir.cfg.blocks), i in pr.forw.cfg.blocks[b].stmts
+    ex = pr.forw[SSAValue(i)]
+    if ex isa PhiNode
+      for (c, x) in zip(ex.edges, ex.values)
+        x in pr.wrt && push!(@get!(info[b].phis, c, []), x)
+      end
+    elseif iscall(ex, Zygote, :_forward)
+      push!(info[b].grads, SSAValue(i+1))
+      for x in ex.args[3:end]
+        x in pr.wrt && push!(info[b].partials, x)
+      end
+    end
+  end
+  worklist = collect(1:length(ir.cfg.blocks))
+  while !isempty(worklist)
+    b = pop!(worklist)
+    for c in pr.forw.cfg.blocks[b].preds
+      in = union(get(info[b].phis, c, []), setdiff(info[b].partials, info[b].grads))
+      out = union(info[c].partials, info[c].grads)
+      @assert isempty(setdiff(in, out))
+    end
+  end
+  return info
+end
+
 # Primal(@code_ir myabs(2)).forw
-# reverse_ir(Primal(@code_ir myabs(2)))
+
+# let
+#   pr = Primal(@code_ir myabs(2))
+#   ir, grads, partials = reverse_ir(pr)
+#   flow(pr, ir, grads, partials)
+# end
 
 @inline tuple_va(N, xs) = xs
 @inline tuple_va(N, x, xs...) = (x, tuple_va(N, xs...)...)
