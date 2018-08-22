@@ -18,7 +18,7 @@ julia> f′(x) = derivative(f, x)
 f′ (generic function with 1 method)
 
 julia> f(5), f′(5)
-(86, 32.0)
+(86, 32)
 ```
 
 "Source-to-source" means that Zygote hooks into Julia's compiler, and generates the backwards pass for you – as if you had written it by hand.
