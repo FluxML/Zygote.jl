@@ -248,12 +248,12 @@ function reverse_ir(pr::Primal; varargs = nothing)
         y = isassert(pr.forw, i) ? SSAValue(i+3) : SSAValue(i+1)
         y in pr.wrt || continue
         J = Alpha(i+2)
-        Δ = insert_node!(ir, j, Any, xcall(Zygote, :accum))
-        insert_node!(ir, j, Any, Expr(:call, J, Δ))
-        grads[y] = Δ
+        dy = insert_node!(ir, j, Any, xcall(Zygote, :accum))
+        dxs = insert_node!(ir, j, Any, Expr(:call, J, dy))
+        grads[y] = dy
         for (i, x) in enumerate(ex.args[3:end])
           x in pr.wrt || continue
-          dx = insert_node!(ir, j, Any, xgradindex(Δ, i))
+          dx = insert_node!(ir, j, Any, xgradindex(dxs, i))
           push!(partials[x], dx)
         end
       end
@@ -276,6 +276,17 @@ function reverse_ir(pr::Primal; varargs = nothing)
   end
   ir, m = _compact!(ir)
   return ir, rename(grads, m), rename(partials, m)
+end
+
+function simplify!(ir)
+  ir = IncrementalCompact(ir)
+  for (i, x) in ir
+    iscall(x, Zygote, :accum) || continue
+    filter!(x -> x != nothing, x.args)
+    nargs = length(x.args)-1
+    ir[i] = nargs == 0 ? nothing : nargs == 1 ? x.args[end] : x
+  end
+  return finish(ir)
 end
 
 function accumulators!(pr::Primal, ir::IRCode, grads, partials)
@@ -307,14 +318,14 @@ function accumulators!(pr::Primal, ir::IRCode, grads, partials)
     append!(ir[dx].args, blockpartials(b, x))
     push!(ir[dx].args, predpartial(b, x))
   end
-  return compact!(ir)
+  return simplify!(ir)
 end
 
 # let
 #   pr = Primal(@code_ir myabs(2))
 #   # pr.forw
 #   # reverse_ir(pr)
-#   accumulators!(pr, reverse_ir(pr)...)
+#   compact!(accumulators!(pr, reverse_ir(pr)...))
 # end
 
 @inline tuple_va(N, xs) = xs

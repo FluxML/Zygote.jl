@@ -1,9 +1,15 @@
 # Interfaces
 
-accum(x, y) = x + y
-accum(x, ::Nothing) = x
-accum(::Nothing, x) = x
-accum(::Nothing, ::Nothing) = nothing
+accum() = nothing
+accum(x) = x
+
+accum(x, y) =
+  x == nothing ? y :
+  y == nothing ? x :
+  x + y
+
+accum(x, y, zs...) = accum(accum(x, y), zs...)
+
 accum(x::Tuple, y::Tuple) = accum.(x, y)
 accum(x::AbstractArray, y::AbstractArray) = accum.(x, y)
 
