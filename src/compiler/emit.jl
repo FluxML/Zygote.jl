@@ -113,7 +113,7 @@ function _lookup_grad(T)
   (m = meta(T)) == nothing && return
   usetyped && m.ret == Union{} && return
   va = varargs(m.method, length(T.parameters))
-  forw, back = stacks!(grad_ir(IRCode(m), varargs = va), T)
+  forw, back = stacks!(Adjoint(IRCode(m), varargs = va), T)
   # verify_ir(forw)
   # verify_ir(back)
   m, forw, back

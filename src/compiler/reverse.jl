@@ -1,5 +1,9 @@
 using Base: @get!
 
+@inline tuple_va(N, xs) = xs
+@inline tuple_va(N, x, xs...) = (x, tuple_va(N, xs...)...)
+@inline tuple_va(::Val{N}, ::Nothing) where N = ntuple(_ -> nothing, Val(N))
+
 iscall(x, m::Module, n::Symbol) = isexpr(x, :call) && x.args[1] == GlobalRef(m, n)
 
 function isassert(ir, i)
@@ -333,27 +337,23 @@ function accumulators!(pr::Primal, ir::IRCode, grads, partials, phis)
   return simplify!(ir)
 end
 
-# let
-#   pr = Primal(@code_ir myabs(2))
-#   # pr.forw
-#   # reverse_ir(pr)
-#   compact!(accumulators!(pr, reverse_ir(pr)...))
-# end
+struct Adjoint
+  forw::IRCode
+  back::IRCode
+  perm::Vector{Int}
+end
 
-@inline tuple_va(N, xs) = xs
-@inline tuple_va(N, x, xs...) = (x, tuple_va(N, xs...)...)
-@inline tuple_va(::Val{N}, ::Nothing) where N = ntuple(_ -> nothing, Val(N))
+function Adjoint(pr::Primal)
+  back = accumulators!(pr, reverse_ir(pr)...)
+  Adjoint(pr.forw, back, pr.perm)
+end
 
-# struct Adjoint
-#   forw::IRCode
-#   back::IRCode
-#   perm::Vector{Int}
-# end
+Adjoint(ir::IRCode; varargs = nothing) = Adjoint(Primal(ir, varargs = varargs))
 
 using InteractiveUtils: @which
 
 macro adjoint(ex)
-  :(grad_ir($(code_irm(ex)), varargs = varargs($(esc(:(@which $ex))), length(($(esc.(ex.args)...),)))))
+  :(Adjoint($(code_irm(ex)), varargs = varargs($(esc(:(@which $ex))), length(($(esc.(ex.args)...),)))))
 end
 
 function pow(x, n)
