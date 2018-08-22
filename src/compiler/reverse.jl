@@ -250,7 +250,7 @@ function reverse_ir(pr::Primal)
     for i in reverse(pr.forw.cfg.blocks[b].stmts)
       ex = pr.forw[SSAValue(i)]
       if ex isa ReturnNode
-        push!(partials[ex.val], SSAValue(1))
+        ex.val in pr.wrt && push!(partials[ex.val], SSAValue(1))
       elseif ex isa PhiNode
         any(x -> x in pr.wrt, ex.values) || continue
         Δ = insert_node!(ir, j, Any, xcall(Zygote, :accum))
@@ -263,7 +263,6 @@ function reverse_ir(pr::Primal)
       elseif iscall(ex, Zygote, :_forward)
         # TODO remove with type hacks above
         y = isassert(pr.forw, i) ? SSAValue(i+3) : SSAValue(i+1)
-        y in pr.wrt || continue
         J = Alpha(i+2)
         dy = insert_node!(ir, j, Any, xcall(Zygote, :accum))
         dxs = insert_node!(ir, j, Any, Expr(:call, J, dy))
@@ -307,7 +306,7 @@ function simplify!(ir)
 end
 
 function accumulators!(pr::Primal, ir::IRCode, grads, partials, phis)
-  blockpartials(b, x) = filter(x -> x.id in ir.cfg.blocks[b].stmts, partials[x])
+  blockpartials(b, x) = filter(x -> x.id in ir.cfg.blocks[b].stmts, get(partials, x, []))
   accums = Dict()
   info = blockinfo(pr)
   for b = 1:length(ir.cfg.blocks), x in setdiff(info[b].partials, info[b].grads)
