@@ -122,7 +122,8 @@ end
     if isimmutable(x)
       ((;nt_nothing(x)...,pair(Val{f}(), Δ)...), nothing)
     else
-      accum!(getfield(grad_mut(__context__, x), f), Δ)
+      dx = getfield(grad_mut(__context__, x), f)
+      dx[] = accum(dx[], Δ)
       return
     end
   end
@@ -174,6 +175,6 @@ end
 # TODO captured mutables + multiple calls to `back`
 @generated function (back::Jnew{T,G})(Δ) where {T,G}
   !T.mutable && Δ == Nothing && return :nothing
-  Δ = G == Nothing ? :Δ  : :(back.g)
+  Δ = G == Nothing ? :Δ : :(back.g)
   :(nothing, nothing, $(map(f -> :(deref!($Δ.$f)), fieldnames(T))...))
 end
