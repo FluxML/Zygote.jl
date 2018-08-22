@@ -75,7 +75,7 @@ function reverse_stacks!(adj, stks, nargs)
     repl = Dict()
     for (i, (b′, α)) in enumerate(stks)
       b == b′ || continue
-      loc = max(2,range(ir.cfg.blocks[b])[1])
+      loc = max(2,afterphi(ir, range(ir.cfg.blocks[b])[1]))
       if adj.perm[b′] == 1
         val = insert_node!(ir, loc, Any, xcall(:getindex, t, i+nargs))
       else

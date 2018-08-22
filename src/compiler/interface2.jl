@@ -9,6 +9,7 @@ ignore(T) = all(T -> T <: Type, T.parameters)
   argnames!(meta, Symbol("#self#"), :ctx, :f, :args)
   forw = varargs!(meta, forw, 3)
   forw = inlineable!(forw)
+  usetyped || (forw = slots!(forw))
   update!(meta, forw)
   return meta.code
 end
@@ -23,7 +24,7 @@ end
   meta, _, back = g
   resize!(back.argtypes, 2)
   argnames!(meta, Symbol("#self#"), :Δ)
-  back = inlineable!(back)
+  back = slots!(inlineable!(back))
   update!(meta, back)
   if usetyped
     # Enable type inference
