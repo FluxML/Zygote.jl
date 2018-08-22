@@ -102,6 +102,14 @@ end
 
 # Structs
 
+deref!(x) = x
+
+function deref!(x::Ref)
+  d = x[]
+  x[] = nothing
+  return d
+end
+
 @generated nt_nothing(x) = Expr(:tuple, [:($f=nothing) for f in fieldnames(x)]...)
 
 @generated pair(::Val{k}, v) where k = :($k = v,)
