@@ -239,7 +239,7 @@ function IRCode(ir::Primal)
               [0x00 for _ in stmts], CFG(blocks), NewNode[])
 end
 
-function reverse_ir(pr::Primal; varargs = nothing)
+function reverse_ir(pr::Primal)
   ir = IRCode(pr)
   grads = Dict()
   partials = Dict(x => [] for x in pr.wrt)
@@ -283,10 +283,10 @@ function reverse_ir(pr::Primal; varargs = nothing)
         grads[Argument(i)] = dx
         push!(gs, dx)
       end
-      if varargs == nothing
+      if pr.varargs == nothing
         Δ = insert_node!(ir, j, Any, xcall(Zygote, :tuple, gs...))
       else
-        Δ = insert_node!(ir, j, Any, xcall(Zygote, :tuple_va, Val(varargs), gs...))
+        Δ = insert_node!(ir, j, Any, xcall(Zygote, :tuple_va, Val(pr.varargs), gs...))
       end
       insert_node!(ir, j, Any, ReturnNode(Δ))
     end
