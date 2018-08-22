@@ -362,7 +362,7 @@ end
 
 function Adjoint(pr::Primal)
   back = accumulators!(pr, reverse_ir(pr)...)
-  Adjoint(pr.forw, back, pr.perm)
+  Adjoint(pr.forw, compact!(back), pr.perm)
 end
 
 Adjoint(ir::IRCode; varargs = nothing) = Adjoint(Primal(ir, varargs = varargs))
