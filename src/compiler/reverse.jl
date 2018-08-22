@@ -256,6 +256,11 @@ function reverse_ir(pr::Primal)
       ex = pr.forw[SSAValue(i)]
       if ex isa ReturnNode
         ex.val in pr.wrt && push!(partials[ex.val], SSAValue(1))
+      elseif ex isa PiNode
+        (SSAValue(i) in pr.wrt && ex.val in pr.wrt) || continue
+        Δ = insert_node!(ir, j, Any, xcall(Zygote, :accum))
+        grads[SSAValue(i)] = Δ
+        push!(partials[ex.val], Δ)
       elseif ex isa PhiNode
         any(x -> x in pr.wrt, ex.values) || continue
         Δ = insert_node!(ir, j, Any, xcall(Zygote, :accum))
@@ -384,5 +389,3 @@ function myprod(xs)
   end
   return s
 end
-
-# Adjoint(@code_ir myprod([1,2,3]))
