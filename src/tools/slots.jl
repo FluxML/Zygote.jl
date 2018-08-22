@@ -4,15 +4,6 @@ end
 
 Base.show(io::IO, s::Slot) = print(io, s.id)
 
-function insert_blockend!(ir::IRCode, pos, typ, val)
-  i = first(ir.cfg.blocks[pos].stmts)
-  j = last(ir.cfg.blocks[pos].stmts)
-  while j > i && ir.stmts[j] isa Union{GotoNode,GotoIfNot}
-    j -= 1
-  end
-  insert_node!(ir, j, typ, val, j != i)
-end
-
 function slots!(ir::IRCode)
   n = 0
   for b = 1:length(ir.cfg.blocks)

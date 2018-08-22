@@ -1,9 +1,15 @@
 # Interfaces
 
-accum(x, y) = x + y
-accum(x, ::Nothing) = x
-accum(::Nothing, x) = x
-accum(::Nothing, ::Nothing) = nothing
+accum() = nothing
+accum(x) = x
+
+accum(x, y) =
+  x == nothing ? y :
+  y == nothing ? x :
+  x + y
+
+accum(x, y, zs...) = accum(accum(x, y), zs...)
+
 accum(x::Tuple, y::Tuple) = accum.(x, y)
 accum(x::AbstractArray, y::AbstractArray) = accum.(x, y)
 
@@ -96,6 +102,14 @@ end
 
 # Structs
 
+deref!(x) = x
+
+function deref!(x::Ref)
+  d = x[]
+  x[] = nothing
+  return d
+end
+
 @generated nt_nothing(x) = Expr(:tuple, [:($f=nothing) for f in fieldnames(x)]...)
 
 @generated pair(::Val{k}, v) where k = :($k = v,)
@@ -108,7 +122,8 @@ end
     if isimmutable(x)
       ((;nt_nothing(x)...,pair(Val{f}(), Δ)...), nothing)
     else
-      accum!(getfield(grad_mut(__context__, x), f), Δ)
+      dx = getfield(grad_mut(__context__, x), f)
+      dx[] = accum(dx[], Δ)
       return
     end
   end
@@ -160,6 +175,6 @@ end
 # TODO captured mutables + multiple calls to `back`
 @generated function (back::Jnew{T,G})(Δ) where {T,G}
   !T.mutable && Δ == Nothing && return :nothing
-  Δ = G == Nothing ? :Δ  : :(back.g)
+  Δ = G == Nothing ? :Δ : :(back.g)
   :(nothing, nothing, $(map(f -> :(deref!($Δ.$f)), fieldnames(T))...))
 end

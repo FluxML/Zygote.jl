@@ -23,6 +23,23 @@ PhiNode(x, y) = PhiNode(Any[x...], Any[y...])
 
 CFG(bs) = CFG(bs, map(b -> b.stmts.first, bs[2:end]))
 
+afterphi(ir, loc) = ir.stmts[loc] isa PhiNode ? afterphi(ir, loc+1) : loc
+
+insert_blockstart!(ir::IRCode, pos, typ, val) =
+  insert_node!(ir, afterphi(ir, ir.cfg.blocks[pos].stmts[1]), typ, val)
+
+function insert_blockend!(ir::IRCode, pos, typ, val)
+  i = first(ir.cfg.blocks[pos].stmts)
+  j = last(ir.cfg.blocks[pos].stmts)
+  if !(ir.stmts[j] isa Union{GotoNode,GotoIfNot,ReturnNode})
+    return insert_node!(ir, j, typ, val, true)
+  end
+  while j > i && ir.stmts[j-1] isa Union{GotoNode,GotoIfNot,ReturnNode}
+    j -= 1
+  end
+  insert_node!(ir, j, typ, val)
+end
+
 function finish_dc(ic::IncrementalCompact)
   Compiler.non_dce_finish!(ic)
   return Compiler.complete(ic)
@@ -57,6 +74,7 @@ rename(x, m) = x
 rename(x::SSAValue, m) = m[x.id]
 rename(xs::AbstractVector, m) = map(x -> rename(x, m), xs)
 rename(xs::AbstractSet, m) = Set(rename(x, m) for x in xs)
+rename(d::AbstractDict, m) = Dict(k => rename(v, m) for (k, v) in d)
 
 function usages(ir)
   us = Dict()

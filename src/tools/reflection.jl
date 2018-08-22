@@ -152,7 +152,6 @@ function varargs!(meta, ir::IRCode, n = 1)
 end
 
 function update!(meta, ir::IRCode)
-  usetyped || (ir = slots!(ir))
   Core.Compiler.replace_code_newstyle!(meta.code, ir, length(ir.argtypes)-1)
   usetyped || (meta.code.ssavaluetypes = length(meta.code.code))
   slots!(meta.code)

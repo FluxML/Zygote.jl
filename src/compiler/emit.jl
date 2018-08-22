@@ -34,8 +34,6 @@ end
 
 xtuple(xs...) = xcall(:tuple, xs...)
 
-afterphi(ir, loc) = ir.stmts[loc] isa PhiNode ? afterphi(ir, loc+1) : loc
-
 concrete(T::DataType) = T
 concrete(::Type{Type{T}}) where T = typeof(T)
 
@@ -77,7 +75,7 @@ function reverse_stacks!(adj, stks, nargs)
     repl = Dict()
     for (i, (b′, α)) in enumerate(stks)
       b == b′ || continue
-      loc = max(2,range(ir.cfg.blocks[b])[1])
+      loc = max(2,afterphi(ir, range(ir.cfg.blocks[b])[1]))
       if adj.perm[b′] == 1
         val = insert_node!(ir, loc, Any, xcall(:getindex, t, i+nargs))
       else
@@ -115,7 +113,7 @@ function _lookup_grad(T)
   (m = meta(T)) == nothing && return
   usetyped && m.ret == Union{} && return
   va = varargs(m.method, length(T.parameters))
-  forw, back = stacks!(grad_ir(IRCode(m), varargs = va), T)
+  forw, back = stacks!(Adjoint(IRCode(m), varargs = va), T)
   # verify_ir(forw)
   # verify_ir(back)
   m, forw, back
