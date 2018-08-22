@@ -58,7 +58,7 @@ function record_branches!(ir::IRCode)
     bi == nothing && continue
     preds = ir.ir.cfg.blocks[bi+1].preds
     length(preds) > 1 || continue
-    @assert length(preds) <= 2 "> 2 predecessors not implemented"
+    @assert length(preds) <= 2 "not implemented"
     insert_node_here!(ir, PhiNode(sort(preds), [false, true]), Bool, ir.result_lines[i])
     offset += 1
   end
@@ -173,6 +173,9 @@ function Primal(ir::IRCode; varargs = nothing)
   Primal(forw, xs, varargs)
 end
 
+newblock(pr::Primal, b) = invperm(pr.perm)[b]
+oldblock(pr::Primal, b) = pr.perm[b]
+
 function blockinfo(pr::Primal)
   info = Dict(b => (phis=Dict(),partials=[],grads=[]) for b in 1:length(pr.forw.cfg.blocks))
   append!(info[1].grads, filter(x -> x isa Argument, pr.wrt))
@@ -195,7 +198,7 @@ function blockinfo(pr::Primal)
     for c in pr.forw.cfg.blocks[b].preds
       in = union(get(info[b].phis, c, []), setdiff(info[b].partials, info[b].grads))
       out = union(info[c].partials, info[c].grads)
-      @assert isempty(setdiff(in, out))
+      @assert isempty(setdiff(in, out)) "not implemented"
     end
   end
   return info
@@ -228,10 +231,11 @@ function reverse_ir(pr::Primal; varargs = nothing)
   ir = IRCode(pr)
   grads = Dict()
   partials = Dict(x => [] for x in pr.wrt)
+  phis = Dict()
   for b in pr.perm
-    j = ir.cfg.blocks[invperm(pr.perm)[b]].stmts[1]
+    j = ir.cfg.blocks[newblock(pr, b)].stmts[1]
+    j = max(j, 2)
     for i in reverse(pr.forw.cfg.blocks[b].stmts)
-      j = max(j, 2)
       ex = pr.forw[SSAValue(i)]
       if ex isa ReturnNode
         push!(partials[ex.val], SSAValue(1))
@@ -239,9 +243,10 @@ function reverse_ir(pr::Primal; varargs = nothing)
         any(x -> x in pr.wrt, ex.values) || continue
         Δ = insert_node!(ir, j, Any, xcall(Zygote, :accum))
         grads[SSAValue(i)] = Δ
-        for x in ex.values
+        for (c, x) in zip(ex.edges, ex.values)
           x in pr.wrt || continue
-          push!(partials[x], Δ)
+          @assert !haskey(phis, (newblock(pr, b), newblock(pr, c), x)) "not implemented"
+          phis[(newblock(pr, b), newblock(pr, c), x)] = Δ
         end
       elseif iscall(ex, Zygote, :_forward)
         # TODO remove with type hacks above
@@ -275,7 +280,7 @@ function reverse_ir(pr::Primal; varargs = nothing)
     end
   end
   ir, m = _compact!(ir)
-  return ir, rename(grads, m), rename(partials, m)
+  return ir, rename(grads, m), rename(partials, m), rename(phis, m)
 end
 
 function simplify!(ir)
@@ -289,23 +294,30 @@ function simplify!(ir)
   return finish(ir)
 end
 
-function accumulators!(pr::Primal, ir::IRCode, grads, partials)
+function accumulators!(pr::Primal, ir::IRCode, grads, partials, phis)
   blockpartials(b, x) = filter(x -> x.id in ir.cfg.blocks[b].stmts, partials[x])
   accums = Dict()
   info = blockinfo(pr)
   for b = 1:length(ir.cfg.blocks), x in setdiff(info[b].partials, info[b].grads)
-    ps = blockpartials(pr.perm[b], x)
-    p = insert_blockend!(ir, pr.perm[b], Any, xcall(Zygote, :accum, ps...))
+    ps = blockpartials(oldblock(pr, b), x)
+    p = insert_blockend!(ir, oldblock(pr, b), Any, xcall(Zygote, :accum, ps...))
     setdiff!(partials[x], ps)
     push!(partials[x], p)
-    accums[(pr.perm[b],x)] = p
+    accums[(oldblock(pr, b),x)] = p
   end
 
   function predpartial(b, x)
-    blockpartial(b, x) = haskey(accums, (b, x)) ? accums[(b, x)] : get(blockpartials(b, x), 1, nothing)
+    function blockpartial(b, c, x)
+      if haskey(accums, (b, x))
+        @assert !haskey(phis, (b, c, x)) "not implemented"
+        return accums[(b, x)]
+      elseif haskey(phis, (b, c, x))
+        return phis[b, c, x]
+      end
+    end
     preds = ir.cfg.blocks[b].preds
     isempty(preds) && return
-    ps = map(b -> blockpartial(b, x), preds)
+    ps = map(c -> blockpartial(c, b, x), preds)
     all(==(nothing), ps) && return
     length(ps) == 1 ? ps[1] : insert_blockstart!(ir, b, Any, PhiNode(preds, ps))
   end
