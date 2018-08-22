@@ -188,13 +188,18 @@ function blockinfo(pr::Primal)
     ex = pr.forw[SSAValue(i)]
     if ex isa ReturnNode
       ex.val in pr.wrt && push!(info[b].partials, ex.val)
-    elseif ex isa PhiNode
+    elseif ex isa PiNode
+      (SSAValue(i) in pr.wrt && ex.val in pr.wrt) || continue
       push!(info[b].grads, SSAValue(i))
+      push!(info[b].partials, ex.val)
+    elseif ex isa PhiNode
+      any(x -> x in pr.wrt, ex.values) && push!(info[b].grads, SSAValue(i))
       for (c, x) in zip(ex.edges, ex.values)
         x in pr.wrt && push!(@get!(info[b].phis, c, []), x)
       end
     elseif iscall(ex, Zygote, :_forward)
-      push!(info[b].grads, SSAValue(i+1))
+      y = isassert(pr.forw, i) ? SSAValue(i+3) : SSAValue(i+1)
+      push!(info[b].grads, y)
       for x in ex.args[3:end]
         x in pr.wrt && push!(info[b].partials, x)
       end
@@ -310,11 +315,11 @@ function accumulators!(pr::Primal, ir::IRCode, grads, partials, phis)
   accums = Dict()
   info = blockinfo(pr)
   for b = 1:length(ir.cfg.blocks), x in setdiff(info[b].partials, info[b].grads)
-    ps = blockpartials(oldblock(pr, b), x)
-    p = insert_blockend!(ir, oldblock(pr, b), Any, xcall(Zygote, :accum, ps...))
+    ps = blockpartials(newblock(pr, b), x)
+    p = insert_blockend!(ir, newblock(pr, b), Any, xcall(Zygote, :accum, ps...))
     setdiff!(partials[x], ps)
     push!(partials[x], p)
-    accums[(oldblock(pr, b),x)] = p
+    accums[(newblock(pr, b),x)] = p
   end
 
   function predpartial(b, x)
@@ -372,9 +377,12 @@ function pow(x, n)
   return r
 end
 
-function myabs(x)
-  if x < 0
-    x = -x
+function myprod(xs)
+  s = 1
+  for x in xs
+    s *= x
   end
-  return x
+  return s
 end
+
+# Adjoint(@code_ir myprod([1,2,3]))
