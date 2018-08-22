@@ -31,10 +31,13 @@ insert_blockstart!(ir::IRCode, pos, typ, val) =
 function insert_blockend!(ir::IRCode, pos, typ, val)
   i = first(ir.cfg.blocks[pos].stmts)
   j = last(ir.cfg.blocks[pos].stmts)
-  while j > i && ir.stmts[j] isa Union{GotoNode,GotoIfNot,ReturnNode}
+  if !(ir.stmts[j] isa Union{GotoNode,GotoIfNot,ReturnNode})
+    return insert_node!(ir, j, typ, val, true)
+  end
+  while j > i && ir.stmts[j-1] isa Union{GotoNode,GotoIfNot,ReturnNode}
     j -= 1
   end
-  insert_node!(ir, j, typ, val, j != i)
+  insert_node!(ir, j, typ, val)
 end
 
 function finish_dc(ic::IncrementalCompact)

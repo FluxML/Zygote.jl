@@ -181,11 +181,15 @@ newblock(pr::Primal, b) = invperm(pr.perm)[b]
 oldblock(pr::Primal, b) = pr.perm[b]
 
 function blockinfo(pr::Primal)
+  preds(b) = pr.forw.cfg.blocks[b].preds
   info = Dict(b => (phis=Dict(),partials=[],grads=[]) for b in 1:length(pr.forw.cfg.blocks))
   append!(info[1].grads, filter(x -> x isa Argument, pr.wrt))
   for b in 1:length(pr.forw.cfg.blocks), i in pr.forw.cfg.blocks[b].stmts
     ex = pr.forw[SSAValue(i)]
-    if ex isa PhiNode
+    if ex isa ReturnNode
+      ex.val in pr.wrt && push!(info[b].partials, ex.val)
+    elseif ex isa PhiNode
+      push!(info[b].grads, SSAValue(i))
       for (c, x) in zip(ex.edges, ex.values)
         x in pr.wrt && push!(@get!(info[b].phis, c, []), x)
       end
@@ -199,10 +203,14 @@ function blockinfo(pr::Primal)
   worklist = collect(1:length(pr.forw.cfg.blocks))
   while !isempty(worklist)
     b = pop!(worklist)
-    for c in pr.forw.cfg.blocks[b].preds
+    for c in preds(b)
       in = union(get(info[b].phis, c, []), setdiff(info[b].partials, info[b].grads))
       out = union(info[c].partials, info[c].grads)
-      @assert isempty(setdiff(in, out)) "not implemented"
+      new = setdiff(in, out)
+      if !isempty(new)
+        append!(info[c].partials, new)
+        c ∉ worklist && push!(worklist, c)
+      end
     end
   end
   return info
