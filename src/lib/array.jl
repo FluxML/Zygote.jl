@@ -34,6 +34,16 @@ end
 #   Δ -> (reshape(.*(circshift.([reshape(xs, length(xs))], 1:length(xs)-1)...), size(xs)) .* Δ,
 #         nothing)
 
+@grad function maximum(xs)
+  let (x, i) = findmax(xs)
+    x, function (dx)
+      dxs = zero(xs)
+      dxs[i] = dx
+      return (dxs,)
+    end
+  end
+end
+
 # NNlib
 
 using NNlib
