@@ -163,6 +163,7 @@ end
   ir = varargs!(m, ir)
   argnames!(m, :f, :args)
   ir = spliceargs!(m, ir, (Symbol("#self#"), typeof(roundtrip)))
+  usetyped || (ir = slots!(ir))
   update!(m, ir)
   return m.code
 end
