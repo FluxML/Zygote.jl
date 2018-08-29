@@ -111,6 +111,12 @@ end
 @test gradient((x, a...) -> x == a, 1) == (nothing,)
 @test gradient((x, a...) -> x == a, 1, 2) == (nothing,nothing)
 
+kwmul(; a = 1, b = 1) = a*b
+
+kwmul(a, b) = kwmul(a = a, b = b)
+
+@test gradient(f, 2, 3) == (3, 2)
+
 function myprod(xs)
   s = 1
   for x in xs

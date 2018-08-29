@@ -61,7 +61,7 @@ function untyped_meta(T; world = worldcounter())
   length(_methods) == 1 || return nothing
   type_signature, sps, method = first(_methods)
   mi = Core.Compiler.code_for_method(method, type_signature, sps, world, false)
-  ci = Base.isgenerated(mi) ? Base.get_staged(mi) : Base.uncompressed_ast(mi)
+  ci = Base.isgenerated(mi) ? Compiler.get_staged(mi) : Base.uncompressed_ast(mi)
   Meta(method, ci, sps)
 end
 
@@ -73,9 +73,12 @@ meta(T; world = worldcounter()) =
 function inline_sparams!(ir::IRCode, sps)
   ir = IncrementalCompact(ir)
   for (i, x) in ir
-    for x in userefs(x)
+    isexpr(x, :static_parameter) && (ir[i] = sps[x.args[1]]; continue)
+    u = userefs(x)
+    for x in u
       isexpr(x[], :static_parameter) && (x[] = sps[x[].args[1]])
     end
+    ir[i] = u[]
   end
   return finish(ir)
 end
@@ -170,5 +173,10 @@ end
 
 function inlineable!(ir)
   insert_node!(ir, 1, Any, Expr(:meta, :inline))
+  compact!(ir)
+end
+
+function log!(ir, msg)
+  insert_node!(ir, 1, Any, xcall(Core, :println, msg))
   compact!(ir)
 end

@@ -2,6 +2,7 @@ __precompile__(false)
 
 module Zygote
 
+using IRTools
 using MacroTools, Requires
 using MacroTools: @forward
 

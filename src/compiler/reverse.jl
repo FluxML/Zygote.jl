@@ -91,7 +91,8 @@ ignored_f(f) = f in (GlobalRef(Base, :not_int),
                      GlobalRef(Core.Intrinsics, :not_int),
                      GlobalRef(Core, :(===)),
                      GlobalRef(Core, :apply_type),
-                     GlobalRef(Core, :typeof))
+                     GlobalRef(Core, :typeof),
+                     GlobalRef(Base, :kwerr))
 ignored_f(ir, f) = ignored_f(f)
 ignored_f(ir, f::SSAValue) = ignored_f(ir[f])
 
@@ -230,13 +231,14 @@ function IRCode(ir::Primal)
     start = length(stmts)+1
     block == length(ir.perm) && push!(stmts, :(Δ()))
     preds, succs = newidx.(old.succs), newidx.(sort(old.preds))
+    @assert length(succs) <= 2
     if isempty(succs)
       push!(stmts, nothing)
     elseif length(succs) == 1
       push!(stmts, GotoNode(succs[1]))
     else
       push!(stmts, GotoIfNot(Alpha(range(old)[1]), succs[1]))
-      block+1 != succs[2] && push!(stmts, GotoNode(succs[2]))
+      push!(stmts, GotoNode(succs[2]))
     end
     push!(blocks, BasicBlock(StmtRange(start,length(stmts)), preds, succs))
   end
@@ -371,21 +373,4 @@ using InteractiveUtils: @which
 
 macro adjoint(ex)
   :(Adjoint($(code_irm(ex)), varargs = varargs($(esc(:(@which $ex))), length(($(esc.(ex.args)...),)))))
-end
-
-function pow(x, n)
-  r = 1
-  while n > 0
-    n -= 1
-    r *= x
-  end
-  return r
-end
-
-function myprod(xs)
-  s = 1
-  for x in xs
-    s *= x
-  end
-  return s
 end
