@@ -57,7 +57,7 @@ end
   (==), (===), (>=), (<), (>), isempty
 
 @grad ifelse(cond::Bool, t, f) =
-  Base.select_value(cond, t, f),
+  ifelse(cond, t, f),
   Δ -> cond ? (Δ, zero(Δ)) : (zero(Δ), Δ)
 
 @grad Base.typeassert(x, T) = Base.typeassert(x, T), Δ -> (Δ, nothing)

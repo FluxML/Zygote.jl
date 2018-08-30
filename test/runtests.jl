@@ -11,10 +11,8 @@ end
   include("gradcheck.jl")
 end
 
-if Zygote.usetyped
-  @testset "Compiler" begin
-    include("compiler.jl")
-  end
+@testset "Compiler" begin
+  include("compiler.jl")
 end
 
 end

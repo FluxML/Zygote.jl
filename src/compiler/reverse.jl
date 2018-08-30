@@ -261,11 +261,13 @@ function reverse_ir(pr::Primal)
       elseif ex isa PiNode
         (SSAValue(i) in pr.wrt && ex.val in pr.wrt) || continue
         Δ = insert_node!(ir, j, Any, xcall(Zygote, :accum))
+        ir.lines[j] = pr.forw.lines[i]
         grads[SSAValue(i)] = Δ
         push!(partials[ex.val], Δ)
       elseif ex isa PhiNode
         any(x -> x in pr.wrt, ex.values) || continue
         Δ = insert_node!(ir, j, Any, xcall(Zygote, :accum))
+        ir.lines[j] = pr.forw.lines[i]
         grads[SSAValue(i)] = Δ
         for (c, x) in zip(ex.edges, ex.values)
           x in pr.wrt || continue
@@ -277,11 +279,14 @@ function reverse_ir(pr::Primal)
         y = isassert(pr.forw, i) ? SSAValue(i+3) : SSAValue(i+1)
         J = Alpha(i+2)
         dy = insert_node!(ir, j, Any, xcall(Zygote, :accum))
+        ir.lines[j] = pr.forw.lines[i]
         dxs = insert_node!(ir, j, Any, Expr(:call, J, dy))
+        ir.lines[j] = pr.forw.lines[i]
         grads[y] = dy
         for (i, x) in enumerate(ex.args[3:end])
           x in pr.wrt || continue
           dx = insert_node!(ir, j, Any, xgradindex(dxs, i))
+          ir.lines[j] = pr.forw.lines[i]
           push!(partials[x], dx)
         end
       end

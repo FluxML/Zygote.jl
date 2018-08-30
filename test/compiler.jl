@@ -1,5 +1,5 @@
 using Zygote, Test
-using Zygote: forward
+using Zygote: forward, @grad
 
 macro test_inferred(ex)
   :(let res = nothing
@@ -11,20 +11,30 @@ macro test_inferred(ex)
   end) |> esc
 end
 
-y, back = @test_inferred forward(*, 2, 3)
-@test_inferred(back(1))
+trace_contains(st, func, file, line) = any(st) do fr
+  func in (nothing, fr.func) && endswith(String(fr.file), file) &&
+    fr.line == line
+end
 
-_sincos(x) = sin(cos(x))
+bad(x) = x
+@grad bad(x) = x, Δ -> error("bad")
 
-y, back = @test_inferred forward(_sincos, 0.5)
-@test_inferred back(1)
+function badly(x)
+  x = x + 1
+  x = bad(x)
+  return x
+end
 
-dpow(n, p) = something(Zygote.gradient(pow, n, p)[1], zero(n))
+y, back = forward(badly, 2)
+@test y == 3
+@test_throws Exception back(1)
+bt = try back(1) catch e stacktrace(catch_backtrace()) end
 
-@test_inferred forward(pow, 2, 3)
-@test_inferred dpow(2, 3)
+@test trace_contains(bt, :badly, "compiler.jl", 24)
+@test trace_contains(bt, nothing, "compiler.jl", 20)
 
-cube(x) = pow(x, 3)
-dcube(x) = something(Zygote.derivative(cube, x), zero(x))
-y, back = @test_inferred forward(cube, 2)
-@test_inferred dcube(2)
+# TODO infer what we can without hacks
+
+if Zygote.usetyped
+  include("typed.jl")
+end
