@@ -2,6 +2,8 @@
 
 @inline _forward(::Context, ::Type{T}, args...) where T<:Array = T(args...), Δ -> nothing
 
+@nograd Colon()
+
 @grad Base.vect(xs...) = Base.vect(xs...), Δ -> (Δ...,)
 
 Base.zero(xs::AbstractArray{Any}) = fill!(similar(xs), nothing)

@@ -38,10 +38,9 @@ Random.seed!(0)
 # @test gradtest(x -> prod(x, (2, 3)), (3,4,5))
 @test gradtest(x -> prod(x), (3,4,5))
 
-# TODO using 1:3 here segfaults
-@test gradtest(x -> softmax(x).*[1,2,3], 3)
-@test gradtest(x -> softmax(x).*[1,2,3], (3,5))
-@test gradtest(x -> logsoftmax(x).*[1,2,3], 3)
-@test gradtest(x -> logsoftmax(x).*[1,2,3], (3,5))
+@test gradtest(x -> softmax(x).*(1:3), 3)
+@test gradtest(x -> softmax(x).*(1:3), (3,5))
+@test gradtest(x -> logsoftmax(x).*(1:3), 3)
+@test gradtest(x -> logsoftmax(x).*(1:3), (3,5))
 
 @test gradtest(x -> permutedims(x, [3,1,2]), rand(4,5,6))
