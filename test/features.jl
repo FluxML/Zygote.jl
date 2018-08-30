@@ -140,6 +140,12 @@ end
   x * d[:x]
 end == (4,)
 
+pow_rec(x, n) = n == 0 ? 1 : x*pow_rec(x, n-1)
+
+if !Zygote.usetyped
+  @test gradient(pow_rec, 2, 3) == (12, nothing)
+end
+
 # For nested AD, until we support errors
 function grad(f, args...)
   y, J = forward(f, args...)
