@@ -19,6 +19,8 @@ end
 bad(x) = x
 @grad bad(x) = x, Δ -> error("bad")
 
+Zygote.refresh() # needed in typed mode...
+
 function badly(x)
   x = x + 1
   x = bad(x)
@@ -30,8 +32,8 @@ y, back = forward(badly, 2)
 @test_throws Exception back(1)
 bt = try back(1) catch e stacktrace(catch_backtrace()) end
 
-@test trace_contains(bt, :badly, "compiler.jl", 24)
 @test trace_contains(bt, nothing, "compiler.jl", 20)
+@test trace_contains(bt, :badly, "compiler.jl", 26)
 
 # TODO infer what we can without hacks
 
