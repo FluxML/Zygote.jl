@@ -56,6 +56,8 @@ end
 @nograd Core.apply_type, Core.typeof, nfields, fieldtype,
   (==), (===), (>=), (<), (>), isempty
 
+_forward(::Context, ::Type{V}, x...) where V<:Val = V(x...), _ -> nothing
+
 @grad ifelse(cond::Bool, t, f) =
   ifelse(cond, t, f),
   Δ -> cond ? (Δ, zero(Δ)) : (zero(Δ), Δ)

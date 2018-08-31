@@ -69,7 +69,7 @@ end
 # Reflection
 
 function code_grad(f, T)
-  forw = code_typed(_forward, Tuple{Context,typeof(f),T.parameters...})[1]
+  forw = code_typed(_forward, Tuple{Context,Typeof(f),T.parameters...})[1]
   Y, J = forw[2].parameters
   back = typed_meta(Tuple{J,Y}, optimize=true)
   back = back.code=>back.ret

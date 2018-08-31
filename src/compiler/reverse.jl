@@ -113,7 +113,7 @@ reachable(ir) = keys(valid_usages(ir))
 
 # TODO: remove this once we don't mess with type inference
 function _forward_type(Ts)
-  isconcretetype(Tuple{Ts...}) || return Any
+  all(T -> isconcretetype(T) || T <: DataType, Ts) || return Any
   typed_meta(Tuple{Ts...}) == nothing && return Any
   T = Core.Compiler.return_type(_forward, Tuple{Context,Ts...})
   return T == Union{} ? Any : T
