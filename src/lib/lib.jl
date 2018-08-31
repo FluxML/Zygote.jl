@@ -42,15 +42,19 @@ end
 _gradtuple_kw(::Nothing) = nothing
 _gradtuple_kw(x::Tuple) = (nothing, nothing, nothing, x...) # kwfunc, kws, func, args...
 _gradtuple_kw(x) = error("Gradient $x should be a tuple")
+_untuple_kw(::Nothing) = nothing
+_untuple_kw(x::Tuple) = Base.tail(Base.tail(x))
 
 function gradm_kw(f, T, args, Ts, body, mut)
   kws = popfirst!(args)
-  kws = namify.(kws.args)
-  args = Any[esc(x) for x in args]
   Ts = esc.(Ts)
-  T = :(Core.kwftype($T))
-  pushfirst!(args, :($(esc(:__context__))::Context), :(::$T), :kw, f)
-  kw_wrappers = [:($(esc(kw)) = kw.$kw) for kw in kws]
+  kT = :(Core.kwftype($T))
+  kwargs = [:($(esc(:__context__))::Context), :(::$kT), :kw, f, esc.(args)...]
+  kw_wrappers = map(kws.args) do kw
+    kw isa Symbol && return :($(esc(kw)) = kw.$kw)
+    k, v = kw.args
+    :($(esc(k)) = haskey(kw, $(Expr(:quote, k))) ? kw.$k : $(esc(v)))
+  end
   body = quote
     Base.@_inline_meta
     $(kw_wrappers...)
@@ -60,7 +64,14 @@ function gradm_kw(f, T, args, Ts, body, mut)
     back2(Δ) = return _gradtuple_kw(back(Δ))
     y, back2
   end
-  :(Zygote._forward($(args...)) where $(Ts...) = $body; nothing)
+  quote
+    Zygote._forward($(kwargs...)) where $(Ts...) = $body
+    function Zygote._forward(cx::Context, f::$T, $(esc.(args)...)) where $(Ts...)
+      y, back = _forward(cx, Core.kwfunc(f), NamedTuple(), f, $(esc.(namify.(args))...)) # TODO unnamed arguments
+      return y, Δ -> _untuple_kw(back(Δ))
+    end
+    nothing
+  end
 end
 
 function gradm(ex, mut = false)

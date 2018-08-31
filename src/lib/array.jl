@@ -28,15 +28,13 @@ end
 @grad transpose(x) = transpose(x), Δ -> (transpose(Δ),)
 @grad adjoint(x) = adjoint(x), Δ -> (adjoint(Δ),)
 
-@grad sum(xs::AbstractArray) = sum(xs), Δ -> (similar(xs) .= Δ,)
-
-@grad sum(xs::AbstractArray; dims) =
+@grad sum(xs::AbstractArray; dims = :) =
   sum(xs, dims = dims), Δ -> (similar(xs) .= Δ,)
-
-@grad prod(xs) = prod(xs), Δ -> (prod(xs) ./ xs .* Δ,)
 
 @grad prod(xs; dims) = prod(xs, dims = dims),
   Δ -> (reshape(.*(circshift.([reshape(xs, length(xs))], 1:length(xs)-1)...), size(xs)) .* Δ,)
+
+@grad prod(xs) = prod(xs), Δ -> (prod(xs) ./ xs .* Δ,)
 
 @grad function maximum(xs)
   let (x, i) = findmax(xs)
