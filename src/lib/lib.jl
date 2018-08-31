@@ -24,16 +24,10 @@ _gradtuple(::Nothing) = nothing
 _gradtuple(x::Tuple) = (nothing, x...)
 _gradtuple(x) = error("Gradient $x should be a tuple")
 
-function gradm(ex, mut = false)
-  @capture(shortdef(ex), (name_(args__) = body_) |
-                         (name_(args__) where {Ts__} = body_)) || error("Need a function definition")
-  name, T = isexpr(name, :(::)) ?
-    (length(name.args) == 1 ? (:_, esc(name.args[1])) : esc.(name.args)) :
-    (:_, :(typeof($(esc(name)))))
-  Ts == nothing && (Ts = [])
+function gradm(f, T, args, Ts, body, mut)
   args = esc.(args)
   Ts = esc.(Ts)
-  pushfirst!(args, :($(esc(:__context__))::Context), :($name::$T))
+  pushfirst!(args, :($(esc(:__context__))::Context), :($f::$T))
   body = quote
     Base.@_inline_meta
     y, back = $(esc(body))
@@ -42,7 +36,42 @@ function gradm(ex, mut = false)
     back2(Δ) = return _gradtuple(back(Δ))
     y, back2
   end
-  :(_forward($(args...)) where $(Ts...) = $body)
+  :(Zygote._forward($(args...)) where $(Ts...) = $body; nothing)
+end
+
+_gradtuple_kw(::Nothing) = nothing
+_gradtuple_kw(x::Tuple) = (nothing, nothing, nothing, x...) # kwfunc, kws, func, args...
+_gradtuple_kw(x) = error("Gradient $x should be a tuple")
+
+function gradm_kw(f, T, args, Ts, body, mut)
+  kws = popfirst!(args)
+  kws = namify.(kws.args)
+  args = Any[esc(x) for x in args]
+  Ts = esc.(Ts)
+  T = :(Core.kwftype($T))
+  pushfirst!(args, :($(esc(:__context__))::Context), :(::$T), :kw, f)
+  kw_wrappers = [:($(esc(kw)) = kw.$kw) for kw in kws]
+  body = quote
+    Base.@_inline_meta
+    $(kw_wrappers...)
+    y, back = $(esc(body))
+    $(mut ? nothing : :(back2(::Nothing) = nothing))
+    # return needed for type inference
+    back2(Δ) = return _gradtuple_kw(back(Δ))
+    y, back2
+  end
+  :(Zygote._forward($(args...)) where $(Ts...) = $body; nothing)
+end
+
+function gradm(ex, mut = false)
+  @capture(shortdef(ex), (name_(args__) = body_) |
+                         (name_(args__) where {Ts__} = body_)) || error("Need a function definition")
+  iskw = length(args) > 1 && isexpr(args[1], :parameters)
+  name, T = isexpr(name, :(::)) ?
+    (length(name.args) == 1 ? (:_, esc(name.args[1])) : esc.(name.args)) :
+    (:_, :(typeof($(esc(name)))))
+  Ts == nothing && (Ts = [])
+  return (iskw ? gradm_kw : gradm)(name, T, args, Ts, body, mut)
 end
 
 macro grad(ex)
