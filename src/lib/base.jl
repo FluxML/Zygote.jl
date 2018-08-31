@@ -12,8 +12,8 @@ grad_mut(d::AbstractDict) = Dict()
   end
 end
 
-function _forward(cx::Context, ::typeof(setindex!), d::AbstractDict, v, k)
+@grad! function setindex!(d::AbstractDict, v, k)
   setindex!(d, v, k), function (Δ)
-    (nothing, nothing, get(grad_mut(cx, d), k, nothing), nothing)
+    (nothing, get(grad_mut(__context__, d), k, nothing), nothing)
   end
 end

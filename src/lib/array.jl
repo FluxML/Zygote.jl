@@ -1,6 +1,6 @@
 @nograd size, length, eachindex
 
-@inline _forward(::Context, ::Type{T}, args...) where T<:Array = T(args...), Δ -> nothing
+@grad (::Type{T})(args...) where T<:Array = T(args...), Δ -> nothing
 
 @nograd Colon()
 

@@ -24,22 +24,33 @@ _gradtuple(::Nothing) = nothing
 _gradtuple(x::Tuple) = (nothing, x...)
 _gradtuple(x) = error("Gradient $x should be a tuple")
 
-macro grad(ex)
+function gradm(ex, mut = false)
   @capture(shortdef(ex), (name_(args__) = body_) |
-                         (name_(args__) where {T__} = body_)) || error("Need a function definition")
-  T == nothing && (T = [])
+                         (name_(args__) where {Ts__} = body_)) || error("Need a function definition")
+  name, T = isexpr(name, :(::)) ?
+    (length(name.args) == 1 ? (:_, esc(name.args[1])) : esc.(name.args)) :
+    (:_, :(typeof($(esc(name)))))
+  Ts == nothing && (Ts = [])
   args = esc.(args)
-  T = esc.(T)
-  pushfirst!(args, :($(esc(:__context__))::Context), :(::typeof($(esc(name)))))
+  Ts = esc.(Ts)
+  pushfirst!(args, :($(esc(:__context__))::Context), :($name::$T))
   body = quote
     Base.@_inline_meta
     y, back = $(esc(body))
-    back2(::Nothing) = nothing
+    $(mut ? nothing : :(back2(::Nothing) = nothing))
     # return needed for type inference
     back2(Δ) = return _gradtuple(back(Δ))
     y, back2
   end
-  :(_forward($(args...)) where $(T...) = $body)
+  :(_forward($(args...)) where $(Ts...) = $body)
+end
+
+macro grad(ex)
+  gradm(ex)
+end
+
+macro grad!(ex)
+  gradm(ex, true)
 end
 
 macro nograd(ex)
@@ -56,7 +67,7 @@ end
 @nograd Core.apply_type, Core.typeof, nfields, fieldtype,
   (==), (===), (>=), (<), (>), isempty
 
-_forward(::Context, ::Type{V}, x...) where V<:Val = V(x...), _ -> nothing
+@grad (::Type{V})(x...) where V<:Val = V(x...), _ -> nothing
 
 @grad ifelse(cond::Bool, t, f) =
   ifelse(cond, t, f),
@@ -145,13 +156,13 @@ function grad_mut(cx::Context, x)
   end
 end
 
-function _forward(cx::Context, ::typeof(setfield!), x, f, val)
+@grad! function setfield!(x, f, val)
   y = setfield!(x, f, val)
-  g = grad_mut(cx::Context, x)
+  g = grad_mut(__context__, x)
   y, function (_)
     r = getfield(g, f)
     Δ = deref!(r)
-    (nothing, nothing, nothing, Δ)
+    (nothing, nothing, Δ)
   end
 end
 
@@ -168,9 +179,9 @@ end
 
 Jnew{T}(g) where T = Jnew{T,typeof(g)}(g)
 
-function _forward(cx::Context, ::typeof(__new__), T, args...)
+@grad! function __new__(T, args...)
   x = __new__(T, args...)
-  g = !T.mutable || fieldcount(T) == 0 ? nothing : grad_mut(cx, x)
+  g = !T.mutable || fieldcount(T) == 0 ? nothing : grad_mut(__context__, x)
   x, Jnew{T}(g)
 end
 
@@ -178,5 +189,5 @@ end
 @generated function (back::Jnew{T,G})(Δ) where {T,G}
   !T.mutable && Δ == Nothing && return :nothing
   Δ = G == Nothing ? :Δ : :(back.g)
-  :(nothing, nothing, $(map(f -> :(deref!($Δ.$f)), fieldnames(T))...))
+  :(nothing, $(map(f -> :(deref!($Δ.$f)), fieldnames(T))...))
 end
