@@ -16,25 +16,27 @@ Base.zero(xs::AbstractArray{Any}) = fill!(similar(xs), nothing)
   end
 end
 
-@grad permutedims(xs, dims) = permutedims(xs, dims),
-  Δ -> (permutedims(Δ, invperm(dims)),nothing)
+@grad! setindex!(xs::AbstractArray, x...) = setindex!(xs, x...),
+  _ -> error("Mutating arrays is not supported")
 
-@grad a::AbstractVecOrMat * b::AbstractVecOrMat =
-  a * b, Δ -> (Δ * transpose(b), transpose(a) * Δ)
+@grad permutedims(xs, dims) = permutedims(xs, dims),
+  Δ -> (permutedims(Δ, invperm(dims)), nothing)
+
+@grad a::AbstractVecOrMat * b::AbstractVecOrMat = a * b,
+  Δ -> (Δ * transpose(b), transpose(a) * Δ)
 
 @grad transpose(x) = transpose(x), Δ -> (transpose(Δ),)
 @grad adjoint(x) = adjoint(x), Δ -> (adjoint(Δ),)
 
 @grad sum(xs::AbstractArray) = sum(xs), Δ -> (similar(xs) .= Δ,)
 
-# @grad sum(xs::AbstractArray, dim...) =
-#   sum(xs, dim...), Δ -> (similar(xs) .= Δ, map(_->nothing, dim)...)
+@grad sum(xs::AbstractArray; dims) =
+  sum(xs, dims = dims), Δ -> (similar(xs) .= Δ,)
 
 @grad prod(xs) = prod(xs), Δ -> (prod(xs) ./ xs .* Δ,)
 
-# @grad prod(xs, dim) = prod(xs, dim),
-#   Δ -> (reshape(.*(circshift.([reshape(xs, length(xs))], 1:length(xs)-1)...), size(xs)) .* Δ,
-#         nothing)
+@grad prod(xs; dims) = prod(xs, dims = dims),
+  Δ -> (reshape(.*(circshift.([reshape(xs, length(xs))], 1:length(xs)-1)...), size(xs)) .* Δ,)
 
 @grad function maximum(xs)
   let (x, i) = findmax(xs)

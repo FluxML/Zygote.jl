@@ -34,8 +34,8 @@ Random.seed!(0)
 @test gradtest((w, x) -> w'*x, randn(10, 2), randn(10))
 @test gradtest((w, x) -> transpose(w)*x, randn(5,5), randn(5,5))
 
-# @test gradtest(x -> sum(x, (2, 3)), (3,4,5))
-# @test gradtest(x -> prod(x, (2, 3)), (3,4,5))
+@test gradtest(x -> sum(x, dims = (2, 3)), (3,4,5))
+@test gradtest(x -> prod(x, dims = (2, 3)), (3,4,5))
 @test gradtest(x -> prod(x), (3,4,5))
 
 @test gradtest(x -> softmax(x).*(1:3), 3)
