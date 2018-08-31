@@ -83,26 +83,26 @@ struct Foo{T}
   b::T
 end
 
-function f(a, b)
+function mul_struct(a, b)
   c = Foo(a, b)
   c.a * c.b
 end
 
-@test gradient(f, 2, 3) == (3, 2)
+@test gradient(mul_struct, 2, 3) == (3, 2)
 
-function f(a, b)
+function mul_tuple(a, b)
   c = (a, b)
   c[1] * c[2]
 end
 
-@test gradient(f, 2, 3) == (3, 2)
+@test gradient(mul_tuple, 2, 3) == (3, 2)
 
-function f(x, y)
+function mul_lambda(x, y)
   g = z -> x * z
   g(y)
 end
 
-@test gradient(f, 2, 3) == (3, 2)
+@test gradient(mul_lambda, 2, 3) == (3, 2)
 
 @test gradient((a, b...) -> *(a, b...), 2, 3) == (3, 2)
 
@@ -113,9 +113,9 @@ end
 
 kwmul(; a = 1, b = 1) = a*b
 
-kwmul(a, b) = kwmul(a = a, b = b)
+mul_kw(a, b) = kwmul(a = a, b = b)
 
-@test gradient(f, 2, 3) == (3, 2)
+@test gradient(mul_kw, 2, 3) == (3, 2)
 
 function myprod(xs)
   s = 1
@@ -127,12 +127,12 @@ end
 
 @test gradient(myprod, [1,2,3])[1] == [6,3,2]
 
-function f(a, b)
+function mul_vec(a, b)
   xs = [a, b]
   xs[1] * xs[2]
 end
 
-@test gradient(f, 2, 3) == (3, 2)
+@test gradient(mul_vec, 2, 3) == (3, 2)
 
 @test gradient(2) do x
   d = Dict()
