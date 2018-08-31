@@ -92,6 +92,7 @@ ignored_f(f) = f in (GlobalRef(Base, :not_int),
                      GlobalRef(Core, :(===)),
                      GlobalRef(Core, :apply_type),
                      GlobalRef(Core, :typeof),
+                     GlobalRef(Core, :throw),
                      GlobalRef(Base, :kwerr))
 ignored_f(ir, f) = ignored_f(f)
 ignored_f(ir, f::SSAValue) = ignored_f(ir[f])
