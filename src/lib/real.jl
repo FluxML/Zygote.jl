@@ -16,3 +16,5 @@ for (M, f, arity) in DiffRules.diffrules()
       Δ -> (Δ * $da, Δ * $db)
   end
 end
+
+@grad Base.:+(xs...) = +(xs...), Δ -> map(_ -> Δ, xs)
