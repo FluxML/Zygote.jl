@@ -135,21 +135,27 @@ unwrap(x) = x
 @grad Core.getfield(xs::NTuple{N,Any}, i::Integer) where N =
   (xs[i], Δ -> (ntuple(j -> i == j ? Δ : nothing, Val(N)), nothing))
 
-# TODO faster version
-function unapply(xs, Δs)
-  Δs′ = []
-  for x in xs
-    push!(Δs′, Δs[1:length(x)])
-    Δs = Δs[length(x)+1:end]
-  end
-  return (Δs′...,)
+_empty(x) = nothing
+_empty(x::Tuple) = map(_empty, x)
+
+_unapply(t, xs) = first(xs), tail(xs)
+_unapply(t::Tuple{}, xs) = (), xs
+
+function _unapply(t::Tuple, xs)
+  t1, xs1 = _unapply(first(t), xs)
+  t2, xs2 = _unapply(tail(t), xs1)
+  (t1, t2...), xs2
 end
+
+unapply(t, xs) = _unapply(t, xs)[1]
 
 @grad function Core._apply(f, args...)
   y, J = Core._apply(_forward, (__context__, f), args...)
-  y, function (Δ)
-    Δ = J(Δ)
-    (first(Δ), unapply(args, Base.tail(Δ))...)
+  let st = _empty(args), J = J
+    y, function (Δ)
+      Δ = J(Δ)
+      (first(Δ), unapply(st, Base.tail(Δ))...)
+    end
   end
 end
 

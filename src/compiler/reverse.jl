@@ -115,7 +115,6 @@ reachable(ir) = keys(valid_usages(ir))
 # TODO: remove this once we don't mess with type inference
 function _forward_type(Ts)
   all(T -> isconcretetype(T) || T <: DataType, Ts) || return Any
-  typed_meta(Tuple{Ts...}) == nothing && return Any
   T = Core.Compiler.return_type(_forward, Tuple{Context,Ts...})
   return T == Union{} ? Any : T
 end
@@ -131,7 +130,7 @@ function record!(ir::IRCode)
     if isexpr(ex, :call) && !ignored(ir, ex)
       yT = widenconst(types(ir)[i])
       T = _forward_type(exprtype.(Ref(ir), ex.args))
-      if T == Any || isvalidtype(T, yT)
+      if yT == Any || isvalidtype(T, yT)
         yJ = insert_node!(ir, i, T, xcall(Zygote, :_forward, Argument(2), ex.args...))
         ir[SSAValue(i)] = xgetindex(yJ, 1)
         insert_node!(ir, i, T == Any ? Any : T.parameters[2], xgetindex(yJ, 2), true)

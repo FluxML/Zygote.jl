@@ -35,6 +35,9 @@ bt = try back(1) catch e stacktrace(catch_backtrace()) end
 @test trace_contains(bt, nothing, "compiler.jl", 20)
 @test trace_contains(bt, :badly, "compiler.jl", 26)
 
+y, back = @test_inferred forward(*, 2, 3)
+@test_inferred(back(1))
+
 # TODO infer what we can without hacks
 
 if Zygote.usetyped
