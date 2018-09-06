@@ -28,6 +28,22 @@ end
 @grad transpose(x) = transpose(x), Δ -> (transpose(Δ),)
 @grad adjoint(x) = adjoint(x), Δ -> (adjoint(Δ),)
 
+@grad function repeat(xs; inner=ntuple(_->1, ndims(xs)), outer=ntuple(_->1, ndims(xs)))
+  repeat(xs, inner = inner, outer = outer), function (Δ)
+    Δ′ = zero(xs)
+    S = size(xs)
+
+    # Loop through each element of Δ, calculate source dimensions, accumulate into Δ′
+    for (dest_idx, val) in pairs(IndexCartesian(), Δ)
+        # First, round dest_idx[dim] to nearest gridpoint defined by inner[dim], then
+        # wrap around based on original size S.
+        src_idx = [mod1(div(dest_idx[dim] - 1, inner[dim]) + 1, S[dim]) for dim in 1:length(S)]
+        Δ′[src_idx...] += val
+    end
+    return (Δ′,)
+  end
+end
+
 @grad sum(xs::AbstractArray; dims = :) =
   sum(xs, dims = dims), Δ -> (similar(xs) .= Δ,)
 
