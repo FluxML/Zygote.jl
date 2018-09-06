@@ -1,8 +1,6 @@
-@nograd size, length, eachindex
-
 @grad (::Type{T})(args...) where T<:Array = T(args...), Δ -> nothing
 
-@nograd Colon()
+@nograd size, length, eachindex, Colon()
 
 @grad Base.vect(xs...) = Base.vect(xs...), Δ -> (Δ...,)
 
@@ -19,17 +17,13 @@ end
 @grad! setindex!(xs::AbstractArray, x...) = setindex!(xs, x...),
   _ -> error("Mutating arrays is not supported")
 
+# General
+
 @grad permutedims(xs, dims) = permutedims(xs, dims),
   Δ -> (permutedims(Δ, invperm(dims)), nothing)
 
 @grad reshape(xs, dims...) = reshape(xs, dims...),
   Δ -> (reshape(Δ, size(xs)),map(_->nothing,dims)...)
-
-@grad a::AbstractVecOrMat * b::AbstractVecOrMat = a * b,
-  Δ -> (Δ * transpose(b), transpose(a) * Δ)
-
-@grad transpose(x) = transpose(x), Δ -> (transpose(Δ),)
-@grad adjoint(x) = adjoint(x), Δ -> (adjoint(Δ),)
 
 @grad function repeat(xs; inner=ntuple(_->1, ndims(xs)), outer=ntuple(_->1, ndims(xs)))
   repeat(xs, inner = inner, outer = outer), function (Δ)
@@ -47,17 +41,7 @@ end
   end
 end
 
-function _kron(mat1::AbstractMatrix,mat2::AbstractMatrix)
-    m1, n1 = size(mat1)
-    mat1_rsh = reshape(mat1,(1,m1,1,n1))
-
-    m2, n2 = size(mat2)
-    mat2_rsh = reshape(mat2,(m2,1,n2,1))
-
-    return reshape(mat1_rsh.*mat2_rsh, (m1*m2,n1*n2))
-end
-
-@grad kron(a::AbstractMatrix, b::AbstractMatrix) = forward(_kron, a, b)
+# Reductions
 
 @grad sum(xs::AbstractArray; dims = :) =
   sum(xs, dims = dims), Δ -> (similar(xs) .= Δ,)
@@ -76,6 +60,26 @@ end
     end
   end
 end
+
+# LinAlg
+
+@grad a::AbstractVecOrMat * b::AbstractVecOrMat = a * b,
+  Δ -> (Δ * transpose(b), transpose(a) * Δ)
+
+@grad transpose(x) = transpose(x), Δ -> (transpose(Δ),)
+@grad adjoint(x) = adjoint(x), Δ -> (adjoint(Δ),)
+
+function _kron(mat1::AbstractMatrix,mat2::AbstractMatrix)
+    m1, n1 = size(mat1)
+    mat1_rsh = reshape(mat1,(1,m1,1,n1))
+
+    m2, n2 = size(mat2)
+    mat2_rsh = reshape(mat2,(m2,1,n2,1))
+
+    return reshape(mat1_rsh.*mat2_rsh, (m1*m2,n1*n2))
+end
+
+@grad kron(a::AbstractMatrix, b::AbstractMatrix) = forward(_kron, a, b)
 
 # NNlib
 
