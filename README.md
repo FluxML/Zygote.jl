@@ -23,7 +23,7 @@ julia> f(5), f′(5)
 
 "Source-to-source" means that Zygote hooks into Julia's compiler, and generates the backwards pass for you – as if you had written it by hand.
 
-Despite its performance, Zygote supports the full flexibility and dynamism of the Julia language.
+Zygote supports the full flexibility and dynamism of the Julia language, without compromising performance.
 
 ```julia
 julia> using Zygote: gradient
