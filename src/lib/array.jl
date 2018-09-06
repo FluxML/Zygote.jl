@@ -140,7 +140,7 @@ end
   y = broadcast(f, args...)
   function back(Δ)
     Δargs = ntuple(i -> partial.(f, Δ, i, args...), Val(N))
-    return unbroadcast.(args, Δargs)
+    return map(unbroadcast, args, Δargs)
   end
   return y, back
 end
