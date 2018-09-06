@@ -19,6 +19,8 @@ end
 
 # General
 
+@grad collect(x) = collect(x), Δ -> (Δ,)
+
 @grad permutedims(xs, dims) = permutedims(xs, dims),
   Δ -> (permutedims(Δ, invperm(dims)), nothing)
 
