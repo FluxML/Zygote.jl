@@ -1,6 +1,6 @@
 @grad (::Type{T})(args...) where T<:Array = T(args...), Δ -> nothing
 
-@nograd size, length, eachindex, Colon()
+@nograd size, length, eachindex, Colon(), findfirst
 
 @grad Base.vect(xs...) = Base.vect(xs...), Δ -> (Δ...,)
 
@@ -51,13 +51,21 @@ end
 
 @grad prod(xs) = prod(xs), Δ -> (prod(xs) ./ xs .* Δ,)
 
-@grad function maximum(xs)
-  let (x, i) = findmax(xs)
-    x, function (dx)
-      dxs = zero(xs)
-      dxs[i] = dx
-      return (dxs,)
-    end
+@grad function maximum(xs; dims = :)
+  maximum(xs, dims = dims), function (Δ)
+    Δ′ = zero(xs)
+    _, i = findmax(xs, dims = dims)
+    Δ′[i] = Δ
+    return (Δ′,)
+  end
+end
+
+@grad function minimum(xs; dims = :)
+  minimum(xs, dims = dims), function (Δ)
+    Δ′ = zero(xs)
+    _, i = findmin(xs, dims = dims)
+    Δ′[i] = Δ
+    return (Δ′,)
   end
 end
 

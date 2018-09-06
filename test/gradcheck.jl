@@ -54,3 +54,23 @@ Random.seed!(0)
 @test gradtest(kron, rand(5,1), rand(3,1))
 @test gradtest(kron, rand(5,1), rand(3,1), rand(8,1))
 @test gradtest(kron, rand(5,2), rand(3,2), rand(8,2))
+
+@testset "maximum" begin
+  @test gradtest(maximum, rand(2, 3))
+
+  @test gradtest(x -> maximum(x, dims=1), rand(2, 3))
+  @test gradtest(x -> maximum(x, dims=2), rand(2, 3))
+  @test gradtest(x -> maximum(x, dims=3), rand(2, 3, 4))
+
+  @test gradtest(x -> maximum(x, dims=[1, 2]), rand(2, 3, 4))
+end
+
+@testset "minimum" begin
+  @test gradtest(minimum, rand(2, 3))
+
+  @test gradtest(x -> minimum(x, dims=1), rand(2, 3))
+  @test gradtest(x -> minimum(x, dims=2), rand(2, 3))
+  @test gradtest(x -> minimum(x, dims=3), rand(2, 3, 4))
+
+  @test gradtest(x -> minimum(x, dims=[1, 2]), rand(2, 3, 4))
+end
