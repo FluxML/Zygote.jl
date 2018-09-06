@@ -22,6 +22,9 @@ end
 @grad permutedims(xs, dims) = permutedims(xs, dims),
   Δ -> (permutedims(Δ, invperm(dims)), nothing)
 
+@grad reshape(xs, dims...) = reshape(xs, dims...),
+  Δ -> (reshape(Δ, size(xs)),map(_->nothing,dims)...)
+
 @grad a::AbstractVecOrMat * b::AbstractVecOrMat = a * b,
   Δ -> (Δ * transpose(b), transpose(a) * Δ)
 
@@ -43,6 +46,18 @@ end
     return (Δ′,)
   end
 end
+
+function _kron(mat1::AbstractMatrix,mat2::AbstractMatrix)
+    m1, n1 = size(mat1)
+    mat1_rsh = reshape(mat1,(1,m1,1,n1))
+
+    m2, n2 = size(mat2)
+    mat2_rsh = reshape(mat2,(m2,1,n2,1))
+
+    return reshape(mat1_rsh.*mat2_rsh, (m1*m2,n1*n2))
+end
+
+@grad kron(a::AbstractMatrix, b::AbstractMatrix) = forward(_kron, a, b)
 
 @grad sum(xs::AbstractArray; dims = :) =
   sum(xs, dims = dims), Δ -> (similar(xs) .= Δ,)
