@@ -40,6 +40,7 @@ function typed_meta(T; world = worldcounter(), optimize = false)
   frame = Core.Compiler.typeinf_code3(method, type_signature, sps, optimize, params)
   ci = frame.src
   ci.inferred = true
+  ci.method_for_inference_limit_heuristics = method
   if ci.ssavaluetypes == 0 # constant return; IRCode doesn't like this
     ci.ssavaluetypes = Any[Any]
   end
@@ -62,6 +63,7 @@ function untyped_meta(T; world = worldcounter())
   type_signature, sps, method = first(_methods)
   mi = Core.Compiler.code_for_method(method, type_signature, sps, world, false)
   ci = Base.isgenerated(mi) ? Compiler.get_staged(mi) : Base.uncompressed_ast(mi)
+  ci.method_for_inference_limit_heuristics = method
   Meta(method, ci, sps)
 end
 
