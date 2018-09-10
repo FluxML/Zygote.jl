@@ -114,10 +114,10 @@ import NNlib: softmax, ∇softmax, logsoftmax, ∇logsoftmax, conv, maxpool, mea
 #  '  `'-'`  |_|                 \ \._,\ '/                          `  \ \._,\ '/.'   \_.'   |   /
 #                                 `--'  `"                               `--'  `"             `'-'
 
-using Base: tail
 using Base.Broadcast
-using Base.Broadcast: Broadcasted, DefaultArrayStyle, broadcasted, materialize, instantiate
-using ForwardDiff: Dual, partials
+using Base.Broadcast: Broadcasted, DefaultArrayStyle, broadcasted, instantiate, materialize, flatten,
+  combine_eltypes, _broadcast_getindex
+using ForwardDiff: Dual
 
 trim(x, Δ) = reshape(Δ, ntuple(i -> size(Δ, i), Val(ndims(x))))
 
@@ -131,19 +131,45 @@ unbroadcast(x::Number, Δ) = sum(Δ)
 dual(x, p) = x
 dual(x::Real, p) = Dual(x, p)
 
-function partial(f::F, Δ, i, args::Vararg{Any,N}) where {F,N}
-  dargs = ntuple(j -> dual(args[j], i==j), Val(N))
-  return Δ * f(dargs...).partials[1]
+dualtype(::Type{Dual{G,T,P}}) where {G,T,P} = T
+
+function dual_function(f::F) where F
+  function (args::Vararg{Any,N}) where N
+    ds = map(args, ntuple(identity,Val(N))) do x, i
+      dual(x, ntuple(j -> i==j, Val(N)))
+    end
+    return f(ds...)
+  end
 end
 
-@inline function ∇broadcast(f::F, args::Vararg{Any,N}) where {F,N}
-  y = broadcast(f, args...)
-  function back(Δ)
-    Δargs = ntuple(i -> partial.(f, Δ, i, args...), Val(N))
-    return map(unbroadcast, args, Δargs)
+dualify(bc::Broadcasted{S}) where S = Broadcasted{S}(dual_function(bc.f), bc.args, bc.axes)
+
+function broadcast_gradient!(bc::Broadcasted, dest::AbstractArray, grads::Vararg{Any})
+  @simd for I in eachindex(bc)
+    @inbounds begin
+      out = bc[I]
+      dest[I] = out.value
+      map((g, p) -> g[I] = p, grads, out.partials.values)
+    end
   end
+end
+
+function broadcast_gradient(bc::Broadcasted, ::Type{T}) where T
+  dest = similar(bc, T)
+  grads = map(_ -> similar(bc, T), bc.args)
+  broadcast_gradient!(bc, dest, grads...)
+  return dest, grads
+end
+
+@inline function ∇broadcast(bc′::Broadcasted) where {F,N}
+  bc = dualify(instantiate(flatten(bc′)))
+  T = combine_eltypes(bc.f, bc.args)
+  y, gs = broadcast_gradient(bc, dualtype(T))
+  back(Δ) = map((x, d) -> unbroadcast(x, Δ.*d), bc.args, gs)
   return y, back
 end
+
+using Base: tail
 
 _unflatten(x, xs) = first(xs), tail(xs)
 
@@ -167,8 +193,7 @@ unflatten(x, xs) = _unflatten(x, xs)[1]
 end
 
 @grad function materialize(bc::Broadcasted{<:DefaultArrayStyle})
-  bc′ = instantiate(Broadcast.flatten(bc))
-  let (y, back) = ∇broadcast(bc′.f, bc′.args...)
+  let (y, back) = ∇broadcast(bc)
     y, Δ -> (unflatten(bc, back(Δ)),)
   end
 end
