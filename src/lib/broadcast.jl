@@ -13,8 +13,8 @@
 #                                 `--'  `"                               `--'  `"             `'-'
 
 using Base.Broadcast
-using Base.Broadcast: Broadcasted, DefaultArrayStyle, broadcasted, instantiate, materialize, flatten,
-  combine_eltypes, _broadcast_getindex
+using Base.Broadcast: Broadcasted, AbstractArrayStyle, DefaultArrayStyle, broadcasted,
+  instantiate, materialize, flatten, combine_eltypes, _broadcast_getindex
 using ForwardDiff: Dual
 
 trim(x, Δ) = reshape(Δ, ntuple(i -> size(Δ, i), Val(ndims(x))))
@@ -65,6 +65,11 @@ end
   y, gs = broadcast_gradient(bc, dualtype(T))
   back(Δ) = map((x, d) -> unbroadcast(x, Δ.*d), bc.args, gs)
   return y, back
+end
+
+function ∇broadcast(bc::Broadcasted{<:AbstractArrayStyle{0}})
+  out = dualify(instantiate(flatten(bc)))[]
+  return out.value, Δ -> map(x -> x*Δ, out.partials.values)
 end
 
 using Base: tail
