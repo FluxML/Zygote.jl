@@ -58,8 +58,13 @@ function forward_stacks!(adj, F)
   isconcretetype(T) || (T = Any)
   rec = insert_node!(adj.forw, length(adj.forw.stmts), T,
                      xtuple(args..., recs...))
-  rec = insert_node!(adj.forw, length(adj.forw.stmts), J{F,T},
-                     Expr(:new, J{F,T}, rec))
+  if usetyped
+    rec = insert_node!(adj.forw, length(adj.forw.stmts), J{F,T},
+                       Expr(:new, J{F,T}, rec))
+  else
+    rec = insert_node!(adj.forw, length(adj.forw.stmts), Any,
+                       Expr(:call, J{F}, rec))
+  end
   ret = xtuple(adj.forw.stmts[end].val, rec)
   R = exprtype(adj.forw, adj.forw.stmts[end].val)
   ret = insert_node!(adj.forw, length(adj.forw.stmts), Tuple{R,J{F,T}}, ret)

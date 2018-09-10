@@ -93,7 +93,8 @@ ignored_f(f) = f in (GlobalRef(Base, :not_int),
                      GlobalRef(Core, :apply_type),
                      GlobalRef(Core, :typeof),
                      GlobalRef(Core, :throw),
-                     GlobalRef(Base, :kwerr))
+                     GlobalRef(Base, :kwerr),
+                     GlobalRef(Core, :kwfunc))
 ignored_f(ir, f) = ignored_f(f)
 ignored_f(ir, f::SSAValue) = ignored_f(ir[f])
 
@@ -114,6 +115,7 @@ reachable(ir) = keys(valid_usages(ir))
 
 # TODO: remove this once we don't mess with type inference
 function _forward_type(Ts)
+  usetyped || return Any
   all(T -> isconcretetype(T) || T <: DataType, Ts) || return Any
   T = Core.Compiler.return_type(_forward, Tuple{Context,Ts...})
   return T == Union{} ? Any : T
@@ -369,7 +371,7 @@ end
 
 function Adjoint(pr::Primal)
   back = accumulators!(pr, reverse_ir(pr)...)
-  Adjoint(pr.forw, compact!(back), pr.perm)
+  Adjoint(pr.forw, compact!(compact!(back)), pr.perm)
 end
 
 Adjoint(ir::IRCode; varargs = nothing) = Adjoint(Primal(ir, varargs = varargs))
