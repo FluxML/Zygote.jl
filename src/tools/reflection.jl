@@ -1,5 +1,3 @@
-const usetyped = isdefined(Core.Compiler, :zygote)
-
 meta(T) = (usetyped ? IRTools.typed_meta : IRTools.meta)(T)
 
 function code_ir(f, T)
@@ -60,10 +58,29 @@ function varargs!(meta, ir::IRCode, n = 1)
   return finish_dc(ir)
 end
 
-function update!(meta, ir::IRCode)
-  Core.Compiler.replace_code_newstyle!(meta.code, ir, length(ir.argtypes)-1)
-  usetyped || (meta.code.ssavaluetypes = length(meta.code.code))
-  slots!(meta.code)
+function pis!(ir::IRCode)
+  for i = 1:length(ir.stmts)
+    ex = ir.stmts[i]
+    ex isa PiNode || continue
+    ir.stmts[i] = xcall(Core, :typeassert, ex.val, ex.typ)
+  end
+  return ir
+end
+
+function slots!(ir::IRCode)
+  n = 0
+  for b = 1:length(ir.cfg.blocks)
+    i = first(ir.cfg.blocks[b].stmts)
+    while (phi = ir[SSAValue(i)]) isa PhiNode
+      slot = IRTools.Slot(Symbol(:phi, n+=1))
+      ir[SSAValue(i)] = slot
+      for (pred, val) in zip(phi.edges, phi.values)
+        insert_blockend!(ir, pred, Any, :($slot = $val))
+      end
+      i += 1
+    end
+  end
+  return compact!(ir)
 end
 
 @generated function roundtrip(f, args...)
@@ -72,9 +89,8 @@ end
   ir = varargs!(m, ir)
   argnames!(m, :f, :args)
   ir = spliceargs!(m, ir, (Symbol("#self#"), typeof(roundtrip)))
-  usetyped || (ir = slots!(ir))
-  update!(m, ir)
-  return m.code
+  ir = slots!(pis!(ir))
+  return IRTools.update!(m, ir)
 end
 
 function inlineable!(ir)

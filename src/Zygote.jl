@@ -2,6 +2,8 @@ __precompile__(false)
 
 module Zygote
 
+const usetyped = false
+
 using IRTools
 using MacroTools, Requires
 using MacroTools: @forward
@@ -10,7 +12,6 @@ export forward, @code_grad
 
 include("tools/idset.jl")
 include("tools/ir.jl")
-include("tools/slots.jl")
 include("tools/reflection.jl")
 
 include("compiler/reverse.jl")

@@ -8,10 +8,8 @@ ignore(T) = all(T -> T <: Type, T.parameters)
   meta, forw, _ = g
   argnames!(meta, Symbol("#self#"), :ctx, :f, :args)
   forw = varargs!(meta, forw, 3)
-  forw = inlineable!(forw)
-  usetyped || (forw = slots!(forw))
-  update!(meta, forw)
-  return meta.code
+  forw = slots!(pis!(inlineable!(forw)))
+  return IRTools.update!(meta, forw)
 end
 
 @generated function (j::J{T})(Δ) where T
@@ -25,11 +23,5 @@ end
   resize!(back.argtypes, 2)
   argnames!(meta, Symbol("#self#"), :Δ)
   back = slots!(inlineable!(back))
-  update!(meta, back)
-  if usetyped
-    # Enable type inference
-    meta.code.inferred = false
-    meta.code.ssavaluetypes = length(meta.code.ssavaluetypes)
-  end
-  return meta.code
+  return IRTools.update!(meta, back)
 end

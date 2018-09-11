@@ -60,7 +60,7 @@ function forward_stacks!(adj, F)
                      xtuple(args..., recs...))
   if usetyped
     rec = insert_node!(adj.forw, length(adj.forw.stmts), J{F,T},
-                       Expr(:new, J{F,T}, rec))
+                       Expr(:call, J{F,T}, rec))
   else
     rec = insert_node!(adj.forw, length(adj.forw.stmts), Any,
                        Expr(:call, J{F}, rec))
