@@ -2,6 +2,13 @@ __precompile__(false)
 
 module Zygote
 
+# This flag enables Zygote to grab extra type inference information during
+# compiles. When control flow is present, this can give gradient code a
+# performance boost.
+
+# HOWEVER, this is not Jameson-approved, nor well supported by the compiler, and
+# has several caveats. Recursion will cause inference to stack overflow.
+# Gradient redefinitions may result in ugly type errors. And Jameson *will* know.
 const usetyped = false
 
 using IRTools
