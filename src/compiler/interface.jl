@@ -36,6 +36,8 @@ end
 
 derivative(f, x) = gradient(f, x)[1]
 
+Base.adjoint(f::Function) = x -> derivative(f, x)
+
 # Param-style wrappers
 
 # TODO store ids only
