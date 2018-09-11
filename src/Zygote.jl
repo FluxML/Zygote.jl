@@ -23,14 +23,17 @@ include("lib/base.jl")
 include("lib/array.jl")
 include("lib/broadcast.jl")
 
+# we need to define this late, so that the genfuncs see lib.jl
 include("compiler/interface2.jl")
+include("precompile.jl")
 
 @init @require Flux="587475ba-b771-5e3f-ad9e-33799f191a9c" include("flux.jl")
 
-# we need to define this late, so that the genfuncs see lib.jl
-# also helps to work around 265-y issues
-refresh() = include(joinpath(@__DIR__, "compiler/interface2.jl"))
-
-@init refresh()
+# helps to work around 265-y issues
+function refresh()
+  include(joinpath(@__DIR__, "compiler/interface2.jl"))
+  include(joinpath(@__DIR__, "precompile.jl"))
+  return
+end
 
 end # module
