@@ -23,11 +23,9 @@ top:
 
 "Source-to-source" means that Zygote hooks into Julia's compiler, and generates the backwards pass for you – as if you had written it by hand.
 
-Zygote supports the full flexibility and dynamism of the Julia language, without compromising performance.
+Without compromising on performance, Zygote supports the full flexibility and dynamism of the Julia language, including control flow, recursion, closures, structs, dictionaries, and more.
 
 ```julia
-julia> using Zygote: derivative
-
 julia> fs = Dict("sin" => sin, "cos" => cos, "tan" => tan);
 
 julia> derivative(x -> fs[readline()](x), 1)
@@ -48,8 +46,6 @@ julia> @grad add(a, b) = add(a, b), Δ -> (Δ, Δ)
 To support large machine learning models with many parameters, Zygote can differentiate implicitly-used parameters, as opposed to just function arguments.
 
 ```julia
-julia> using Zygote: gradient
-
 julia> W, b = rand(2, 3), rand(2);
 
 julia> predict(x) = W*x .+ b;
