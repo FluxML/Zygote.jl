@@ -4,6 +4,8 @@
 
 [![Build Status](https://travis-ci.org/FluxML/Zygote.jl.svg?branch=master)](https://travis-ci.org/FluxML/Zygote.jl)
 
+`] add Zygote#master`
+
 Zygote is a working prototype for source-to-source automatic differentiation (AD) in Julia.
 
 ```julia
