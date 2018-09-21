@@ -25,6 +25,7 @@ include("compiler/reverse.jl")
 include("compiler/emit.jl")
 include("compiler/interface.jl")
 
+include("lib/grad.jl")
 include("lib/lib.jl")
 include("lib/real.jl")
 include("lib/base.jl")
