@@ -30,6 +30,7 @@ include("lib/lib.jl")
 include("lib/real.jl")
 include("lib/base.jl")
 include("lib/array.jl")
+include("lib/nnlib.jl")
 include("lib/broadcast.jl")
 
 # we need to define this late, so that the genfuncs see lib.jl

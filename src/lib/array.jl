@@ -90,12 +90,3 @@ function _kron(mat1::AbstractMatrix,mat2::AbstractMatrix)
 end
 
 @grad kron(a::AbstractMatrix, b::AbstractMatrix) = forward(_kron, a, b)
-
-# NNlib
-
-using NNlib
-import NNlib: softmax, ∇softmax, logsoftmax, ∇logsoftmax, conv, maxpool, meanpool
-
-@grad softmax(xs) = softmax(xs), Δ -> (∇softmax(Δ, xs),)
-
-@grad logsoftmax(xs) = logsoftmax(xs), Δ -> (∇logsoftmax(Δ, xs),)

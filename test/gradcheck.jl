@@ -1,5 +1,6 @@
 using Zygote, NNlib, Test
 using Zygote: gradient
+using NNlib: conv
 import Random
 
 function ngradient(f, xs::AbstractArray...)
@@ -42,6 +43,16 @@ Random.seed!(0)
 @test gradtest(x -> softmax(x).*(1:3), (3,5))
 @test gradtest(x -> logsoftmax(x).*(1:3), 3)
 @test gradtest(x -> logsoftmax(x).*(1:3), (3,5))
+
+@test gradtest(conv, rand(10, 3, 2), randn(Float64,2, 3, 2))
+@test gradtest(conv, rand(10, 10, 3, 2), randn(Float64,2, 2, 3, 2))
+@test gradtest(conv, rand(10, 10, 10, 3, 2), randn(Float64,2, 2, 2, 3, 2))
+
+@test gradtest(x -> maxpool(x, (2,2)), rand(10, 10, 3, 2))
+@test gradtest(x -> maxpool(x, (2,2,2)), rand(10, 10, 10, 3, 2))
+
+@test gradtest(x -> meanpool(x, (2,2)), rand(10, 10, 3, 2))
+@test gradtest(x -> meanpool(x, (2,2,2)), rand(5, 5, 5, 3, 2))
 
 @test gradtest(x -> permutedims(x, [3,1,2]), rand(4,5,6))
 
