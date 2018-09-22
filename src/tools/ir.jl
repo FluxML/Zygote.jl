@@ -74,7 +74,7 @@ end
 
 blockidx(ir, i::SSAValue) = blockidx(ir, i.id)
 
-Base.range(b::BasicBlock) = b.stmts.first:b.stmts.last
+Base.range(b::BasicBlock) = b.stmts.start:b.stmts.stop
 
 xcall(mod::Module, f::Symbol, args...) = Expr(:call, GlobalRef(mod, f), args...)
 xcall(f::Symbol, args...) = xcall(Base, f, args...)
