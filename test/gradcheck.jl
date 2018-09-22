@@ -85,3 +85,8 @@ end
 
   @test gradtest(x -> minimum(x, dims=[1, 2]), rand(2, 3, 4))
 end
+
+@testset "hessian-vector-product" begin
+  H = [1 0.5; 0.5 2]
+  @test gradtest(x->0.5*(x'*(H*x)),2)
+end
