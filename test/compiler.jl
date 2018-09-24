@@ -64,6 +64,12 @@ getx(x) = x.x
 y, back = @test_inferred forward(getx, (x=1,y=2.0))
 @test_inferred back(1)
 
+# TODO
+# MRP:
+#     foo(f) = Ref((f,))
+#     @code_typed foo(Complex)
+# @test_inferred forward(Complex, 1, 2)
+
 # Checks that use control flow
 if Zygote.usetyped
   include("typed.jl")
