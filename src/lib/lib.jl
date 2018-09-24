@@ -90,17 +90,37 @@ end
 @generated pair(::Val{k}, v) where k = :($k = v,)
 
 # TODO make this inferrable
+# Right now constant prop is too fragile ...
 @grad function getfield(x, f::Symbol)
   val = getfield(x, f)
   unwrap(val), function (Δ)
     accum_param(__context__, val, Δ)
     if isimmutable(x)
-      ((;nt_nothing(x)...,pair(Val{f}(), Δ)...), nothing)
+      ((;nt_nothing(x)...,pair(Val(f), Δ)...), nothing)
     else
       dx = getfield(grad_mut(__context__, x), f)
       dx[] = accum(dx[], Δ)
       return
     end
+  end
+end
+
+# ... so we have Zygote call this version where we can.
+literal_getproperty(x, ::Val{f}) where f = getproperty(x, f)
+
+@grad function literal_getproperty(x, ::Val{f}) where f
+  let val = getproperty(x, f)
+    function back(Δ)
+      accum_param(__context__, val, Δ)
+      if isimmutable(x)
+        ((;nt_nothing(x)...,pair(Val(f), Δ)...), nothing)
+      else
+        dx = getfield(grad_mut(__context__, x), f)
+        dx[] = accum(dx[], Δ)
+        return
+      end
+    end
+    unwrap(val), back
   end
 end
 

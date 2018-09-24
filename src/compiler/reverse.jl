@@ -113,6 +113,9 @@ end
 
 reachable(ir) = keys(valid_usages(ir))
 
+# Hack to work around fragile constant prop through overloaded functions
+is_literal_getproperty(ex) = iscall(ex, Base, :getproperty) && ex.args[3] isa QuoteNode
+
 # TODO: remove this once we don't mess with type inference
 function _forward_type(Ts)
   usetyped || return Any
@@ -129,6 +132,8 @@ function record!(ir::IRCode)
   for i = 1:length(ir.stmts)
     ex = argmap(x -> Argument(x.n+2), ir[SSAValue(i)])
     isexpr(ex, :new) && (ex = ir[SSAValue(i)] = xcall(Zygote, :__new__, ex.args...))
+    is_literal_getproperty(ex) &&
+      (ex = ir[SSAValue(i)] = xcall(Zygote, :literal_getproperty, ex.args[2], Val(ex.args[3].value)))
     if isexpr(ex, :call) && !ignored(ir, ex)
       yT = widenconst(types(ir)[i])
       T = _forward_type(exprtype.(Ref(ir), ex.args))
