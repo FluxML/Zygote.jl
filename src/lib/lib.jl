@@ -99,14 +99,17 @@ end
 # Right now constant prop is too fragile ...
 @grad function getfield(x, f::Symbol)
   val = getfield(x, f)
-  unwrap(val), function (Δ)
-    accum_param(__context__, val, Δ)
-    if isimmutable(x)
-      ((;nt_nothing(x)...,pair(Val(f), Δ)...), nothing)
-    else
-      dx = getfield(grad_mut(__context__, x), f)
-      dx[] = accum(dx[], Δ)
-      return
+  w = unwrap(val)
+  let val=val
+    w, function (Δ)
+      accum_param(__context__, val, Δ)
+      if isimmutable(x)
+        ((;nt_nothing(x)...,pair(Val(f), Δ)...), nothing)
+      else
+        dx = getfield(grad_mut(__context__, x), f)
+        dx[] = accum(dx[], Δ)
+        return
+      end
     end
   end
 end
