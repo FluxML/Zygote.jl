@@ -51,6 +51,12 @@ unwrap(x) = x
 @grad Core.getfield(xs::NTuple{N,Any}, i::Integer) where N =
   (xs[i], Δ -> (ntuple(j -> i == j ? Δ : nothing, Val(N)), nothing))
 
+@grad function Base.first(xs::Tuple)
+  let drest = map(_->nothing, tail(xs))
+    first(xs), Δ -> ((Δ, drest...),)
+  end
+end
+
 _empty(x) = nothing
 _empty(x::Tuple) = map(_empty, x)
 
