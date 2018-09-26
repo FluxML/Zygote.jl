@@ -11,9 +11,18 @@ function isassert(ir, i)
   iscall(ex, Zygote, :typeassert)
 end
 
+# TODO: Move this to Base
+function append_node!(ir, @nospecialize(typ), @nospecialize(node), line)
+  push!(ir.stmts, node)
+  push!(ir.types, typ)
+  push!(ir.lines, line)
+  push!(ir.flags, 0)
+  return SSAValue(length(ir.stmts))
+end
+
 function merge_returns(ir)
   any(x -> x == unreachable, ir.stmts) && error("`throw` not supported")
-  rs = findall(x -> x isa ReturnNode, ir.stmts)
+  rs = findall(x -> x isa ReturnNode && isdefined(x, :val), ir.stmts)
   length(rs) <= 1 && return ir
   bs = blockidx.(Ref(ir), rs)
   xs = []
@@ -26,17 +35,13 @@ function merge_returns(ir)
     push!(xs, x)
     ir.stmts[r] = GotoNode(bb)
   end
-  push!(ir.cfg.blocks, BasicBlock(StmtRange(length(ir.stmts), length(ir.stmts)-1), bs, []))
-  push!(ir.cfg.index, length(ir.stmts))
   for b in bs
     push!(ir.cfg.blocks[b].succs, bb)
   end
-  ir = IncrementalCompact(ir)
-  for _ in ir end
-  # TODO preserve types
-  r = insert_node_here!(ir, PhiNode(bs, xs), Any, ir.result_lines[end])
-  insert_node_here!(ir, ReturnNode(r), Any, ir.result_lines[end])
-  ir = finish(ir)
+  push!(ir.cfg.blocks, BasicBlock(StmtRange(length(ir.stmts)+1, length(ir.stmts)+3), bs, []))
+  push!(ir.cfg.index, length(ir.stmts) + 1)
+  r = append_node!(ir, Any, PhiNode(bs, xs), ir.lines[end])
+  append_node!(ir, Any, ReturnNode(r), ir.lines[end])
   return ir
 end
 
