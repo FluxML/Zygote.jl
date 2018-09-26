@@ -95,7 +95,13 @@ unflatten(x, xs) = _unflatten(x, xs)[1]
   broadcasted(f, args...), Δ -> (nothing, Δ.args...)
 end
 
-@grad function materialize(bc::Broadcasted{<:DefaultArrayStyle})
+@grad function copy(bc::Broadcasted{<:AbstractArrayStyle})
+  let (y, back) = ∇broadcast(bc)
+    y, Δ -> (unflatten(bc, back(Δ)),)
+  end
+end
+
+@grad function materialize(bc::Broadcasted{<:AbstractArrayStyle})
   let (y, back) = ∇broadcast(bc)
     y, Δ -> (unflatten(bc, back(Δ)),)
   end

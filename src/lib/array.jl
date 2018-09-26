@@ -45,8 +45,9 @@ end
 
 # Reductions
 
+fill_similar_array(xs, v) = similar(xs) .= Δ
 @grad sum(xs::AbstractArray; dims = :) =
-  sum(xs, dims = dims), Δ -> (similar(xs) .= Δ,)
+  sum(xs, dims = dims), Δ -> (fill_similar_array(xs, Δ),)
 
 @grad prod(xs; dims) = prod(xs, dims = dims),
   Δ -> (reshape(.*(circshift.([reshape(xs, length(xs))], 1:length(xs)-1)...), size(xs)) .* Δ,)
