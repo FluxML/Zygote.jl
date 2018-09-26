@@ -156,7 +156,14 @@ end
   broadcasted(f, args...), Δ -> (nothing, Δ.args...)
 end
 
-@adjoint function materialize(bc::Broadcasted{<:DefaultArrayStyle})
-  y, back = ∇broadcast(bc)
-  y, Δ -> (unflatten(bc, back(Δ)),)
+@adjoint function copy(bc::Broadcasted{<:AbstractArrayStyle})
+  let (y, back) = ∇broadcast(bc)
+    y, Δ -> (unflatten(bc, back(Δ)),)
+  end
+end
+
+@adjoint function materialize(bc::Broadcasted{<:AbstractArrayStyle})
+  let (y, back) = ∇broadcast(bc)
+    y, Δ -> (unflatten(bc, back(Δ)),)
+  end
 end

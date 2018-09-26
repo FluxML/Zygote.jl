@@ -49,13 +49,9 @@ end
 
 # Reductions
 
-@adjoint function sum(xs::AbstractArray; dims = :)
-  if dims === (:)
-    sum(xs), Δ -> (FillArray(Δ, size(xs)),)
-  else
-    sum(xs, dims = dims), Δ -> (similar(xs) .= Δ,)
-  end
-end
+fill_similar_array(xs, v) = similar(xs) .= Δ
+@adjoint sum(xs::AbstractArray; dims = :) =
+  sum(xs, dims = dims), Δ -> (fill_similar_array(xs, Δ),)
 
 function _forward(cx::Context, ::typeof(sum), f, xs::AbstractArray)
   y, back = forward(cx, (xs -> sum(f.(xs))), xs)

@@ -38,9 +38,10 @@ function forward(f, args...)
   y, Δ -> tailmemaybe(back(Δ))
 end
 
+isscalar(y) = y isa Real
 function gradient(f, args...)
   y, back = forward(f, args...)
-  y isa Real || error("Function output is not scalar")
+  isscalar(y) || error("Function output is not scalar")
   return back(Int8(1))
 end
 
