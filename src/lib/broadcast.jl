@@ -19,10 +19,15 @@ using ForwardDiff: Dual
 
 trim(x, Δ) = reshape(Δ, ntuple(i -> size(Δ, i), Val(ndims(x))))
 
-unbroadcast(x::AbstractArray, Δ) =
-  size(x) == size(Δ) ? Δ :
+# Compute which dimensions were broadcast
+@Base.pure broadcasted_dims(sz, sΔ) = tuple(filter(i->i > length(sz) || sz[i] != sΔ[i], 1:length(sΔ))...)
+
+function unbroadcast(x::AbstractArray, Δ)
+  res = size(x) == size(Δ) ? Δ :
   length(x) == length(Δ) ? trim(x, Δ) :
-    trim(x, sum(Δ, dims = ntuple(i -> size(x, i) == 1 ? i : ndims(Δ)+1, Val(ndims(Δ)))))
+    trim(x, Base.sum(Δ, dims = broadcasted_dims(size(x), size(Δ))))
+  res
+end
 
 unbroadcast(x::Number, Δ) = sum(Δ)
 
