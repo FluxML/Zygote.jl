@@ -1,5 +1,3 @@
-__precompile__(false)
-
 module Zygote
 
 # This flag enables Zygote to grab extra type inference information during
