@@ -33,7 +33,7 @@ include("lib/broadcast.jl")
 
 # we need to define this late, so that the genfuncs see lib.jl
 include("compiler/interface2.jl")
-include("precompile.jl")
+usetyped || include("precompile.jl")
 
 @init @require Flux="587475ba-b771-5e3f-ad9e-33799f191a9c" include("flux.jl")
 
