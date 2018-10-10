@@ -10,7 +10,9 @@ function gradm(f, T, args, Ts, body, mut)
   pushfirst!(args, :($(esc(:__context__))::Context), :($f::$T))
   body = quote
     Base.@_inline_meta
-    y, back = $(esc(body))
+    y, back = let
+      $(esc(body))
+    end
     $(mut ? nothing : :(back2(::Nothing) = nothing))
     # return needed for type inference
     back2(Δ) = return _gradtuple(back(Δ))
@@ -39,7 +41,9 @@ function gradm_kw(f, T, args, Ts, body, mut)
   body = quote
     Base.@_inline_meta
     $(kw_wrappers...)
-    y, back = $(esc(body))
+    y, back = let
+      $(esc(body))
+    end
     $(mut ? nothing : :(back2(::Nothing) = nothing))
     # return needed for type inference
     back2(Δ) = return _gradtuple_kw(back(Δ))
