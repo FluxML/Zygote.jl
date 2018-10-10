@@ -2,6 +2,8 @@ using Base: @get!
 
 @nograd readline
 
+@grad copy(x) = copy(x), ȳ -> (ȳ,)
+
 grad_mut(d::AbstractDict) = Dict()
 
 # TODO perhaps look up mutable gradients in `forward`
