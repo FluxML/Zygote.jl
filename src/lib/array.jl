@@ -49,7 +49,7 @@ end
 
 # Reductions
 
-fill_similar_array(xs, v) = similar(xs) .= Δ
+fill_similar_array(xs, v) = similar(xs) .= v
 @adjoint sum(xs::AbstractArray; dims = :) =
   sum(xs, dims = dims), Δ -> (fill_similar_array(xs, Δ),)
 
