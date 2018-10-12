@@ -59,7 +59,7 @@ function broadcast_gradient(bc::Broadcasted, ::Type{T}) where T
   return dest, grads
 end
 
-@inline function ∇broadcast(bc′::Broadcasted) where {F,N}
+@inline function ∇broadcast(bc′::Broadcasted)
   bc = dualify(instantiate(flatten(bc′)))
   T = combine_eltypes(bc.f, bc.args)
   y, gs = broadcast_gradient(bc, dualtype(T))
