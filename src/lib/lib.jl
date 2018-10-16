@@ -101,13 +101,13 @@ end
 @grad function getfield(x, f::Symbol)
   val = getfield(x, f)
   w = unwrap(val)
-  let val=val
+  let val=val, vf=Val(f)
     w, function (Δ)
       accum_param(__context__, val, Δ)
       if isimmutable(x)
-        ((;nt_nothing(x)...,pair(Val(f), Δ)...), nothing)
+        ((;nt_nothing(x)...,pair(vf, Δ)...), nothing)
       else
-        dx = getfield(grad_mut(__context__, x), f)
+        dx = getfield(grad_mut(__context__, x), typeof(vf).parameters[1])
         dx[] = accum(dx[], Δ)
         return
       end
