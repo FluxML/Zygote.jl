@@ -13,7 +13,7 @@ end
 
 J{S}(x) where S = J{S,typeof(x)}(x)
 
-Base.show(io::IO, j::J{S}) where S = print(io, "J($(j.t[1]))")
+Base.show(io::IO, j::J{S}) where S = print(io, length(j.t) == 0 ? "J()" : "J($(j.t[1]))")
 
 # interface2.jl
 
