@@ -31,6 +31,7 @@ end
 
 @grad Base.typeassert(x, T) = Base.typeassert(x, T), Δ -> (Δ, nothing)
 
+accum_param(cx::Context{Nothing}, x, Δ) = nothing
 function accum_param(cx::Context, x, Δ)
   haskey(cache(cx), x) && (cache(cx)[x] = accum(cache(cx)[x],Δ))
   return
