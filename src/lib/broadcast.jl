@@ -31,15 +31,12 @@ end
 
 unbroadcast(x::Number, Δ) = sum(Δ)
 
-dual(x, p) = x
-dual(x::Real, p) = Dual(x, p)
-
 dualtype(::Type{Dual{G,T,P}}) where {G,T,P} = T
 
 function dual_function(f::F) where F
   function (args::Vararg{Any,N}) where N
     ds = map(args, ntuple(identity,Val(N))) do x, i
-      dual(x, ntuple(j -> i==j, Val(N)))
+      Dual(x, ntuple(j -> i==j ? one(typeof(x)) : zero(typeof(x)), Val(N)))
     end
     return f(ds...)
   end
