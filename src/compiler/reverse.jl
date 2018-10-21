@@ -89,7 +89,6 @@ function record_globals!(ir::IRCode)
       end
     end
   end
-  @Base.show ir
   return compact!(ir)
 end
 
