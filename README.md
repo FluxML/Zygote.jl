@@ -6,7 +6,7 @@
 
 `] add Zygote#master`
 
-Zygote is a working prototype for source-to-source automatic differentiation (AD) in Julia.
+Zygote is a working prototype for source-to-source automatic differentiation (AD) in Julia. For more details and benchmarks of Zygote's technique, see [our paper](https://arxiv.org/abs/1810.07951).
 
 ```julia
 julia> using Zygote
