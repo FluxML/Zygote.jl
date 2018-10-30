@@ -31,7 +31,7 @@ end
 function gradient(f, args...)
   y, J = forward(f, args...)
   y isa Real || error("Function output is not scalar")
-  return J(1)
+  return J(true)
 end
 
 derivative(f, x) = gradient(f, x)[1]
