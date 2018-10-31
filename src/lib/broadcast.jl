@@ -60,7 +60,7 @@ Jtrivial(::typeof(-), a, b) = (a..., .-b...)
 
 trivia(_) = (1,)
 function trivia(bc::Broadcasted)
-  t = trivia.(bc.args)
+  t = map(trivia, bc.args)
   any(t -> t === nothing, t) && return
   Jtrivial(bc.f, t...)
 end

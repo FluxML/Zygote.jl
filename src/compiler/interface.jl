@@ -34,7 +34,7 @@ function gradient(f, args...)
   return J(true)
 end
 
-derivative(f, x) = gradient(f, x)[1]
+derivative(f::F, x) where F = gradient(f, x)[1]
 
 Base.adjoint(f::Function) = x -> derivative(f, x)
 
