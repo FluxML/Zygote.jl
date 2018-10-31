@@ -45,8 +45,13 @@ end
 
 # Reductions
 
-@grad sum(xs::AbstractArray; dims = :) =
-  sum(xs, dims = dims), Δ -> (similar(xs) .= Δ,)
+@grad function sum(xs::AbstractArray; dims = :)
+  if dims === (:)
+    sum(xs), Δ -> (FillArray(Δ, size(xs)),)
+  else
+    sum(xs, dims = dims), Δ -> (similar(xs) .= Δ,)
+  end
+end
 
 @grad prod(xs; dims) = prod(xs, dims = dims),
   Δ -> (reshape(.*(circshift.([reshape(xs, length(xs))], 1:length(xs)-1)...), size(xs)) .* Δ,)
@@ -56,7 +61,7 @@ end
 @grad function maximum(xs; dims = :)
   let (max, i) = findmax(xs, dims = dims)
     max, function (Δ)
-      Δ == 0 && return nothing
+      Δ <= sqrt(eps(float(Δ))) && return nothing
       Δ′ = zero(xs)
       Δ′[i] = Δ
       return (Δ′,)

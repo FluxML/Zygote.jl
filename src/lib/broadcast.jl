@@ -69,7 +69,7 @@ Joutput(f, a...) = nothing
 Joutput(::typeof(exp), x) = map(t -> y -> y*t, x)
 
 function Jbroadcast(bc::Broadcasted)
-  t = trivia.(bc.args)
+  t = map(trivia, bc.args)
   any(t -> t === nothing, t) && return
   Joutput(bc.f, t...)
 end
