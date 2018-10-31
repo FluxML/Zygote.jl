@@ -112,7 +112,7 @@ end
 
 dualify(bc::Broadcasted{S}) where S = Broadcasted{S}(dual_function(bc.f), bc.args, bc.axes)
 
-function broadcast_gradient!(bc::Broadcasted, dest::AbstractArray, grads::Vararg{Any})
+@inline function broadcast_gradient!(bc::Broadcasted, dest::AbstractArray, grads...)
   @simd for I in eachindex(bc)
     @inbounds begin
       out = bc[I]
@@ -129,7 +129,7 @@ function broadcast_gradient(bc::Broadcasted, ::Type{T}) where T
   return dest, grads
 end
 
-@inline function ∇broadcast(bc′::Broadcasted)
+@inline function ∇broadcast_f(bc′::Broadcasted)
   bc = dualify(instantiate(flatten(bc′)))
   T = combine_eltypes(bc.f, bc.args)
   y, gs = broadcast_gradient(bc, dualtype(T))
@@ -137,10 +137,14 @@ end
   return y, back
 end
 
-function ∇broadcast(bc::Broadcasted{<:AbstractArrayStyle{0}})
+function ∇broadcast_f(bc::Broadcasted{<:AbstractArrayStyle{0}})
   out = dualify(instantiate(flatten(bc)))[]
   return out.value, Δ -> map(x -> x*Δ, out.partials.values)
 end
+
+∇broadcast(bc::Broadcasted, ::Nothing) = ∇broadcast_f(bc)
+∇broadcast(bc::Broadcasted, J) = ∇broadcast_r(bc, J)
+∇broadcast(bc::Broadcasted) = ∇broadcast(bc, Jbroadcast(bc))
 
 @grad function broadcasted(f, args...)
   broadcasted(f, args...), Δ -> (nothing, Δ.args...)
