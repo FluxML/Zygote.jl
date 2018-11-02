@@ -1,5 +1,5 @@
 using Zygote, Test
-using Zygote: Params, gradient, roundtrip
+using Zygote: Params, gradient, derivative, roundtrip
 
 add(a, b) = a+b
 _relu(x) = x > 0 ? x : 0
@@ -184,3 +184,8 @@ y, back = forward(() -> layer(x), Params([W]))
 @test back([1, 1])[W] == [1 2; 1 2]
 
 @test gradient(() -> sum(W * x), Params([W]))[W] == [1 2; 1 2]
+
+@test derivative(2) do x
+  H = [1 x; 3 4]
+  sum(H)
+end == 1

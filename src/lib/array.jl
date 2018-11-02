@@ -1,6 +1,6 @@
 @grad (::Type{T})(args...) where T<:Array = T(args...), Δ -> nothing
 
-@nograd size, length, eachindex, Colon(), findfirst
+@nograd size, length, eachindex, Colon(), findfirst, rand, randn
 
 @grad Base.vect(xs...) = Base.vect(xs...), Δ -> (Δ...,)
 
@@ -26,6 +26,10 @@ end
 
 @grad reshape(xs, dims...) = reshape(xs, dims...),
   Δ -> (reshape(Δ, size(xs)),map(_->nothing,dims)...)
+
+@grad function hvcat(rows::Tuple{Vararg{Int}}, xs::T...) where T<:Number
+  hvcat(rows, xs...), ȳ -> (nothing, ȳ...)
+end
 
 @grad function repeat(xs; inner=ntuple(_->1, ndims(xs)), outer=ntuple(_->1, ndims(xs)))
   repeat(xs, inner = inner, outer = outer), function (Δ)
