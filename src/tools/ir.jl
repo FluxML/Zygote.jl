@@ -50,7 +50,7 @@ exprtype(ir::IRCode, x::SSAValue) = widenconst(types(ir)[x])
 exprtype(ir::IRCode, x::GlobalRef) = isconst(x.mod, x.name) ? Typeof(getfield(x.mod, x.name)) : Any
 exprtype(ir::IRCode, x::QuoteNode) = Typeof(x.value)
 # probably can fall back to any here
-exprtype(ir::IRCode, x::Union{Type,Number,Nothing,Tuple,Function,Val}) = Typeof(x)
+exprtype(ir::IRCode, x::Union{Type,Number,Nothing,Tuple,Function,Val,String}) = Typeof(x)
 exprtype(ir::IRCode, x::Expr) = error(x)
 
 rename(x, m) = x
