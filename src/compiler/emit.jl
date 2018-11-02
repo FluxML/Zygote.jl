@@ -37,6 +37,7 @@ xtuple(xs...) = xcall(:tuple, xs...)
 concrete(T::DataType) = T
 concrete(::Type{Type{T}}) where T = typeof(T)
 
+# TODO: combine stacks by type
 function forward_stacks!(adj, F)
   stks, recs = [], []
   for fb = 1:length(adj.perm)
@@ -47,8 +48,7 @@ function forward_stacks!(adj, F)
         T = exprtype(adj.forw, α)
         stk = insert_node!(adj.forw, 1, xstack(T)...)
         push!(recs, stk)
-        loc = afterphi(adj.forw, α.id+1)
-        insert_node!(adj.forw, loc-1, Any, xcall(Zygote, :_push!, stk, α), true)
+        insert_blockend!(adj.forw, blockidx(adj.forw, α.id), Any, xcall(Zygote, :_push!, stk, α))
       end
       push!(stks, (invperm(adj.perm)[fb], alpha(α)))
     end

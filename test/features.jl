@@ -189,3 +189,10 @@ y, back = forward(() -> layer(x), Params([W]))
   H = [1 x; 3 4]
   sum(H)
 end == 1
+
+@test derivative(2) do x
+  if x < 0
+    throw("foo")
+  end
+  return x*5
+end == 5
