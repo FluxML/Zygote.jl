@@ -69,7 +69,7 @@ end
 @grad function maximum(xs; dims = :)
   let (max, i) = findmax(xs, dims = dims)
     max, function (Δ)
-      Δ <= sqrt(eps(float(Δ))) && return nothing
+      Δ isa Real && Δ <= sqrt(eps(float(Δ))) && return nothing
       Δ′ = zero(xs)
       Δ′[i] = Δ
       return (Δ′,)
