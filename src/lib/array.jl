@@ -53,10 +53,14 @@ end
   end
 end
 
-@grad prod(xs; dims) = prod(xs, dims = dims),
-  Δ -> (reshape(.*(circshift.([reshape(xs, length(xs))], 1:length(xs)-1)...), size(xs)) .* Δ,)
-
-@grad prod(xs) = prod(xs), Δ -> (prod(xs) ./ xs .* Δ,)
+@grad function prod(xs; dims = :)
+  if dims === (:)
+    prod(xs), Δ -> (prod(xs) ./ xs .* Δ,)
+  else
+    prod(xs, dims = dims),
+      Δ -> (reshape(.*(circshift.([reshape(xs, length(xs))], 1:length(xs)-1)...), size(xs)) .* Δ,)
+  end
+end
 
 @grad function maximum(xs; dims = :)
   let (max, i) = findmax(xs, dims = dims)
