@@ -14,6 +14,16 @@ J{S}(x) where S = J{S,typeof(x)}(x)
 
 Base.show(io::IO, j::J{S}) where S = print(io, "J($(j.t[1]))")
 
+struct CompileError
+  T
+  e
+end
+
+function Base.showerror(io::IO, e::CompileError)
+  print(io, "Compiling $(e.T): ")
+  showerror(io, e.e)
+end
+
 # interface2.jl
 
 # Wrappers

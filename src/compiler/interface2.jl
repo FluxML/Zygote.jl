@@ -14,7 +14,10 @@ end
 
 @generated function (j::J{T})(Δ) where T
   ignore(T) && return :nothing
-  g = _lookup_grad(T)
+  g = try _lookup_grad(T)
+  catch e
+    rethrow(CompileError(T,e))
+  end
   if g == nothing
     Δ == Nothing && return :nothing
     return :(error("Non-differentiable function $(j.t[1])"))

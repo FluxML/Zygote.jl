@@ -21,7 +21,7 @@ function append_node!(ir, @nospecialize(typ), @nospecialize(node), line)
 end
 
 function merge_returns(ir)
-  any(x -> x == unreachable, ir.stmts) && error("`throw` not supported")
+  any(x -> x == unreachable, ir.stmts) && error("Unsupported control flow")
   rs = findall(x -> x isa ReturnNode && isdefined(x, :val), ir.stmts)
   length(rs) <= 1 && return ir
   bs = blockidx.(Ref(ir), rs)
