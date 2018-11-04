@@ -17,6 +17,8 @@ for (M, f, arity) in DiffRules.diffrules()
   end
 end
 
+@grad Base.convert(T::Type{<:Real}, x::Real) = convert(T, x), Δ -> (nothing, Δ)
+
 @grad Base.:+(xs...) = +(xs...), Δ -> map(_ -> Δ, xs)
 
 @grad function sincos(x)
