@@ -226,3 +226,5 @@ if !Zygote.usetyped
   invokable(x::Integer) = 3x
   @test gradient(x -> invoke(invokable, Tuple{Any}, x), 5) == (2,)
 end
+
+@test gradient(x -> one(eltype(x)), rand(10)) == nothing
