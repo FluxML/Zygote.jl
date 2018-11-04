@@ -13,10 +13,15 @@ end
 
 # TODO: Move this to Base
 function append_node!(ir, @nospecialize(typ), @nospecialize(node), line)
+  @assert isempty(ir.new_nodes)
   push!(ir.stmts, node)
   push!(ir.types, typ)
   push!(ir.lines, line)
   push!(ir.flags, 0)
+  last_bb = ir.cfg.blocks[end]
+  ir.cfg.blocks[end] = BasicBlock(StmtRange(first(last_bb.stmts):length(ir.stmts)),
+      last_bb.preds,
+      last_bb.succs)
   return SSAValue(length(ir.stmts))
 end
 
@@ -25,23 +30,24 @@ function merge_returns(ir)
   rs = findall(x -> x isa ReturnNode && isdefined(x, :val), ir.stmts)
   length(rs) <= 1 && return ir
   bs = blockidx.(Ref(ir), rs)
-  xs = []
+  xs = Any[]
   bb = length(ir.cfg.blocks)+1
   @assert length(unique(bs)) == length(bs)
+  push!(ir.cfg.blocks, BasicBlock(StmtRange(length(ir.stmts)+1, length(ir.stmts)), bs, []))
+  push!(ir.cfg.index, length(ir.stmts) + 1)
+  r = append_node!(ir, Any, nothing, ir.lines[end])
+  append_node!(ir, Any, ReturnNode(r), ir.lines[end])
   for r in rs
     x = ir.stmts[r].val
-    x == GlobalRef(Base, :nothing) && (x = nothing)
-    @assert !(x isa Union{GlobalRef,Expr})
+    x = insert_node!(ir, r, Any, x)
     push!(xs, x)
     ir.stmts[r] = GotoNode(bb)
   end
   for b in bs
     push!(ir.cfg.blocks[b].succs, bb)
   end
-  push!(ir.cfg.blocks, BasicBlock(StmtRange(length(ir.stmts)+1, length(ir.stmts)+3), bs, []))
-  push!(ir.cfg.index, length(ir.stmts) + 1)
-  r = append_node!(ir, Any, PhiNode(bs, xs), ir.lines[end])
-  append_node!(ir, Any, ReturnNode(r), ir.lines[end])
+  ir.stmts[r.id] = PhiNode(bs, xs)
+  ir = compact!(ir)
   return ir
 end
 

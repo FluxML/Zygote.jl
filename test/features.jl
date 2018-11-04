@@ -209,3 +209,6 @@ end
   end
   x
 end == 2
+
+
+@test gradient(x -> one(eltype(x)), rand(10)) == nothing
