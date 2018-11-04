@@ -18,3 +18,4 @@ for (M, f, arity) in DiffRules.diffrules()
 end
 
 @grad Base.:+(xs...) = +(xs...), Δ -> map(_ -> Δ, xs)
+@grad Base.convert(T::Type{<:Real}, x::Real) = convert(T, x), Δ -> (nothing, Δ)
