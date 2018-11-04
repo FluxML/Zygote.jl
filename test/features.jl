@@ -184,3 +184,5 @@ y, back = forward(() -> layer(x), Params([W]))
 @test back([1, 1])[W] == [1 2; 1 2]
 
 @test gradient(() -> sum(W * x), Params([W]))[W] == [1 2; 1 2]
+
+@test gradient(x -> one(eltype(x)), rand(10)) == nothing
