@@ -199,3 +199,13 @@ if !Zygote.usetyped
     return x*5
   end == 5
 end
+
+# Thre-way control flow merge
+@test derivative(1) do x
+  if x > 0
+    x *= 2
+  elseif x < 0
+    x *= 3
+  end
+  x
+end == 2
