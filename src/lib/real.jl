@@ -18,3 +18,9 @@ for (M, f, arity) in DiffRules.diffrules()
 end
 
 @grad Base.:+(xs...) = +(xs...), Δ -> map(_ -> Δ, xs)
+
+@grad function sincos(x)
+  let (s, c) = sincos(x)
+    (s, c), ((s̄, c̄),) -> (s̄*c - c̄*s,)
+  end
+end
