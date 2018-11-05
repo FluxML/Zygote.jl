@@ -59,8 +59,8 @@ end
   end
 end
 
-function _forward(cx::Context, ::typeof(sum), f, xs; dims = :)
-  let (y, back) = forward(cx, (xs -> sum(f.(xs), dims = dims)), xs)
+function _forward(cx::Context, ::typeof(sum), f, xs::AbstractArray)
+  let (y, back) = forward(cx, (xs -> sum(f.(xs))), xs)
     y, ȳ -> (nothing, nothing, back(ȳ)...)
   end
 end
