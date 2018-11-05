@@ -41,7 +41,7 @@ end
 function gradient(f, args...)
   y, J = forward(f, args...)
   y isa Real || error("Function output is not scalar")
-  return J(true)
+  return J(Int8(1))
 end
 
 derivative(f::F, x) where F = gradient(f, x)[1]
