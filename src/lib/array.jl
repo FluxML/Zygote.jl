@@ -105,3 +105,5 @@ function _kron(mat1::AbstractMatrix,mat2::AbstractMatrix)
 end
 
 @grad kron(a::AbstractMatrix, b::AbstractMatrix) = forward(_kron, a, b)
+
+@grad iterate(r::UnitRange, i...) = iterate(r, i...), _ -> nothing
