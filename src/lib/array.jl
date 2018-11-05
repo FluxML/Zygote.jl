@@ -57,6 +57,12 @@ end
   end
 end
 
+function _forward(cx::Context, ::typeof(sum), f, xs; dims = :)
+  let (y, back) = forward(cx, (xs -> sum(f.(xs), dims = dims)), xs)
+    y, ȳ -> (nothing, nothing, back(ȳ)...)
+  end
+end
+
 @grad function prod(xs; dims = :)
   if dims === (:)
     prod(xs), Δ -> (prod(xs) ./ xs .* Δ,)
