@@ -1,3 +1,5 @@
+using LinearAlgebra
+
 @grad (::Type{T})(args...) where T<:Array = T(args...), Δ -> nothing
 
 @nograd size, length, eachindex, Colon(), findfirst, rand, randn
@@ -99,6 +101,7 @@ end
 
 @grad transpose(x) = transpose(x), Δ -> (transpose(Δ),)
 @grad adjoint(x) = adjoint(x), Δ -> (adjoint(Δ),)
+@grad parent(x::LinearAlgebra.Adjoint) = parent(x), ȳ -> (LinearAlgebra.Adjoint(ȳ),)
 
 function _kron(mat1::AbstractMatrix,mat2::AbstractMatrix)
     m1, n1 = size(mat1)
