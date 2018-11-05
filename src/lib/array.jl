@@ -1,5 +1,3 @@
-using LinearAlgebra
-
 @grad (::Type{T})(args...) where T<:Array = T(args...), Δ -> nothing
 
 @nograd size, length, eachindex, Colon(), findfirst, rand, randn
