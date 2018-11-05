@@ -26,7 +26,6 @@ matrix:
 
 ## uncomment the following lines to override the default test script
 script:
- - julia -e 'using Pkg; Pkg.activate(); Pkg.instantiate(); Pkg.test()'
- - export ZYGOTE_TYPED=true
- - touch src/Zygote.jl
- - julia -e 'using Pkg; Pkg.activate(); Pkg.instantiate(); Pkg.test()'
+ - julia --color=yes -e 'using Pkg; Pkg.activate(); Pkg.instantiate(); Pkg.test()'
+ - export ZYGOTE_TYPED=true && touch src/Zygote.jl
+ - julia --color=yes -e 'using Pkg; Pkg.activate(); Pkg.instantiate(); Pkg.test()'
