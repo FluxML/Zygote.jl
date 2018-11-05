@@ -2,7 +2,7 @@ using Base: @get!
 
 @nograd readline
 
-@grad copy(x) = copy(x), ȳ -> (ȳ,)
+@grad copy(x::AbstractArray) = copy(x), ȳ -> (ȳ,)
 
 grad_mut(d::AbstractDict) = Dict()
 
