@@ -198,6 +198,8 @@ if !Zygote.usetyped
     end
     return x*5
   end == 5
+
+  @test derivative(x -> one(eltype(x)), rand(10)) == nothing
 end
 
 # Thre-way control flow merge
@@ -209,5 +211,3 @@ end
   end
   x
 end == 2
-
-@test derivative(x -> one(eltype(x)), rand(10)) == nothing
