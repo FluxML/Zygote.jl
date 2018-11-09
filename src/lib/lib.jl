@@ -8,7 +8,7 @@ accum(x, y::Nothing) = x
 accum(x::Nothing, y::Nothing) = nothing
 accum(x, y) = x + y
 
-accum(x, y, zs...) = accum(x, accum(x, zs...))
+accum(x, y, zs...) = accum(x, accum(y, zs...))
 
 accum(x::Tuple, y::Tuple) = accum.(x, y)
 accum(x::AbstractArray, y::AbstractArray) = accum.(x, y)
