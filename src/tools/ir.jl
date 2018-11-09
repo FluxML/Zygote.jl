@@ -6,10 +6,20 @@ import Core.Compiler: CodeInfo, IRCode, CFG, BasicBlock, Argument, ReturnNode,
   compact!, finish, DomTree, construct_domtree, dominates, userefs, widenconst, types, verify_ir
 using InteractiveUtils: typesof
 
-afterphi(ir, loc) = ir.stmts[loc] isa PhiNode ? afterphi(ir, loc+1) : loc
+function afterphi(ir, loc)
+    if isa(ir.stmts[loc], PhiNode)
+        if isa(ir.stmts[loc+1], PhiNode)
+            return afterphi(ir, loc+1)
+        end
+        return (loc, true)
+    end
+    return (loc, false)
+end
 
-insert_blockstart!(ir::IRCode, pos, typ, val) =
-  insert_node!(ir, afterphi(ir, ir.cfg.blocks[pos].stmts[1]), typ, val)
+function insert_blockstart!(ir::IRCode, pos, typ, val)
+    (loc, attach_after) = afterphi(ir, ir.cfg.blocks[pos].stmts[1])
+    insert_node!(ir, loc, typ, val, attach_after)
+end
 
 function insert_blockend!(ir::IRCode, pos, typ, val)
   i = first(ir.cfg.blocks[pos].stmts)

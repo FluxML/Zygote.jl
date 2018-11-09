@@ -85,13 +85,14 @@ function reverse_stacks!(adj, stks)
     repl = Dict()
     for (i, (b′, α)) in enumerate(stks)
       b == b′ || continue
-      loc = max(2,afterphi(ir, range(ir.cfg.blocks[b])[1]))
+      loc, attach_after = afterphi(ir, range(ir.cfg.blocks[b])[1])
+      loc = max(2, loc)
       if adj.perm[b′] == 1
-        val = insert_node!(ir, loc, Any, xcall(:getindex, t, i))
+        val = insert_node!(ir, loc, Any, xcall(:getindex, t, i), attach_after)
       else
         stk = insert_node!(ir, 1, Any, xcall(:getindex, t, i))
         stk = insert_node!(ir, 1, Any, xcall(Zygote, :Stack, stk))
-        val = insert_node!(ir, loc, Any, xcall(:pop!, stk))
+        val = insert_node!(ir, loc, Any, xcall(:pop!, stk), attach_after)
       end
       repl[α] = val
     end
