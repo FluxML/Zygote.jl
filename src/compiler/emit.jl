@@ -47,8 +47,8 @@ function forward_stacks!(adj, F)
         T = exprtype(adj.forw, α)
         stk = insert_node!(adj.forw, 1, xstack(T)...)
         push!(recs, stk)
-        loc = afterphi(adj.forw, α.id+1)
-        insert_node!(adj.forw, loc-1, Any, xcall(Zygote, :_push!, stk, α), true)
+        loc, attach_after = afterphi(adj.forw, α.id+1)
+        insert_node!(adj.forw, loc, Any, xcall(Zygote, :_push!, stk, α), attach_after)
       end
       push!(stks, (invperm(adj.perm)[fb], alpha(α)))
     end
@@ -80,13 +80,14 @@ function reverse_stacks!(adj, stks, nargs)
     repl = Dict()
     for (i, (b′, α)) in enumerate(stks)
       b == b′ || continue
-      loc = max(2,afterphi(ir, range(ir.cfg.blocks[b])[1]))
+      loc, attach_after = afterphi(ir, range(ir.cfg.blocks[b])[1])
+      loc = max(2, loc)
       if adj.perm[b′] == 1
-        val = insert_node!(ir, loc, Any, xcall(:getindex, t, i+nargs))
+        val = insert_node!(ir, loc, Any, xcall(:getindex, t, i+nargs), attach_after)
       else
         stk = insert_node!(ir, 1, Any, xcall(:getindex, t, i+nargs))
         stk = insert_node!(ir, 1, Any, xcall(Zygote, :Stack, stk))
-        val = insert_node!(ir, loc, Any, xcall(:pop!, stk))
+        val = insert_node!(ir, loc, Any, xcall(:pop!, stk), attach_after)
       end
       repl[α] = val
     end
