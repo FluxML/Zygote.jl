@@ -3,12 +3,12 @@
 accum() = nothing
 accum(x) = x
 
-accum(x, y) =
-  x == nothing ? y :
-  y == nothing ? x :
-  x + y
+accum(x::Nothing, y) = y
+accum(x, y::Nothing) = x
+accum(x::Nothing, y::Nothing) = nothing
+accum(x, y) = x + y
 
-accum(x, y, zs...) = accum(accum(x, y), zs...)
+accum(x, y, zs...) = accum(x, accum(x, zs...))
 
 accum(x::Tuple, y::Tuple) = accum.(x, y)
 accum(x::AbstractArray, y::AbstractArray) = accum.(x, y)
@@ -94,7 +94,7 @@ end
 
 @generated nt_nothing(x) = Expr(:tuple, [:($f=nothing) for f in fieldnames(x)]...)
 
-@generated pair(::Val{k}, v) where k = :($k = v,)
+pair(::Val{k}, v::T) where {k, T} = NamedTuple{(k,), Tuple{T}}((v,))
 
 # TODO make this inferrable
 # Right now constant prop is too fragile ...
