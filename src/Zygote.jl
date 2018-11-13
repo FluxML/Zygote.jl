@@ -42,6 +42,7 @@ include("compiler/interface2.jl")
 usetyped || include("precompile.jl")
 
 @init @require Flux="587475ba-b771-5e3f-ad9e-33799f191a9c" include("flux.jl")
+@init @require OrdinaryDiffEq="1dea7af3-3e70-54e6-95c3-0bf5283fa5ed" include("lib/diffeq.jl")
 
 # helps to work around 265-y issues
 function refresh()
