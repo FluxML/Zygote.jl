@@ -43,6 +43,8 @@ end
 
 unflatten(x, xs) = _unflatten(x, xs)[1]
 
+unflatten(x, xs::Nothing) = nothing
+
 trim(x, Δ) = reshape(Δ, ntuple(i -> size(Δ, i), Val(ndims(x))))
 
 unbroadcast(x::AbstractArray, Δ) =
@@ -50,7 +52,7 @@ unbroadcast(x::AbstractArray, Δ) =
   length(x) == length(Δ) ? trim(x, Δ) :
     trim(x, sum(Δ, dims = ntuple(i -> size(x, i) == 1 ? i : ndims(Δ)+1, Val(ndims(Δ)))))
 
-unbroadcast(x::Number, Δ) = sum(Δ)
+unbroadcast(x::Union{Number,Ref}, Δ) = sum(Δ)
 
 # Reverse Mode
 
@@ -94,12 +96,14 @@ end
 
 # Mixed Mode
 
+import ForwardDiff
 using ForwardDiff: Dual
 
 dual(x, p) = x
 dual(x::Real, p) = Dual(x, p)
 
 dualtype(::Type{Dual{G,T,P}}) where {G,T,P} = T
+dualtype(T) = T
 
 function dual_function(f::F) where F
   function (args::Vararg{Any,N}) where N
@@ -116,15 +120,16 @@ dualify(bc::Broadcasted{S}) where S = Broadcasted{S}(dual_function(bc.f), bc.arg
   @simd for I in eachindex(bc)
     @inbounds begin
       out = bc[I]
-      dest[I] = out.value
-      map((g, p) -> g[I] = p, grads, out.partials.values)
+      dest[I] = ForwardDiff.value(out)
+      Δs = out isa Dual ? out.partials.values : map(_ -> false, grads)
+      map((g, p) -> g[I] = p, grads, Δs)
     end
   end
 end
 
 function broadcast_gradient(bc::Broadcasted, ::Type{T}) where T
   dest = similar(bc, T)
-  grads = map(_ -> similar(bc, T), bc.args)
+  grads = map(_ -> similar(bc, promote_type(T,Bool)), bc.args)
   broadcast_gradient!(bc, dest, grads...)
   return dest, grads
 end
@@ -132,6 +137,7 @@ end
 @inline function ∇broadcast_f(bc′::Broadcasted)
   bc = dualify(instantiate(flatten(bc′)))
   T = combine_eltypes(bc.f, bc.args)
+  T <: Bool && return copy(bc′), _ -> nothing
   y, gs = broadcast_gradient(bc, dualtype(T))
   back(Δ) = map((x, d) -> unbroadcast(x, Δ.*d), bc.args, gs)
   return y, back
