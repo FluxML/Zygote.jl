@@ -52,7 +52,7 @@ function gradm_kw(f, T, args, Ts, body, mut)
   quote
     Zygote._forward($(kwargs...)) where $(Ts...) = $body
     function Zygote._forward(cx::Context, f::$T, $(esc.(args)...)) where $(Ts...)
-      y, back = _forward(cx, Core.kwfunc(f), NamedTuple(), f, $(esc.(namify.(args))...)) # TODO unnamed arguments
+      y, back = _forward(cx, Core.kwfunc(f), NamedTuple(), f, $(esc.(args)...)) # TODO unnamed arguments
       return y, Δ -> _untuple_kw(back(Δ))
     end
     nothing
