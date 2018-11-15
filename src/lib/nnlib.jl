@@ -12,13 +12,11 @@ import NNlib: softmax, ∇softmax, logsoftmax, ∇logsoftmax, conv, maxpool, mea
        NNlib.∇conv_filter(Δ, x, w; kw...))
 
 @grad function maxpool(x, k; kw...)
-  let y = maxpool(x, k; kw...)
-    y, Δ -> (NNlib.∇maxpool(Δ, y, x, k; kw...), nothing)
-  end
+  y = maxpool(x, k; kw...)
+  y, Δ -> (NNlib.∇maxpool(Δ, y, x, k; kw...), nothing)
 end
 
 @grad function meanpool(x, k; kw...)
-  let y = meanpool(x, k; kw...)
-    y, Δ -> (NNlib.∇meanpool(Δ, y, x, k; kw...), nothing)
-  end
+  y = meanpool(x, k; kw...)
+  y, Δ -> (NNlib.∇meanpool(Δ, y, x, k; kw...), nothing)
 end

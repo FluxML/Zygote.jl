@@ -52,9 +52,8 @@ unwrap(x) = x
   (xs[i], Δ -> (ntuple(j -> i == j ? Δ : nothing, Val(N)), nothing))
 
 @grad function Base.first(xs::Tuple)
-  let drest = map(_->nothing, tail(xs))
-    first(xs), Δ -> ((Δ, drest...),)
-  end
+  drest = map(_->nothing, tail(xs))
+  first(xs), Δ -> ((Δ, drest...),)
 end
 
 _empty(x) = nothing
@@ -73,11 +72,10 @@ unapply(t, xs) = _unapply(t, xs)[1]
 
 @grad function Core._apply(f, args...)
   y, J = Core._apply(_forward, (__context__, f), args...)
-  let st = _empty(args), J = J
-    y, function (Δ)
-      Δ = J(Δ)
-      (first(Δ), unapply(st, Base.tail(Δ))...)
-    end
+  st = _empty(args)
+  y, function (Δ)
+    Δ = J(Δ)
+    (first(Δ), unapply(st, Base.tail(Δ))...)
   end
 end
 
@@ -115,19 +113,18 @@ end
 literal_getproperty(x, ::Val{f}) where f = getproperty(x, f)
 
 @grad function literal_getproperty(x, ::Val{f}) where f
-  let val = getproperty(x, f)
-    function back(Δ)
-      accum_param(__context__, val, Δ)
-      if isimmutable(x)
-        ((;nt_nothing(x)...,pair(Val(f), Δ)...), nothing)
-      else
-        dx = getfield(grad_mut(__context__, x), f)
-        dx[] = accum(dx[], Δ)
-        return
-      end
+  val = getproperty(x, f)
+  function back(Δ)
+    accum_param(__context__, val, Δ)
+    if isimmutable(x)
+      ((;nt_nothing(x)...,pair(Val(f), Δ)...), nothing)
+    else
+      dx = getfield(grad_mut(__context__, x), f)
+      dx[] = accum(dx[], Δ)
+      return
     end
-    unwrap(val), back
   end
+  unwrap(val), back
 end
 
 @generated function grad_mut(x)

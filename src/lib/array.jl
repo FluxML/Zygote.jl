@@ -58,9 +58,8 @@ end
 end
 
 function _forward(cx::Context, ::typeof(sum), f, xs::AbstractArray)
-  let (y, back) = forward(cx, (xs -> sum(f.(xs))), xs)
-    y, ȳ -> (nothing, nothing, back(ȳ)...)
-  end
+  y, back = forward(cx, (xs -> sum(f.(xs))), xs)
+  y, ȳ -> (nothing, nothing, back(ȳ)...)
 end
 
 @grad function prod(xs; dims = :)
@@ -73,20 +72,19 @@ end
 end
 
 @grad function maximum(xs; dims = :)
-  let (max, i) = findmax(xs, dims = dims)
-    max, function (Δ)
-      Δ isa Real && Δ <= sqrt(eps(float(Δ))) && return nothing
-      Δ′ = zero(xs)
-      Δ′[i] = Δ
-      return (Δ′,)
-    end
+  max, i = findmax(xs, dims = dims)
+  max, function (Δ)
+    Δ isa Real && Δ <= sqrt(eps(float(Δ))) && return nothing
+    Δ′ = zero(xs)
+    Δ′[i] = Δ
+    return (Δ′,)
   end
 end
 
 @grad function minimum(xs; dims = :)
-  minimum(xs, dims = dims), function (Δ)
+  min, i = findmin(xs, dims = dims)
+  min, function (Δ)
     Δ′ = zero(xs)
-    _, i = findmin(xs, dims = dims)
     Δ′[i] = Δ
     return (Δ′,)
   end

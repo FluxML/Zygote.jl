@@ -157,7 +157,6 @@ end
 end
 
 @grad function materialize(bc::Broadcasted{<:DefaultArrayStyle})
-  let (y, back) = ∇broadcast(bc)
-    y, Δ -> (unflatten(bc, back(Δ)),)
-  end
+  y, back = ∇broadcast(bc)
+  y, Δ -> (unflatten(bc, back(Δ)),)
 end
