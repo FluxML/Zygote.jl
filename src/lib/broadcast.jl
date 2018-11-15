@@ -152,11 +152,11 @@ end
 ∇broadcast(bc::Broadcasted, J) = ∇broadcast_r(bc, J)
 ∇broadcast(bc::Broadcasted) = ∇broadcast(bc, Jbroadcast(bc))
 
-@grad function broadcasted(f, args...)
+@adjoint function broadcasted(f, args...)
   broadcasted(f, args...), Δ -> (nothing, Δ.args...)
 end
 
-@grad function materialize(bc::Broadcasted{<:DefaultArrayStyle})
+@adjoint function materialize(bc::Broadcasted{<:DefaultArrayStyle})
   y, back = ∇broadcast(bc)
   y, Δ -> (unflatten(bc, back(Δ)),)
 end

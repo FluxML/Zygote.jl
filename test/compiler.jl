@@ -1,5 +1,5 @@
 using Zygote, Test
-using Zygote: forward, @grad
+using Zygote: forward, @adjoint
 
 macro test_inferred(ex)
   :(let res = nothing
@@ -17,7 +17,7 @@ trace_contains(st, func, file, line) = any(st) do fr
 end
 
 bad(x) = x
-@grad bad(x) = x, Δ -> error("bad")
+@adjoint bad(x) = x, Δ -> error("bad")
 
 Zygote.refresh() # needed in typed mode...
 

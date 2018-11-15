@@ -393,6 +393,6 @@ Adjoint(ir::IRCode; varargs = nothing) = Adjoint(Primal(ir, varargs = varargs))
 
 using InteractiveUtils: @which
 
-macro adjoint(ex)
+macro code_adjoint(ex)
   :(Adjoint($(code_irm(ex)), varargs = varargs($(esc(:(@which $ex))), length(($(esc.(ex.args)...),)))))
 end

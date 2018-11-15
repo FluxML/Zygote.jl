@@ -38,11 +38,11 @@ sin
 Defining custom gradients is a cinch, and errors have good stacktraces.
 
 ```julia
-julia> using Zygote: @grad
+julia> using Zygote: @adjoint
 
 julia> add(a, b) = a + b
 
-julia> @grad add(a, b) = add(a, b), Δ -> (Δ, Δ)
+julia> @adjoint add(a, b) = add(a, b), Δ -> (Δ, Δ)
 ```
 
 To support large machine learning models with many parameters, Zygote can differentiate implicitly-used parameters, as opposed to just function arguments.

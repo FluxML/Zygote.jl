@@ -23,13 +23,13 @@ end
 @nograd Core.apply_type, Core.typeof, nfields, fieldtype,
   (==), (===), (>=), (<), (>), isempty
 
-@grad (::Type{V})(x...) where V<:Val = V(x...), _ -> nothing
+@adjoint (::Type{V})(x...) where V<:Val = V(x...), _ -> nothing
 
-@grad ifelse(cond::Bool, t, f) =
+@adjoint ifelse(cond::Bool, t, f) =
   ifelse(cond, t, f),
   Δ -> cond ? (Δ, zero(Δ)) : (zero(Δ), Δ)
 
-@grad Base.typeassert(x, T) = Base.typeassert(x, T), Δ -> (Δ, nothing)
+@adjoint Base.typeassert(x, T) = Base.typeassert(x, T), Δ -> (Δ, nothing)
 
 function accum_param(cx::Context, x, Δ)
   haskey(cache(cx), x) && (cache(cx)[x] = accum(cache(cx)[x],Δ))
@@ -38,20 +38,20 @@ end
 
 unwrap(x) = x
 
-@grad unwrap(x) = unwrap(x), Δ -> accum_param(__context__, x, Δ)
+@adjoint unwrap(x) = unwrap(x), Δ -> accum_param(__context__, x, Δ)
 
 # Tuples
 
-@grad tuple(xs...) = xs, identity
+@adjoint tuple(xs...) = xs, identity
 
-@grad getindex(xs::NTuple{N,Any}, i::Integer) where N =
+@adjoint getindex(xs::NTuple{N,Any}, i::Integer) where N =
   (xs[i], Δ -> (ntuple(j -> i == j ? Δ : nothing, Val(N)), nothing))
 
 # Needed for iteration lowering
-@grad Core.getfield(xs::NTuple{N,Any}, i::Integer) where N =
+@adjoint Core.getfield(xs::NTuple{N,Any}, i::Integer) where N =
   (xs[i], Δ -> (ntuple(j -> i == j ? Δ : nothing, Val(N)), nothing))
 
-@grad function Base.first(xs::Tuple)
+@adjoint function Base.first(xs::Tuple)
   drest = map(_->nothing, tail(xs))
   first(xs), Δ -> ((Δ, drest...),)
 end
@@ -70,7 +70,7 @@ end
 
 unapply(t, xs) = _unapply(t, xs)[1]
 
-@grad function Core._apply(f, args...)
+@adjoint function Core._apply(f, args...)
   y, J = Core._apply(_forward, (__context__, f), args...)
   st = _empty(args)
   y, function (Δ)
@@ -95,7 +95,7 @@ end
 
 # TODO make this inferrable
 # Right now constant prop is too fragile ...
-@grad function getfield(x, f::Symbol)
+@adjoint function getfield(x, f::Symbol)
   val = getfield(x, f)
   unwrap(val), function (Δ)
     accum_param(__context__, val, Δ)
@@ -112,7 +112,7 @@ end
 # ... so we have Zygote call this version where we can.
 literal_getproperty(x, ::Val{f}) where f = getproperty(x, f)
 
-@grad function literal_getproperty(x, ::Val{f}) where f
+@adjoint function literal_getproperty(x, ::Val{f}) where f
   val = getproperty(x, f)
   function back(Δ)
     accum_param(__context__, val, Δ)
@@ -141,7 +141,7 @@ function grad_mut(cx::Context, x)
   end
 end
 
-@grad! function setfield!(x, f, val)
+@adjoint! function setfield!(x, f, val)
   y = setfield!(x, f, val)
   g = grad_mut(__context__, x)
   y, function (_)
@@ -164,7 +164,7 @@ end
 
 Jnew{T}(g) where T = Jnew{T,typeof(g)}(g)
 
-@grad! function __new__(T, args...)
+@adjoint! function __new__(T, args...)
   x = __new__(T, args...)
   g = !T.mutable || fieldcount(T) == 0 ? nothing : grad_mut(__context__, x)
   x, Jnew{T}(g)

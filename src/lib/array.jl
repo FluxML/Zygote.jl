@@ -1,12 +1,12 @@
-@grad (::Type{T})(args...) where T<:Array = T(args...), Δ -> nothing
+@adjoint (::Type{T})(args...) where T<:Array = T(args...), Δ -> nothing
 
 @nograd size, length, eachindex, Colon(), findfirst, rand, randn
 
-@grad Base.vect(xs...) = Base.vect(xs...), Δ -> (Δ...,)
+@adjoint Base.vect(xs...) = Base.vect(xs...), Δ -> (Δ...,)
 
 Base.zero(xs::AbstractArray{Any}) = fill!(similar(xs), nothing)
 
-@grad function getindex(xs::Array, i...)
+@adjoint function getindex(xs::Array, i...)
   xs[i...], function (Δ)
     Δ′ = zero(xs)
     Δ′[i...] = Δ
@@ -14,24 +14,24 @@ Base.zero(xs::AbstractArray{Any}) = fill!(similar(xs), nothing)
   end
 end
 
-@grad! setindex!(xs::AbstractArray, x...) = setindex!(xs, x...),
+@adjoint! setindex!(xs::AbstractArray, x...) = setindex!(xs, x...),
   _ -> error("Mutating arrays is not supported")
 
 # General
 
-@grad collect(x) = collect(x), Δ -> (Δ,)
+@adjoint collect(x) = collect(x), Δ -> (Δ,)
 
-@grad permutedims(xs, dims) = permutedims(xs, dims),
+@adjoint permutedims(xs, dims) = permutedims(xs, dims),
   Δ -> (permutedims(Δ, invperm(dims)), nothing)
 
-@grad reshape(xs, dims...) = reshape(xs, dims...),
+@adjoint reshape(xs, dims...) = reshape(xs, dims...),
   Δ -> (reshape(Δ, size(xs)),map(_->nothing,dims)...)
 
-@grad function hvcat(rows::Tuple{Vararg{Int}}, xs::T...) where T<:Number
+@adjoint function hvcat(rows::Tuple{Vararg{Int}}, xs::T...) where T<:Number
   hvcat(rows, xs...), ȳ -> (nothing, ȳ...)
 end
 
-@grad function repeat(xs; inner=ntuple(_->1, ndims(xs)), outer=ntuple(_->1, ndims(xs)))
+@adjoint function repeat(xs; inner=ntuple(_->1, ndims(xs)), outer=ntuple(_->1, ndims(xs)))
   repeat(xs, inner = inner, outer = outer), function (Δ)
     Δ′ = zero(xs)
     S = size(xs)
@@ -49,7 +49,7 @@ end
 
 # Reductions
 
-@grad function sum(xs::AbstractArray; dims = :)
+@adjoint function sum(xs::AbstractArray; dims = :)
   if dims === (:)
     sum(xs), Δ -> (FillArray(Δ, size(xs)),)
   else
@@ -62,7 +62,7 @@ function _forward(cx::Context, ::typeof(sum), f, xs::AbstractArray)
   y, ȳ -> (nothing, nothing, back(ȳ)...)
 end
 
-@grad function prod(xs; dims = :)
+@adjoint function prod(xs; dims = :)
   if dims === (:)
     prod(xs), Δ -> (prod(xs) ./ xs .* Δ,)
   else
@@ -71,7 +71,7 @@ end
   end
 end
 
-@grad function maximum(xs; dims = :)
+@adjoint function maximum(xs; dims = :)
   max, i = findmax(xs, dims = dims)
   max, function (Δ)
     Δ isa Real && Δ <= sqrt(eps(float(Δ))) && return nothing
@@ -81,7 +81,7 @@ end
   end
 end
 
-@grad function minimum(xs; dims = :)
+@adjoint function minimum(xs; dims = :)
   min, i = findmin(xs, dims = dims)
   min, function (Δ)
     Δ′ = zero(xs)
@@ -92,12 +92,12 @@ end
 
 # LinAlg
 
-@grad a::AbstractVecOrMat * b::AbstractVecOrMat = a * b,
+@adjoint a::AbstractVecOrMat * b::AbstractVecOrMat = a * b,
   Δ -> (Δ * transpose(b), transpose(a) * Δ)
 
-@grad transpose(x) = transpose(x), Δ -> (transpose(Δ),)
-@grad adjoint(x) = adjoint(x), Δ -> (adjoint(Δ),)
-@grad parent(x::LinearAlgebra.Adjoint) = parent(x), ȳ -> (LinearAlgebra.Adjoint(ȳ),)
+@adjoint transpose(x) = transpose(x), Δ -> (transpose(Δ),)
+@adjoint Base.adjoint(x) = x', Δ -> (Δ',)
+@adjoint parent(x::LinearAlgebra.Adjoint) = parent(x), ȳ -> (LinearAlgebra.Adjoint(ȳ),)
 
 function _kron(mat1::AbstractMatrix,mat2::AbstractMatrix)
     m1, n1 = size(mat1)
@@ -109,6 +109,6 @@ function _kron(mat1::AbstractMatrix,mat2::AbstractMatrix)
     return reshape(mat1_rsh.*mat2_rsh, (m1*m2,n1*n2))
 end
 
-@grad kron(a::AbstractMatrix, b::AbstractMatrix) = forward(_kron, a, b)
+@adjoint kron(a::AbstractMatrix, b::AbstractMatrix) = forward(_kron, a, b)
 
-@grad iterate(r::UnitRange, i...) = iterate(r, i...), _ -> nothing
+@adjoint iterate(r::UnitRange, i...) = iterate(r, i...), _ -> nothing
