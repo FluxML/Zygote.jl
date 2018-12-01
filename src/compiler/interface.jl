@@ -1,10 +1,18 @@
+struct Key
+  id::UInt64
+  Key(x) = new(objectid(x))
+end
+
+# Shaves some time on dict lookups (which is all we use this for).
+Base.hash(k::Key) = k.id
+
 mutable struct Context
-  cache::Union{IdDict{Any,Any},Nothing}
+  cache::Union{Dict{Key,Any},Nothing}
 end
 
 Context() = Context(nothing)
 
-cache(cx::Context) = cx.cache == nothing ? (cx.cache = IdDict()) : cx.cache
+cache(cx::Context) = cx.cache === nothing ? (cx.cache = Dict{Key,Any}()) : cx.cache
 
 struct Pullback{S,T}
   t::T
@@ -59,19 +67,20 @@ end
 @forward Params.params Base.iterate
 
 struct Grads
-  grads::IdDict{Any,Any}
+  grads::Dict{Key,Any}
 end
 
 Base.show(io::IO, ps::Grads) = print(io, "Grads(...)")
 
-@forward Grads.grads Base.setindex!, Base.getindex, Base.haskey
+Base.getindex(gs::Grads, x) = gs.grads[Key(x)]
+Base.haskey(gs::Grads, x) = haskey(gs.grads, Key(x))
 
 function forward(f, ps::Params)
   cx = Context()
   y, back = _forward(cx, f)
   y, function (Δ)
     for p in ps
-      cache(cx)[p] = nothing
+      cache(cx)[Key(p)] = nothing
     end
     back(Δ)
     Grads(cx.cache) # TODO make a copy

@@ -32,7 +32,8 @@ end
 @adjoint Base.typeassert(x, T) = Base.typeassert(x, T), Δ -> (Δ, nothing)
 
 function accum_param(cx::Context, x, Δ)
-  haskey(cache(cx), x) && (cache(cx)[x] = accum(cache(cx)[x],Δ))
+  k = Key(x)
+  haskey(cache(cx), k) && (cache(cx)[k] = accum(cache(cx)[k],Δ))
   return
 end
 
@@ -133,11 +134,12 @@ end
 
 function grad_mut(cx::Context, x)
   T = Core.Compiler.return_type(grad_mut, Tuple{typeof(x)})
+  k = Key(x)
   ch = cache(cx)
-  if haskey(ch, x)
-    ch[x]::T
+  if haskey(ch, k)
+    ch[k]::T
   else
-    ch[x] = grad_mut(x)
+    ch[k] = grad_mut(x)
   end
 end
 
