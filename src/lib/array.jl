@@ -16,8 +16,14 @@ Base.zero(xs::AbstractArray{Any}) = fill!(similar(xs), nothing)
   end
 end
 
-@adjoint! setindex!(xs::AbstractArray, x...) = setindex!(xs, x...),
-  _ -> error("Mutating arrays is not supported")
+@adjoint function setindex!(x::AbstractArray, v, i...)
+  setindex!(x, v, i...)
+  x, function (dx)
+    dv = dx[i...]
+    view(dx, i...) .= 0
+    return (dx, dv, map(_ -> nothing, i)...)
+  end
+end
 
 # General
 
