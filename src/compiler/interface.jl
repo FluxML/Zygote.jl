@@ -36,7 +36,12 @@ end
 
 # Wrappers
 
-_forward(f, args...) = _forward(Context(), f, args...)
+function _forward(f, args...)
+  cx = Context()
+  ks = mutkeys(f, args...)
+  y, back = _forward(cx, f, args...)
+  y, dy -> out_grad_mut(cx, ks, back(dy))
+end
 
 tailmemaybe(::Nothing) = nothing
 tailmemaybe(x::Tuple) = Base.tail(x)

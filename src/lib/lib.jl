@@ -178,3 +178,41 @@ end
   Δ = G == Nothing ? :Δ : :(back.g)
   :(nothing, $(map(f -> :(deref!($Δ.$f)), fieldnames(T))...))
 end
+
+# Mutable Primitives (e.g. arrays)
+
+ismutvalue(x) = false
+
+mutkey(x) = ismutvalue(x) ? Key(x) : nothing
+mutkeys(xs...) = map(mutkey, xs)
+
+function out_grad_mut(cx, k::Key, default)
+  Δ = get(cache(cx), k, nothing)
+  cache(cx)[k] = nothing
+  return accum(Δ, default)
+end
+
+out_grad_mut(cx, ::Nothing, default) = default
+
+out_grad_mut(cx, xs::Tuple, dxs) = map((x, dx) -> out_grad_mut(cx, x, dx), xs, dxs)
+out_grad_mut(cx, xs::Tuple, ::Nothing) = nothing
+
+function in_grad_mut(cx, k::Key, Δ)
+  cache(cx)[k] = accum(get(cache(cx), k, nothing), Δ)
+  return
+end
+
+in_grad_mut(cx, ::Nothing, Δ) = Δ
+
+in_grad_mut(cx, ::Tuple, ::Nothing) = nothing
+
+in_grad_mut(cx, xs::Tuple, dxs) = map((x, dx) -> in_grad_mut(cx, x, dx), xs, dxs)
+
+mutback(cache, ks::NTuple{<:Any,Nothing}, ::Nothing, back) = back
+
+function mutback(cx, xs, y, back::F) where F
+  return function (dy)
+    dxs = back(out_grad_mut(cx, y, dy))
+    in_grad_mut(cx, xs, dxs)
+  end
+end

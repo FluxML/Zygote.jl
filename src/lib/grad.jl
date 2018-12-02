@@ -32,16 +32,18 @@ function gradm(ex, mut = false)
   quote
     @inline Zygote.adjoint($(fargs...)) where $(Ts...) = $(esc(body))
     @inline function Zygote._forward($cx, $f::$T, $(args...)) where $(Ts...)
+      ks = mutkeys($(argnames...))
       y, _back = adjoint(__context__, $f, $(argnames...))
       $(mut ? nothing : :(back(::Nothing) = nothing))
       back(Δ) = _gradtuple(_back(Δ))
-      return y, back
+      return y, mutback($cx, _gradtuple(ks), mutkey(y), back)
     end
     @inline function Zygote._forward($cx, ::$kT, kw, $f::$T, $(args...)) where $(Ts...)
+      ks = mutkeys($(argnames...))
       y, _back = adjoint(__context__, $f, $(argnames...); kw...)
       $(mut ? nothing : :(back(::Nothing) = nothing))
       back(Δ) = _gradtuple_kw(_back(Δ))
-      return y, back
+      return y, mutback($cx, _gradtuple_kw(ks), mutkey(y), back)
     end
     nothing
   end

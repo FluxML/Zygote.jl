@@ -1,3 +1,5 @@
+ismutvalue(x::AbstractArray) = !isimmutable(x)
+
 @adjoint (::Type{T})(args...) where T<:Array = T(args...), Δ -> nothing
 
 @nograd size, length, eachindex, Colon(), findfirst, rand, randn
