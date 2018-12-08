@@ -218,3 +218,11 @@ end == 2
   x[1] = y
   x[1] * x[2]
 end == ([0, 3], 2)
+
+using LinearAlgebra
+
+@test gradient([1, 2]) do x
+  y = x ⋅ x
+  x[1] = 3
+  y
+end == ([2, 4],)

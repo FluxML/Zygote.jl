@@ -8,6 +8,8 @@ ismutvalue(x::AbstractArray) = !isimmutable(x)
 
 Base.zero(xs::AbstractArray{Any}) = fill!(similar(xs), nothing)
 
+# TODO a smarter implementation for mutable arrays
+# we should just grab `dxs` and mutate it
 @adjoint function getindex(xs::Array, i...)
   xs[i...], function (Δ)
     Δ′ = zero(xs)
@@ -16,11 +18,16 @@ Base.zero(xs::AbstractArray{Any}) = fill!(similar(xs), nothing)
   end
 end
 
-@adjoint function setindex!(x::AbstractArray, v, i...)
-  setindex!(x, v, i...)
-  x, function (dx)
-    dv = dx[i...]
-    view(dx, i...) .= 0
+@adjoint! function setindex!(x::AbstractArray, v, i...)
+  old = x[i...]
+  setindex!(x, v, i...), function (dx)
+    if dx !== nothing
+      dv = dx[i...]
+      view(dx, i...) .= 0
+    else
+      dv = nothing
+    end
+    x[i...] = old
     return (dx, dv, map(_ -> nothing, i)...)
   end
 end
@@ -102,6 +109,8 @@ end
 
 @adjoint a::AbstractVecOrMat * b::AbstractVecOrMat = a * b,
   Δ -> (Δ * transpose(b), transpose(a) * Δ)
+
+@adjoint dot(xs, ys) = dot(xs, ys), Δ -> (Δ .* ys, Δ .* xs)
 
 @adjoint transpose(x) = transpose(x), Δ -> (transpose(Δ),)
 @adjoint Base.adjoint(x) = x', Δ -> (Δ',)
