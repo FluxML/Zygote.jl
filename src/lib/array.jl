@@ -10,7 +10,7 @@ Base.zero(xs::AbstractArray{Any}) = fill!(similar(xs), nothing)
 
 # TODO a smarter implementation for mutable arrays
 # we should just grab `dxs` and mutate it
-@adjoint function getindex(xs::Array, i...)
+@adjoint function getindex(xs::AbstractArray, i...)
   xs[i...], function (Δ)
     Δ′ = zero(xs)
     Δ′[i...] = Δ
