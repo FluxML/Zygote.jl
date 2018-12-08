@@ -23,7 +23,7 @@ end
   setindex!(x, v, i...), function (dx)
     if dx !== nothing
       dv = dx[i...]
-      view(dx, i...) .= 0
+      ismutvalue(dx) && (view(dx, i...) .= 0)
     else
       dv = nothing
     end

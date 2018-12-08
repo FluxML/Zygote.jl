@@ -36,6 +36,7 @@ end
 
 # Wrappers
 
+# TODO the case where we return a mutable value
 function _forward(f, args...)
   cx = Context()
   ks = mutkeys(f, args...)
