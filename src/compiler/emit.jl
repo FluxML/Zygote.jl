@@ -37,7 +37,16 @@ xtuple(xs...) = xcall(:tuple, xs...)
 concrete(T::DataType) = T
 concrete(::Type{Type{T}}) where T = typeof(T)
 
-# TODO: combine stacks by type
+function stacklines(adj::Adjoint)
+  recs = []
+  for fb = 1:length(adj.perm)
+    for α in alphauses(adj.back, invperm(adj.perm)[fb])
+      push!(recs, adj.forw.linetable[adj.forw.lines[α.id]])
+    end
+  end
+  return recs
+end
+
 function forward_stacks!(adj, F)
   stks, recs = [], []
   for fb = 1:length(adj.perm)
@@ -93,9 +102,6 @@ function reverse_stacks!(adj, stks)
     for i in range(ir.cfg.blocks[b]), u in userefs(ir.stmts[i])
       if u.stmt == Expr(:call, :Δ)
         u.stmt = Argument(2)
-      elseif u[] isa Argument
-        x = insert_node!(ir, i, Any, xcall(:getindex, t, u[].n-2))
-        u[] = x
       elseif haskey(repl, u[])
         u[] = repl[u[]]
       else continue
@@ -123,3 +129,5 @@ function _lookup_grad(T)
   # verify_ir(back)
   m, forw, back
 end
+
+stacklines(T::Type) = stacklines(Adjoint(IRCode(meta(T))))
