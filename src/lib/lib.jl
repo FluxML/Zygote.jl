@@ -71,10 +71,10 @@ end
 unapply(t, xs) = _unapply(t, xs)[1]
 
 @adjoint function Core._apply(f, args...)
-  y, J = Core._apply(_forward, (__context__, f), args...)
+  y, back = Core._apply(_forward, (__context__, f), args...)
   st = _empty(args)
   y, function (Δ)
-    Δ = J(Δ)
+    Δ = back(Δ)
     (first(Δ), unapply(st, Base.tail(Δ))...)
   end
 end

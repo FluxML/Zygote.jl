@@ -6,13 +6,13 @@ Context() = Context(nothing)
 
 cache(cx::Context) = cx.cache == nothing ? (cx.cache = IdDict()) : cx.cache
 
-struct J{S,T}
+struct Pullback{S,T}
   t::T
 end
 
-J{S}(x) where S = J{S,typeof(x)}(x)
+Pullback{S}(x) where S = Pullback{S,typeof(x)}(x)
 
-Base.show(io::IO, j::J{S}) where S = print(io, "J($(j.t[1]))")
+Base.show(io::IO, j::Pullback{S}) where S = print(io, "Pullback($(j.t[1]))")
 
 struct CompileError
   T
@@ -39,9 +39,9 @@ function forward(f, args...)
 end
 
 function gradient(f, args...)
-  y, J = forward(f, args...)
+  y, back = forward(f, args...)
   y isa Real || error("Function output is not scalar")
-  return J(Int8(1))
+  return back(Int8(1))
 end
 
 derivative(f::F, x) where F = gradient(f, x)[1]

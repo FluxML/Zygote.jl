@@ -148,8 +148,8 @@ end
 
 # For nested AD, until we support errors
 function grad(f, args...)
-  y, J = forward(f, args...)
-  return J(1)
+  y, back = forward(f, args...)
+  return back(1)
 end
 
 D(f, x) = grad(f, x)[1]
