@@ -76,7 +76,7 @@ end
 
 profile(x) = profile(x, IdSet())
 
-@require Atom="c52e3926-4ff0-5f6e-af25-54175e0327b1" begin
+@init @require Atom="c52e3926-4ff0-5f6e-af25-54175e0327b1" begin
   function tojson(n::Node)
     name, path = Atom.expandpath(string(n.file))
     Dict(:path => path,
@@ -86,7 +86,7 @@ profile(x) = profile(x, IdSet())
          :count => n.size,
          :children => map(tojson, n.children))
   end
-  juno(n::Node) = Atom.@msg profile(tojson(n))
+  juno(n::Node) = Atom.msg("profile", tojson(n))
 end
 
 end
