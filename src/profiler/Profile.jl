@@ -45,6 +45,17 @@ struct Node
   children::Vector{Node}
 end
 
+merge(a::Node, b::Node) = Node(a.file, a.line, a.size + b.size, merge(vcat(a.children, b.children)))
+
+function merge(ns)
+  d = Dict()
+  for n in ns
+    k = (n.file, n.line)
+    d[k] = haskey(d, k) ? merge(d[k], n) : n
+  end
+  return collect(values(d))
+end
+
 function profile(x, seen)
   Node(loc_wrapped(x)..., mem(x, seen), [])
 end
@@ -59,7 +70,7 @@ function children(x::Pullback)
 end
 
 function profile(x::Pullback, seen)
-  ns = map(x -> profile(x, seen), children(x))
+  ns = merge(map(x -> profile(x, seen), children(x)))
   Node(loc(x)..., sum(x -> x.size, ns), ns)
 end
 
