@@ -57,7 +57,7 @@ function forward_stacks!(adj, F)
   T = Tuple{concrete.(exprtype.(Ref(adj.forw), (args..., recs...)))...}
   isconcretetype(T) || (T = Any)
   rec = insert_node!(adj.forw, length(adj.forw.stmts), T,
-                     xtuple(args..., recs...))
+                     xtuple(recs...))
   if usetyped
     rec = insert_node!(adj.forw, length(adj.forw.stmts), Pullback{F,T},
                        Expr(:call, Pullback{F,T}, rec))
@@ -73,7 +73,7 @@ function forward_stacks!(adj, F)
   return forw, stks
 end
 
-function reverse_stacks!(adj, stks, nargs)
+function reverse_stacks!(adj, stks)
   ir = adj.back
   t = insert_node!(ir, 1, Any, xcall(Base, :getfield, Argument(1), QuoteNode(:t)))
   for b = 1:length(ir.cfg.blocks)
@@ -82,9 +82,9 @@ function reverse_stacks!(adj, stks, nargs)
       b == b′ || continue
       loc = max(2,afterphi(ir, range(ir.cfg.blocks[b])[1]))
       if adj.perm[b′] == 1
-        val = insert_node!(ir, loc, Any, xcall(:getindex, t, i+nargs))
+        val = insert_node!(ir, loc, Any, xcall(:getindex, t, i))
       else
-        stk = insert_node!(ir, 1, Any, xcall(:getindex, t, i+nargs))
+        stk = insert_node!(ir, 1, Any, xcall(:getindex, t, i))
         stk = insert_node!(ir, 1, Any, xcall(Zygote, :Stack, stk))
         val = insert_node!(ir, loc, Any, xcall(:pop!, stk))
       end
@@ -108,7 +108,7 @@ end
 
 function stacks!(adj, T)
   forw, stks = forward_stacks!(adj, T)
-  back = reverse_stacks!(adj, stks, length(forw.argtypes)-2)
+  back = reverse_stacks!(adj, stks)
   return forw, back
 end
 
