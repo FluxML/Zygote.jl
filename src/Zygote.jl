@@ -41,6 +41,8 @@ include("lib/broadcast.jl")
 include("compiler/interface2.jl")
 usetyped || include("precompile.jl")
 
+include("profiler/Profile.jl")
+
 @init @require Flux="587475ba-b771-5e3f-ad9e-33799f191a9c" include("flux.jl")
 
 # helps to work around 265-y issues
@@ -48,6 +50,14 @@ function refresh()
   include(joinpath(@__DIR__, "compiler/interface2.jl"))
   include(joinpath(@__DIR__, "precompile.jl"))
   return
+end
+
+macro profile(ex)
+  @capture(ex, f_(x__)) || error("@profile f(args...)")
+  quote
+    _, back = _forward($(esc(f)), $(esc.(x)...))
+    Profile.juno(Profile.profile(back))
+  end
 end
 
 end # module

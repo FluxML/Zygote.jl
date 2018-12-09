@@ -59,7 +59,8 @@ macro nograd(ex)
   isexpr(ex, :tuple) || (ex = Expr(:tuple, ex))
   blk = :(;)
   for f in ex.args
-    push!(blk.args, :(@inline Zygote._forward(::Context, ::typeof($(esc(f))), args...) = $(esc(f))(args...), _ -> nothing))
+    back = MacroTools.@q _ -> ($__source__; nothing)
+    push!(blk.args, :(@inline Zygote._forward(::Context, ::typeof($(esc(f))), args...) = $(esc(f))(args...), $back))
   end
   return blk
 end
