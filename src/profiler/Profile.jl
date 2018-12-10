@@ -55,6 +55,7 @@ merge(a::Node, b::Node) = Node(a.func, a.file, a.line, a.size+b.size, merge(vcat
 function merge(cs)
   ds = []
   for c in cs
+    c.size == 0 && continue
     i = findfirst(x -> (x.func, x.file, x.line) == (c.func, c.file, c.line), ds)
     i == nothing ? push!(ds, c) : (ds[i] = merge(ds[i], c))
   end
@@ -69,7 +70,7 @@ function profile(x::Pullback{T}, seen) where T
   ls = []
   for (c, l) in zip(x.t, stacklines(T))
     c isa Vector{<:Integer} && continue
-    cs = c isa Vector ? vcat(map(x -> profile(x, seen),c)...) : profile(c, seen)
+    cs = c isa Vector ? merge(vcat(map(x -> profile(x, seen),c)...)) : profile(c, seen)
     push!(ls, Node(loc(x)[1],String(l.file),l.line,cs))
   end
   return merge(ls)

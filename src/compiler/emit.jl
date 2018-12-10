@@ -39,28 +39,24 @@ concrete(::Type{Type{T}}) where T = typeof(T)
 
 function stacklines(adj::Adjoint)
   recs = []
-  for fb = 1:length(adj.perm)
-    for α in alphauses(adj.back, invperm(adj.perm)[fb])
-      push!(recs, adj.forw.linetable[adj.forw.lines[α.id]])
-    end
+  for fb in adj.perm, α in alphauses(adj.back, invperm(adj.perm)[fb])
+    pushfirst!(recs, adj.forw.linetable[adj.forw.lines[α.id]])
   end
   return recs
 end
 
 function forward_stacks!(adj, F)
   stks, recs = [], []
-  for fb = 1:length(adj.perm)
-    for α in alphauses(adj.back, invperm(adj.perm)[fb])
-      if fb == 1
-        push!(recs, α)
-      else
-        T = exprtype(adj.forw, α)
-        stk = insert_node!(adj.forw, 1, xstack(T)...)
-        push!(recs, stk)
-        insert_blockend!(adj.forw, blockidx(adj.forw, α.id), Any, xcall(Zygote, :_push!, stk, α))
-      end
-      push!(stks, (invperm(adj.perm)[fb], alpha(α)))
+  for fb in adj.perm, α in alphauses(adj.back, invperm(adj.perm)[fb])
+    if fb == 1
+      pushfirst!(recs, α)
+    else
+      T = exprtype(adj.forw, α)
+      stk = insert_node!(adj.forw, 1, xstack(T)...)
+      pushfirst!(recs, stk)
+      insert_blockend!(adj.forw, blockidx(adj.forw, α.id), Any, xcall(Zygote, :_push!, stk, α))
     end
+    pushfirst!(stks, (invperm(adj.perm)[fb], alpha(α)))
   end
   args = [Argument(i) for i = 3:length(adj.forw.argtypes)]
   T = Tuple{concrete.(exprtype.(Ref(adj.forw), (args..., recs...)))...}
