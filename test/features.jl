@@ -1,5 +1,5 @@
 using Zygote, Test
-using Zygote: Params, gradient, roundtrip
+using Zygote: Params, gradient, derivative, roundtrip
 
 add(a, b) = a+b
 _relu(x) = x > 0 ? x : 0
@@ -148,8 +148,8 @@ end
 
 # For nested AD, until we support errors
 function grad(f, args...)
-  y, J = forward(f, args...)
-  return J(1)
+  y, back = forward(f, args...)
+  return back(1)
 end
 
 D(f, x) = grad(f, x)[1]
@@ -185,4 +185,31 @@ y, back = forward(() -> layer(x), Params([W]))
 
 @test gradient(() -> sum(W * x), Params([W]))[W] == [1 2; 1 2]
 
-@test gradient(x -> one(eltype(x)), rand(10)) == nothing
+@test gradient(x -> one(eltype(x)), rand(10)) == (nothing,)
+
+@test derivative(2) do x
+  H = [1 x; 3 4]
+  sum(H)
+end == 1
+
+# FIXME
+if !Zygote.usetyped
+  @test derivative(2) do x
+    if x < 0
+      throw("foo")
+    end
+    return x*5
+  end == 5
+
+  @test derivative(x -> one(eltype(x)), rand(10)) == nothing
+end
+
+# Thre-way control flow merge
+@test derivative(1) do x
+  if x > 0
+    x *= 2
+  elseif x < 0
+    x *= 3
+  end
+  x
+end == 2

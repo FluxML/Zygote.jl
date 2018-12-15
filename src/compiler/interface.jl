@@ -7,13 +7,23 @@ Context() = Context{Union{IdDict{Any,Any},Nothing}}(nothing)
 cache(cs::Context{Nothing}) = error("Cache not enabled for this context")
 cache(cx::Context) = cx.cache == nothing ? (cx.cache = IdDict()) : cx.cache
 
-struct J{S,T}
+struct Pullback{S,T}
   t::T
 end
 
-J{S}(x) where S = J{S,typeof(x)}(x)
+Pullback{S}(x) where S = Pullback{S,typeof(x)}(x)
 
-Base.show(io::IO, j::J{S}) where S = print(io, length(j.t) == 0 ? "J()" : "J($(j.t[1]))")
+Base.show(io::IO, j::Pullback{S}) where S = print(io, "J#$(S.parameters[1])(...)")
+
+struct CompileError
+  T
+  e
+end
+
+function Base.showerror(io::IO, e::CompileError)
+  print(io, "Compiling $(e.T): ")
+  showerror(io, e.e)
+end
 
 # interface2.jl
 
@@ -31,12 +41,12 @@ end
 
 isscalar(y) = y isa Real
 function gradient(f, args...)
-  y, J = forward(f, args...)
+  y, back = forward(f, args...)
   isscalar(y) || error("Function output is not scalar")
-  return J(1)
+  return back(Int8(1))
 end
 
-derivative(f, x) = gradient(f, x)[1]
+derivative(f::F, x) where F = gradient(f, x)[1]
 
 Base.adjoint(f::Function) = x -> derivative(f, x)
 

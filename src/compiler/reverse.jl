@@ -26,7 +26,7 @@ function append_node!(ir, @nospecialize(typ), @nospecialize(node), line)
 end
 
 function merge_returns(ir)
-  any(x -> x == unreachable, ir.stmts) && error("`throw` not supported")
+  any(x -> x == unreachable, ir.stmts) && error("Unsupported control flow")
   rs = findall(x -> x isa ReturnNode && isdefined(x, :val), ir.stmts)
   length(rs) <= 1 && return ir
   bs = blockidx.(Ref(ir), rs)
@@ -73,8 +73,7 @@ function record_branches!(ir::IRCode)
     bi == nothing && continue
     preds = ir.ir.cfg.blocks[bi+1].preds
     length(preds) > 1 || continue
-    @assert length(preds) <= 2 "not implemented"
-    insert_node_here!(ir, PhiNode(sort(preds), [false, true]), Bool, ir.result_lines[i])
+    insert_node_here!(ir, PhiNode(sort(preds), Int8.(1:length(preds))), Int8, ir.result_lines[i])
     offset += 1
   end
   return finish_dc(ir)
@@ -249,14 +248,14 @@ function IRCode(ir::Primal)
     start = length(stmts)+1
     block == length(ir.perm) && push!(stmts, :(Δ()))
     preds, succs = newidx.(old.succs), newidx.(sort(old.preds))
-    @assert length(succs) <= 2
     if isempty(succs)
       push!(stmts, nothing)
-    elseif length(succs) == 1
-      push!(stmts, GotoNode(succs[1]))
     else
-      push!(stmts, GotoIfNot(Alpha(range(old)[1]), succs[1]))
-      push!(stmts, GotoNode(succs[2]))
+      for (i, b) in enumerate(succs[1:end-1])
+        push!(stmts, xcall(Base, :(!==), Alpha(range(old)[1]), Int8(i)))
+        push!(stmts, GotoIfNot(SSAValue(length(stmts)), b))
+      end
+      push!(stmts, GotoNode(succs[end]))
     end
     push!(blocks, BasicBlock(StmtRange(start,length(stmts)), preds, succs))
   end
@@ -394,6 +393,6 @@ Adjoint(ir::IRCode; varargs = nothing) = Adjoint(Primal(ir, varargs = varargs))
 
 using InteractiveUtils: @which
 
-macro adjoint(ex)
+macro code_adjoint(ex)
   :(Adjoint($(code_irm(ex)), varargs = varargs($(esc(:(@which $ex))), length(($(esc.(ex.args)...),)))))
 end

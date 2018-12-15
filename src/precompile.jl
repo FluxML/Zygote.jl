@@ -12,9 +12,9 @@ end
 # Invoking the compiler outside of the genfuncs appears
 # to make the specialised versions visible inside them,
 # leading to a significant first-compile speedup.
-@adjoint pow(2, 3)
+@code_adjoint pow(2, 3)
 
-@adjoint ((x, y) -> sum(x.*y))([1,2,3],[4,5,6])
+@code_adjoint ((x, y) -> sum(x.*y))([1,2,3],[4,5,6])
 
 gradient(pow, 2, 3)
 gradient((x, y) -> sum(x.*y), [1, 2, 3], [4, 5, 6])

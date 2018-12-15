@@ -4,9 +4,9 @@
 
 [![Build Status](https://travis-ci.org/FluxML/Zygote.jl.svg?branch=master)](https://travis-ci.org/FluxML/Zygote.jl)
 
-`] add Zygote#master`
+`] add Zygote#master IRTools#master`
 
-Zygote is a working prototype for source-to-source automatic differentiation (AD) in Julia.
+Zygote is a working prototype for source-to-source automatic differentiation (AD) in Julia. For more details and benchmarks of Zygote's technique, see [our paper](https://arxiv.org/abs/1810.07951).
 
 ```julia
 julia> using Zygote
@@ -38,11 +38,11 @@ sin
 Defining custom gradients is a cinch, and errors have good stacktraces.
 
 ```julia
-julia> using Zygote: @grad
+julia> using Zygote: @adjoint
 
 julia> add(a, b) = a + b
 
-julia> @grad add(a, b) = add(a, b), Δ -> (Δ, Δ)
+julia> @adjoint add(a, b) = add(a, b), Δ -> (Δ, Δ)
 ```
 
 To support large machine learning models with many parameters, Zygote can differentiate implicitly-used parameters, as opposed to just function arguments.
