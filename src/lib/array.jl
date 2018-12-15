@@ -52,11 +52,7 @@ end
 fill_similar_array(xs, v) = similar(xs) .= v
 
 @adjoint function sum(xs::AbstractArray; dims = :)
-  if dims === (:)
-    sum(xs), Δ -> (FillArray(Δ, size(xs)),)
-  else
-    sum(xs, dims = dims), Δ -> (fill_similar_array(xs, Δ),)
-  end
+  sum(xs, dims = dims), Δ -> (fill_similar_array(xs, Δ),)
 end
 
 function _forward(cx::Context, ::typeof(sum), f, xs::AbstractArray)
