@@ -139,7 +139,6 @@ end
 @inline function ∇broadcast_f(bc′::Broadcasted)
   bc = dualify(instantiate(flatten(bc′)))
   T = combine_eltypes(bc.f, bc.args)
-  T <: Bool && return copy(bc′), _ -> nothing
   y, gs = broadcast_gradient(bc, dualtype(T))
   back(Δ) = map((x, d) -> unbroadcast(x, Δ.*d), bc.args, gs)
   return y, back
@@ -150,9 +149,11 @@ function ∇broadcast_f(bc::Broadcasted{<:AbstractArrayStyle{0}})
   return out.value, Δ -> map(x -> x*Δ, out.partials.values)
 end
 
-∇broadcast(bc::Broadcasted, ::Nothing) = ∇broadcast_f(bc)
-∇broadcast(bc::Broadcasted, J) = ∇broadcast_r(bc, J)
-∇broadcast(bc::Broadcasted) = ∇broadcast(bc, Jbroadcast(bc))
+# ∇broadcast(bc::Broadcasted, ::Nothing) = ∇broadcast_f(bc)
+# ∇broadcast(bc::Broadcasted, J) = ∇broadcast_r(bc, J)
+# ∇broadcast(bc::Broadcasted) = ∇broadcast(bc, Jbroadcast(bc))
+
+∇broadcast(bc::Broadcasted) = ∇broadcast_f(bc)
 
 @adjoint function broadcasted(f, args...)
   broadcasted(f, args...), Δ -> (nothing, Δ.args...)
