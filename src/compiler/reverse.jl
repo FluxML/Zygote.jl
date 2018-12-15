@@ -300,9 +300,9 @@ function reverse_ir(pr::Primal)
         dxs = insert_node!(ir, j, Any, Expr(:call, J, dy))
         ir.lines[j] = pr.forw.lines[i]
         grads[y] = dy
-        for (i, x) in enumerate(ex.args[3:end])
+        for (a, x) in enumerate(ex.args[3:end])
           x in pr.wrt || continue
-          dx = insert_node!(ir, j, Any, xgradindex(dxs, i))
+          dx = insert_node!(ir, j, Any, xgradindex(dxs, a))
           ir.lines[j] = pr.forw.lines[i]
           push!(partials[x], dx)
         end

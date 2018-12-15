@@ -37,21 +37,26 @@ xtuple(xs...) = xcall(:tuple, xs...)
 concrete(T::DataType) = T
 concrete(::Type{Type{T}}) where T = typeof(T)
 
-# TODO: combine stacks by type
+function stacklines(adj::Adjoint)
+  recs = []
+  for fb in adj.perm, α in alphauses(adj.back, invperm(adj.perm)[fb])
+    pushfirst!(recs, adj.forw.linetable[adj.forw.lines[α.id]])
+  end
+  return recs
+end
+
 function forward_stacks!(adj, F)
   stks, recs = [], []
-  for fb = 1:length(adj.perm)
-    for α in alphauses(adj.back, invperm(adj.perm)[fb])
-      if fb == 1
-        push!(recs, α)
-      else
-        T = exprtype(adj.forw, α)
-        stk = insert_node!(adj.forw, 1, xstack(T)...)
-        push!(recs, stk)
-        insert_blockend!(adj.forw, blockidx(adj.forw, α.id), Any, xcall(Zygote, :_push!, stk, α))
-      end
-      push!(stks, (invperm(adj.perm)[fb], alpha(α)))
+  for fb in adj.perm, α in alphauses(adj.back, invperm(adj.perm)[fb])
+    if fb == 1
+      pushfirst!(recs, α)
+    else
+      T = exprtype(adj.forw, α)
+      stk = insert_node!(adj.forw, 1, xstack(T)...)
+      pushfirst!(recs, stk)
+      insert_blockend!(adj.forw, blockidx(adj.forw, α.id), Any, xcall(Zygote, :_push!, stk, α))
     end
+    pushfirst!(stks, (invperm(adj.perm)[fb], alpha(α)))
   end
   args = [Argument(i) for i = 3:length(adj.forw.argtypes)]
   T = Tuple{concrete.(exprtype.(Ref(adj.forw), (args..., recs...)))...}
@@ -80,22 +85,20 @@ function reverse_stacks!(adj, stks)
     repl = Dict()
     for (i, (b′, α)) in enumerate(stks)
       b == b′ || continue
-      loc = max(2,afterphi(ir, range(ir.cfg.blocks[b])[1]))
+      loc, attach_after = afterphi(ir, range(ir.cfg.blocks[b])[1])
+      loc = max(2, loc)
       if adj.perm[b′] == 1
-        val = insert_node!(ir, loc, Any, xcall(:getindex, t, i))
+        val = insert_node!(ir, loc, Any, xcall(:getindex, t, i), attach_after)
       else
         stk = insert_node!(ir, 1, Any, xcall(:getindex, t, i))
         stk = insert_node!(ir, 1, Any, xcall(Zygote, :Stack, stk))
-        val = insert_node!(ir, loc, Any, xcall(:pop!, stk))
+        val = insert_node!(ir, loc, Any, xcall(:pop!, stk), attach_after)
       end
       repl[α] = val
     end
     for i in range(ir.cfg.blocks[b]), u in userefs(ir.stmts[i])
       if u.stmt == Expr(:call, :Δ)
         u.stmt = Argument(2)
-      elseif u[] isa Argument
-        x = insert_node!(ir, i, Any, xcall(:getindex, t, u[].n-2))
-        u[] = x
       elseif haskey(repl, u[])
         u[] = repl[u[]]
       else continue
@@ -123,3 +126,5 @@ function _lookup_grad(T)
   # verify_ir(back)
   m, forw, back
 end
+
+stacklines(T::Type) = stacklines(Adjoint(IRCode(meta(T))))

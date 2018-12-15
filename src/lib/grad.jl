@@ -21,7 +21,7 @@ function gradm(ex, mut = false)
   kw = length(args) > 1 && isexpr(args[1], :parameters) ? esc(popfirst!(args)) : nothing
   f, T = isexpr(name, :(::)) ?
     (length(name.args) == 1 ? (esc(gensym()), esc(name.args[1])) : esc.(name.args)) :
-    (esc(gensym()), :(typeof($(esc(name)))))
+    (esc(gensym()), :(Core.Typeof($(esc(name)))))
   kT = :(Core.kwftype($T))
   Ts == nothing && (Ts = [])
   args = esc.(named.(args))
@@ -62,7 +62,7 @@ macro nograd(ex)
   blk = :(;)
   for f in ex.args
     back = MacroTools.@q _ -> ($__source__; nothing)
-    push!(blk.args, :(@inline Zygote._forward(::Context, ::typeof($(esc(f))), args...) = $(esc(f))(args...), $back))
+    push!(blk.args, :(@inline Zygote._forward(::Context, ::Core.Typeof($(esc(f))), args...) = $(esc(f))(args...), $back))
   end
   return blk
 end
