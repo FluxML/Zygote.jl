@@ -130,14 +130,14 @@ is_literal_getproperty(ex) = iscall(ex, Base, :getproperty) && ex.args[3] isa Qu
 function _forward_type(Ts)
   usetyped || return Any
   all(T -> isconcretetype(T) || T <: DataType, Ts) || return Any
-  T = Core.Compiler.return_type(_forward, Tuple{Context,Ts...})
+  T = Core.Compiler.return_type(_forward, Tuple{ContextCache,Ts...})
   return T == Union{} ? Any : T
 end
 
 isvalidtype(jT, yT) = jT <: Tuple && length(jT.parameters) == 2 && jT.parameters[1] <: yT
 
 function record!(ir::IRCode)
-  pushfirst!(ir.argtypes, typeof(_forward), Context)
+  pushfirst!(ir.argtypes, typeof(_forward), ContextCache)
   xs = reachable(ir)
   for i = 1:length(ir.stmts)
     ex = argmap(x -> Argument(x.n+2), ir[SSAValue(i)])

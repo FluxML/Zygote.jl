@@ -1,6 +1,6 @@
 ignore(T) = all(T -> T <: Type, T.parameters)
 
-@generated function _forward(ctx::Context, f, args...)
+@generated function _forward(ctx::ContextCache, f, args...)
   T = Tuple{f,args...}
   ignore(T) && return :(f(args...), Pullback{$T}(()))
   g = try _lookup_grad(T) catch e e end

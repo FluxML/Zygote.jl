@@ -31,7 +31,7 @@ end
 
 @adjoint Base.typeassert(x, T) = Base.typeassert(x, T), Δ -> (Δ, nothing)
 
-function accum_param(cx::Context, x, Δ)
+function accum_param(cx::ContextCache, x, Δ)
   haskey(cache(cx), x) && (cache(cx)[x] = accum(cache(cx)[x],Δ))
   return
 end
@@ -131,7 +131,7 @@ end
   Expr(:tuple, [:($f = Ref{Any}(nothing)) for f in fieldnames(x)]...)
 end
 
-function grad_mut(cx::Context, x)
+function grad_mut(cx::ContextCache, x)
   T = Core.Compiler.return_type(grad_mut, Tuple{typeof(x)})
   ch = cache(cx)
   if haskey(ch, x)
