@@ -171,7 +171,7 @@ Jnew{T}(g) where T = Jnew{T,typeof(g)}(g)
 end
 
 # TODO captured mutables + multiple calls to `back`
-@generated function (back::Jnew{T,G})(Δ) where {T,G}
+@generated function (back::Jnew{T,G})(Δ::Union{NamedTuple,Nothing}) where {T,G}
   !T.mutable && Δ == Nothing && return :nothing
   Δ = G == Nothing ? :Δ : :(back.g)
   :(nothing, $(map(f -> :(deref!($Δ.$f)), fieldnames(T))...))
