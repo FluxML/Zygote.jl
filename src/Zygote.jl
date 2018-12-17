@@ -1,6 +1,7 @@
 module Zygote
 
-using LinearAlgebra
+using LinearAlgebra, Cassette
+using Cassette: Reflection
 
 # This flag enables Zygote to grab extra type inference information during
 # compiles. When control flow is present, this can give gradient code a

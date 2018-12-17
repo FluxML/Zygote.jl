@@ -95,6 +95,12 @@ xcall(f::Symbol, args...) = xcall(Base, f, args...)
 
 const unreachable = ReturnNode()
 
+function IRCode(meta::Reflection)
+  ir = just_construct_ssa(meta.code_info, deepcopy(meta.code_info.code),
+                          Int(meta.method.nargs)-1, Core.svec(meta.static_params...))
+  return compact!(ir)
+end
+
 # Dominance frontiers
 
 function domfront(cfg, dt = construct_domtree(cfg))

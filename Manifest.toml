@@ -17,7 +17,7 @@ version = "0.5.3"
 
 [[Cassette]]
 deps = ["InteractiveUtils", "LinearAlgebra", "Test"]
-git-tree-sha1 = "93bd4a23e2f3de79672279abda7ea1404b988649"
+git-tree-sha1 = "727f69974847e5fa5a29069fea1f782b459a8370"
 repo-rev = "jr/cycle"
 repo-url = "https://github.com/jrevels/Cassette.jl.git"
 uuid = "7057c7e9-c182-5462-911a-8362d720325c"
