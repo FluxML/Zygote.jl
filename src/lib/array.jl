@@ -57,7 +57,7 @@ end
   end
 end
 
-function _forward(cx::Context, ::typeof(sum), f, xs::AbstractArray)
+function _forward(cx::ContextCache, ::typeof(sum), f, xs::AbstractArray)
   y, back = forward(cx, (xs -> sum(f.(xs))), xs)
   y, ȳ -> (nothing, nothing, back(ȳ)...)
 end

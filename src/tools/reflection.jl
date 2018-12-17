@@ -19,6 +19,10 @@ function argnames!(meta, names...)
   meta.code.slotnames = [names...]
 end
 
+function argnames!(meta::Reflection, names...)
+  meta.code_info.slotnames = [names...]
+end
+
 function spliceargs!(meta, ir::IRCode, args...)
   for i = 1:length(ir.stmts)
     ir[SSAValue(i)] = argmap(x -> Argument(x.n+length(args)), ir[SSAValue(i)])
@@ -81,6 +85,14 @@ function slots!(ir::IRCode)
     end
   end
   return compact!(ir)
+end
+
+function IRTools.update!(meta::Reflection, ir::Core.Compiler.IRCode)
+  Core.Compiler.replace_code_newstyle!(meta.code_info, ir, length(ir.argtypes)-1)
+  meta.code_info.inferred = false
+  meta.code_info.ssavaluetypes = length(meta.code_info.code)
+  IRTools.slots!(meta.code_info)
+  return meta.code_info
 end
 
 @generated function roundtrip(f, args...)

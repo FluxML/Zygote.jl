@@ -1,10 +1,13 @@
-mutable struct Context
+
+Cassette.@context ZygoteContext
+
+mutable struct ContextCache
   cache::Union{IdDict{Any,Any},Nothing}
 end
 
-Context() = Context(nothing)
+ContextCache() = ContextCache(nothing)
 
-cache(cx::Context) = cx.cache == nothing ? (cx.cache = IdDict()) : cx.cache
+cache(cx::ContextCache) = cx.cache == nothing ? (cx.cache = IdDict()) : cx.cache
 
 struct Pullback{S,T}
   t::T
@@ -28,7 +31,7 @@ end
 
 # Wrappers
 
-_forward(f, args...) = _forward(Context(), f, args...)
+_forward(f, args...) = _forward(ContextCache(), f, args...)
 
 tailmemaybe(::Nothing) = nothing
 tailmemaybe(x::Tuple) = Base.tail(x)
@@ -67,7 +70,7 @@ Base.show(io::IO, ps::Grads) = print(io, "Grads(...)")
 @forward Grads.grads Base.setindex!, Base.getindex, Base.haskey
 
 function forward(f, ps::Params)
-  cx = Context()
+  cx = ContextCache()
   y, back = _forward(cx, f)
   y, function (Δ)
     for p in ps
@@ -81,7 +84,7 @@ end
 # Reflection
 
 # function code_grad(f, T)
-#   forw = code_typed(_forward, Tuple{Context,Typeof(f),T.parameters...})[1]
+#   forw = code_typed(_forward, Tuple{ContextCache,Typeof(f),T.parameters...})[1]
 #   Y, J = forw[2].parameters
 #   back = typed_meta(Tuple{J,Y}, optimize=true)
 #   back = back.code=>back.ret

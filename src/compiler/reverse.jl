@@ -130,14 +130,14 @@ is_literal_getproperty(ex) = iscall(ex, Base, :getproperty) && ex.args[3] isa Qu
 function _forward_type(Ts)
   usetyped || return Any
   all(T -> isconcretetype(T) || T <: DataType, Ts) || return Any
-  T = Core.Compiler.return_type(_forward, Tuple{Context,Ts...})
+  T = Core.Compiler.return_type(_forward, Tuple{ContextCache,Ts...})
   return T == Union{} ? Any : T
 end
 
 isvalidtype(jT, yT) = jT <: Tuple && length(jT.parameters) == 2 && jT.parameters[1] <: yT
 
 function record!(ir::IRCode)
-  pushfirst!(ir.argtypes, typeof(_forward), Context)
+  pushfirst!(ir.argtypes, typeof(_forward), ContextCache)
   xs = reachable(ir)
   for i = 1:length(ir.stmts)
     ex = argmap(x -> Argument(x.n+2), ir[SSAValue(i)])
@@ -215,13 +215,14 @@ function blockinfo(pr::Primal)
       for (c, x) in zip(ex.edges, ex.values)
         x in pr.wrt && push!(@get!(info[b].phis, c, []), x)
       end
-    elseif iscall(ex, Zygote, :_forward)
-      y = isassert(pr.forw, i) ? SSAValue(i+3) : SSAValue(i+1)
-      push!(info[b].grads, y)
-      for x in ex.args[3:end]
-        x in pr.wrt && push!(info[b].partials, x)
-      end
     end
+    # elseif iscall(ex, Zygote, :_forward)
+    #   y = isassert(pr.forw, i) ? SSAValue(i+3) : SSAValue(i+1)
+    #   push!(info[b].grads, y)
+    #   for x in ex.args[3:end]
+    #     x in pr.wrt && push!(info[b].partials, x)
+    #   end
+    # end
   end
   worklist = collect(1:length(pr.forw.cfg.blocks))
   while !isempty(worklist)
@@ -291,22 +292,23 @@ function reverse_ir(pr::Primal)
           @assert !haskey(phis, (newblock(pr, b), newblock(pr, c), x)) "not implemented"
           phis[(newblock(pr, b), newblock(pr, c), x)] = Δ
         end
-      elseif iscall(ex, Zygote, :_forward)
-        # TODO remove with type hacks above
-        y = isassert(pr.forw, i) ? SSAValue(i+3) : SSAValue(i+1)
-        J = Alpha(i+2)
-        dy = insert_node!(ir, j, Any, xcall(Zygote, :accum))
-        ir.lines[j] = pr.forw.lines[i]
-        dxs = insert_node!(ir, j, Any, Expr(:call, J, dy))
-        ir.lines[j] = pr.forw.lines[i]
-        grads[y] = dy
-        for (a, x) in enumerate(ex.args[3:end])
-          x in pr.wrt || continue
-          dx = insert_node!(ir, j, Any, xgradindex(dxs, a))
-          ir.lines[j] = pr.forw.lines[i]
-          push!(partials[x], dx)
-        end
       end
+      # elseif iscall(ex, Zygote, :_forward)
+      #   # TODO remove with type hacks above
+      #   y = isassert(pr.forw, i) ? SSAValue(i+3) : SSAValue(i+1)
+      #   J = Alpha(i+2)
+      #   dy = insert_node!(ir, j, Any, xcall(Zygote, :accum))
+      #   ir.lines[j] = pr.forw.lines[i]
+      #   dxs = insert_node!(ir, j, Any, Expr(:call, J, dy))
+      #   ir.lines[j] = pr.forw.lines[i]
+      #   grads[y] = dy
+      #   for (a, x) in enumerate(ex.args[3:end])
+      #     x in pr.wrt || continue
+      #     dx = insert_node!(ir, j, Any, xgradindex(dxs, a))
+      #     ir.lines[j] = pr.forw.lines[i]
+      #     push!(partials[x], dx)
+      #   end
+      # end
     end
     if b == 1
       gs = []

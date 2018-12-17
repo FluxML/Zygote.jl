@@ -27,7 +27,7 @@ function gradm(ex, mut = false)
   args = esc.(named.(args))
   argnames = typeless.(args)
   Ts = esc.(Ts)
-  cx = :($(esc(:__context__))::Context)
+  cx = :($(esc(:__context__))::ContextCache)
   fargs = kw == nothing ? [cx, :($f::$T), args...] : [kw, cx, :($f::$T), args...]
   quote
     @inline Zygote.adjoint($(fargs...)) where $(Ts...) = $(esc(body))
@@ -60,7 +60,7 @@ macro nograd(ex)
   blk = :(;)
   for f in ex.args
     back = MacroTools.@q _ -> ($__source__; nothing)
-    push!(blk.args, :(@inline Zygote._forward(::Context, ::Core.Typeof($(esc(f))), args...) = $(esc(f))(args...), $back))
+    push!(blk.args, :(@inline Zygote._forward(::ContextCache, ::Core.Typeof($(esc(f))), args...) = $(esc(f))(args...), $back))
   end
   return blk
 end
