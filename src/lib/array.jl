@@ -51,7 +51,7 @@ end
 
 @adjoint function sum(xs::AbstractArray; dims = :)
   if dims === (:)
-    sum(xs), Δ -> (FillArray(Δ, size(xs)),)
+    sum(xs), Δ -> (Fill(Δ, size(xs)),)
   else
     sum(xs, dims = dims), Δ -> (similar(xs) .= Δ,)
   end

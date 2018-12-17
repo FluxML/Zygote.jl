@@ -48,8 +48,14 @@ uuid = "b552c78f-8df3-52c6-915a-8e097449b14b"
 version = "0.0.7"
 
 [[Distributed]]
-deps = ["LinearAlgebra", "Random", "Serialization", "Sockets"]
+deps = ["Random", "Serialization", "Sockets"]
 uuid = "8ba89e20-285c-5b6f-9357-94700520ee1b"
+
+[[FillArrays]]
+deps = ["LinearAlgebra", "Random", "SparseArrays", "Test"]
+git-tree-sha1 = "d87b7fc5c086cf157deabec625d53ba55eca6436"
+uuid = "1a297f60-69ca-5386-bcde-b61e274b549b"
+version = "0.3.0"
 
 [[ForwardDiff]]
 deps = ["CommonSubexpressions", "DiffResults", "DiffRules", "InteractiveUtils", "LinearAlgebra", "NaNMath", "Random", "SparseArrays", "SpecialFunctions", "StaticArrays", "Test"]

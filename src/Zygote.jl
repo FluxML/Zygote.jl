@@ -1,6 +1,6 @@
 module Zygote
 
-using LinearAlgebra
+using LinearAlgebra, FillArrays
 
 # This flag enables Zygote to grab extra type inference information during
 # compiles. When control flow is present, this can give gradient code a
@@ -20,7 +20,6 @@ export Params, gradient, derivative, forward, @code_grad
 include("tools/idset.jl")
 include("tools/ir.jl")
 include("tools/reflection.jl")
-include("tools/fillarray.jl")
 
 include("compiler/reverse.jl")
 include("compiler/emit.jl")
