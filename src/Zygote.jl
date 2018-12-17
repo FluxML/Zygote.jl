@@ -27,6 +27,7 @@ include("tools/fillarray.jl")
 
 include("compiler/reverse.jl")
 include("compiler/emit.jl")
+include("compiler/emit_new.jl")
 include("compiler/interface.jl")
 
 include("forward/Forward.jl")

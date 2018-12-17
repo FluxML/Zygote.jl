@@ -128,19 +128,3 @@ function _lookup_grad(T)
 end
 
 stacklines(T::Type) = stacklines(Adjoint(IRCode(meta(T))))
-
-function zygote_pass(::Type{C}, m::Reflection) where C
-  T = m.signature
-  va = varargs(m.method, length(T.parameters))
-  forw, back = stacks!(Adjoint(IRCode(m), varargs = va), T)
-  argnames!(m, Symbol("#self#"), :ctx, :f, :args)
-  forw = varargs!(m, forw, 3)
-  forw = slots!(pis!(inlineable!(forw)))
-  return IRTools.update!(m, forw)
-end
-
-# add(a, b) = a+b
-# ctx = Cassette.disablehooks(ZygoteContext())
-# m = Cassette.reflect((typeof(add),Int,Int))
-#
-# zygote_pass(typeof(ctx), Cassette.reflect((typeof(add),Int,Int)))
