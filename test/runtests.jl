@@ -15,4 +15,8 @@ end
   include("compiler.jl")
 end
 
+@testset "Failing" begin
+  include("failing.jl")
+end
+
 end
