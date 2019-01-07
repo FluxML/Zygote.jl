@@ -1,4 +1,4 @@
-using Zygote, NNlib, Test
+using Zygote, NNlib, Test, Random, LinearAlgebra
 using Zygote: gradient
 using NNlib: conv
 import Random
@@ -84,4 +84,46 @@ end
   @test gradtest(x -> minimum(x, dims=3), rand(2, 3, 4))
 
   @test gradtest(x -> minimum(x, dims=[1, 2]), rand(2, 3, 4))
+end
+
+@testset "backsolve" begin
+  rng, P, Q = MersenneTwister(123456), 10, 9
+  X, Y, y = randn(rng, P, P), randn(rng, P, Q), randn(rng, P)
+
+  # \
+  @test gradtest(X -> X \ Y, X)
+  @test gradtest(Y -> X \ Y, Y)
+  @test gradtest(X -> X \ y, X)
+  @test gradtest(y -> X \ y, y)
+
+  # /
+  @test gradtest(X -> Y' / X, X)
+  @test gradtest(Y -> Y' / X, Y)
+  @test gradtest(X -> y' / X, X)
+  @test gradtest(y -> y' / X, y)
+end
+
+@testset "Symmetric" begin
+  rng, P = MersenneTwister(123456), 7
+  A = randn(rng, P, P)
+  @test gradtest(Symmetric, A)
+end
+
+@testset "diag" begin
+  rng, P = MersenneTwister(123456), 10
+  A = randn(rng, P, P)
+  @test gradtest(diag, A)
+end
+
+@testset "dense + UniformScaling" begin
+  rng = MersenneTwister(123456)
+  A, λ = randn(rng, 10, 10), randn(rng)
+  @test gradtest(A->A + 5I, A)
+  @test gradtest(λ->A + λ[1] * I, [λ])
+end
+
+@testset "cholesky" begin
+  rng, N = MersenneTwister(123456), 5
+  A = randn(rng, N, N)
+  @test gradtest(A->logdet(cholesky(A' * A + 1e-6I)), A)
 end
