@@ -1,9 +1,10 @@
-mutable struct Context
-  cache::Union{IdDict{Any,Any},Nothing}
+mutable struct Context{T<:Union{IdDict{Any,Any},Nothing}}
+  cache::T
 end
 
-Context() = Context(nothing)
+Context() = Context{Union{IdDict{Any,Any},Nothing}}(nothing)
 
+cache(cs::Context{Nothing}) = error("Cache not enabled for this context")
 cache(cx::Context) = cx.cache == nothing ? (cx.cache = IdDict()) : cx.cache
 
 struct Pullback{S,T}
