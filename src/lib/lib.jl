@@ -31,9 +31,12 @@ end
 
 @adjoint Base.typeassert(x, T) = Base.typeassert(x, T), Δ -> (Δ, nothing)
 
-function accum_param(cx::Context, x, Δ)
-  haskey(cache(cx), x) && (cache(cx)[x] = accum(cache(cx)[x],Δ))
-  return
+@generated function accum_param(cx::Context, x, Δ)
+  isbitstype(x) && return
+  quote
+    haskey(cache(cx), x) && (cache(cx)[x] = accum(cache(cx)[x],Δ))
+    return
+  end
 end
 
 unwrap(x) = x
