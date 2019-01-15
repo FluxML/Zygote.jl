@@ -211,3 +211,10 @@ end
   end
   x
 end == 2
+
+# Gradient of closure
+grad_closure(x) = 2x
+
+Zygote.@adjoint (f::typeof(grad_closure))(x) = f(x), Δ -> (1, 2)
+
+@test gradient((f, x) -> f(x), grad_closure, 5) == (1, 2)
