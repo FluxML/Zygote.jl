@@ -138,23 +138,23 @@ let
 
   # Check sqeuclidean.
   let
-      x, y = randn(rng, D), randn(rng, D)
-      gradtest(x->sqeuclidean(x, y), x)
-      gradtest(y->sqeuclidean(x, y), y)
+    x, y = randn(rng, D), randn(rng, D)
+    gradtest(x->sqeuclidean(x, y), x)
+    gradtest(y->sqeuclidean(x, y), y)
   end
 
   # Check binary colwise.
   let
-      X, Y = randn(rng, D, P), randn(rng, D, P)
-      gradtest(X->colwise(SqEuclidean(), X, Y), X)
-      gradtest(Y->colwise(SqEuclidean(), X, Y), Y)
+    X, Y = randn(rng, D, P), randn(rng, D, P)
+    gradtest(X->colwise(SqEuclidean(), X, Y), X)
+    gradtest(Y->colwise(SqEuclidean(), X, Y), Y)
   end
 
   # Check binary pairwise.
   let
-      X, Y = randn(rng, D, P), randn(rng, D, Q)
-      gradtest(X->pairwise(SqEuclidean(), X, Y), X)
-      gradtest(Y->pairwise(SqEuclidean(), X, Y), Y)
+    X, Y = randn(rng, D, P), randn(rng, D, Q)
+    gradtest(X->pairwise(SqEuclidean(), X, Y), X)
+    gradtest(Y->pairwise(SqEuclidean(), X, Y), Y)
   end
 
   # Check unary pairwise.
