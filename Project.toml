@@ -3,6 +3,7 @@ uuid = "e88e6eb3-aa80-5325-afca-941959d7151f"
 
 [deps]
 DiffRules = "b552c78f-8df3-52c6-915a-8e097449b14b"
+Distances = "b4f34e82-e78d-54a5-968a-f98e89d6e8f7"
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 IRTools = "7869d1d1-7146-5819-86e3-90919afe41df"
 InteractiveUtils = "b77e0a4c-d291-57a0-90e8-8db25a27a240"
