@@ -49,7 +49,7 @@ include("profiler/Profile.jl")
 # helps to work around 265-y issues
 function refresh()
   include(joinpath(@__DIR__, "compiler/interface2.jl"))
-  include(joinpath(@__DIR__, "precompile.jl"))
+  usetyped || include(joinpath(@__DIR__, "precompile.jl"))
   return
 end
 

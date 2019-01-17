@@ -19,7 +19,7 @@ end
 bad(x) = x
 @adjoint bad(x) = x, Δ -> error("bad")
 
-Zygote.refresh() # needed in typed mode...
+Zygote.usetyped && Zygote.refresh()
 
 function badly(x)
   x = x + 1

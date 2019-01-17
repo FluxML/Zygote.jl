@@ -36,6 +36,7 @@ xtuple(xs...) = xcall(:tuple, xs...)
 
 concrete(T::DataType) = T
 concrete(::Type{Type{T}}) where T = typeof(T)
+concrete(T) = Any
 
 function stacklines(adj::Adjoint)
   recs = []
@@ -59,7 +60,7 @@ function forward_stacks!(adj, F)
     pushfirst!(stks, (invperm(adj.perm)[fb], alpha(α)))
   end
   args = [Argument(i) for i = 3:length(adj.forw.argtypes)]
-  T = Tuple{concrete.(exprtype.(Ref(adj.forw), (args..., recs...)))...}
+  T = Tuple{concrete.(exprtype.((adj.forw,), recs))...}
   isconcretetype(T) || (T = Any)
   rec = insert_node!(adj.forw, length(adj.forw.stmts), T,
                      xtuple(recs...))
