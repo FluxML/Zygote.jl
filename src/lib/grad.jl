@@ -5,9 +5,14 @@ named(arg) = isexpr(arg, :(::)) && length(arg.args) == 1 ? :($(gensym())::$(arg.
 
 typeless(x) = MacroTools.prewalk(x -> isexpr(x, :(::)) ? x.args[1] : x, x)
 
-tupleornothing(f, ::Nothing) = nothing
-tupleornothing(f, x::Tuple) = f(x)
-tupleornothing(f, x) = error("Gradient $x should be a tuple")
+for n = 0:3
+  gradtuple = Symbol(:gradtuple, n)
+  @eval begin
+    $gradtuple(x::Tuple) = ($(ntuple(_->:nothing,n)...), x...)
+    $gradtuple(x::Nothing) = nothing
+    $gradtuple(x) = error("Gradient $x should be a tuple")
+  end
+end
 
 function adjoint end
 
@@ -26,21 +31,20 @@ function gradm(ex, mut = false)
   Ts = esc.(Ts)
   cx = :($(esc(:__context__))::Context)
   fargs = kw == nothing ? [cx, :($f::$T), args...] : [kw, cx, :($f::$T), args...]
+  gradtuple   = isclosure ? gradtuple0 : gradtuple1
+  gradtuplekw = isclosure ? gradtuple2 : gradtuple3
   quote
     @inline Zygote.adjoint($(fargs...)) where $(Ts...) = $(esc(body))
     @inline function Zygote._forward($cx, $f::$T, $(args...)) where $(Ts...)
       y, _back = adjoint(__context__, $f, $(argnames...))
       $(mut ? nothing : :(back(::Nothing) = nothing))
-      back(Δ) = tupleornothing($(isclosure ? :identity : :(x -> (nothing, x...))),
-                               _back(Δ))
+      back(Δ) = $gradtuple(_back(Δ))
       return y, back
     end
     @inline function Zygote._forward($cx, ::$kT, kw, $f::$T, $(args...)) where $(Ts...)
       y, _back = adjoint(__context__, $f, $(argnames...); kw...)
       $(mut ? nothing : :(back(::Nothing) = nothing))
-      back(Δ) = tupleornothing($(isclosure ? :(x -> (nothing, nothing, x...)) :
-                                             :(x -> (nothing, nothing, nothing, x...))),
-                               _back(Δ))
+      back(Δ) = $gradtuplekw(_back(Δ))
       return y, back
     end
     nothing
