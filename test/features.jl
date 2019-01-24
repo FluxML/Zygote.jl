@@ -212,6 +212,21 @@ end
   x
 end == 2
 
+# Gradient of closure
+grad_closure(x) = 2x
+
+Zygote.@adjoint (f::typeof(grad_closure))(x) = f(x), Δ -> (1, 2)
+
+Zygote.usetyped && Zygote.refresh()
+
+@test gradient((f, x) -> f(x), grad_closure, 5) == (1, 2)
+
+if !Zygote.usetyped
+  invokable(x) = 2x
+  invokable(x::Integer) = 3x
+  @test gradient(x -> invoke(invokable, Tuple{Any}, x), 5) == (2,)
+end
+
 # Mutation
 
 @test gradient([1, 2],3) do x, y

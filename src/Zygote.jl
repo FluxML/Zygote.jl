@@ -1,6 +1,7 @@
 module Zygote
 
 using LinearAlgebra
+using LinearAlgebra: copytri!
 
 # This flag enables Zygote to grab extra type inference information during
 # compiles. When control flow is present, this can give gradient code a
@@ -48,7 +49,7 @@ include("profiler/Profile.jl")
 # helps to work around 265-y issues
 function refresh()
   include(joinpath(@__DIR__, "compiler/interface2.jl"))
-  include(joinpath(@__DIR__, "precompile.jl"))
+  usetyped || include(joinpath(@__DIR__, "precompile.jl"))
   return
 end
 

@@ -25,3 +25,5 @@ end
   s, c = sincos(x)
   (s, c), ((s̄, c̄),) -> (s̄*c - c̄*s,)
 end
+
+@adjoint a // b = (a // b, c̄ -> (c̄ * 1//b, - c̄ * a // b // b))

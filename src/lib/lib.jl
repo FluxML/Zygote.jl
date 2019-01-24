@@ -31,10 +31,13 @@ end
 
 @adjoint Base.typeassert(x, T) = Base.typeassert(x, T), Δ -> (Δ, nothing)
 
-function accum_param(cx::Context, x, Δ)
-  k = Key(x)
-  haskey(cache(cx), k) && (cache(cx)[k] = accum(cache(cx)[k],Δ))
-  return
+@generated function accum_param(cx::Context, x, Δ)
+  isbitstype(x) && return
+  quote
+    k = Key(x)
+    haskey(cache(cx), k) && (cache(cx)[k] = accum(cache(cx)[k],Δ))
+    return
+  end
 end
 
 unwrap(x) = x
@@ -173,7 +176,7 @@ Jnew{T}(g) where T = Jnew{T,typeof(g)}(g)
 end
 
 # TODO captured mutables + multiple calls to `back`
-@generated function (back::Jnew{T,G})(Δ) where {T,G}
+@generated function (back::Jnew{T,G})(Δ::Union{NamedTuple,Nothing}) where {T,G}
   !T.mutable && Δ == Nothing && return :nothing
   Δ = G == Nothing ? :Δ : :(back.g)
   :(nothing, $(map(f -> :(deref!($Δ.$f)), fieldnames(T))...))

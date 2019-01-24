@@ -19,7 +19,7 @@ end
 bad(x) = x
 @adjoint bad(x) = x, Δ -> error("bad")
 
-Zygote.refresh() # needed in typed mode...
+Zygote.usetyped && Zygote.refresh()
 
 function badly(x)
   x = x + 1
@@ -59,6 +59,12 @@ y, back = @test_inferred forward(Core._apply, +, (1, 2, 3))
 bcast(x) = x .* 5
 y, back = @test_inferred forward(bcast, [1,2,3])
 # @test_inferred back([1,1,1])
+
+foo = let a = 4
+  x -> x*a
+end
+
+@test_inferred gradient(f -> f(5), foo)
 
 getx(x) = x.x
 y, back = @test_inferred forward(getx, (x=1,y=2.0))

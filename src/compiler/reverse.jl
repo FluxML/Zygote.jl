@@ -124,7 +124,9 @@ end
 reachable(ir) = keys(valid_usages(ir))
 
 # Hack to work around fragile constant prop through overloaded functions
-is_literal_getproperty(ex) = iscall(ex, Base, :getproperty) && ex.args[3] isa QuoteNode
+is_literal_getproperty(ex) =
+  (iscall(ex, Base, :getproperty) || iscall(ex, Core, :getfield)) &&
+  ex.args[3] isa QuoteNode
 
 # TODO: remove this once we don't mess with type inference
 function _forward_type(Ts)
