@@ -129,3 +129,91 @@ end
   A = randn(rng, N, N)
   @test gradtest(A->logdet(cholesky(A' * A + 1e-6I)), A)
 end
+
+@testset "vcat" begin
+
+  # Vector-only tests.
+  @test gradtest(x->vcat(x), randn(10))
+  @test Zygote.gradient(x->sum(vcat(x)), randn(10))[1] isa Vector
+
+  @test gradtest((x, y)->vcat(x, y), randn(5), randn(6))
+  let
+    x̄, ȳ = Zygote.gradient((x, y)->sum(vcat(x, y)), randn(5), randn(6))
+    @test x̄ isa Vector
+    @test ȳ isa Vector
+  end
+
+  # Matrix-only tests.
+  @test gradtest(x->vcat(x), randn(10, 2))
+  @test Zygote.gradient(x->sum(vcat(x)), randn(10, 2))[1] isa Matrix
+
+  @test gradtest((x, y)->vcat(x, y), randn(10, 2), randn(3, 2))
+  let
+    x̄, ȳ = Zygote.gradient((x, y)->sum(vcat(x, y)), randn(10, 2), randn(3, 2))
+    @test x̄ isa Matrix
+    @test ȳ isa Matrix
+  end
+
+  # Matrix-Vector tests.
+  @test gradtest((x, Y)->vcat(x, Y), randn(10), randn(3, 1))
+  let
+    x̄, Ȳ = Zygote.gradient((x, Y)->sum(vcat(x, Y)), randn(10), randn(3, 1))
+    @test x̄ isa Vector
+    @test Ȳ isa Matrix
+  end
+
+  @test gradtest((X, y)->vcat(X, y), randn(2, 1), randn(1))
+  let
+    X̄, ȳ = Zygote.gradient((X, y)->sum(vcat(X, y)), randn(2, 1), randn(1))
+    @test X̄ isa Matrix
+    @test ȳ isa Vector
+  end
+end
+
+@testset "hcat" begin
+
+  # Vector-only.
+  @test gradtest(hcat, randn(10))
+  @test Zygote.gradient(x->sum(hcat(x)), randn(10))[1] isa Vector
+
+  let
+    x, y = randn(5), randn(5)
+    @test gradtest(hcat, x, y)
+    z, back = Zygote.forward(hcat, x, y)
+    x̄, ȳ = back(randn(5, 2))
+    @test x̄ isa Vector
+    @test ȳ isa Vector
+  end
+
+  # Matrix-only.
+  let
+    X, Y = randn(5, 3), randn(5, 1)
+    @test gradtest(hcat, X, Y)
+    Z, back = Zygote.forward(hcat, X, Y)
+    X̄, Ȳ = back(randn(size(Z)))
+    @test X̄ isa Matrix
+    @test Ȳ isa Matrix
+  end
+
+  # Matrix-Vector tests.
+  let
+    x, Y, Z = randn(5), rand(5, 1), randn(5, 3)
+    @test gradtest(hcat, x, Y, Z)
+    Z, back = Zygote.forward(hcat, x, Y, Z)
+    x̄, Ȳ, Z̄ = back(randn(size(Z)))
+    @test x̄ isa Vector
+    @test Ȳ isa Matrix
+    @test Z̄ isa Matrix
+  end
+
+  # Some more Matrix-Vector tests.
+  let
+    x, Y, z = randn(1), randn(1, 1), randn(1)
+    @test gradtest(hcat, x, Y, z)
+    Z, back = Zygote.forward(hcat, x, Y, z)
+    x̄, Ȳ, z̄ = back(randn(size(Z)))
+    @test x̄ isa Vector
+    @test Ȳ isa Matrix
+    @test z̄ isa Vector
+  end
+end

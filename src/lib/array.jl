@@ -1,6 +1,6 @@
 @adjoint (::Type{T})(args...) where T<:Array = T(args...), Δ -> nothing
 
-@nograd size, length, eachindex, Colon(), findfirst, rand, randn
+@nograd size, length, eachindex, Colon(), findfirst, randn
 
 @adjoint Base.vect(xs...) = Base.vect(xs...), Δ -> (Δ...,)
 
@@ -30,6 +30,23 @@ end
 @adjoint function hvcat(rows::Tuple{Vararg{Int}}, xs::T...) where T<:Number
   hvcat(rows, xs...), ȳ -> (nothing, ȳ...)
 end
+
+pull_block_vert(sz, Δ, A::AbstractVector) = Δ[sz-length(A)+1:sz]
+pull_block_vert(sz, Δ, A::AbstractMatrix) = Δ[sz-size(A, 1)+1:sz, :]
+@adjoint function vcat(A::Union{AbstractVector, AbstractMatrix}...)
+  sz = cumsum([size.(A, 1)...])
+  return vcat(A...), Δ->(map(n->pull_block_vert(sz[n], Δ, A[n]), eachindex(A))...,)
+end
+
+# @adjoint hcat(A::AbstractVector...) = hcat(A...), Δ->([Δ[:, n] for n in 1:size(Δ, 2)]...,)
+
+pull_block_horz(sz, Δ, A::AbstractVector) = Δ[:, sz]
+pull_block_horz(sz, Δ, A::AbstractMatrix) = Δ[:, sz-size(A, 2)+1:sz]
+@adjoint function hcat(A::Union{AbstractVector, AbstractMatrix}...)
+  sz = cumsum([size.(A, 2)...])
+  return hcat(A...), Δ->(map(n->pull_block_horz(sz[n], Δ, A[n]), eachindex(A))...,)
+end
+
 
 @adjoint function repeat(xs; inner=ntuple(_->1, ndims(xs)), outer=ntuple(_->1, ndims(xs)))
   repeat(xs, inner = inner, outer = outer), function (Δ)
