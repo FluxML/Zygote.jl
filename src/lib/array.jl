@@ -38,8 +38,6 @@ pull_block_vert(sz, Δ, A::AbstractMatrix) = Δ[sz-size(A, 1)+1:sz, :]
   return vcat(A...), Δ->(map(n->pull_block_vert(sz[n], Δ, A[n]), eachindex(A))...,)
 end
 
-# @adjoint hcat(A::AbstractVector...) = hcat(A...), Δ->([Δ[:, n] for n in 1:size(Δ, 2)]...,)
-
 pull_block_horz(sz, Δ, A::AbstractVector) = Δ[:, sz]
 pull_block_horz(sz, Δ, A::AbstractMatrix) = Δ[:, sz-size(A, 2)+1:sz]
 @adjoint function hcat(A::Union{AbstractVector, AbstractMatrix}...)
