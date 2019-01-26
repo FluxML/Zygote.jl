@@ -48,12 +48,19 @@ unwrap(x) = x
 
 @adjoint tuple(xs...) = xs, identity
 
-@adjoint getindex(xs::NTuple{N,Any}, i::Integer) where N =
-  (xs[i], Δ -> (ntuple(j -> i == j ? Δ : nothing, Val(N)), nothing))
+@adjoint function Base.getindex(xs::NTuple{N, Any}, i::Integer) where N
+  back = let i=Val(i), NN=Val(N)
+    Δ -> (ntuple(j -> i === Val(j) ? Δ : nothing, NN), nothing)
+  end
+  (xs[i], back)
+end
 
-# Needed for iteration lowering
-@adjoint Core.getfield(xs::NTuple{N,Any}, i::Integer) where N =
-  (xs[i], Δ -> (ntuple(j -> i == j ? Δ : nothing, Val(N)), nothing))
+@adjoint function Core.getfield(xs::NTuple{N, Any}, i::Integer) where N
+  back = let i=Val(i), NN=Val(N)
+    Δ -> (ntuple(j -> i === Val(j) ? Δ : nothing, NN), nothing)
+  end
+  (Core.getfield(xs, i), back)
+end
 
 @adjoint function Base.first(xs::Tuple)
   drest = map(_->nothing, tail(xs))
