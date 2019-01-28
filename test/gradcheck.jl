@@ -181,6 +181,7 @@ end
     cat_test(hcat, randn(r), randn(r, c))
     cat_test(hcat, randn(r), randn(r, c), randn(r))
   end
+end
 
 @testset "one(s) and zero(s)" begin
   @test Zygote.gradient(x->sum(ones(size(x))), randn(5))[1] isa Nothing
