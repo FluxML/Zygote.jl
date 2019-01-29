@@ -145,6 +145,11 @@ end
   Expr(:tuple, [:($f = Ref{Any}(nothing)) for f in fieldnames(x)]...)
 end
 
+struct CacheNotEnabledError
+    x::Type
+end
+grad_mut(cx::Context{Nothing}, x) = throw(CacheNotEnabledError(typeof(x)))
+
 function grad_mut(cx::Context, x)
   T = Core.Compiler.return_type(grad_mut, Tuple{typeof(x)})
   ch = cache(cx)
