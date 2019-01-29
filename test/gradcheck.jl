@@ -132,8 +132,7 @@ end
 
 using Distances
 
- @testset "distances" begin
-let
+@testset "distances" begin
   rng, P, Q, D = MersenneTwister(123456), 10, 9, 8
 
    # Check sqeuclidean.
@@ -160,4 +159,63 @@ let
    # Check unary pairwise.
   gradtest(X->pairwise(SqEuclidean(), X), randn(rng, D, P))
 end
+
+function cat_test(f, A::Union{AbstractVector, AbstractMatrix}...)
+  @test gradtest(f, A...)
+  Z, back = Zygote.forward(f, A...)
+  Ā = back(randn(size(Z)))
+  @test all(map((a, ā)->ā isa typeof(a), A, Ā))
+end
+
+@testset "vcat" begin
+
+  # Vector-only.
+  cat_test(vcat, randn(1))
+  cat_test(vcat, randn(10))
+
+  cat_test(vcat, randn(1), randn(1))
+  cat_test(vcat, randn(5), randn(1))
+  cat_test(vcat, randn(1), randn(6))
+  cat_test(vcat, randn(5), randn(6))
+
+  # Matrix-only.
+  for c in [1, 2], r1 in [1, 2], r2 in [1, 2]
+    cat_test(vcat, randn(r1, c))
+    cat_test(vcat, randn(r1, c), randn(r2, c))
+  end
+
+  # Matrix-Vector / Vector-Matrix / Vector-Matrix-Vector.
+  for r in [1, 2]
+    cat_test(vcat, randn(r, 1), randn(r))
+    cat_test(vcat, randn(r), randn(r, 1))
+    cat_test(vcat, randn(r), randn(r, 1), randn(r))
+  end
+end
+
+@testset "hcat" begin
+
+  # Vector-only.
+  for r in [1, 2]
+    cat_test(hcat, randn(r))
+    cat_test(hcat, randn(r), randn(r))
+  end
+
+  # Matrix-only.
+  for r in [1, 2], c1 in [1, 2], c2 in [1, 2]
+    cat_test(hcat, randn(r, c1), randn(r, c2))
+  end
+
+  # Matrix-Vector / Vector-Matrix / Vector-Matrix-Vector.
+  for r in [1, 2], c in [1, 2]
+    cat_test(hcat, randn(r, c), randn(r))
+    cat_test(hcat, randn(r), randn(r, c))
+    cat_test(hcat, randn(r), randn(r, c), randn(r))
+  end
+end
+
+@testset "one(s) and zero(s)" begin
+  @test Zygote.gradient(x->sum(ones(size(x))), randn(5))[1] isa Nothing
+  @test Zygote.gradient(x->sum(one(x)), randn(3, 3))[1] isa Nothing
+  @test Zygote.gradient(x->sum(zeros(size(x))), randn(7))[1] isa Nothing
+  @test Zygote.gradient(x->sum(zero(x)), randn(3))[1] isa Nothing
 end
