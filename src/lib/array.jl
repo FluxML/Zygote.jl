@@ -132,75 +132,75 @@ end
 @adjoint diag(A::AbstractMatrix) = diag(A), Δ->(Diagonal(Δ),)
 
 @adjoint function \(A::AbstractMatrix, B::AbstractVecOrMat)
-    Y = A \ B
-    return Y, function(Ȳ)
-        B̄ = A' \ Ȳ
-        return (-B̄ * Y', B̄)
-    end
+  Y = A \ B
+  return Y, function(Ȳ)
+      B̄ = A' \ Ȳ
+      return (-B̄ * Y', B̄)
+  end
 end
 
 @adjoint function /(A::AbstractMatrix, B::AbstractMatrix)
-    Y = A / B
-    return Y, function(Ȳ)
-        Ā = Ȳ / B'
-        return (Ā, -Y' * Ā)
-    end
+  Y = A / B
+  return Y, function(Ȳ)
+      Ā = Ȳ / B'
+      return (Ā, -Y' * Ā)
+  end
 end
 
 _symmetric_back(Δ) = UpperTriangular(Δ) + LowerTriangular(Δ)' - Diagonal(Δ)
 _symmetric_back(Δ::UpperTriangular) = Δ
 @adjoint function Symmetric(A::AbstractMatrix)
-    back(Δ::AbstractMatrix) = (_symmetric_back(Δ),)
-    back(Δ::NamedTuple) = (_symmetric_back(Δ.data),)
-    return Symmetric(A), back
+  back(Δ::AbstractMatrix) = (_symmetric_back(Δ),)
+  back(Δ::NamedTuple) = (_symmetric_back(Δ.data),)
+  return Symmetric(A), back
 end
 
 # Implementation due to Seeger, Matthias, et al. "Auto-differentiating linear algebra."
 @adjoint function cholesky(Σ::Union{StridedMatrix, Symmetric{<:Real, <:StridedMatrix}})
-    C = cholesky(Σ)
-    return C, function(Δ)
-        U, Ū = C.U, Δ.factors
-        Σ̄ = Ū * U'
-        Σ̄ = copytri!(Σ̄, 'U')
-        Σ̄ = ldiv!(U, Σ̄)
-        BLAS.trsm!('R', 'U', 'T', 'N', one(eltype(Σ)), U.data, Σ̄)
-        @inbounds for n in diagind(Σ̄)
-            Σ̄[n] /= 2
-        end
-        return (UpperTriangular(Σ̄),)
+  C = cholesky(Σ)
+  return C, function(Δ)
+    U, Ū = C.U, Δ.factors
+    Σ̄ = Ū * U'
+    Σ̄ = copytri!(Σ̄, 'U')
+    Σ̄ = ldiv!(U, Σ̄)
+    BLAS.trsm!('R', 'U', 'T', 'N', one(eltype(Σ)), U.data, Σ̄)
+    @inbounds for n in diagind(Σ̄)
+      Σ̄[n] /= 2
     end
+    return (UpperTriangular(Σ̄),)
+  end
 end
 
 # Various sensitivities for `literal_getproperty`, depending on the 2nd argument.
 @adjoint function literal_getproperty(C::Cholesky, ::Val{:uplo})
-    return literal_getproperty(C, Val(:uplo)), function(Δ)
-        return ((uplo=nothing, info=nothing, factors=nothing),)
-    end
+  return literal_getproperty(C, Val(:uplo)), function(Δ)
+    return ((uplo=nothing, info=nothing, factors=nothing),)
+  end
 end
 @adjoint function literal_getproperty(C::Cholesky, ::Val{:info})
-    return literal_getproperty(C, Val(:info)), function(Δ)
-        return ((uplo=nothing, info=nothing, factors=nothing),)
-    end
+  return literal_getproperty(C, Val(:info)), function(Δ)
+    return ((uplo=nothing, info=nothing, factors=nothing),)
+  end
 end
 @adjoint function literal_getproperty(C::Cholesky, ::Val{:U})
-    return literal_getproperty(C, Val(:U)), function(Δ)
-        Δ_factors = C.uplo == 'U' ? UpperTriangular(Δ) : LowerTriangular(copy(Δ'))
-        return ((uplo=nothing, info=nothing, factors=Δ_factors),)
-    end
+  return literal_getproperty(C, Val(:U)), function(Δ)
+    Δ_factors = C.uplo == 'U' ? UpperTriangular(Δ) : LowerTriangular(copy(Δ'))
+    return ((uplo=nothing, info=nothing, factors=Δ_factors),)
+  end
 end
 @adjoint function literal_getproperty(C::Cholesky, ::Val{:L})
-    return literal_getproperty(C, Val(:L)), function(Δ)
-        Δ_factors = C.uplo == 'L' ? LowerTriangular(Δ) : UpperTriangular(copy(Δ'))
-        return ((uplo=nothing, info=nothing, factors=Δ_factors),)
-    end
+  return literal_getproperty(C, Val(:L)), function(Δ)
+    Δ_factors = C.uplo == 'L' ? LowerTriangular(Δ) : UpperTriangular(copy(Δ'))
+    return ((uplo=nothing, info=nothing, factors=Δ_factors),)
+  end
 end
 
 @adjoint function logdet(C::Cholesky)
-    return logdet(C), function(Δ)
-        return ((uplo=nothing, info=nothing, factors=Diagonal(2 .* Δ ./ diag(C.factors))),)
-    end
+  return logdet(C), function(Δ)
+    return ((uplo=nothing, info=nothing, factors=Diagonal(2 .* Δ ./ diag(C.factors))),)
+  end
 end
 
 @adjoint function +(A::AbstractMatrix, S::UniformScaling)
-    return A + S, Δ->(Δ, (λ=sum(view(Δ, diagind(Δ))),))
+  return A + S, Δ->(Δ, (λ=sum(view(Δ, diagind(Δ))),))
 end

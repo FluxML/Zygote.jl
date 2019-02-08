@@ -130,6 +130,38 @@ end
   @test gradtest(A->logdet(cholesky(A' * A + 1e-6I)), A)
 end
 
+using Distances
+
+Zygote.refresh()
+
+@testset "distances" begin
+  rng, P, Q, D = MersenneTwister(123456), 10, 9, 8
+
+   # Check sqeuclidean.
+  let
+    x, y = randn(rng, D), randn(rng, D)
+    @test gradtest(x->sqeuclidean(x, y), x)
+    @test gradtest(y->sqeuclidean(x, y), y)
+  end
+
+   # Check binary colwise.
+  let
+    X, Y = randn(rng, D, P), randn(rng, D, P)
+    @test gradtest(X->colwise(SqEuclidean(), X, Y), X)
+    @test gradtest(Y->colwise(SqEuclidean(), X, Y), Y)
+  end
+
+   # Check binary pairwise.
+  let
+    X, Y = randn(rng, D, P), randn(rng, D, Q)
+    @test gradtest(X->pairwise(SqEuclidean(), X, Y), X)
+    @test gradtest(Y->pairwise(SqEuclidean(), X, Y), Y)
+  end
+
+   # Check unary pairwise.
+  @test gradtest(X->pairwise(SqEuclidean(), X), randn(rng, D, P))
+end
+
 function cat_test(f, A::Union{AbstractVector, AbstractMatrix}...)
   @test gradtest(f, A...)
   Z, back = Zygote.forward(f, A...)

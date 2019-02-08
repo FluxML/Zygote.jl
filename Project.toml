@@ -13,4 +13,10 @@ NaNMath = "77ba4419-2d1f-58cd-9bb1-8ffee604a2e3"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 Requires = "ae029012-a4dd-5104-9daa-d747884805df"
 SpecialFunctions = "276daf66-3868-5448-9aa4-cd146d93841b"
+
+[extras]
+Distances = "b4f34e82-e78d-54a5-968a-f98e89d6e8f7"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test", "Distances"]
