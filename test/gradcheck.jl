@@ -132,32 +132,34 @@ end
 
 using Distances
 
+Zygote.refresh()
+
 @testset "distances" begin
   rng, P, Q, D = MersenneTwister(123456), 10, 9, 8
 
    # Check sqeuclidean.
   let
     x, y = randn(rng, D), randn(rng, D)
-    gradtest(x->sqeuclidean(x, y), x)
-    gradtest(y->sqeuclidean(x, y), y)
+    @test gradtest(x->sqeuclidean(x, y), x)
+    @test gradtest(y->sqeuclidean(x, y), y)
   end
 
    # Check binary colwise.
   let
     X, Y = randn(rng, D, P), randn(rng, D, P)
-    gradtest(X->colwise(SqEuclidean(), X, Y), X)
-    gradtest(Y->colwise(SqEuclidean(), X, Y), Y)
+    @test gradtest(X->colwise(SqEuclidean(), X, Y), X)
+    @test gradtest(Y->colwise(SqEuclidean(), X, Y), Y)
   end
 
    # Check binary pairwise.
   let
     X, Y = randn(rng, D, P), randn(rng, D, Q)
-    gradtest(X->pairwise(SqEuclidean(), X, Y), X)
-    gradtest(Y->pairwise(SqEuclidean(), X, Y), Y)
+    @test gradtest(X->pairwise(SqEuclidean(), X, Y), X)
+    @test gradtest(Y->pairwise(SqEuclidean(), X, Y), Y)
   end
 
    # Check unary pairwise.
-  gradtest(X->pairwise(SqEuclidean(), X), randn(rng, D, P))
+  @test gradtest(X->pairwise(SqEuclidean(), X), randn(rng, D, P))
 end
 
 function cat_test(f, A::Union{AbstractVector, AbstractMatrix}...)
