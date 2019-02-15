@@ -59,9 +59,10 @@ unwrap(x) = x
   first(xs), Δ -> ((Δ, drest...),)
 end
 
-_empty(x) = nothing
-_empty(x::Tuple) = map(_empty, x)
+_empty(x) = length(x)
+_empty(x::Tuple) = map(_->nothing, x)
 
+_unapply(t::Integer, xs) = xs[1:t], xs[t+1:end]
 _unapply(t, xs) = first(xs), tail(xs)
 _unapply(t::Tuple{}, xs) = (), xs
 
@@ -75,7 +76,7 @@ unapply(t, xs) = _unapply(t, xs)[1]
 
 @adjoint function Core._apply(f, args...)
   y, back = Core._apply(_forward, (__context__, f), args...)
-  st = _empty(args)
+  st = map(_empty, args)
   y, function (Δ)
     Δ = back(Δ)
     (first(Δ), unapply(st, Base.tail(Δ))...)

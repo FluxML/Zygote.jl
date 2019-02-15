@@ -226,3 +226,6 @@ if !Zygote.usetyped
   invokable(x::Integer) = 3x
   @test gradient(x -> invoke(invokable, Tuple{Any}, x), 5) == (2,)
 end
+
+y, back = Zygote.forward(x->tuple(x...), [1, 2, 3])
+@test back((1, 1, 1)) == ((1,1,1),)
