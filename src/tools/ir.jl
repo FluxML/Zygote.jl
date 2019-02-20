@@ -1,7 +1,7 @@
 import Core: SSAValue, GotoNode, Compiler
 import Core: Typeof
 import Core.Compiler: CodeInfo, IRCode, CFG, BasicBlock, Argument, ReturnNode,
-  NullLineInfo, just_construct_ssa, compact!, NewNode, InferenceState, OptimizationState,
+  just_construct_ssa, compact!, NewNode, InferenceState, OptimizationState,
   GotoIfNot, PhiNode, PiNode, StmtRange, IncrementalCompact, insert_node!, insert_node_here!,
   compact!, finish, DomTree, construct_domtree, dominates, userefs, widenconst, types, verify_ir
 using InteractiveUtils: typesof
@@ -66,6 +66,7 @@ exprtype(ir::IRCode, x::Expr) = error(x)
 rename(x, m) = x
 rename(x::SSAValue, m) = m[x.id]
 rename(xs::AbstractVector, m) = map(x -> rename(x, m), xs)
+rename(xs::Tuple, m) = map(x -> rename(x, m), xs)
 rename(xs::AbstractSet, m) = Set(rename(x, m) for x in xs)
 rename(d::AbstractDict, m) = Dict(k => rename(v, m) for (k, v) in d)
 
