@@ -1,6 +1,7 @@
 using Zygote, NNlib, Test, Random, LinearAlgebra
 using Zygote: gradient
 using NNlib: conv
+import ForwardDiff
 import Random
 
 function ngradient(f, xs::AbstractArray...)
@@ -232,4 +233,28 @@ end
 @testset "* sizing" begin
   @test size(Zygote.gradient((x, y)->sum(x * y), randn(1, 1), randn(1, 10))[1]) == (1, 1)
   @test size(Zygote.gradient((x, y)->sum(x * y), randn(1, 1), randn(1, 10))[2]) == (1, 10)
+end
+
+# Currently disabled pending improvements in Zygote and Base
+if false
+  @testset "third order AD (indexing)" begin
+    # Nested AD for getindex
+    grad_tracker = gradient([1.0, 2.0, 3.0]) do x
+      sum(gradient(x) do x
+        sum(gradient(x) do x
+          sum(x[1:2])^4
+        end[1])
+      end[1])
+    end[1]
+    # We compare to ForwardDiff, since the high order derivative is not
+    # numerically stable under finite differencing.
+    grad_forward = ForwardDiff.gradient([1.0, 2.0, 3.0]) do x
+      sum(ForwardDiff.gradient(x) do x
+        sum(ForwardDiff.gradient(x) do x
+          sum(x[1:2])^4
+        end)
+      end)
+    end
+    @test grad_tracker ≈ grad_forward ≈ [288.0, 288.0, 0.0]
+  end
 end

@@ -35,7 +35,7 @@ end
   d[k], function (Δ)
     grad = grad_mut(__context__, d)
     grad[k] = accum(get(grad, k, nothing), Δ)
-    return (grad, nothing)
+    return (nobacksies(:getindex, grad), nothing)
   end
 end
 
