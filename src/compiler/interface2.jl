@@ -7,7 +7,6 @@ ignore(T) = all(T -> T <: Type, T.parameters)
   !(g isa Tuple) && return :(f(args...), Pullback{$T}((f,)))
   meta, forw, _ = g
   argnames!(meta, Symbol("#self#"), :ctx, :f, :args)
-  meta.code.slotflags = UInt8[0x0, 0x0, 0x0, 0x0]
   forw = varargs!(meta, forw, 3)
   forw = slots!(pis!(inlineable!(forw)))
   return IRTools.update!(meta, forw)
@@ -26,7 +25,6 @@ end
   meta, _, back = g
   resize!(back.argtypes, 2)
   argnames!(meta, Symbol("#self#"), :Δ)
-  meta.code.slotflags = UInt8[0x0, 0x0]
   back = slots!(inlineable!(back))
   return IRTools.update!(meta, back)
 end
