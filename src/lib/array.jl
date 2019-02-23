@@ -108,8 +108,11 @@ end
 
 # LinAlg
 
-@adjoint a::AbstractVecOrMat * b::AbstractVecOrMat = a * b,
-  Δ -> (Δ * transpose(b), transpose(a) * Δ)
+@adjoint function(a::AbstractVecOrMat * b::AbstractVecOrMat)
+  return a * b, function(Δ)
+    return (reshape(Δ * transpose(b), size(a)), reshape(transpose(a) * Δ, size(b)))
+  end
+end
 
 @adjoint transpose(x) = transpose(x), Δ -> (transpose(Δ),)
 @adjoint Base.adjoint(x) = x', Δ -> (Δ',)
@@ -169,6 +172,11 @@ end
     end
     return (UpperTriangular(Σ̄),)
   end
+end
+
+@adjoint function cholesky(Σ::Real)
+  C = cholesky(Σ)
+  return C, Δ::NamedTuple->(Δ.factors[1, 1] / (2 * C.U[1, 1]),)
 end
 
 # Various sensitivities for `literal_getproperty`, depending on the 2nd argument.
