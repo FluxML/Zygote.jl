@@ -156,9 +156,8 @@ D(f, x) = grad(f, x)[1]
 
 @test D(x -> D(sin, x), 0.5) == -sin(0.5)
 
-# FIXME segfaults on beta2 for some reason
-# @test D(x -> x*D(y -> x+y, 1), 1) == 1
-# @test D(x -> x*D(y -> x*y, 1), 4) == 8
+@test D(x -> x*D(y -> x+y, 1), 1) == 1
+@test_broken D(x -> x*D(y -> x*y, 1), 4) == 8
 
 f(x) = throw(DimensionMismatch("fubar"))
 
