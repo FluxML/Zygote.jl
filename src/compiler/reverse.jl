@@ -169,6 +169,7 @@ function record!(ir::IRCode)
   for i = 1:length(ir.stmts)
     ex = argmap(x -> Argument(x.n+2), ir[SSAValue(i)])
     isexpr(ex, :new) && (ex = ir[SSAValue(i)] = xcall(Zygote, :__new__, ex.args...))
+    isexpr(ex, :splatnew) && (ex = ir[SSAValue(i)] = xcall(Zygote, :__splatnew__, ex.args...))
     is_literal_getproperty(ex) &&
       (ex = ir[SSAValue(i)] = xcall(Zygote, :literal_getproperty, ex.args[2], Val(ex.args[3].value)))
     if isexpr(ex, :call) && !ignored(ir, ex)
