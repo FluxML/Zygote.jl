@@ -422,7 +422,7 @@ end
 
 Adjoint(ir::IRCode; varargs = nothing) = Adjoint(Primal(ir, varargs = varargs))
 
-using InteractiveUtils: @which
+using InteractiveUtils
 
 macro code_adjoint(ex)
   :(Adjoint($(code_irm(ex)), varargs = varargs($(esc(:($InteractiveUtils.@which $ex))), length(($(esc.(ex.args)...),)))))
