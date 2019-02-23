@@ -238,4 +238,6 @@ function f(x)
   end
 end
 
-@test Zygote.@code_adjoint(f(1)) isa Zygote.Adjoint
+if VERSION >= v"1.1"
+  @test Zygote.@code_adjoint(f(1)) isa Zygote.Adjoint
+end
