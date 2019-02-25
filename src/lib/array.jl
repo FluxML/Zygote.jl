@@ -5,6 +5,8 @@
 
 @adjoint Base.vect(xs...) = Base.vect(xs...), Δ -> (Δ...,)
 
+@adjoint copy(x::AbstractArray) = copy(x), ȳ -> (ȳ,)
+
 Base.zero(xs::AbstractArray{Any}) = fill!(similar(xs), nothing)
 
 @adjoint function getindex(xs::Array, i...)

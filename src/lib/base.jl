@@ -2,7 +2,26 @@ using Base: @get!
 
 @nograd readline
 
-@adjoint copy(x::AbstractArray) = copy(x), ȳ -> (ȳ,)
+# Gradient of AD stacks
+
+grad_mut(::AbstractVector) = []
+
+@adjoint! function _push!(a::Vector, x)
+  _push!(a, x), function (y)
+    dstk = grad_mut(__context__, a)
+    return (nothing, pop!(dstk))
+  end
+end
+
+@adjoint! function pop!(stk::Stack)
+  pop!(stk), function (Δ)
+    dstk = grad_mut(__context__, stk.data)
+    push!(dstk, Δ)
+    return
+  end
+end
+
+# Dictionaries
 
 grad_mut(d::AbstractDict) = Dict()
 
