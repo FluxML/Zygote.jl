@@ -41,7 +41,7 @@ end
 
 unwrap(x) = x
 
-@adjoint unwrap(x) = unwrap(x), Δ -> accum_param(__context__, x, Δ)
+@adjoint unwrap(x) = unwrap(x), Δ ->(accum_param(__context__, x, Δ); (Δ,))
 
 # Tuples
 

@@ -158,7 +158,7 @@ D(f, x) = grad(f, x)[1]
 
 if VERSION > v"1.2-"
   @test D(x -> x*D(y -> x+y, 1), 1) == 1
-  @test_broken D(x -> x*D(y -> x*y, 1), 4) == 8
+  @test D(x -> x*D(y -> x*y, 1), 4) == 8
 end
 
 f(x) = throw(DimensionMismatch("fubar"))
