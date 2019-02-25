@@ -242,3 +242,8 @@ end
 if VERSION >= v"1.1"
   @test Zygote.@code_adjoint(f(1)) isa Zygote.Adjoint
 end
+
+@test_throws ErrorException Zygote.gradient(1) do x
+  push!([], x)
+  return x
+end

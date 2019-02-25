@@ -334,6 +334,12 @@ function reverse_ir(pr::Primal)
           ir.lines[j] = pr.forw.lines[i]
           push!(partials[x], dx)
         end
+      elseif isexpr(ex, :call, :isdefined, GotoIfNot, GotoNode, Nothing, GlobalRef)
+        # ignore it
+      else
+        desc = isexpr(ex) ? "$(ex.head) expression" : ex
+        insert_node!(ir, j, Any, xcall(Base, :error, "Can't differentiate $desc"))
+        ir.lines[j] = pr.forw.lines[i]
       end
     end
     if b == 1
