@@ -27,8 +27,6 @@ include("compiler/reverse.jl")
 include("compiler/emit.jl")
 include("compiler/interface.jl")
 
-include("forward/Forward.jl")
-
 include("lib/grad.jl")
 include("lib/lib.jl")
 include("lib/real.jl")
@@ -37,6 +35,7 @@ include("lib/base.jl")
 include("lib/array.jl")
 include("lib/nnlib.jl")
 include("lib/broadcast.jl")
+@init @require Distances="b4f34e82-e78d-54a5-968a-f98e89d6e8f7" include("lib/distances.jl")
 
 # we need to define this late, so that the genfuncs see lib.jl
 include("compiler/interface2.jl")

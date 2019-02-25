@@ -2,9 +2,12 @@ ismutvalue(x::AbstractArray) = !isimmutable(x)
 
 @adjoint (::Type{T})(args...) where T<:Array = T(args...), Δ -> nothing
 
-@nograd size, length, eachindex, Colon(), findfirst, rand, randn
+@nograd size, length, eachindex, Colon(), findfirst, randn, ones, zeros, one, zero
+
 
 @adjoint Base.vect(xs...) = Base.vect(xs...), Δ -> (Δ...,)
+
+@adjoint copy(x::AbstractArray) = copy(x), ȳ -> (ȳ,)
 
 Base.zero(xs::AbstractArray{Any}) = fill!(similar(xs), nothing)
 
@@ -45,6 +48,21 @@ end
 @adjoint function hvcat(rows::Tuple{Vararg{Int}}, xs::T...) where T<:Number
   hvcat(rows, xs...), ȳ -> (nothing, ȳ...)
 end
+
+pull_block_vert(sz, Δ, A::AbstractVector) = Δ[sz-length(A)+1:sz]
+pull_block_vert(sz, Δ, A::AbstractMatrix) = Δ[sz-size(A, 1)+1:sz, :]
+@adjoint function vcat(A::Union{AbstractVector, AbstractMatrix}...)
+  sz = cumsum([size.(A, 1)...])
+  return vcat(A...), Δ->(map(n->pull_block_vert(sz[n], Δ, A[n]), eachindex(A))...,)
+end
+
+pull_block_horz(sz, Δ, A::AbstractVector) = Δ[:, sz]
+pull_block_horz(sz, Δ, A::AbstractMatrix) = Δ[:, sz-size(A, 2)+1:sz]
+@adjoint function hcat(A::Union{AbstractVector, AbstractMatrix}...)
+  sz = cumsum([size.(A, 2)...])
+  return hcat(A...), Δ->(map(n->pull_block_horz(sz[n], Δ, A[n]), eachindex(A))...,)
+end
+
 
 @adjoint function repeat(xs; inner=ntuple(_->1, ndims(xs)), outer=ntuple(_->1, ndims(xs)))
   repeat(xs, inner = inner, outer = outer), function (Δ)
@@ -107,8 +125,11 @@ end
 
 # LinAlg
 
-@adjoint a::AbstractVecOrMat * b::AbstractVecOrMat = a * b,
-  Δ -> (Δ * transpose(b), transpose(a) * Δ)
+@adjoint function(a::AbstractVecOrMat * b::AbstractVecOrMat)
+  return a * b, function(Δ)
+    return (reshape(Δ * transpose(b), size(a)), reshape(transpose(a) * Δ, size(b)))
+  end
+end
 
 @adjoint dot(xs, ys) = dot(xs, ys), Δ -> (Δ .* ys, Δ .* xs)
 
@@ -133,75 +154,80 @@ end
 @adjoint diag(A::AbstractMatrix) = diag(A), Δ->(Diagonal(Δ),)
 
 @adjoint function \(A::AbstractMatrix, B::AbstractVecOrMat)
-    Y = A \ B
-    return Y, function(Ȳ)
-        B̄ = A' \ Ȳ
-        return (-B̄ * Y', B̄)
-    end
+  Y = A \ B
+  return Y, function(Ȳ)
+      B̄ = A' \ Ȳ
+      return (-B̄ * Y', B̄)
+  end
 end
 
 @adjoint function /(A::AbstractMatrix, B::AbstractMatrix)
-    Y = A / B
-    return Y, function(Ȳ)
-        Ā = Ȳ / B'
-        return (Ā, -Y' * Ā)
-    end
+  Y = A / B
+  return Y, function(Ȳ)
+      Ā = Ȳ / B'
+      return (Ā, -Y' * Ā)
+  end
 end
 
 _symmetric_back(Δ) = UpperTriangular(Δ) + LowerTriangular(Δ)' - Diagonal(Δ)
 _symmetric_back(Δ::UpperTriangular) = Δ
 @adjoint function Symmetric(A::AbstractMatrix)
-    back(Δ::AbstractMatrix) = (_symmetric_back(Δ),)
-    back(Δ::NamedTuple) = (_symmetric_back(Δ.data),)
-    return Symmetric(A), back
+  back(Δ::AbstractMatrix) = (_symmetric_back(Δ),)
+  back(Δ::NamedTuple) = (_symmetric_back(Δ.data),)
+  return Symmetric(A), back
 end
 
 # Implementation due to Seeger, Matthias, et al. "Auto-differentiating linear algebra."
 @adjoint function cholesky(Σ::Union{StridedMatrix, Symmetric{<:Real, <:StridedMatrix}})
-    C = cholesky(Σ)
-    return C, function(Δ)
-        U, Ū = C.U, Δ.factors
-        Σ̄ = Ū * U'
-        Σ̄ = copytri!(Σ̄, 'U')
-        Σ̄ = ldiv!(U, Σ̄)
-        BLAS.trsm!('R', 'U', 'T', 'N', one(eltype(Σ)), U.data, Σ̄)
-        @inbounds for n in diagind(Σ̄)
-            Σ̄[n] /= 2
-        end
-        return (UpperTriangular(Σ̄),)
+  C = cholesky(Σ)
+  return C, function(Δ)
+    U, Ū = C.U, Δ.factors
+    Σ̄ = Ū * U'
+    Σ̄ = copytri!(Σ̄, 'U')
+    Σ̄ = ldiv!(U, Σ̄)
+    BLAS.trsm!('R', 'U', 'T', 'N', one(eltype(Σ)), U.data, Σ̄)
+    @inbounds for n in diagind(Σ̄)
+      Σ̄[n] /= 2
     end
+    return (UpperTriangular(Σ̄),)
+  end
+end
+
+@adjoint function cholesky(Σ::Real)
+  C = cholesky(Σ)
+  return C, Δ::NamedTuple->(Δ.factors[1, 1] / (2 * C.U[1, 1]),)
 end
 
 # Various sensitivities for `literal_getproperty`, depending on the 2nd argument.
 @adjoint function literal_getproperty(C::Cholesky, ::Val{:uplo})
-    return literal_getproperty(C, Val(:uplo)), function(Δ)
-        return ((uplo=nothing, info=nothing, factors=nothing),)
-    end
+  return literal_getproperty(C, Val(:uplo)), function(Δ)
+    return ((uplo=nothing, info=nothing, factors=nothing),)
+  end
 end
 @adjoint function literal_getproperty(C::Cholesky, ::Val{:info})
-    return literal_getproperty(C, Val(:info)), function(Δ)
-        return ((uplo=nothing, info=nothing, factors=nothing),)
-    end
+  return literal_getproperty(C, Val(:info)), function(Δ)
+    return ((uplo=nothing, info=nothing, factors=nothing),)
+  end
 end
 @adjoint function literal_getproperty(C::Cholesky, ::Val{:U})
-    return literal_getproperty(C, Val(:U)), function(Δ)
-        Δ_factors = C.uplo == 'U' ? UpperTriangular(Δ) : LowerTriangular(copy(Δ'))
-        return ((uplo=nothing, info=nothing, factors=Δ_factors),)
-    end
+  return literal_getproperty(C, Val(:U)), function(Δ)
+    Δ_factors = C.uplo == 'U' ? UpperTriangular(Δ) : LowerTriangular(copy(Δ'))
+    return ((uplo=nothing, info=nothing, factors=Δ_factors),)
+  end
 end
 @adjoint function literal_getproperty(C::Cholesky, ::Val{:L})
-    return literal_getproperty(C, Val(:L)), function(Δ)
-        Δ_factors = C.uplo == 'L' ? LowerTriangular(Δ) : UpperTriangular(copy(Δ'))
-        return ((uplo=nothing, info=nothing, factors=Δ_factors),)
-    end
+  return literal_getproperty(C, Val(:L)), function(Δ)
+    Δ_factors = C.uplo == 'L' ? LowerTriangular(Δ) : UpperTriangular(copy(Δ'))
+    return ((uplo=nothing, info=nothing, factors=Δ_factors),)
+  end
 end
 
 @adjoint function logdet(C::Cholesky)
-    return logdet(C), function(Δ)
-        return ((uplo=nothing, info=nothing, factors=Diagonal(2 .* Δ ./ diag(C.factors))),)
-    end
+  return logdet(C), function(Δ)
+    return ((uplo=nothing, info=nothing, factors=Diagonal(2 .* Δ ./ diag(C.factors))),)
+  end
 end
 
 @adjoint function +(A::AbstractMatrix, S::UniformScaling)
-    return A + S, Δ->(Δ, (λ=sum(view(Δ, diagind(Δ))),))
+  return A + S, Δ->(Δ, (λ=sum(view(Δ, diagind(Δ))),))
 end
