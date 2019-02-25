@@ -18,6 +18,19 @@ accum(x::AbstractArray, y::AbstractArray) = accum.(x, y)
   Expr(:tuple, [:($f=accum(x.$f, $(grad(f)))) for f in fieldnames(x)]...)
 end
 
+"""
+  accum_sum(Δ)
+
+`accum_sum` is to `sum` as `accum` is to `+` (i.e. accum_sum treats `nothing`
+as a strong zero).
+"""
+accum_sum(Δ) = reduce(accum, Δ)
+@adjoint accum_sum(Δ) = accum_sum(Δ), Δ -> (FillArray(Δ, size(xs)),)
+
+@adjoint function (T::Type{<:FillArray})(value, size)
+  T(value, size), Δ->(nothing, accum_sum(Δ), nothing)
+end
+
 # Core functions
 
 @nograd Core.apply_type, Core.typeof, nfields, fieldtype,
@@ -41,18 +54,24 @@ end
 
 unwrap(x) = x
 
-@adjoint unwrap(x) = unwrap(x), Δ -> accum_param(__context__, x, Δ)
+@adjoint unwrap(x) = unwrap(x), Δ ->(accum_param(__context__, x, Δ); (Δ,))
+
+nobacksies(s, x) = x
+@adjoint nobacksies(s, x) = x, Δ->error("Nested AD not defined for $s")
 
 # Tuples
 
 @adjoint tuple(xs...) = xs, identity
 
+tuple_at(Δ, i, N) = ntuple(j -> i == j ? Δ : nothing, Val(N))
+@adjoint tuple_at(Δ, i, N) = tuple_at(Δ, i, N), Δ′->(Δ′[i], nothing, nothing)
+
 @adjoint getindex(xs::NTuple{N,Any}, i::Integer) where N =
-  (xs[i], Δ -> (ntuple(j -> i == j ? Δ : nothing, Val(N)), nothing))
+  (xs[i], Δ -> (tuple_at(Δ, i, N), nothing))
 
 # Needed for iteration lowering
 @adjoint Core.getfield(xs::NTuple{N,Any}, i::Integer) where N =
-  (xs[i], Δ -> (ntuple(j -> i == j ? Δ : nothing, Val(N)), nothing))
+  (xs[i], Δ -> (tuple_at(Δ, i, N), nothing))
 
 @adjoint function Base.first(xs::Tuple)
   drest = map(_->nothing, tail(xs))
@@ -79,7 +98,7 @@ unapply(t, xs) = _unapply(t, xs)[1]
   st = map(_empty, args)
   y, function (Δ)
     Δ = back(Δ)
-    (first(Δ), unapply(st, Base.tail(Δ))...)
+    (nobacksies(:apply, first(Δ)), unapply(st, Base.tail(Δ))...)
   end
 end
 
@@ -94,23 +113,39 @@ function deref!(x::Ref)
 end
 
 @generated nt_nothing(x) = Expr(:tuple, [:($f=nothing) for f in fieldnames(x)]...)
+@generated nt_nothing_type(::Type{T}) where {T} = Expr(:tuple, [:($f=nothing) for f in fieldnames(T)]...)
 
 @generated pair(::Val{k}, v) where k = :($k = v,)
+
+struct ∇getfield{T}
+    f::Symbol
+end
+
+function (g::∇getfield{T})(Δ) where {T}
+  ((;nt_nothing_type(T)...,pair(Val(g.f), Δ)...), nothing)
+end
+
+@adjoint function (g::∇getfield)(Δ)
+  g(Δ), Δ′′->(nothing, getfield(Δ′′[1], g.f))
+end
 
 # TODO make this inferrable
 # Right now constant prop is too fragile ...
 @adjoint function getfield(x, f::Symbol)
   val = getfield(x, f)
-  unwrap(val), function (Δ)
-    accum_param(__context__, val, Δ)
-    if isimmutable(x)
-      ((;nt_nothing(x)...,pair(Val(f), Δ)...), nothing)
-    else
+  back = if isimmutable(x)
+    g = ∇getfield{typeof(x)}(f)
+    isimmutable(val) ? g : Δ->(accum_param(__context__, val, Δ); g(Δ))
+  else
+    # TODO: Nested AD for mutable structs
+    function (Δ)
+      accum_param(__context__, val, Δ)
       dx = getfield(grad_mut(__context__, x), f)
       dx[] = accum(dx[], Δ)
       return
     end
   end
+  unwrap(val), back
 end
 
 # ... so we have Zygote call this version where we can.

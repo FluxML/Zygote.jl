@@ -19,6 +19,10 @@ end
 
 @adjoint Base.convert(T::Type{<:Real}, x::Real) = convert(T, x), Δ -> (nothing, Δ)
 
+for T in Base.uniontypes(Core.BuiltinInts)
+    @adjoint (::Type{T})(x::Core.BuiltinInts) = T(x), Δ -> (Δ,)
+end
+
 @adjoint Base.:+(xs...) = +(xs...), Δ -> map(_ -> Δ, xs)
 
 @adjoint function sincos(x)

@@ -7,12 +7,23 @@
 
 Base.zero(xs::AbstractArray{Any}) = fill!(similar(xs), nothing)
 
+struct ∇getindex{T,S}
+    xs::T
+    i::S
+end
+
+function (g::∇getindex)(Δ)
+  Δ′ = zero(g.xs)
+  Δ′[g.i...] = Δ
+  (Δ′, map(_ -> nothing, g.i)...)
+end
+
+@adjoint function (g::∇getindex)(Δ)
+  g(Δ), Δ′′->(nothing, Δ′′[1][g.i...])
+end
+
 @adjoint function getindex(xs::Array, i...)
-  xs[i...], function (Δ)
-    Δ′ = zero(xs)
-    Δ′[i...] = Δ
-    (Δ′, map(_ -> nothing, i)...)
-  end
+  xs[i...], ∇getindex(xs, i)
 end
 
 @adjoint! setindex!(xs::AbstractArray, x...) = setindex!(xs, x...),
