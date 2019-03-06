@@ -257,3 +257,5 @@ if VERSION >= v"1.1"
     pop!(stk)
   end == (1,)
 end
+
+@test gradient(x -> [x][1].a, Foo(1, 1)) == ((a=1, b=nothing),)

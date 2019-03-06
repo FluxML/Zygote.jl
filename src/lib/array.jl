@@ -7,11 +7,12 @@
 
 @adjoint copy(x::AbstractArray) = copy(x), ȳ -> (ȳ,)
 
-Base.zero(xs::AbstractArray{Any}) = fill!(similar(xs), nothing)
+_zero(xs::AbstractArray{<:Number}) = zero(xs)
+_zero(xs::AbstractArray) = Any[nothing for x in xs]
 
 @adjoint function getindex(xs::Array, i...)
   xs[i...], function (Δ)
-    Δ′ = zero(xs)
+    Δ′ = _zero(xs)
     Δ′[i...] = Δ
     (Δ′, map(_ -> nothing, i)...)
   end
