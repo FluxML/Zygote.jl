@@ -2,6 +2,9 @@ mutable struct Context{T<:Union{IdDict{Any,Any},Nothing}}
   cache::T
 end
 
+# No gradients with respect to the cache argument
+_forward(ctx::Context, T::Type{<:Context}, args...) = T(args...), Δ->nothing
+
 Context() = Context{Union{IdDict{Any,Any},Nothing}}(nothing)
 
 cache(cs::Context{Nothing}) = error("Cache not enabled for this context")

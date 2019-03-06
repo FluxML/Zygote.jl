@@ -103,6 +103,15 @@ unapply(t, xs) = _unapply(t, xs)[1]
   end
 end
 
+@adjoint function Core._apply_latest(f, args...)
+  y, back = Core._apply_latest(_forward, (__context__, f), args...)
+  st = map(_empty, args)
+  y, function (Δ)
+    Δ = Core._apply_latest(back, (Δ,))
+    (nobacksies(:apply, first(Δ)), unapply(st, Base.tail(Δ))...)
+  end
+end
+
 # Structs
 
 deref!(x) = x
