@@ -8,13 +8,18 @@
 
 @adjoint copy(x::AbstractArray) = copy(x), ȳ -> (ȳ,)
 
-_zero(xs::AbstractArray{<:Integer}) = fill!(similar(xs, float(eltype(xs))), false)
-_zero(xs::AbstractArray{<:Number}) = zero(xs)
-_zero(xs::AbstractArray) = Any[nothing for x in xs]
+_zero(xs::AbstractArray{<:Integer}, T) = fill!(similar(xs, float(eltype(xs))), false)
+_zero(xs::AbstractArray{<:Number}, T) = zero(xs)
+_zero(xs::AbstractArray, T) = T[nothing for x in xs]
 
 @adjoint function getindex(xs::Array, i...)
   xs[i...], function (Δ)
-    Δ′ = _zero(xs)
+    if i isa NTuple{Integer}
+      T = Union{Nothing, eltype(Δ)}
+    else
+      T = Union{Nothing, typeof(Δ)}
+    end
+    Δ′ = _zero(xs, T)
     Δ′[i...] = Δ
     (Δ′, map(_ -> nothing, i)...)
   end
