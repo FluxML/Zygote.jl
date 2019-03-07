@@ -11,19 +11,19 @@ julia> y
 0.479425538604203
 ```
 
-`forward` gives two outputs: the result of the original function, `sin(0.5)`, and a *pullback*, here called `back`. `back` implements the gradient computation for `sin`, accepting a derivative and producing a new one. In mathematical terms, it implements a vector-Jacobian product. Where ``y = f(x)`` and the gradient ``\frac{\partial l}{\partial x}`` is written ``\bar{x}``, the pullback ``\mathcal{B}`` computes:
+`forward` gives two outputs: the result of the original function, `sin(0.5)`, and a *pullback*, here called `back`. `back` implements the gradient computation for `sin`, accepting a derivative and producing a new one. In mathematical terms, it implements a vector-Jacobian product. Where ``y = f(x)`` and the gradient ``\frac{\partial l}{\partial x}`` is written ``\bar{x}``, the pullback ``\mathcal{B}_y`` computes:
 
 ```math
 \bar{x} = \frac{\partial l}{\partial x} = \frac{\partial l}{\partial y} \frac{\partial y}{\partial x} = \mathcal{B}_y(\bar{y})
 ```
 
-To make this concrete, take the function ``y = sin(x)``. ``\frac{\partial y}{\partial x} = cos(x)``, so the pullback is ``\bar{y} cos(x)``. In other words `forward(sin, x)` behaves the same as
+To make this concrete, take the function ``y = sin(x)``. ``\frac{\partial y}{\partial x} = cos(x)``, so the pullback is ``\bar{y} \cos(x)``. In other words `forward(sin, x)` behaves the same as
 
 ```julia
 dsin(x) = sin(x), ȳ -> (ȳ * cos(x),)
 ```
 
-`gradient` takes a function ``l = f(x)`` and assumes ``l̄ = \frac{\partial l}{\partial l} = 1`` and feeds this in to the backpropagator. In the case of `sin`,
+`gradient` takes a function ``l = f(x)`` and assumes ``l̄ = \frac{\partial l}{\partial l} = 1`` and feeds this in to the pullback. In the case of `sin`,
 
 ```julia
 julia> function gradsin(x)
