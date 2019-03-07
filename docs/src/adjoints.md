@@ -17,7 +17,7 @@ julia> y
 \bar{x} = \frac{\partial l}{\partial x} = \frac{\partial l}{\partial y} \frac{\partial y}{\partial x} = \mathcal{B}_y(\bar{y})
 ```
 
-To make this concrete, take the function ``y = sin(x)``. ``\frac{\partial y}{\partial x} = cos(x)``, so the pullback is ``\bar{y} \cos(x)``. In other words `forward(sin, x)` behaves the same as
+To make this concrete, take the function ``y = \sin(x)``. ``\frac{\partial y}{\partial x} = \cos(x)``, so the pullback is ``\bar{y} \cos(x)``. In other words `forward(sin, x)` behaves the same as
 
 ```julia
 dsin(x) = sin(x), ȳ -> (ȳ * cos(x),)
