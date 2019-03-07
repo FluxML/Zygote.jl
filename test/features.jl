@@ -259,3 +259,5 @@ if VERSION >= v"1.1"
 end
 
 @test gradient(x -> [x][1].a, Foo(1, 1)) == ((a=1, b=nothing),)
+
+@test gradient((a, b) -> Zygote.hook(-, a)*b, 2, 3) == (-3, 2)
