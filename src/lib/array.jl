@@ -1,6 +1,7 @@
 @adjoint (::Type{T})(args...) where T<:Array = T(args...), Δ -> nothing
 
-@nograd size, length, eachindex, Colon(), findfirst, randn, ones, zeros, one, zero
+@nograd size, length, eachindex, Colon(), findfirst, randn, ones, zeros, one, zero,
+  print, println
 
 
 @adjoint Base.vect(xs...) = Base.vect(xs...), Δ -> (Δ...,)
