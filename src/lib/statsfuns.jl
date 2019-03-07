@@ -1,4 +1,5 @@
-using .StatsFuns
+import .StatsFuns
+using StatsFuns: xlogx, logistic, logit, log1psq, log1pexp, logsumexp
 
 @adjoint function xlogx(x::Real)
     y = xlogx(x)

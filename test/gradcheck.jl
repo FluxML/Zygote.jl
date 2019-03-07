@@ -229,37 +229,37 @@ end
   @test Zygote.gradient(x->sum(zero(x)), randn(3))[1] isa Nothing
 end
 
-using StatsFuns
+import StatsFuns
 
 Zygote.refresh()
 
 @testset "xlogx" begin
-  @test gradcheck(x->2.5 * xlogx(x[1]), [1.0])
-  @test gradcheck(x->2.5 * xlogx(x[1]), [2.45])
+  @test gradcheck(x->2.5 * StatsFuns.xlogx(x[1]), [1.0])
+  @test gradcheck(x->2.5 * StatsFuns.xlogx(x[1]), [2.45])
 end
 
 @testset "logistic" begin
-  @test gradcheck(x->3.0 * logistic(x[1]), [-5.0])
-  @test gradcheck(x->3.0 * logistic(x[1]), [-1.0])
-  @test gradcheck(x->3.0 * logistic(x[1]), [-eps()])
-  @test gradcheck(x->3.0 * logistic(x[1]), [0.0])
-  @test gradcheck(x->3.0 * logistic(x[1]), [eps()])
-  @test gradcheck(x->3.0 * logistic(x[1]), [1.0])
-  @test gradcheck(x->3.0 * logistic(x[1]), [5.0])
+  @test gradcheck(x->3.0 * StatsFuns.logistic(x[1]), [-5.0])
+  @test gradcheck(x->3.0 * StatsFuns.logistic(x[1]), [-1.0])
+  @test gradcheck(x->3.0 * StatsFuns.logistic(x[1]), [-eps()])
+  @test gradcheck(x->3.0 * StatsFuns.logistic(x[1]), [0.0])
+  @test gradcheck(x->3.0 * StatsFuns.logistic(x[1]), [eps()])
+  @test gradcheck(x->3.0 * StatsFuns.logistic(x[1]), [1.0])
+  @test gradcheck(x->3.0 * StatsFuns.logistic(x[1]), [5.0])
 end
 
 @testset "logit" begin
-  @test gradcheck(x->5.0 * logit(x[1]), [0.1])
-  @test gradcheck(x->5.0 * logit(x[1]), [0.3])
-  @test gradcheck(x->5.0 * logit(x[1]), [0.5])
-  @test gradcheck(x->5.0 * logit(x[1]), [0.7])
-  @test gradcheck(x->5.0 * logit(x[1]), [0.9])
+  @test gradcheck(x->5.0 * StatsFuns.logit(x[1]), [0.1])
+  @test gradcheck(x->5.0 * StatsFuns.logit(x[1]), [0.3])
+  @test gradcheck(x->5.0 * StatsFuns.logit(x[1]), [0.5])
+  @test gradcheck(x->5.0 * StatsFuns.logit(x[1]), [0.7])
+  @test gradcheck(x->5.0 * StatsFuns.logit(x[1]), [0.9])
 end
 
 function test_log1pexp(T, xs)
   y = T(4.3)
   for x in xs
-    @test gradcheck(x->y * log1pexp(x[1]), [x])
+    @test gradcheck(x->y * StatsFuns.log1pexp(x[1]), [x])
   end
 end
 
@@ -281,7 +281,7 @@ end
   rng = MersenneTwister(123456)
   @testset "Float64" begin
     for x in [-10.0, -5.0, -1.0, -eps(), 0.0, eps(), 1.0, 5.0, 10.0]
-      @test gradcheck(x->5.1 * log1psq(x[1]), [x])
+      @test gradcheck(x->5.1 * StatsFuns.log1psq(x[1]), [x])
     end
   end
 end
@@ -289,10 +289,10 @@ end
 @testset "logsumexp" begin
   rng = MersenneTwister(123456)
   @testset "Float64" begin
-    @test gradtest(logsumexp, randn(rng, 1))
-    @test gradtest(logsumexp, randn(rng, 1, 1))
-    @test gradtest(logsumexp, randn(rng, 3))
-    @test gradtest(logsumexp, randn(rng, 3, 4, 5))
+    @test gradtest(StatsFuns.logsumexp, randn(rng, 1))
+    @test gradtest(StatsFuns.logsumexp, randn(rng, 1, 1))
+    @test gradtest(StatsFuns.logsumexp, randn(rng, 3))
+    @test gradtest(StatsFuns.logsumexp, randn(rng, 3, 4, 5))
   end
 end
 
