@@ -130,6 +130,8 @@ julia> gradient(x -> dist(Point(x, 1)), 1)
 
 We usually use custom adjoints to add gradients that Zygote can't derive itself (for example, because they `ccall` to BLAS). But there are some more advanced and fun things we can to with `@adjoint`.
 
+### Gradient Hooks
+
 ```julia
 julia> hook(f, x) = x
 hook (generic function with 1 method)
@@ -154,6 +156,8 @@ julia> gradient((a, b) -> hook(ā -> @show(ā), a)*b, 2, 3)
 
 Zygote provides both `hook` and `@showgrad` so you don't have to write these yourself.
 
+### Checkpointing
+
 A more advanced example is checkpointing, in which we save memory by re-computing the forward pass of a function during the backwards pass. To wit:
 
 ```julia
@@ -176,4 +180,44 @@ julia> gradient(x -> checkpoint(foo, x), 1)
 1
 1
 (0.5403023058681398,)
+```
+
+### Gradient Reflection
+
+It's easy to check whether the code we're running is currently being differentiated.
+
+```julia
+isderiving() = false
+
+@adjoint isderiving() = true, _ -> nothing
+```
+
+A more interesting example is to actually detect how many levels of nesting are going on.
+
+```julia
+nestlevel() = 0
+
+@adjoint nestlevel() = nestlevel()+1, _ -> nothing
+```
+
+Demo:
+
+```julia
+julia> function f(x)
+         println(nestlevel(), " levels of nesting")
+         return x
+       end
+f (generic function with 1 method)
+
+julia> grad(f, x) = gradient(f, x)[1]
+grad (generic function with 1 method)
+
+julia> f(1);
+0 levels of nesting
+
+julia> grad(f, 1);
+1 levels of nesting
+
+julia> grad(x -> x*grad(f, x), 1);
+2 levels of nesting
 ```
