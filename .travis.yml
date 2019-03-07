@@ -22,6 +22,17 @@ matrix:
  allow_failures:
  - julia: nightly
 
+jobs:
+  include:
+    - stage: "Documentation"
+      julia: 1.0
+      os: linux
+      script:
+        - julia --project=docs/ -e 'using Pkg; Pkg.develop(PackageSpec(path=pwd()));
+                                               Pkg.instantiate()'
+        - julia --project=docs/ docs/make.jl
+      after_success: skip
+
 ## uncomment and modify the following lines to manually install system packages
 #addons:
 #  apt: # apt-get for linux
