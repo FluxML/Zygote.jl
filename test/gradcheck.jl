@@ -229,6 +229,73 @@ end
   @test Zygote.gradient(x->sum(zero(x)), randn(3))[1] isa Nothing
 end
 
+import StatsFuns
+
+Zygote.refresh()
+
+@testset "xlogx" begin
+  @test gradcheck(x->2.5 * StatsFuns.xlogx(x[1]), [1.0])
+  @test gradcheck(x->2.5 * StatsFuns.xlogx(x[1]), [2.45])
+end
+
+@testset "logistic" begin
+  @test gradcheck(x->3.0 * StatsFuns.logistic(x[1]), [-5.0])
+  @test gradcheck(x->3.0 * StatsFuns.logistic(x[1]), [-1.0])
+  @test gradcheck(x->3.0 * StatsFuns.logistic(x[1]), [-eps()])
+  @test gradcheck(x->3.0 * StatsFuns.logistic(x[1]), [0.0])
+  @test gradcheck(x->3.0 * StatsFuns.logistic(x[1]), [eps()])
+  @test gradcheck(x->3.0 * StatsFuns.logistic(x[1]), [1.0])
+  @test gradcheck(x->3.0 * StatsFuns.logistic(x[1]), [5.0])
+end
+
+@testset "logit" begin
+  @test gradcheck(x->5.0 * StatsFuns.logit(x[1]), [0.1])
+  @test gradcheck(x->5.0 * StatsFuns.logit(x[1]), [0.3])
+  @test gradcheck(x->5.0 * StatsFuns.logit(x[1]), [0.5])
+  @test gradcheck(x->5.0 * StatsFuns.logit(x[1]), [0.7])
+  @test gradcheck(x->5.0 * StatsFuns.logit(x[1]), [0.9])
+end
+
+function test_log1pexp(T, xs)
+  y = T(4.3)
+  for x in xs
+    @test gradcheck(x->y * StatsFuns.log1pexp(x[1]), [x])
+  end
+end
+
+@testset "log1pexp" begin
+  @testset "Float64" begin
+    @testset "x ∈ (-∞, 18.0)" begin
+      test_log1pexp(Float64, [-1000.0, -50.0, -25.0, -10.0, 0.0, 10.0, 18.0 - eps()])
+    end
+    @testset "x ∈ [18.0, 33.3)" begin
+      test_log1pexp(Float64, [18.0, 18.0 + eps(), 33.3 - eps()])
+    end
+    @testset "x ∈ [33.3, ∞)" begin
+      test_log1pexp(Float64, [33.3, 33.3 + eps(), 100.0])
+    end
+  end
+end
+
+@testset "log1psq" begin
+  rng = MersenneTwister(123456)
+  @testset "Float64" begin
+    for x in [-10.0, -5.0, -1.0, -eps(), 0.0, eps(), 1.0, 5.0, 10.0]
+      @test gradcheck(x->5.1 * StatsFuns.log1psq(x[1]), [x])
+    end
+  end
+end
+
+@testset "logsumexp" begin
+  rng = MersenneTwister(123456)
+  @testset "Float64" begin
+    @test gradtest(StatsFuns.logsumexp, randn(rng, 1))
+    @test gradtest(StatsFuns.logsumexp, randn(rng, 1, 1))
+    @test gradtest(StatsFuns.logsumexp, randn(rng, 3))
+    @test gradtest(StatsFuns.logsumexp, randn(rng, 3, 4, 5))
+  end
+end
+
 @testset "* sizing" begin
   @test size(Zygote.gradient((x, y)->sum(x * y), randn(1, 1), randn(1, 10))[1]) == (1, 1)
   @test size(Zygote.gradient((x, y)->sum(x * y), randn(1, 1), randn(1, 10))[2]) == (1, 10)
