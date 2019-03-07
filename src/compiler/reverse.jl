@@ -169,6 +169,7 @@ function record!(ir::IRCode)
   for i = 1:length(ir.stmts)
     ex = argmap(x -> Argument(x.n+2), ir[SSAValue(i)])
     isexpr(ex, :new) && (ex = ir[SSAValue(i)] = xcall(Zygote, :__new__, ex.args...))
+    isexpr(ex, :splatnew) && (ex = ir[SSAValue(i)] = xcall(Zygote, :__splatnew__, ex.args...))
     is_literal_getproperty(ex) &&
       (ex = ir[SSAValue(i)] = xcall(Zygote, :literal_getproperty, ex.args[2], Val(ex.args[3].value)))
     if isexpr(ex, :call) && !ignored(ir, ex)
@@ -333,6 +334,12 @@ function reverse_ir(pr::Primal)
           ir.lines[j] = pr.forw.lines[i]
           push!(partials[x], dx)
         end
+      elseif isexpr(ex, :call, :isdefined, GotoIfNot, GotoNode, Nothing, GlobalRef)
+        # ignore it
+      else
+        desc = isexpr(ex) ? "$(ex.head) expression" : ex
+        insert_node!(ir, j, Any, xcall(Base, :error, "Can't differentiate $desc"))
+        ir.lines[j] = pr.forw.lines[i]
       end
     end
     if b == 1
@@ -422,7 +429,7 @@ end
 
 Adjoint(ir::IRCode; varargs = nothing) = Adjoint(Primal(ir, varargs = varargs))
 
-using InteractiveUtils: @which
+using InteractiveUtils
 
 macro code_adjoint(ex)
   :(Adjoint($(code_irm(ex)), varargs = varargs($(esc(:($InteractiveUtils.@which $ex))), length(($(esc.(ex.args)...),)))))

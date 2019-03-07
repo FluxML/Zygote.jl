@@ -17,6 +17,7 @@ end
 
 function argnames!(meta, names...)
   meta.code.slotnames = [names...]
+  meta.code.slotflags = [0x00 for name in names]
 end
 
 function spliceargs!(meta, ir::IRCode, args...)

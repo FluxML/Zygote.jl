@@ -128,6 +128,13 @@ end
   rng, N = MersenneTwister(123456), 5
   A = randn(rng, N, N)
   @test gradtest(A->logdet(cholesky(A' * A + 1e-6I)), A)
+  @testset "cholesky - scalar" begin
+    y, back = Zygote.forward(cholesky, 5.0 * ones(1, 1))
+    y′, back′ = Zygote.forward(cholesky, 5.0)
+    C̄ = randn(rng, 1, 1)
+    @test back′((factors=C̄,))[1] isa Real
+    @test back′((factors=C̄,))[1] ≈ back((factors=C̄,))[1][1, 1]
+  end
 end
 
 using Distances
@@ -287,4 +294,9 @@ end
     @test gradtest(logsumexp, randn(rng, 3))
     @test gradtest(logsumexp, randn(rng, 3, 4, 5))
   end
+end
+
+@testset "* sizing" begin
+  @test size(Zygote.gradient((x, y)->sum(x * y), randn(1, 1), randn(1, 10))[1]) == (1, 1)
+  @test size(Zygote.gradient((x, y)->sum(x * y), randn(1, 1), randn(1, 10))[2]) == (1, 10)
 end

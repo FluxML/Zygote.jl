@@ -5,11 +5,14 @@
 
 @adjoint Base.vect(xs...) = Base.vect(xs...), Δ -> (Δ...,)
 
-Base.zero(xs::AbstractArray{Any}) = fill!(similar(xs), nothing)
+@adjoint copy(x::AbstractArray) = copy(x), ȳ -> (ȳ,)
+
+_zero(xs::AbstractArray{<:Number}) = zero(xs)
+_zero(xs::AbstractArray) = Any[nothing for x in xs]
 
 @adjoint function getindex(xs::Array, i...)
   xs[i...], function (Δ)
-    Δ′ = zero(xs)
+    Δ′ = _zero(xs)
     Δ′[i...] = Δ
     (Δ′, map(_ -> nothing, i)...)
   end
@@ -108,8 +111,11 @@ end
 
 # LinAlg
 
-@adjoint a::AbstractVecOrMat * b::AbstractVecOrMat = a * b,
-  Δ -> (Δ * transpose(b), transpose(a) * Δ)
+@adjoint function(a::AbstractVecOrMat * b::AbstractVecOrMat)
+  return a * b, function(Δ)
+    return (reshape(Δ * transpose(b), size(a)), reshape(transpose(a) * Δ, size(b)))
+  end
+end
 
 @adjoint transpose(x) = transpose(x), Δ -> (transpose(Δ),)
 @adjoint Base.adjoint(x) = x', Δ -> (Δ',)
@@ -169,6 +175,11 @@ end
     end
     return (UpperTriangular(Σ̄),)
   end
+end
+
+@adjoint function cholesky(Σ::Real)
+  C = cholesky(Σ)
+  return C, Δ::NamedTuple->(Δ.factors[1, 1] / (2 * C.U[1, 1]),)
 end
 
 # Various sensitivities for `literal_getproperty`, depending on the 2nd argument.

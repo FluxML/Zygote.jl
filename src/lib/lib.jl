@@ -41,7 +41,7 @@ end
 
 unwrap(x) = x
 
-@adjoint unwrap(x) = unwrap(x), Δ -> accum_param(__context__, x, Δ)
+@adjoint unwrap(x) = unwrap(x), Δ ->(accum_param(__context__, x, Δ); (Δ,))
 
 # Tuples
 
@@ -162,7 +162,14 @@ end
   end
 end
 
-struct Jnew{T,G}
+@generated function __splatnew__(T, args)
+  quote
+    Base.@_inline_meta
+    $(Expr(:splatnew, :T, :args))
+  end
+end
+
+struct Jnew{T,G,splat}
   g::G
 end
 
@@ -171,12 +178,24 @@ Jnew{T}(g) where T = Jnew{T,typeof(g)}(g)
 @adjoint! function __new__(T, args...)
   x = __new__(T, args...)
   g = !T.mutable || fieldcount(T) == 0 ? nothing : grad_mut(__context__, x)
-  x, Jnew{T}(g)
+  x, Jnew{T,typeof(g),false}(g)
+end
+
+@adjoint! function __splatnew__(T, args)
+  x = __splatnew__(T, args)
+  g = !T.mutable || fieldcount(T) == 0 ? nothing : grad_mut(__context__, x)
+  x, Jnew{T,typeof(g),true}(g)
 end
 
 # TODO captured mutables + multiple calls to `back`
-@generated function (back::Jnew{T,G})(Δ::Union{NamedTuple,Nothing}) where {T,G}
+@generated function (back::Jnew{T,G,false})(Δ::Union{NamedTuple,Nothing}) where {T,G}
   !T.mutable && Δ == Nothing && return :nothing
   Δ = G == Nothing ? :Δ : :(back.g)
   :(nothing, $(map(f -> :(deref!($Δ.$f)), fieldnames(T))...))
+end
+
+@generated function (back::Jnew{T,G,true})(Δ::Union{NamedTuple,Nothing}) where {T,G}
+  !T.mutable && Δ == Nothing && return :nothing
+  Δ = G == Nothing ? :Δ : :(back.g)
+  :(nothing, ($(map(f -> :(deref!($Δ.$f)), fieldnames(T))...),))
 end

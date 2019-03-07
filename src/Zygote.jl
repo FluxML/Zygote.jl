@@ -27,8 +27,6 @@ include("compiler/reverse.jl")
 include("compiler/emit.jl")
 include("compiler/interface.jl")
 
-include("forward/Forward.jl")
-
 include("lib/grad.jl")
 include("lib/lib.jl")
 include("lib/real.jl")
