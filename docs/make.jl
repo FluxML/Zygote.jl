@@ -5,7 +5,6 @@ makedocs(
   pages = [
         "Home" => "index.md",
         "Custom Adjoints" => "adjoints.md",
-        "Debugging" => "debugging.md",
         "Profiling" => "profiling.md",
         "Internals" => "internals.md"])
 
