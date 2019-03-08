@@ -14,7 +14,7 @@ using Pkg; pkg"add Zygote#master"
 
 ## Taking Gradients
 
-Zygote is easy to understand since, at its core, it has a one-function API, along with a few simple conveniences. Before explaining `forward`, we'll look at the higher-level function `gradient`.
+Zygote is easy to understand since, at its core, it has a one-function API (`forward`), along with a few simple conveniences. Before explaining `forward`, we'll look at the higher-level function `gradient`.
 
 `gradient` calculates derivatives. For example, the derivative of ``3x^2 + 2x + 1`` is ``6x + 2``, so when `x = 5`, `dx = 32`.
 
@@ -25,7 +25,7 @@ julia> gradient(x -> 3x^2 + 2x + 1, 5)
 (32,)
 ```
 
-`gradient` returns a tuple so that we can give a gradient for each argument to the function.
+`gradient` returns a tuple, with a gradient for each argument to the function.
 
 ```julia
 julia> gradient((a, b) -> a*b, 2, 3)
@@ -41,6 +41,44 @@ julia> gradient(W -> sum(W*x), W)[1]
 2×3 Array{Float64,2}:
  0.0462002  0.817608  0.979036
  0.0462002  0.817608  0.979036
+```
+
+Control flow is fully supported, including recursion.
+
+```julia
+julia> function pow(x, n)
+         r = 1
+         for i = 1:n
+           r *= x
+         end
+         return r
+       end
+pow (generic function with 1 method)
+
+julia> gradient(x -> pow(x, 3), 5)
+(75,)
+
+julia> pow2(x, n) = n <= 0 ? 1 : x*pow(x, n-1)
+pow2 (generic function with 1 method)
+
+julia> gradient(x -> pow2(x, 3), 5)
+(75,)
+```
+
+Data structures are also supported, including mutable ones like dictionaries. Arrays are currently immutable, though [this may change](https://github.com/FluxML/Zygote.jl/pull/75) in future.
+
+```julia
+julia> d = Dict()
+Dict{Any,Any} with 0 entries
+
+julia> gradient(5) do x
+         d[:x] = x
+         d[:x] * d[:x]
+       end
+(10,)
+
+julia> d[:x]
+5
 ```
 
 ## Structs and Types
