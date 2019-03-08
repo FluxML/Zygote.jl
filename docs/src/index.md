@@ -9,7 +9,7 @@ At least, that's the idea. We're still in beta so expect some adventures.
 Zygote is still moving quickly and it's best to work from the development branches. Run this in a Julia session:
 
 ```julia
-using Pkg; pkg"add Zygote#master IRTools#master"
+using Pkg; pkg"add Zygote#master"
 ```
 
 ## Taking Gradients
