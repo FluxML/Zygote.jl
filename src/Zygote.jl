@@ -45,7 +45,9 @@ usetyped || include("precompile.jl")
 
 include("profiler/Profile.jl")
 
-@init @require Flux="587475ba-b771-5e3f-ad9e-33799f191a9c" include("flux.jl")
+@init @require Flux="587475ba-b771-5e3f-ad9e-33799f191a9c" begin
+  isdefined(Flux, :Tracker) && include("flux.jl")
+end
 
 # helps to work around 265-y issues
 function refresh()
