@@ -164,7 +164,7 @@ A more advanced example is checkpointing, in which we save memory by re-computin
 julia> checkpoint(f, x) = f(x)
 checkpoint (generic function with 1 method)
 
-julia> @adjoint checkpoint(f, x) = f(x), ȳ -> (nothing, Zygote.forward(f, x)[2](ȳ)...)
+julia> @adjoint checkpoint(f, x) = f(x), ȳ -> Zygote._forward(f, x)[2](ȳ)
 
 julia> gradient(x -> checkpoint(sin, x), 1)
 (0.5403023058681398,)
