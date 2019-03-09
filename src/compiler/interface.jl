@@ -12,8 +12,6 @@ end
 
 Pullback{S}(x) where S = Pullback{S,typeof(x)}(x)
 
-Base.show(io::IO, j::Pullback{S}) where S = print(io, "J#$(S.parameters[1])(...)")
-
 struct CompileError
   T
   e
