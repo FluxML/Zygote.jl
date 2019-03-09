@@ -45,7 +45,7 @@ vec_scalar(x::Real) = [x]
 reshape_scalar(x, y) = reshape(y, size(x))
 reshape_scalar(x::Real, y) = y[]
 
-forwarddiff(f, x) = (x)
+forwarddiff(f, x) = f(x)
 
 @adjoint function forwarddiff(f, x)
   y, J = forward_jacobian(f, x)
