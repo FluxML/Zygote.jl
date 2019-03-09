@@ -116,6 +116,18 @@ function ∇broadcast_r(bc::Broadcasted)
   end
 end
 
+function ∇broadcast_r(bc::Broadcasted{<:DefaultArrayStyle{0}})
+  bc′, unflatten = _forward(Broadcast.flatten, bc)
+  len = Val(length(bc′.args)+1)
+  y, ∂b = broadcast(_forward, bc′.f, bc′.args...)
+  y, function (ȳ)
+    dxs = ∂b(ȳ)
+    (f = dxs[1],
+     args = Base.tail(dxs),
+     axes = nothing) |> unflatten |> Base.tail
+  end
+end
+
 ∇broadcast(bc::Broadcasted, ::Nothing) = ∇broadcast_r(bc)
 ∇broadcast(bc::Broadcasted, J) = ∇broadcast_t(bc, J)
 ∇broadcast(bc::Broadcasted) = ∇broadcast(bc, Jbroadcast(bc))
