@@ -27,10 +27,10 @@ function insert_blockend!(ir::IRCode, pos, typ, val)
   if !(ir.stmts[j] isa Union{GotoNode,GotoIfNot,ReturnNode})
     return insert_node!(ir, j, typ, val, true)
   end
-  while j > i && ir.stmts[j-1] isa Union{GotoNode,GotoIfNot,ReturnNode}
-    j -= 1
+  while i < j && !(ir.stmts[i] isa Union{GotoNode,GotoIfNot,ReturnNode})
+    i += 1
   end
-  insert_node!(ir, j, typ, val)
+  insert_node!(ir, i, typ, val)
 end
 
 function finish_dc(ic::IncrementalCompact)
@@ -60,7 +60,7 @@ exprtype(ir::IRCode, x::SSAValue) = widenconst(types(ir)[x])
 exprtype(ir::IRCode, x::GlobalRef) = isconst(x.mod, x.name) ? Typeof(getfield(x.mod, x.name)) : Any
 exprtype(ir::IRCode, x::QuoteNode) = Typeof(x.value)
 # probably can fall back to any here
-exprtype(ir::IRCode, x::Union{Type,Number,Nothing,Tuple,Function,Val,String,Char}) = Typeof(x)
+exprtype(ir::IRCode, x::Union{Type,Number,Nothing,Tuple,Function,Val,String,Char,Module}) = Typeof(x)
 exprtype(ir::IRCode, x::Expr) = error(x)
 
 rename(x, m) = x

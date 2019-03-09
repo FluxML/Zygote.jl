@@ -2,11 +2,13 @@
 <img width="400px" src="https://raw.githubusercontent.com/FluxML/fluxml.github.io/master/zygote.png"/>
 </p>
 
-[![Build Status](https://travis-ci.org/FluxML/Zygote.jl.svg?branch=master)](https://travis-ci.org/FluxML/Zygote.jl)
+[![Build Status](https://travis-ci.org/FluxML/Zygote.jl.svg?branch=master)](https://travis-ci.org/FluxML/Zygote.jl) [![Dev Docs](https://img.shields.io/badge/docs-dev-blue.svg)](https://fluxml.ai/Zygote.jl/dev)
 
-`] add Zygote#master IRTools#master`
+`] add Zygote#master`
 
-Zygote is a working prototype for source-to-source automatic differentiation (AD) in Julia. For more details and benchmarks of Zygote's technique, see [our paper](https://arxiv.org/abs/1810.07951).
+Zygote is a working prototype for source-to-source automatic differentiation (AD) in Julia, and the next-gen AD system for the [Flux](https://github.com/FluxML/Flux.jl) differentiable programming framework. For more details and benchmarks of Zygote's technique, see [our paper](https://arxiv.org/abs/1810.07951).
+
+You probably don't want to use Zygote yet (except as a preview of the future). Instead use Flux's built-in AD, which is API-compatible, and at some point in the near future you'll get a free speed boost.
 
 ```julia
 julia> using Zygote
