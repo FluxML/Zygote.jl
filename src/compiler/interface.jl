@@ -94,19 +94,3 @@ function forward(f, ps::Params)
     Grads(cx.cache) # TODO make a copy
   end
 end
-
-# Reflection
-
-# function code_grad(f, T)
-#   forw = code_typed(_forward, Tuple{Context,Typeof(f),T.parameters...})[1]
-#   Y, J = forw[2].parameters
-#   back = typed_meta(Tuple{J,Y}, optimize=true)
-#   back = back.code=>back.ret
-#   (forw, back)
-# end
-
-# macro code_grad(ex)
-#   isexpr(ex, :call) || error("@code_grad f(args...)")
-#   f, args = ex.args[1], ex.args[2:end]
-#   :(code_grad($(esc(f)), typesof($(esc.(args)...))))
-# end
