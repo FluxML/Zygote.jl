@@ -13,8 +13,7 @@
 #                                 `--'  `"                               `--'  `"             `'-'
 
 using Base.Broadcast
-using Base.Broadcast: Broadcasted, AbstractArrayStyle, DefaultArrayStyle, broadcasted,
-  instantiate, materialize, flatten, combine_eltypes, _broadcast_getindex
+using Base.Broadcast: Broadcasted, DefaultArrayStyle, instantiate
 
 # Structural utilities
 
@@ -25,25 +24,6 @@ tcat(x, y, z...) = tcat((x..., y...), z...)
 
 broadcast_args(x) = (x,)
 broadcast_args(bc::Broadcasted) = tcat(map(broadcast_args, bc.args)...)
-
-_unflatten(x, xs) = first(xs), tail(xs)
-
-_unflatten(x::Tuple{}, xs) = (), xs
-
-function _unflatten(x::Tuple, xs)
-  t1, xs1 = _unflatten(first(x), xs)
-  t2, xs2 = _unflatten(tail(x), xs1)
-  (t1, t2...), xs2
-end
-
-function _unflatten(bc::Broadcasted, xs)
-  t, xs′ = _unflatten(bc.args, xs)
-  (args=t,f=nothing,axes=nothing), xs′
-end
-
-unflatten(x, xs) = _unflatten(x, xs)[1]
-
-unflatten(x, xs::Nothing) = nothing
 
 accum_sum(xs, dims = :) = reduce(accum, xs, dims = dims)
 
@@ -132,4 +112,4 @@ end
 ∇broadcast(bc::Broadcasted, J) = ∇broadcast_t(bc, J)
 ∇broadcast(bc::Broadcasted) = ∇broadcast(bc, Jbroadcast(bc))
 
-@adjoint materialize(bc::Broadcasted{<:DefaultArrayStyle}) = ∇broadcast_r(bc)
+@adjoint Broadcast.materialize(bc::Broadcasted{<:DefaultArrayStyle}) = ∇broadcast_r(bc)
