@@ -1,4 +1,5 @@
 using ForwardDiff
+using ForwardDiff: Dual
 
 seed(x::Real, ::Val) = Dual(x, true)
 
