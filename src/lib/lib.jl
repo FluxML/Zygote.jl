@@ -21,7 +21,7 @@ end
 # Core functions
 
 @nograd Core.apply_type, Core.typeof, nfields, fieldtype,
-  (==), (===), (>=), (<), (>), isempty, supertype, Base.typename
+  (==), (===), (>=), (<), (>), isempty, supertype, Base.typename, Base.parameter_upper_bound
 
 @adjoint (::Type{V})(x...) where V<:Val = V(x...), _ -> nothing
 

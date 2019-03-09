@@ -27,10 +27,10 @@ function insert_blockend!(ir::IRCode, pos, typ, val)
   if !(ir.stmts[j] isa Union{GotoNode,GotoIfNot,ReturnNode})
     return insert_node!(ir, j, typ, val, true)
   end
-  while j > i && ir.stmts[j-1] isa Union{GotoNode,GotoIfNot,ReturnNode}
-    j -= 1
+  while i < j && !(ir.stmts[i] isa Union{GotoNode,GotoIfNot,ReturnNode})
+    i += 1
   end
-  insert_node!(ir, j, typ, val)
+  insert_node!(ir, i, typ, val)
 end
 
 function finish_dc(ic::IncrementalCompact)

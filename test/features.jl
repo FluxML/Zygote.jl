@@ -265,3 +265,11 @@ end
 @test gradient(5) do x
   forwarddiff(x -> x^2, x)
 end == (10,)
+
+@test gradient(1) do x
+  if true
+  elseif true
+    nothing
+  end
+  x + x
+end == (2,)
