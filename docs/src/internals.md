@@ -20,7 +20,11 @@ how do we differentiate it? The key is that we can differentiate `foo` if we can
 function J(::typeof(foo), x)
   a, da = J(bar, x)
   b, db = J(baz, a)
-  return b, b̄ -> da(db(b̄))
+  return b, function(b̄)
+    ā = db(b̄)
+    x̄ = da(ā)
+    return x̄
+  end
 end
 ```
 
@@ -37,7 +41,11 @@ foo(x) = sin(cos(x))
 function J(::typeof(foo), x)
   a, da = J(sin, x)
   b, db = J(cos, a)
-  return b, b̄ -> da(db(b̄))
+  return b, function(b̄)
+    ā = db(b̄)
+    x̄ = da(ā)
+    return x̄
+  end
 end
 
 gradient(f, x) = J(f, x)[2](1)
@@ -158,7 +166,12 @@ function J(::typeof(foo), x)
   return b, Pullback{typeof(foo)}((da, db))
 end
 
-(p::Pullback{typeof(foo)})(b̄) = p.data[1](p.data[2](b̄))
+function(p::Pullback{typeof(foo)})(b̄)
+  da, db = p.data[1], p.data[2]
+  ā = db(b̄)
+  x̄ = da(ā)
+  return x̄
+end
 ```
 
 ## Debugging
