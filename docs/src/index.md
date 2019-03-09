@@ -41,6 +41,9 @@ julia> gradient(W -> sum(W*x), W)[1]
 2×3 Array{Float64,2}:
  0.0462002  0.817608  0.979036
  0.0462002  0.817608  0.979036
+
+julia> gradient(x -> 3x^2 + 2x + 1, 1//4)
+(7//2,)
 ```
 
 Control flow is fully supported, including recursion.
