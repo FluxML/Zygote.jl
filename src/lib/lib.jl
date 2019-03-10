@@ -39,9 +39,24 @@ end
   end
 end
 
+function accum_global(cx::Context, ref, x̄)
+  gs = globals(cx)
+  gs[ref] = accum(get(gs, ref, nothing), x̄)
+  return
+end
+
 unwrap(x) = x
 
-@adjoint unwrap(x) = unwrap(x), Δ ->(accum_param(__context__, x, Δ); (Δ,))
+@adjoint unwrap(x) = unwrap(x), x̄ -> (accum_param(__context__, x, x̄); (x̄,))
+
+unwrap(ref, x) = x
+
+# Right now we accumulate twice, for both implicit params and the `globals`
+# API. Eventually we'll deprecate implicit params.
+@adjoint unwrap(ref, x) = unwrap(x), function (x̄)
+  accum_global(__context__, ref, x̄)
+  accum_param(__context__, x, x̄)
+end
 
 # Tuples
 

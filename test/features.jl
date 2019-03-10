@@ -273,3 +273,13 @@ end == (10,)
   end
   x + x
 end == (2,)
+
+global_param = 3
+
+@testset "Global Params" begin
+  cx = Zygote.Context()
+  y, back = Zygote._forward(cx, x -> x*global_param, 2)
+  @test y == 6
+  @test back(1) == (nothing, 3)
+  Zygote.globals(cx)[GlobalRef(Main, :global_param)] == 2
+end

@@ -104,9 +104,12 @@ function record_branches!(ir::IRCode)
   return finish_dc(ir)
 end
 
-istrackable(x) =
-  x isa GlobalRef && x.mod ∉ (Base, Core) &&
-  !(isconst(x.mod, x.name) && typeof(getfield(x.mod, x.name)) <: Union{Function,Type})
+function istrackable(x)
+  x isa GlobalRef && x.mod ∉ (Base, Core) || return false
+  isconst(x.mod, x.name) || return true
+  x = getfield(x.mod, x.name)
+  !(x isa Type || sizeof(x) == 0)
+end
 
 function record_globals!(ir::IRCode)
   for i = 1:length(ir.stmts)
@@ -115,7 +118,7 @@ function record_globals!(ir::IRCode)
     if isexpr(ex, :call)
       for j = 1:length(ex.args)
         istrackable(ex.args[j]) || continue
-        ex.args[j] = insert_node!(ir, i, Any, xcall(Zygote, :unwrap, ex.args[j]))
+        ex.args[j] = insert_node!(ir, i, Any, xcall(Zygote, :unwrap, QuoteNode(ex.args[j]), ex.args[j]))
       end
     end
   end
