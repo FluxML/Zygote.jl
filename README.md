@@ -2,7 +2,10 @@
 <img width="400px" src="https://raw.githubusercontent.com/FluxML/fluxml.github.io/master/zygote.png"/>
 </p>
 
-[![Build Status](https://travis-ci.org/FluxML/Zygote.jl.svg?branch=master)](https://travis-ci.org/FluxML/Zygote.jl) [![Dev Docs](https://img.shields.io/badge/docs-dev-blue.svg)](https://fluxml.ai/Zygote.jl/dev)
+[![Build Status](https://travis-ci.org/FluxML/Zygote.jl.svg?branch=master)](https://travis-ci.org/FluxML/Zygote.jl)
+[![Dev Docs](https://img.shields.io/badge/docs-dev-blue.svg)](https://fluxml.ai/Zygote.jl/dev)
+[![codecov.io](http://codecov.io/github/FluxML/Zygote.jl/coverage.svg?branch=master)](http://codecov.io/github/FluxML/Zygote.jl?branch=master)
+
 
 `] add Zygote#master`
 
