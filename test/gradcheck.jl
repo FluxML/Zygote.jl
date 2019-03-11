@@ -62,6 +62,13 @@ Random.seed!(0)
 @test gradtest(x -> repeat(x; inner=2, outer=3), rand(5))
 @test gradtest(x -> repeat(x; inner=(2,2,1), outer=(1,1,3)), rand(5,4,3))
 
+@testset "dot" begin
+  rng = MersenneTwister(123456)
+  @test gradtest((x, y)->dot(x[1], y[1]), [randn(rng)], [randn(rng)])
+  @test gradtest(dot, randn(rng, 10), randn(rng, 10))
+  @test gradtest(dot, randn(rng, 10, 3), randn(rng, 10, 3))
+end
+
 @test gradtest(kron, rand(5), rand(3))
 @test gradtest(kron, rand(5), rand(3), rand(8))
 @test gradtest(kron, rand(5,1), rand(3,1))
@@ -103,6 +110,16 @@ end
   @test gradtest(Y -> Y' / X, Y)
   @test gradtest(X -> y' / X, X)
   @test gradtest(y -> y' / X, y)
+
+  @testset "Cholesky" begin
+
+    # Check that the forwards pass computes the correct thing.
+    @test Zygote.forward(X->cholesky(X * X' + I) \ Y, X)[1] == cholesky(X * X' + I) \ Y
+    @test gradtest(X->cholesky(X * X' + I) \ Y, X)
+    @test gradtest(Y->cholesky(X * X' + I) \ Y, Y)
+    @test gradtest(X->cholesky(X * X' + I) \ y, X)
+    @test gradtest(y->cholesky(X * X' + I) \ y, y)
+  end
 end
 
 @testset "Symmetric" begin
