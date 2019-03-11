@@ -43,3 +43,8 @@ jobs:
 ## uncomment the following lines to override the default test script
 script:
  - julia --color=yes -e 'using Pkg; Pkg.activate(); Pkg.instantiate(); Pkg.test()'
+
+# coverage
+after_success:
+  - julia --project=test/coverage -e 'using Pkg; Pkg.instantiate()'
+  - julia --project=test/coverage test/coverage/coverage.jl
