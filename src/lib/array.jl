@@ -122,6 +122,8 @@ end
 @adjoint Base.adjoint(x) = x', Δ -> (Δ',)
 @adjoint parent(x::LinearAlgebra.Adjoint) = parent(x), ȳ -> (LinearAlgebra.Adjoint(ȳ),)
 
+@adjoint dot(x::AbstractArray, y::AbstractArray) = dot(x, y), Δ->(Δ .* y, Δ .* x)
+
 function _kron(mat1::AbstractMatrix,mat2::AbstractMatrix)
     m1, n1 = size(mat1)
     mat1_rsh = reshape(mat1,(1,m1,1,n1))
@@ -143,6 +145,15 @@ end
   return Y, function(Ȳ)
       B̄ = A' \ Ȳ
       return (-B̄ * Y', B̄)
+  end
+end
+
+# This is basically a hack while we don't have a working `ldiv!`.
+@adjoint function \(A::Cholesky, B::AbstractVecOrMat)
+  Y, back = Zygote.forward((U, B)->U \ (U' \ B), A.U, B)
+  return Y, function(Ȳ)
+    Ā_factors, B̄ = back(Ȳ)
+    return ((uplo=nothing, status=nothing, factors=Ā_factors), B̄)
   end
 end
 
