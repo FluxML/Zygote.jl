@@ -32,9 +32,9 @@ trim(x, Δ) = reshape(Δ, ntuple(i -> size(Δ, i), Val(ndims(x))))
 unbroadcast(x::AbstractArray, Δ) =
   size(x) == size(Δ) ? Δ :
   length(x) == length(Δ) ? trim(x, Δ) :
-    trim(x, sum(Δ, dims = ntuple(i -> size(x, i) == 1 ? i : ndims(Δ)+1, Val(ndims(Δ)))))
+    trim(x, accum_sum(Δ, dims = ntuple(i -> size(x, i) == 1 ? i : ndims(Δ)+1, Val(ndims(Δ)))))
 
-unbroadcast(x::Union{Number,Ref}, Δ) = sum(Δ)
+unbroadcast(x::Union{Number,Ref}, Δ) = accum_sum(Δ)
 
 # Trivial Special Cases
 # TODO fix this up and use it
