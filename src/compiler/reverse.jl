@@ -120,6 +120,9 @@ function record_globals!(ir::IRCode)
         istrackable(ex.args[j]) || continue
         ex.args[j] = insert_node!(ir, i, Any, xcall(Zygote, :unwrap, QuoteNode(ex.args[j]), ex.args[j]))
       end
+    elseif isexpr(ex, ReturnNode) && istrackable(ex.val)
+      x = insert_node!(ir, i, Any, xcall(Zygote, :unwrap, QuoteNode(ex.val), ex.val))
+      ir[SSAValue(i)] = ReturnNode(x)
     end
   end
   return compact!(ir)
