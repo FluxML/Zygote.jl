@@ -29,6 +29,11 @@ Random.seed!(0)
 
 @test gradient(//, 2, 3) === (1//3, -2//9)
 
+@testset "getindex (Nabla.jl - #139)" begin
+  z = [2, 3, 3]
+  @test gradtest(x->x[z], randn(MersenneTwister(123456), 3))
+end
+
 @test gradtest((x, W, b) -> σ.(W*x .+ b), 5, (2,5), 2)
 @test gradtest((x, W, b) -> σ.(W*x .+ b), (5,3), (2,5), 2)
 @test gradtest((x, W, b) -> logσ.(W*x .+ b), 5, (2,5), 2)

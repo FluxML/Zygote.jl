@@ -11,10 +11,18 @@
 _zero(xs::AbstractArray{<:Number}) = zero(xs)
 _zero(xs::AbstractArray) = Any[nothing for x in xs]
 
-@adjoint function getindex(xs::Array, i...)
-  xs[i...], function (Δ)
+@adjoint function getindex(xs::Array, i::Integer...)
+  xs[i...], function(Δ)
     Δ′ = _zero(xs)
     Δ′[i...] = Δ
+    (Δ′, map(_ -> nothing, i)...)
+  end
+end
+
+@adjoint function getindex(xs::Array, i::AbstractArray...)
+  xs[i...], function (Δ)
+    Δ′ = _zero(xs)
+    @views Δ′[i...] .+= Δ
     (Δ′, map(_ -> nothing, i)...)
   end
 end
