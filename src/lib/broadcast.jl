@@ -27,6 +27,10 @@ broadcast_args(bc::Broadcasted) = tcat(map(broadcast_args, bc.args)...)
 
 accum_sum(xs; dims = :) = reduce(accum, xs, dims = dims)
 
+# Work around reducedim_init issue
+accum_sum(xs::AbstractArray{Nothing}; dims = :) = nothing
+accum_sum(xs::AbstractArray{<:Real}; dims = :) = sum(xs, dims = dims)
+
 trim(x, Δ) = reshape(Δ, ntuple(i -> size(Δ, i), Val(ndims(x))))
 
 unbroadcast(x::AbstractArray, Δ) =
