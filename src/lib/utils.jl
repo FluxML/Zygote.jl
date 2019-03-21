@@ -8,3 +8,5 @@ macro showgrad(x)
       x̄
     end)
 end
+
+hessian(f, x::AbstractArray) = forward_jacobian(x -> gradient(f, x)[1], x)[2]
