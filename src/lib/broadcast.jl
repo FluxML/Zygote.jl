@@ -25,7 +25,7 @@ tcat(x, y, z...) = tcat((x..., y...), z...)
 broadcast_args(x) = (x,)
 broadcast_args(bc::Broadcasted) = tcat(map(broadcast_args, bc.args)...)
 
-accum_sum(xs, dims = :) = reduce(accum, xs, dims = dims)
+accum_sum(xs; dims = :) = reduce(accum, xs, dims = dims)
 
 trim(x, Δ) = reshape(Δ, ntuple(i -> size(Δ, i), Val(ndims(x))))
 
