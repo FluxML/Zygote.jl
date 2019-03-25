@@ -75,6 +75,16 @@ end
 @test gradtest(kron, rand(5,1), rand(3,1), rand(8,1))
 @test gradtest(kron, rand(5,2), rand(3,2), rand(8,2))
 
+@testset "map" begin
+  @test gradtest(xs -> sum(map(x -> x^2, xs)), rand(2,3))
+  @test gradtest((xss...) -> sum(map((xs...) -> sqrt(sum(xs.^2)), xss...)), [rand(5) for _ in 1:6]...)
+  function foo(y)
+    bar = (x) -> x*y
+    sum(map(bar, 1:5))
+  end
+  @test gradtest(foo, 3)
+end
+
 @testset "maximum" begin
   @test gradtest(maximum, rand(2, 3))
 

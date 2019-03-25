@@ -67,6 +67,24 @@ end
   end
 end
 
+@adjoint getindex(i::Int, j::Int) = i[j], _ -> nothing
+
+function unzip(tuples)
+  map(1:length(first(tuples))) do i
+      map(tuple -> tuple[i], tuples)
+  end
+end
+@adjoint function map(f, args::AbstractArray...)
+  ys_and_backs = map((args...) -> _forward(__context__, f, args...), args...)
+  ys, backs = unzip(ys_and_backs)
+  ys, function (Δ)
+    Δf_and_args_zipped = map((f, δ) -> f(δ), backs, Δ)
+    Δf_and_args = unzip(Δf_and_args_zipped)
+    Δf = reduce(accum, Δf_and_args[1])
+    (Δf, Δf_and_args[2:end]...)
+  end
+end
+
 # Reductions
 
 @adjoint function sum(xs::AbstractArray; dims = :)
