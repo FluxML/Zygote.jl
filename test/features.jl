@@ -1,5 +1,5 @@
 using Zygote, Test
-using Zygote: Params, gradient, derivative, roundtrip
+using Zygote: Params, gradient, derivative, roundtrip, forwarddiff
 
 add(a, b) = a+b
 _relu(x) = x > 0 ? x : 0
@@ -256,4 +256,30 @@ if VERSION >= v"1.1"
     stk = Zygote.Stack(stk)
     pop!(stk)
   end == (1,)
+end
+
+@test gradient(x -> [x][1].a, Foo(1, 1)) == ((a=1, b=nothing),)
+
+@test gradient((a, b) -> Zygote.hook(-, a)*b, 2, 3) == (-3, 2)
+
+@test gradient(5) do x
+  forwarddiff(x -> x^2, x)
+end == (10,)
+
+@test gradient(1) do x
+  if true
+  elseif true
+    nothing
+  end
+  x + x
+end == (2,)
+
+global_param = 3
+
+@testset "Global Params" begin
+  cx = Zygote.Context()
+  y, back = Zygote._forward(cx, x -> x*global_param, 2)
+  @test y == 6
+  @test back(1) == (nothing, 3)
+  Zygote.globals(cx)[GlobalRef(Main, :global_param)] == 2
 end

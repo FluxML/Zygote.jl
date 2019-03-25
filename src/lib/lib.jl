@@ -21,13 +21,13 @@ end
 # Core functions
 
 @nograd Core.apply_type, Core.typeof, nfields, fieldtype,
-  (==), (===), (>=), (<), (>), isempty
+  (==), (===), (>=), (<), (>), isempty, supertype, Base.typename, Base.parameter_upper_bound
 
 @adjoint (::Type{V})(x...) where V<:Val = V(x...), _ -> nothing
 
 @adjoint ifelse(cond::Bool, t, f) =
   ifelse(cond, t, f),
-  Δ -> cond ? (Δ, zero(Δ)) : (zero(Δ), Δ)
+  Δ -> cond ? (nothing, Δ, zero(Δ)) : (nothing, zero(Δ), Δ)
 
 @adjoint Base.typeassert(x, T) = Base.typeassert(x, T), Δ -> (Δ, nothing)
 
@@ -39,9 +39,24 @@ end
   end
 end
 
+function accum_global(cx::Context, ref, x̄)
+  gs = globals(cx)
+  gs[ref] = accum(get(gs, ref, nothing), x̄)
+  return
+end
+
 unwrap(x) = x
 
-@adjoint unwrap(x) = unwrap(x), Δ ->(accum_param(__context__, x, Δ); (Δ,))
+@adjoint unwrap(x) = unwrap(x), x̄ -> (accum_param(__context__, x, x̄); (x̄,))
+
+unwrap(ref, x) = x
+
+# Right now we accumulate twice, for both implicit params and the `globals`
+# API. Eventually we'll deprecate implicit params.
+@adjoint unwrap(ref, x) = unwrap(x), function (x̄)
+  accum_global(__context__, ref, x̄)
+  accum_param(__context__, x, x̄)
+end
 
 # Tuples
 

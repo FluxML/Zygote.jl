@@ -68,8 +68,9 @@ function forward_stacks!(adj, F)
     rec = insert_node!(adj.forw, length(adj.forw.stmts), Pullback{F,T},
                        Expr(:call, Pullback{F,T}, rec))
   else
+    P = length(adj.perm) == 1 ? Pullback{F} : Pullback{F,Any}
     rec = insert_node!(adj.forw, length(adj.forw.stmts), Any,
-                       Expr(:call, Pullback{F}, rec))
+                       Expr(:call, P, rec))
   end
   ret = xtuple(adj.forw.stmts[end].val, rec)
   R = exprtype(adj.forw, adj.forw.stmts[end].val)

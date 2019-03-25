@@ -26,6 +26,7 @@ include("tools/fillarray.jl")
 include("compiler/reverse.jl")
 include("compiler/emit.jl")
 include("compiler/interface.jl")
+include("compiler/show.jl")
 
 include("lib/grad.jl")
 include("lib/lib.jl")
@@ -35,7 +36,10 @@ include("lib/base.jl")
 include("lib/array.jl")
 include("lib/nnlib.jl")
 include("lib/broadcast.jl")
+include("lib/forward.jl")
+include("lib/utils.jl")
 @init @require Distances="b4f34e82-e78d-54a5-968a-f98e89d6e8f7" include("lib/distances.jl")
+@init @require StatsFuns="4c63d2b9-4356-54db-8cca-17b64c39e42c" include("lib/statsfuns.jl")
 
 # we need to define this late, so that the genfuncs see lib.jl
 include("compiler/interface2.jl")
@@ -43,7 +47,9 @@ usetyped || include("precompile.jl")
 
 include("profiler/Profile.jl")
 
-@init @require Flux="587475ba-b771-5e3f-ad9e-33799f191a9c" include("flux.jl")
+@init @require Flux="587475ba-b771-5e3f-ad9e-33799f191a9c" begin
+  isdefined(Flux, :Tracker) && include("flux.jl")
+end
 
 # helps to work around 265-y issues
 function refresh()

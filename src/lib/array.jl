@@ -1,17 +1,19 @@
 @adjoint (::Type{T})(args...) where T<:Array = T(args...), Δ -> nothing
 
-@nograd size, length, eachindex, Colon(), findfirst, randn, ones, zeros, one, zero
+@nograd size, length, eachindex, Colon(), findfirst, randn, ones, zeros, one, zero,
+  print, println
 
 
 @adjoint Base.vect(xs...) = Base.vect(xs...), Δ -> (Δ...,)
 
 @adjoint copy(x::AbstractArray) = copy(x), ȳ -> (ȳ,)
 
-Base.zero(xs::AbstractArray{Any}) = fill!(similar(xs), nothing)
+_zero(xs::AbstractArray{<:Number}) = zero(xs)
+_zero(xs::AbstractArray) = Any[nothing for x in xs]
 
 @adjoint function getindex(xs::Array, i...)
   xs[i...], function (Δ)
-    Δ′ = zero(xs)
+    Δ′ = _zero(xs)
     Δ′[i...] = Δ
     (Δ′, map(_ -> nothing, i)...)
   end
@@ -136,6 +138,8 @@ end
 @adjoint Base.adjoint(x) = x', Δ -> (Δ',)
 @adjoint parent(x::LinearAlgebra.Adjoint) = parent(x), ȳ -> (LinearAlgebra.Adjoint(ȳ),)
 
+@adjoint dot(x::AbstractArray, y::AbstractArray) = dot(x, y), Δ->(Δ .* y, Δ .* x)
+
 function _kron(mat1::AbstractMatrix,mat2::AbstractMatrix)
     m1, n1 = size(mat1)
     mat1_rsh = reshape(mat1,(1,m1,1,n1))
@@ -157,6 +161,15 @@ end
   return Y, function(Ȳ)
       B̄ = A' \ Ȳ
       return (-B̄ * Y', B̄)
+  end
+end
+
+# This is basically a hack while we don't have a working `ldiv!`.
+@adjoint function \(A::Cholesky, B::AbstractVecOrMat)
+  Y, back = Zygote.forward((U, B)->U \ (U' \ B), A.U, B)
+  return Y, function(Ȳ)
+    Ā_factors, B̄ = back(Ȳ)
+    return ((uplo=nothing, status=nothing, factors=Ā_factors), B̄)
   end
 end
 

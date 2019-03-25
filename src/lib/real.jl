@@ -17,7 +17,8 @@ for (M, f, arity) in DiffRules.diffrules()
   end
 end
 
-@adjoint Base.convert(T::Type{<:Real}, x::Real) = convert(T, x), Δ -> (nothing, Δ)
+@adjoint Base.convert(T::Type{<:Real}, x::Real) = convert(T, x), ȳ -> (nothing, ȳ)
+@adjoint (T::Type{<:Real})(x::Real) = T(x), ȳ -> (nothing, ȳ)
 
 for T in Base.uniontypes(Core.BuiltinInts)
     @adjoint (::Type{T})(x::Core.BuiltinInts) = T(x), Δ -> (Δ,)

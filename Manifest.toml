@@ -23,9 +23,9 @@ version = "0.2.0"
 
 [[Compat]]
 deps = ["Base64", "Dates", "DelimitedFiles", "Distributed", "InteractiveUtils", "LibGit2", "Libdl", "LinearAlgebra", "Markdown", "Mmap", "Pkg", "Printf", "REPL", "Random", "Serialization", "SharedArrays", "Sockets", "SparseArrays", "Statistics", "Test", "UUIDs", "Unicode"]
-git-tree-sha1 = "49269e311ffe11ac5b334681d212329002a9832a"
+git-tree-sha1 = "195a3ffcb8b0762684b6821de18f83a16455c6ea"
 uuid = "34da2185-b29b-5c13-b0c7-acf172513d20"
-version = "1.5.1"
+version = "2.0.0"
 
 [[Dates]]
 deps = ["Printf"]
@@ -59,11 +59,9 @@ version = "0.10.3"
 
 [[IRTools]]
 deps = ["InteractiveUtils", "MacroTools", "Test"]
-git-tree-sha1 = "afcf8847a6fdccc8c2fb6e3e089caacdaf697939"
-repo-rev = "master"
-repo-url = "https://github.com/MikeInnes/IRTools.jl.git"
+git-tree-sha1 = "a5a47cba5f8d9a56ff683789cdd6d20ce1cb9d53"
 uuid = "7869d1d1-7146-5819-86e3-90919afe41df"
-version = "0.1.1"
+version = "0.1.2"
 
 [[InteractiveUtils]]
 deps = ["Markdown"]
@@ -154,9 +152,9 @@ version = "0.7.2"
 
 [[StaticArrays]]
 deps = ["InteractiveUtils", "LinearAlgebra", "Random", "Statistics", "Test"]
-git-tree-sha1 = "1eb114d6e23a817cd3e99abc3226190876d7c898"
+git-tree-sha1 = "3841b39ed5f047db1162627bf5f80a9cd3e39ae2"
 uuid = "90137ffa-7385-5640-81b9-e52037218182"
-version = "0.10.2"
+version = "0.10.3"
 
 [[Statistics]]
 deps = ["LinearAlgebra", "SparseArrays"]
