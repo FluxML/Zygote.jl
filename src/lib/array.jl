@@ -67,13 +67,15 @@ end
   end
 end
 
+@adjoint getindex(i::Int, j::Int) = i[j], _ -> nothing
+
 function unzip(tuples)
   map(1:length(first(tuples))) do i
       map(tuple -> tuple[i], tuples)
   end
 end
-@adjoint function map(f, args...)
-  ys_and_backs = map((args...) -> Zygote._forward(__context__, f, args...), args...)
+@adjoint function map(f, args::AbstractArray...)
+  ys_and_backs = map((args...) -> _forward(__context__, f, args...), args...)
   ys, backs = unzip(ys_and_backs)
   ys, function (Δ)
     Δf_and_args_zipped = map((f, δ) -> f(δ), backs, Δ)
