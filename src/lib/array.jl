@@ -156,6 +156,12 @@ end
 
 @adjoint iterate(r::UnitRange, i...) = iterate(r, i...), _ -> nothing
 
+@adjoint function Diagonal(d::AbstractVector)
+  back(Δ::Union{NamedTuple, Diagonal}) = (Δ.diag,)
+  back(Δ::AbstractMatrix) = (diag(Δ),)
+  return Diagonal(d), back
+end
+
 @adjoint diag(A::AbstractMatrix) = diag(A), Δ->(Diagonal(Δ),)
 
 @adjoint function \(A::AbstractMatrix, B::AbstractVecOrMat)
@@ -194,7 +200,7 @@ end
 # Implementation due to Seeger, Matthias, et al. "Auto-differentiating linear algebra."
 @adjoint function cholesky(Σ::Union{StridedMatrix, Symmetric{<:Real, <:StridedMatrix}})
   C = cholesky(Σ)
-  return C, function(Δ)
+  return C, function(Δ::NamedTuple)
     U, Ū = C.U, Δ.factors
     Σ̄ = Ū * U'
     Σ̄ = copytri!(Σ̄, 'U')
@@ -210,6 +216,11 @@ end
 @adjoint function cholesky(Σ::Real)
   C = cholesky(Σ)
   return C, Δ::NamedTuple->(Δ.factors[1, 1] / (2 * C.U[1, 1]),)
+end
+
+@adjoint function cholesky(Σ::Diagonal)
+  C = cholesky(Σ)
+  return C, Δ::NamedTuple->(Diagonal(diag(Δ.factors) .* inv.(2 .* C.factors.diag)),)
 end
 
 # Various sensitivities for `literal_getproperty`, depending on the 2nd argument.

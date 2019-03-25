@@ -144,6 +144,16 @@ end
   @test gradtest(diag, A)
 end
 
+@testset "Diagonal" begin
+  rng, P = MersenneTwister(123456), 10
+  d = randn(rng, P)
+  @test gradtest(Diagonal, d)
+  y, back = Zygote.forward(Diagonal, d)
+  D̄ = randn(rng, P, P)
+  @test back(D̄) == back(Diagonal(D̄))
+  @test back(D̄) == back((diag=diag(D̄),))
+end
+
 @testset "dense + UniformScaling" begin
   rng = MersenneTwister(123456)
   A, λ = randn(rng, 10, 10), randn(rng)
@@ -161,6 +171,15 @@ end
     C̄ = randn(rng, 1, 1)
     @test back′((factors=C̄,))[1] isa Real
     @test back′((factors=C̄,))[1] ≈ back((factors=C̄,))[1][1, 1]
+  end
+  @testset "cholesky - Diagonal" begin
+    D = Diagonal(exp.(randn(3)))
+    Dmat = Matrix(D)
+    y, back = Zygote.forward(cholesky, Dmat)
+    y′, back′ = Zygote.forward(cholesky, D)
+    C̄ = (factors=randn(rng, 3, 3),)
+    @test back′(C̄)[1] isa Diagonal
+    @test diag(back′(C̄)[1]) ≈ diag(back(C̄)[1])
   end
 end
 
