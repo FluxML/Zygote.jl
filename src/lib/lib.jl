@@ -27,7 +27,7 @@ end
 
 @adjoint ifelse(cond::Bool, t, f) =
   ifelse(cond, t, f),
-  Δ -> cond ? (Δ, zero(Δ)) : (zero(Δ), Δ)
+  Δ -> cond ? (nothing, Δ, zero(Δ)) : (nothing, zero(Δ), Δ)
 
 @adjoint Base.typeassert(x, T) = Base.typeassert(x, T), Δ -> (Δ, nothing)
 
