@@ -188,19 +188,25 @@ Zygote.refresh()
    # Check binary pairwise.
   let
     X, Y = randn(rng, D, P), randn(rng, D, Q)
-    @test gradtest(X->pairwise(SqEuclidean(), X, Y), X)
-    @test gradtest(Y->pairwise(SqEuclidean(), X, Y), Y)
+    @test gradtest(X->pairwise(SqEuclidean(), X, Y; dims=2), X)
+    @test gradtest(Y->pairwise(SqEuclidean(), X, Y; dims=2), Y)
+  end
+  let
+    Xt, Yt = randn(rng, P, D), randn(rng, Q, D)
+    @test gradtest(Xt->pairwise(SqEuclidean(), Xt, Yt; dims=1), Xt)
+    @test gradtest(Yt->pairwise(SqEuclidean(), Xt, Yt; dims=1), Yt)
   end
 
    # Check unary pairwise.
-  @test gradtest(X->pairwise(SqEuclidean(), X), randn(rng, D, P))
+  @test gradtest(X->pairwise(SqEuclidean(), X; dims=2), randn(rng, D, P))
+  @test gradtest(Xt->pairwise(SqEuclidean(), Xt; dims=1), randn(rng, P, D))
 end
 
 function cat_test(f, A::Union{AbstractVector, AbstractMatrix}...)
   @test gradtest(f, A...)
   Z, back = Zygote.forward(f, A...)
-  Ā = back(randn(size(Z)))
-  @test all(map((a, ā)->ā isa typeof(a), A, Ā))
+  Ā = back(randn(size(Z)))
+  @test all(map((a, ā)->ā isa typeof(a), A, Ā))
 end
 
 @testset "vcat" begin
