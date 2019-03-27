@@ -138,6 +138,13 @@ end
   rng, P = MersenneTwister(123456), 7
   A = randn(rng, P, P)
   @test gradtest(Symmetric, A)
+  y, back = Zygote.forward(Symmetric, A)
+
+  @testset "back(::Diagonal)" begin
+    D̄ = Diagonal(randn(rng, P))
+    @test back(Diagonal(D̄))[1] isa Diagonal
+    @test back(Diagonal(D̄))[1] ≈ back(Matrix(D̄))[1]
+  end
 end
 
 @testset "diag" begin

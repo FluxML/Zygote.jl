@@ -161,7 +161,7 @@ end
 @adjoint iterate(r::UnitRange, i...) = iterate(r, i...), _ -> nothing
 
 @adjoint function Diagonal(d::AbstractVector)
-  back(Δ::Union{NamedTuple, Diagonal}) = (Δ.diag,)
+  back(Δ::NamedTuple) = (Δ.diag,)
   back(Δ::AbstractMatrix) = (diag(Δ),)
   return Diagonal(d), back
 end
@@ -194,11 +194,21 @@ end
 end
 
 _symmetric_back(Δ) = UpperTriangular(Δ) + LowerTriangular(Δ)' - Diagonal(Δ)
-_symmetric_back(Δ::UpperTriangular) = Δ
+_symmetric_back(Δ::Union{Diagonal, UpperTriangular}) = Δ
 @adjoint function Symmetric(A::AbstractMatrix)
   back(Δ::AbstractMatrix) = (_symmetric_back(Δ),)
   back(Δ::NamedTuple) = (_symmetric_back(Δ.data),)
   return Symmetric(A), back
+end
+
+@adjoint function cholesky(Σ::Real)
+  C = cholesky(Σ)
+  return C, Δ::NamedTuple->(Δ.factors[1, 1] / (2 * C.U[1, 1]),)
+end
+
+@adjoint function cholesky(Σ::Diagonal)
+  C = cholesky(Σ)
+  return C, Δ::NamedTuple->(Diagonal(diag(Δ.factors) .* inv.(2 .* C.factors.diag)),)
 end
 
 # Implementation due to Seeger, Matthias, et al. "Auto-differentiating linear algebra."
@@ -215,16 +225,6 @@ end
     end
     return (UpperTriangular(Σ̄),)
   end
-end
-
-@adjoint function cholesky(Σ::Real)
-  C = cholesky(Σ)
-  return C, Δ::NamedTuple->(Δ.factors[1, 1] / (2 * C.U[1, 1]),)
-end
-
-@adjoint function cholesky(Σ::Diagonal)
-  C = cholesky(Σ)
-  return C, Δ::NamedTuple->(Diagonal(diag(Δ.factors) .* inv.(2 .* C.factors.diag)),)
 end
 
 # Various sensitivities for `literal_getproperty`, depending on the 2nd argument.
