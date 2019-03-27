@@ -100,6 +100,10 @@ function _forward(cx::Context, ::typeof(sum), f, xs::AbstractArray)
   y, ȳ -> (nothing, nothing, back(ȳ)...)
 end
 
+@adjoint function sum(::typeof(abs2), X::AbstractArray; dims = :)
+  return sum(abs2, X; dims=dims), Δ::Union{Number, AbstractArray}->(nothing, ((2Δ) .* X))
+end
+
 @adjoint function prod(xs; dims = :)
   if dims === (:)
     prod(xs), Δ -> (prod(xs) ./ xs .* Δ,)

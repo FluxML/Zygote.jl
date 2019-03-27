@@ -38,6 +38,8 @@ Random.seed!(0)
 @test gradtest((w, x) -> transpose(w)*x, randn(5,5), randn(5,5))
 
 @test gradtest(x -> sum(x, dims = (2, 3)), (3,4,5))
+@test gradtest(x -> sum(abs2, x), randn(4, 3, 2))
+@test gradtest(x -> sum(abs2, x; dims=1), randn(4, 3, 2))
 @test gradtest(x -> prod(x, dims = (2, 3)), (3,4,5))
 @test gradtest(x -> prod(x), (3,4,5))
 
@@ -207,19 +209,25 @@ Zygote.refresh()
    # Check binary pairwise.
   let
     X, Y = randn(rng, D, P), randn(rng, D, Q)
-    @test gradtest(X->pairwise(SqEuclidean(), X, Y), X)
-    @test gradtest(Y->pairwise(SqEuclidean(), X, Y), Y)
+    @test gradtest(X->pairwise(SqEuclidean(), X, Y; dims=2), X)
+    @test gradtest(Y->pairwise(SqEuclidean(), X, Y; dims=2), Y)
+  end
+  let
+    Xt, Yt = randn(rng, P, D), randn(rng, Q, D)
+    @test gradtest(Xt->pairwise(SqEuclidean(), Xt, Yt; dims=1), Xt)
+    @test gradtest(Yt->pairwise(SqEuclidean(), Xt, Yt; dims=1), Yt)
   end
 
    # Check unary pairwise.
-  @test gradtest(X->pairwise(SqEuclidean(), X), randn(rng, D, P))
+  @test gradtest(X->pairwise(SqEuclidean(), X; dims=2), randn(rng, D, P))
+  @test gradtest(Xt->pairwise(SqEuclidean(), Xt; dims=1), randn(rng, P, D))
 end
 
 function cat_test(f, A::Union{AbstractVector, AbstractMatrix}...)
   @test gradtest(f, A...)
   Z, back = Zygote.forward(f, A...)
-  Ā = back(randn(size(Z)))
-  @test all(map((a, ā)->ā isa typeof(a), A, Ā))
+  Ā = back(randn(size(Z)))
+  @test all(map((a, ā)->ā isa typeof(a), A, Ā))
 end
 
 @testset "vcat" begin
@@ -345,4 +353,9 @@ end
 @testset "* sizing" begin
   @test size(Zygote.gradient((x, y)->sum(x * y), randn(1, 1), randn(1, 10))[1]) == (1, 1)
   @test size(Zygote.gradient((x, y)->sum(x * y), randn(1, 1), randn(1, 10))[2]) == (1, 10)
+end
+
+@testset "broadcast" begin
+  y, back = forward(x -> sin.(x), Diagonal(randn(3)))
+  @test back(ones(3,3))[1][2] == 1.0
 end
