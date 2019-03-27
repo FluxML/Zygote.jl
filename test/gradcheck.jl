@@ -335,3 +335,8 @@ end
   @test size(Zygote.gradient((x, y)->sum(x * y), randn(1, 1), randn(1, 10))[1]) == (1, 1)
   @test size(Zygote.gradient((x, y)->sum(x * y), randn(1, 1), randn(1, 10))[2]) == (1, 10)
 end
+
+@testset "broadcast" begin
+  y, back = forward(x -> sin.(x), Diagonal(randn(3)))
+  @test back(ones(3,3))[1][2] == 1.0
+end

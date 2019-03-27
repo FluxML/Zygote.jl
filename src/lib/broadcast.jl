@@ -13,7 +13,7 @@
 #                                 `--'  `"                               `--'  `"             `'-'
 
 using Base.Broadcast
-using Base.Broadcast: Broadcasted, DefaultArrayStyle, instantiate
+using Base.Broadcast: Broadcasted, AbstractArrayStyle, instantiate
 
 # Structural utilities
 
@@ -100,7 +100,7 @@ function ∇broadcast_r(bc::Broadcasted)
   end
 end
 
-function ∇broadcast_r(bc::Broadcasted{<:DefaultArrayStyle{0}})
+function ∇broadcast_r(bc::Broadcasted{<:AbstractArrayStyle{0}})
   bc′, unflatten = _forward(Broadcast.flatten, bc)
   len = Val(length(bc′.args)+1)
   y, ∂b = broadcast(_forward, bc′.f, bc′.args...)
@@ -116,4 +116,4 @@ end
 ∇broadcast(bc::Broadcasted, J) = ∇broadcast_t(bc, J)
 ∇broadcast(bc::Broadcasted) = ∇broadcast(bc, Jbroadcast(bc))
 
-@adjoint Broadcast.materialize(bc::Broadcasted{<:DefaultArrayStyle}) = ∇broadcast_r(bc)
+@adjoint Broadcast.materialize(bc::Broadcasted{<:AbstractArrayStyle}) = ∇broadcast_r(bc)
