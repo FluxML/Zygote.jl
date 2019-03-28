@@ -6,6 +6,8 @@ using Base: @get!
 
 iscall(x, m::Module, n::Symbol) = isexpr(x, :call) && x.args[1] == GlobalRef(m, n)
 
+isreturn(x) = x isa ReturnNode && isdefined(x, :val)
+
 function isassert(ir, i)
   ex = ir.stmts[i+3]
   iscall(ex, Zygote, :typeassert)
@@ -26,8 +28,7 @@ function append_node!(ir, @nospecialize(typ), @nospecialize(node), line)
 end
 
 function merge_returns(ir)
-  any(x -> x == unreachable, ir.stmts) && error("Unsupported control flow")
-  rs = findall(x -> x isa ReturnNode && isdefined(x, :val), ir.stmts)
+  rs = findall(isreturn, ir.stmts)
   length(rs) <= 1 && return ir
   bs = blockidx.(Ref(ir), rs)
   xs = Any[]
@@ -120,7 +121,7 @@ function record_globals!(ir::IRCode)
         istrackable(ex.args[j]) || continue
         ex.args[j] = insert_node!(ir, i, Any, xcall(Zygote, :unwrap, QuoteNode(ex.args[j]), ex.args[j]))
       end
-    elseif isexpr(ex, ReturnNode) && istrackable(ex.val)
+    elseif isreturn(ex) && istrackable(ex.val)
       x = insert_node!(ir, i, Any, xcall(Zygote, :unwrap, QuoteNode(ex.val), ex.val))
       ir[SSAValue(i)] = ReturnNode(x)
     end
@@ -238,7 +239,7 @@ function blockinfo(pr::Primal)
   append!(info[1].grads, filter(x -> x isa Argument, pr.wrt))
   for b in 1:length(pr.forw.cfg.blocks), i in pr.forw.cfg.blocks[b].stmts
     ex = pr.forw[SSAValue(i)]
-    if ex isa ReturnNode
+    if isreturn(ex)
       ex.val in pr.wrt && push!(info[b].partials, ex.val)
     elseif ex isa PiNode
       (SSAValue(i) in pr.wrt && ex.val in pr.wrt) || continue
@@ -307,7 +308,7 @@ function reverse_ir(pr::Primal)
     j = max(j, 2)
     for i in reverse(pr.forw.cfg.blocks[b].stmts)
       ex = pr.forw[SSAValue(i)]
-      if ex isa ReturnNode
+      if isreturn(ex)
         ex.val in pr.wrt && push!(partials[ex.val], SSAValue(1))
       elseif ex isa PiNode
         (SSAValue(i) in pr.wrt && ex.val in pr.wrt) || continue
@@ -340,6 +341,8 @@ function reverse_ir(pr::Primal)
           ir.lines[j] = pr.forw.lines[i]
           push!(partials[x], dx)
         end
+      elseif ex == unreachable
+        insert_node!(ir, j, Union{}, unreachable)
       elseif isexpr(ex, :call, :isdefined, GotoIfNot, GotoNode, Nothing, GlobalRef)
         # ignore it
       else
