@@ -29,7 +29,7 @@ end
 
 function merge_returns(ir)
   rs = findall(isreturn, ir.stmts)
-  length(rs) <= 1 && return ir
+  length(rs) == 1 && isreturn(ir.stmts[end]) && return ir
   bs = blockidx.(Ref(ir), rs)
   xs = Any[]
   bb = length(ir.cfg.blocks)+1

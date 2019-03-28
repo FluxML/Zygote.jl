@@ -337,6 +337,8 @@ end
 end
 
 @testset "broadcast" begin
-  y, back = forward(x -> sin.(x), Diagonal(randn(3)))
-  @test back(ones(3,3))[1][2] == 1.0
+  if !Zygote.usetyped
+    y, back = forward(x -> sin.(x), Diagonal(randn(3)))
+    @test back(ones(3,3))[1][2] == 1.0
+  end
 end
