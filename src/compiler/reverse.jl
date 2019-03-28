@@ -419,7 +419,8 @@ function accumulators!(pr::Primal, ir::IRCode, grads, partials, phis)
     append!(ir[dx].args, blockpartials(b, x))
     push!(ir[dx].args, predpartial(b, x))
   end
-  return simplify!(ir)
+  # https://github.com/FluxML/Zygote.jl/issues/129
+  return compact!(simplify!(ir))
 end
 
 struct Adjoint
