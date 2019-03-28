@@ -29,7 +29,7 @@ function gradm(ex, mut = false)
   Ts == nothing && (Ts = [])
   args = named.(args)
   argnames = Any[typeless(arg) for arg in args]
-  isvararg(args[end]) && (argnames[end] = :($(argnames[end])...))
+  isvararg(args[end]) && (argnames[end] = :($(argnames[end])...,))
   args = esc.(args)
   argnames = esc.(argnames)
   Ts = esc.(Ts)
