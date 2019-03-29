@@ -60,6 +60,8 @@ end
 
 # Tuples
 
+using Base: tail
+
 @adjoint tuple(xs...) = xs, identity
 
 @adjoint getindex(xs::NTuple{N,Any}, i::Integer) where N =

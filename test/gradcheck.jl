@@ -1,8 +1,6 @@
-using Zygote, NNlib, Test, Random, LinearAlgebra
+using Zygote, NNlib, Test, Random, LinearAlgebra, Statistics
 using Zygote: gradient
 using NNlib: conv
-using Statistics
-import Random
 
 function ngradient(f, xs::AbstractArray...)
   grads = zero.(xs)
@@ -355,6 +353,6 @@ end
 
 @testset "broadcast" begin
   if !Zygote.usetyped
-    @test_broken gradient(x -> sum(sin.(x)), Diagonal(randn(3)))[1][2] == 1
+    @test gradient(x -> sum(sin.(x)), Diagonal(randn(3)))[1][2] == 1
   end
 end

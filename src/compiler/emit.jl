@@ -64,7 +64,7 @@ function forward_stacks!(adj, F)
   isconcretetype(T) || (T = Any)
   rec = insert_node!(adj.forw, length(adj.forw.stmts), T,
                      xtuple(recs...))
-  if usetyped
+  if usetyped && length(adj.perm) > 1
     rec = insert_node!(adj.forw, length(adj.forw.stmts), Pullback{F,T},
                        Expr(:call, Pullback{F,T}, rec))
   else
@@ -119,13 +119,18 @@ end
 
 varargs(m::Method, n) = m.isva ? n - m.nargs + 1 : nothing
 
+function getmeta(T)
+  m = meta(T)
+  (usetyped && m != nothing) || return m
+  any(x -> isexpr(x, :goto, :gotoifnot), m.code.code) || return IRTools.meta(T)
+  return m
+end
+
 function _lookup_grad(T)
-  (m = meta(T)) == nothing && return
-  usetyped && m.ret == Union{} && return
+  (m = getmeta(T)) == nothing && return
+  m isa IRTools.TypedMeta && m.ret == Union{} && return
   va = varargs(m.method, length(T.parameters))
   forw, back = stacks!(Adjoint(IRCode(m), varargs = va), T)
-  # verify_ir(forw)
-  # verify_ir(back)
   m, forw, back
 end
 
