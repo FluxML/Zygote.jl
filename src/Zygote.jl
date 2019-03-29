@@ -1,6 +1,6 @@
 module Zygote
 
-using LinearAlgebra
+using LinearAlgebra, Statistics
 using LinearAlgebra: copytri!
 
 # This flag enables Zygote to grab extra type inference information during

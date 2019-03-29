@@ -1,6 +1,7 @@
 using Zygote, NNlib, Test, Random, LinearAlgebra
 using Zygote: gradient
 using NNlib: conv
+using Statistics
 import Random
 
 function ngradient(f, xs::AbstractArray...)
@@ -48,6 +49,12 @@ Random.seed!(0)
 @test gradtest(x -> logsoftmax(x).*(1:3), 3)
 @test gradtest(x -> logsoftmax(x).*(1:3), (3,5))
 
+@test gradtest(x -> x', rand(5))
+
+@test gradtest(det, (4, 4))
+@test gradtest(logdet, map(x -> x*x', (rand(4, 4),))[1])
+@test gradtest(x -> logabsdet(x)[1], (4, 4))
+
 @test gradtest(conv, rand(10, 3, 2), randn(Float64,2, 3, 2))
 @test gradtest(conv, rand(10, 10, 3, 2), randn(Float64,2, 2, 3, 2))
 @test gradtest(conv, rand(10, 10, 10, 3, 2), randn(Float64,2, 2, 2, 3, 2))
@@ -85,6 +92,16 @@ end
     sum(map(bar, 1:5))
   end
   @test gradtest(foo, 3)
+end
+
+@testset "mean" begin
+  @test gradtest(mean, rand(2, 3))
+
+  @test gradtest(x -> mean(x, dims=1), rand(2, 3))
+  @test gradtest(x -> mean(x, dims=2), rand(2, 3))
+  @test gradtest(x -> mean(x, dims=3), rand(2, 3, 4))
+
+  @test gradtest(x -> mean(x, dims=[1, 2]), rand(2, 3, 4))
 end
 
 @testset "maximum" begin

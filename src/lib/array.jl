@@ -85,6 +85,8 @@ end
   end
 end
 
+@adjoint iterate(r::UnitRange, i...) = iterate(r, i...), _ -> nothing
+
 # Reductions
 
 @adjoint function sum(xs::AbstractArray; dims = :)
@@ -132,7 +134,12 @@ end
   end
 end
 
+@adjoint mean(xs; dims = :) = mean(xs, dims=dims), Δ -> (_backmean(xs,Δ,dims),)
+_backmean(xs, Δ, ::Colon) = zero(xs) .+ Δ ./ length(xs)
+_backmean(xs, Δ, dims) = zero(xs) .+ Δ ./ mapreduce(i -> size(xs,i),*,dims)
+
 # LinAlg
+# ======
 
 @adjoint function(a::AbstractVecOrMat * b::AbstractVecOrMat)
   return a * b, function(Δ)
@@ -158,9 +165,21 @@ end
 
 @adjoint kron(a::AbstractMatrix, b::AbstractMatrix) = forward(_kron, a, b)
 
-@adjoint iterate(r::UnitRange, i...) = iterate(r, i...), _ -> nothing
-
 @adjoint diag(A::AbstractMatrix) = diag(A), Δ->(Diagonal(Δ),)
+
+@adjoint det(xs) = det(xs), Δ -> (Δ * det(xs) * transpose(inv(xs)),)
+
+@adjoint logdet(xs) = logdet(xs), Δ -> (Δ * transpose(inv(xs)),)
+
+@adjoint logabsdet(xs) = logabsdet(xs), Δ -> (Δ[1] * transpose(inv(xs)),)
+
+@adjoint function inv(A)
+    return inv(A), function (Δ)
+        Ainv = inv(A)
+        ∇A = - Ainv' * Δ * Ainv'
+        return (∇A, )
+    end
+end
 
 @adjoint function \(A::AbstractMatrix, B::AbstractVecOrMat)
   Y = A \ B
@@ -169,6 +188,9 @@ end
       return (-B̄ * Y', B̄)
   end
 end
+
+# LinAlg Matrix Types
+# ===================
 
 # This is basically a hack while we don't have a working `ldiv!`.
 @adjoint function \(A::Cholesky, B::AbstractVecOrMat)
