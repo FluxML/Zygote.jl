@@ -355,7 +355,6 @@ end
 
 @testset "broadcast" begin
   if !Zygote.usetyped
-    y, back = forward(x -> sin.(x), Diagonal(randn(3)))
-    @test back(ones(3,3))[1][2] == 1.0
+    @test_broken gradient(x -> sum(sin.(x)), Diagonal(randn(3)))[1][2] == 1
   end
 end
