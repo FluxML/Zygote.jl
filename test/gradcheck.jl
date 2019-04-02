@@ -1,7 +1,6 @@
-using Zygote, NNlib, Test, Random, LinearAlgebra
+using Zygote, NNlib, Test, Random, LinearAlgebra, Statistics
 using Zygote: gradient
 using NNlib: conv
-import Random
 
 function ngradient(f, xs::AbstractArray...)
   grads = zero.(xs)
@@ -48,6 +47,12 @@ Random.seed!(0)
 @test gradtest(x -> logsoftmax(x).*(1:3), 3)
 @test gradtest(x -> logsoftmax(x).*(1:3), (3,5))
 
+@test gradtest(x -> x', rand(5))
+
+@test gradtest(det, (4, 4))
+@test gradtest(logdet, map(x -> x*x', (rand(4, 4),))[1])
+@test gradtest(x -> logabsdet(x)[1], (4, 4))
+
 @test gradtest(conv, rand(10, 3, 2), randn(Float64,2, 3, 2))
 @test gradtest(conv, rand(10, 10, 3, 2), randn(Float64,2, 2, 3, 2))
 @test gradtest(conv, rand(10, 10, 10, 3, 2), randn(Float64,2, 2, 2, 3, 2))
@@ -85,6 +90,16 @@ end
     sum(map(bar, 1:5))
   end
   @test gradtest(foo, 3)
+end
+
+@testset "mean" begin
+  @test gradtest(mean, rand(2, 3))
+
+  @test gradtest(x -> mean(x, dims=1), rand(2, 3))
+  @test gradtest(x -> mean(x, dims=2), rand(2, 3))
+  @test gradtest(x -> mean(x, dims=3), rand(2, 3, 4))
+
+  @test gradtest(x -> mean(x, dims=[1, 2]), rand(2, 3, 4))
 end
 
 @testset "maximum" begin
@@ -363,6 +378,7 @@ end
 end
 
 @testset "broadcast" begin
-  y, back = forward(x -> sin.(x), Diagonal(randn(3)))
-  @test back(ones(3,3))[1][2] == 1.0
+  if !Zygote.usetyped
+    @test gradient(x -> sum(sin.(x)), Diagonal(randn(3)))[1][2] == 1
+  end
 end

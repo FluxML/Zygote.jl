@@ -1,6 +1,6 @@
 module Zygote
 
-using LinearAlgebra
+using LinearAlgebra, Statistics
 using LinearAlgebra: copytri!
 
 # This flag enables Zygote to grab extra type inference information during
@@ -47,8 +47,8 @@ usetyped || include("precompile.jl")
 
 include("profiler/Profile.jl")
 
-@init @require Flux="587475ba-b771-5e3f-ad9e-33799f191a9c" begin
-  isdefined(Flux, :Tracker) && include("flux.jl")
+@init @require Tracker="9f7883ad-71c0-57eb-9f7f-b5c9e6d3789c" begin
+  include("flux.jl")
 end
 
 # helps to work around 265-y issues

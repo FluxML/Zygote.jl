@@ -240,23 +240,19 @@ function f(x)
   end
 end
 
-if VERSION >= v"1.1"
-  @test Zygote.@code_adjoint(f(1)) isa Zygote.Adjoint
-end
+@test Zygote.@code_adjoint(f(1)) isa Zygote.Adjoint
 
 @test_throws ErrorException Zygote.gradient(1) do x
   push!([], x)
   return x
 end
 
-if VERSION >= v"1.1"
-  @test gradient(1) do x
-    stk = []
-    Zygote._push!(stk, x)
-    stk = Zygote.Stack(stk)
-    pop!(stk)
-  end == (1,)
-end
+@test gradient(1) do x
+  stk = []
+  Zygote._push!(stk, x)
+  stk = Zygote.Stack(stk)
+  pop!(stk)
+end == (1,)
 
 @test gradient(x -> [x][1].a, Foo(1, 1)) == ((a=1, b=nothing),)
 

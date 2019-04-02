@@ -1,5 +1,9 @@
 using DiffRules, SpecialFunctions, NaNMath
 
+@nograd isinf, isnan, isfinite
+
+# TODO use CSE here
+
 for (M, f, arity) in DiffRules.diffrules()
   arity == 1 || continue
   @eval begin
@@ -34,3 +38,10 @@ end
 @adjoint a // b = (a // b, c̄ -> (c̄ * 1//b, - c̄ * a // b // b))
 
 @nograd floor, ceil, trunc, round, hash
+
+# Hack for conversions
+
+using ForwardDiff: Dual
+
+(T::Type{<:Real})(x::Dual) = Dual(T(x.value), map(T, x.partials.values))
+(Dual{T,V,N})(x::Dual) where {T,V,N} = invoke(Dual{T,V,N}, Tuple{Number}, x)
