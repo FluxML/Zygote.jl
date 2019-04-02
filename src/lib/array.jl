@@ -165,8 +165,6 @@ end
 
 @adjoint kron(a::AbstractMatrix, b::AbstractMatrix) = forward(_kron, a, b)
 
-@adjoint iterate(r::UnitRange, i...) = iterate(r, i...), _ -> nothing
-
 @adjoint function Diagonal(d::AbstractVector)
   back(Δ::NamedTuple) = (Δ.diag,)
   back(Δ::AbstractMatrix) = (diag(Δ),)
