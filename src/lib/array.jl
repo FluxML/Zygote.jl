@@ -134,7 +134,9 @@ end
   end
 end
 
-@adjoint mean(xs; dims = :) = mean(xs, dims=dims), Δ -> (_backmean(xs,Δ,dims),)
+@adjoint function mean(xs::AbstractArray; dims = :)
+  return mean(xs, dims=dims), Δ -> (_backmean(xs,Δ,dims),)
+end
 _backmean(xs, Δ, ::Colon) = zero(xs) .+ Δ ./ length(xs)
 _backmean(xs, Δ, dims) = zero(xs) .+ Δ ./ mapreduce(i -> size(xs,i),*,dims)
 
