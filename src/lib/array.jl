@@ -25,7 +25,7 @@ end
 
 # General
 
-@adjoint collect(x) = collect(x), Δ -> (Δ,)
+@adjoint collect(x::Array) = collect(x), Δ -> (Δ,)
 
 @adjoint permutedims(xs, dims) = permutedims(xs, dims),
   Δ -> (permutedims(Δ, invperm(dims)), nothing)
@@ -83,6 +83,14 @@ end
     Δf_and_args = unzip(Δf_and_args_zipped)
     Δf = reduce(accum, Δf_and_args[1])
     (Δf, Δf_and_args[2:end]...)
+  end
+end
+
+function _forward(cx::Context, ::typeof(collect), g::Base.Generator)
+  y, back = _forward(cx, map, g.f, g.iter)
+  y, function (ȳ)
+    _, f̄, x̄ = back(ȳ)
+    (nothing, (f = f̄, iter = x̄),)
   end
 end
 

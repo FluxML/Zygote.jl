@@ -90,6 +90,7 @@ end
     sum(map(bar, 1:5))
   end
   @test gradtest(foo, 3)
+  @test gradient(v -> sum([x for x in v]), [1.1,2.2,3.3]) == ([1, 1, 1],)
 end
 
 @testset "mean" begin
