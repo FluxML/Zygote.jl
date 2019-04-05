@@ -8,6 +8,7 @@
 
 @adjoint copy(x::AbstractArray) = copy(x), ȳ -> (ȳ,)
 
+_zero(xs::AbstractArray{<:Integer}) = fill!(similar(xs, float(eltype(xs))), false)
 _zero(xs::AbstractArray{<:Number}) = zero(xs)
 _zero(xs::AbstractArray) = Any[nothing for x in xs]
 
