@@ -30,7 +30,7 @@ include("compiler/show.jl")
 
 include("lib/grad.jl")
 include("lib/lib.jl")
-include("lib/real.jl")
+include("lib/number.jl")
 include("lib/complex.jl")
 include("lib/base.jl")
 include("lib/array.jl")
