@@ -23,6 +23,8 @@ end
 @nograd Core.apply_type, Core.typeof, nfields, fieldtype,
   (==), (===), (>=), (<), (>), isempty, supertype, Base.typename, Base.parameter_upper_bound
 
+@adjoint deepcopy(x) = deepcopy(x), ȳ -> (ȳ,)
+
 @adjoint (::Type{V})(x...) where V<:Val = V(x...), _ -> nothing
 
 @adjoint ifelse(cond::Bool, t, f) =
