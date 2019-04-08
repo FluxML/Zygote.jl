@@ -7,8 +7,8 @@ using DiffRules, SpecialFunctions, NaNMath
 for (M, f, arity) in DiffRules.diffrules()
   arity == 1 || continue
   @eval begin
-    @adjoint $M.$f(x::Real) = $M.$f(x),
-      Δ -> (Δ * $(DiffRules.diffrule(M, f, :x)),)
+    @adjoint $M.$f(x::Number) = $M.$f(x),
+      Δ -> (Δ * conj($(DiffRules.diffrule(M, f, :x))),)
   end
 end
 
@@ -16,8 +16,8 @@ for (M, f, arity) in DiffRules.diffrules()
   arity == 2 || continue
   da, db = DiffRules.diffrule(M, f, :a, :b)
   @eval begin
-    @adjoint $M.$f(a::Real, b::Real) = $M.$f(a, b),
-      Δ -> (Δ * $da, Δ * $db)
+    @adjoint $M.$f(a::Number, b::Number) = $M.$f(a, b),
+      Δ -> (Δ * conj($da), Δ * conj($db))
   end
 end
 
@@ -38,3 +38,10 @@ end
 @adjoint a // b = (a // b, c̄ -> (c̄ * 1//b, - c̄ * a // b // b))
 
 @nograd floor, ceil, trunc, round, hash
+
+# Complex Numbers
+
+@adjoint (T::Type{<:Complex})(re, im) = T(re, im), c̄ -> (nothing, real(c̄), imag(c̄))
+
+@adjoint real(x::Complex) = real(x), r̄ -> (r̄ + zero(r̄)*im,)
+@adjoint imag(x::Complex) = imag(x), ī -> (zero(ī) + ī*im,)
