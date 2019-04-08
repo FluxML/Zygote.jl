@@ -40,7 +40,7 @@ end
 
 function gradient(f, args...)
   y, back = forward(f, args...)
-  y isa Real || error("Function output is not scalar")
+  y isa Number || error("Function output is not scalar")
   return back(Int8(1))
 end
 
