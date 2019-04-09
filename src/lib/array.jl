@@ -260,12 +260,12 @@ end
   end
 end
 
-Zygote.@adjoint function LinearAlgebra.tr(x)
+Zygote.@adjoint function LinearAlgebra.tr(x::AbstractMatrix{T}) where T
   # x is a squre matrix checked by tr,
   # so we could just use Eye(size(x, 1))
   # to create a Diagonal
-  tr(x), function (Δ)
-    (Δ, Diagonal(FillArray(one(eltype(x)), (size(x, 1), ))))
+  tr(x), function (Δ::Number)
+    (Diagonal(FillArray(T(Δ), (size(x, 1), ))), )
   end
 end
 
