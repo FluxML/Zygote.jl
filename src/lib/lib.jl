@@ -1,3 +1,5 @@
+using Base: RefValue
+
 # Interfaces
 
 accum() = nothing
@@ -16,6 +18,11 @@ accum(x::AbstractArray, y::AbstractArray) = accum.(x, y)
 @generated function accum(x::NamedTuple, y::NamedTuple)
   grad(x) = x in fieldnames(y) ? :(y.$x) : :nothing
   Expr(:tuple, [:($f=accum(x.$f, $(grad(f)))) for f in fieldnames(x)]...)
+end
+
+function accum(x::RefValue, y::RefValue)
+  @assert x === y
+  return x
 end
 
 # Core functions
@@ -125,9 +132,9 @@ end
     if isimmutable(x)
       ((;nt_nothing(x)...,pair(Val(f), Δ)...), nothing)
     else
-      dx = getfield(grad_mut(__context__, x), f)
-      dx[] = accum(dx[], Δ)
-      return
+      dx = grad_mut(__context__, x)
+      dx[] = (;dx[]...,pair(Val(f),accum(getfield(dx[], f), Δ))...)
+      return (dx,nothing)
     end
   end
 end
@@ -142,23 +149,20 @@ literal_getproperty(x, ::Val{f}) where f = getproperty(x, f)
     if isimmutable(x)
       ((;nt_nothing(x)...,pair(Val(f), Δ)...), nothing)
     else
-      dx = getfield(grad_mut(__context__, x), f)
-      dx[] = accum(dx[], Δ)
-      return
+      dx = grad_mut(__context__, x)
+      dx[] = (;dx[]...,pair(Val(f),accum(getfield(dx[], f), Δ))...)
+      return (dx,nothing)
     end
   end
   unwrap(val), back
 end
 
-@generated function grad_mut(x)
-  Expr(:tuple, [:($f = Ref{Any}(nothing)) for f in fieldnames(x)]...)
-end
+grad_mut(x) = Ref{Any}(nt_nothing(x))
 
 function grad_mut(cx::Context, x)
-  T = Core.Compiler.return_type(grad_mut, Tuple{typeof(x)})
   ch = cache(cx)
   if haskey(ch, x)
-    ch[x]::T
+    ch[x]
   else
     ch[x] = grad_mut(x)
   end
@@ -168,8 +172,8 @@ end
   y = setfield!(x, f, val)
   g = grad_mut(__context__, x)
   y, function (_)
-    r = getfield(g, f)
-    Δ = deref!(r)
+    Δ = getfield(g[], f)
+    g[] = (;g[]...,pair(Val(f),nothing)...)
     (nothing, nothing, Δ)
   end
 end
@@ -207,14 +211,22 @@ end
 end
 
 # TODO captured mutables + multiple calls to `back`
-@generated function (back::Jnew{T,G,false})(Δ::Union{NamedTuple,Nothing}) where {T,G}
+@generated function (back::Jnew{T,G,false})(Δ::Union{NamedTuple,Nothing,RefValue}) where {T,G}
   !T.mutable && Δ == Nothing && return :nothing
-  Δ = G == Nothing ? :Δ : :(back.g)
-  :(nothing, $(map(f -> :(deref!($Δ.$f)), fieldnames(T))...))
+  Δ = G == Nothing ? :Δ : :(back.g[])
+  quote
+    x̄ = $Δ
+    $(G == Nothing || :($Δ = nt_nothing($Δ)))
+    (nothing, $(map(f -> :(x̄.$f), fieldnames(T))...))
+  end
 end
 
-@generated function (back::Jnew{T,G,true})(Δ::Union{NamedTuple,Nothing}) where {T,G}
+@generated function (back::Jnew{T,G,true})(Δ::Union{NamedTuple,Nothing,RefValue}) where {T,G}
   !T.mutable && Δ == Nothing && return :nothing
   Δ = G == Nothing ? :Δ : :(back.g)
-  :(nothing, ($(map(f -> :(deref!($Δ.$f)), fieldnames(T))...),))
+  quote
+    x̄ = $Δ
+    $(G == Nothing || :($Δ = nt_nothing($Δ)))
+    (nothing, $(map(f -> :(x̄.$f), fieldnames(T))...))
+  end
 end
