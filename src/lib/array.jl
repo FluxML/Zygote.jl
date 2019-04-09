@@ -260,6 +260,15 @@ end
   end
 end
 
+Zygote.@adjoint function LinearAlgebra.tr(x::AbstractMatrix)
+  # x is a squre matrix checked by tr,
+  # so we could just use Eye(size(x, 1))
+  # to create a Diagonal
+  tr(x), function (Δ::Number)
+    (Diagonal(FillArray(Δ, (size(x, 1), ))), )
+  end
+end
+
 # Various sensitivities for `literal_getproperty`, depending on the 2nd argument.
 @adjoint function literal_getproperty(C::Cholesky, ::Val{:uplo})
   return literal_getproperty(C, Val(:uplo)), function(Δ)
