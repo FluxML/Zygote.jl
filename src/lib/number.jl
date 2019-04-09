@@ -43,5 +43,5 @@ end
 
 @adjoint (T::Type{<:Complex})(re, im) = T(re, im), c̄ -> (nothing, real(c̄), imag(c̄))
 
-@adjoint real(x::Complex) = real(x), r̄ -> (r̄ + zero(r̄)*im,)
-@adjoint imag(x::Complex) = imag(x), ī -> (zero(ī) + ī*im,)
+@adjoint real(x::Complex) = real(x), r̄ -> (real(r̄) + zero(r̄)*im,)
+@adjoint imag(x::Complex) = imag(x), ī -> (zero(ī) + real(ī)*im,)
