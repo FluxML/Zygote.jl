@@ -1,6 +1,12 @@
 using Zygote, Test
 using Zygote: gradient
 
+if Zygote.usetyped
+  @info "Testing Zygote in type-hacks mode."
+else
+  @info "Testing Zygote in normal mode."
+end
+
 @testset "Zygote" begin
 
 @testset "Features" begin
