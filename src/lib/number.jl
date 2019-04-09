@@ -2,13 +2,17 @@ using DiffRules, SpecialFunctions, NaNMath
 
 @nograd isinf, isnan, isfinite
 
+const non_holomorphic = :[abs].args
+
 # TODO use CSE here
 
 for (M, f, arity) in DiffRules.diffrules()
   arity == 1 || continue
+  dx = DiffRules.diffrule(M, f, :x)
+  f in non_holomorphic || (dx = :(conj($dx)))
   @eval begin
     @adjoint $M.$f(x::Number) = $M.$f(x),
-      Δ -> (Δ * conj($(DiffRules.diffrule(M, f, :x))),)
+      Δ -> (Δ * conj($dx),)
   end
 end
 
