@@ -1,5 +1,5 @@
 using Zygote, Test
-using Zygote: Params, gradient, derivative, roundtrip, forwarddiff
+using Zygote: Params, gradient, roundtrip, forwarddiff
 
 add(a, b) = a+b
 _relu(x) = x > 0 ? x : 0
@@ -187,32 +187,32 @@ y, back = forward(() -> layer(x), Params([W]))
 
 @test gradient(() -> sum(W * x), Params([W]))[W] == [1 2; 1 2]
 
-@test derivative(2) do x
+@test gradient(2) do x
   H = [1 x; 3 4]
   sum(H)
-end == 1
+end[1] == 1
 
 # FIXME
 if !Zygote.usetyped
-  @test derivative(2) do x
+  @test gradient(2) do x
     if x < 0
       throw("foo")
     end
     return x*5
-  end == 5
+  end[1] == 5
 
-  @test derivative(x -> one(eltype(x)), rand(10)) == nothing
+  @test gradient(x -> one(eltype(x)), rand(10))[1] == nothing
 end
 
 # Thre-way control flow merge
-@test derivative(1) do x
+@test gradient(1) do x
   if x > 0
     x *= 2
   elseif x < 0
     x *= 3
   end
   x
-end == 2
+end[1] == 2
 
 # Gradient of closure
 grad_closure(x) = 2x

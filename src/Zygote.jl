@@ -16,7 +16,7 @@ using IRTools
 using MacroTools, Requires
 using MacroTools: @forward
 
-export Params, gradient, derivative, forward, @code_grad
+export Params, gradient, forward, @code_grad
 
 include("tools/idset.jl")
 include("tools/ir.jl")
