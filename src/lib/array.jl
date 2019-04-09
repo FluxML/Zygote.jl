@@ -1,3 +1,5 @@
+import FillArrays: Eye
+
 @adjoint (::Type{T})(args...) where T<:Array = T(args...), Δ -> nothing
 
 @nograd size, length, eachindex, Colon(), findfirst, randn, ones, zeros, one, zero,
@@ -257,6 +259,15 @@ end
       Σ̄[n] /= 2
     end
     return (UpperTriangular(Σ̄),)
+  end
+end
+
+Zygote.@adjoint function LinearAlgebra.tr(x)
+  # x is a squre matrix checked by tr,
+  # so we could just use Eye(size(x, 1))
+  # to create a Diagonal
+  tr(x), function (Δ)
+      (Δ * Eye{eltype(x)}(size(x, 1)), ) 
   end
 end
 

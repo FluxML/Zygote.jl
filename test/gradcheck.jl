@@ -69,6 +69,8 @@ Random.seed!(0)
 @test gradtest(x -> repeat(x; inner=2, outer=3), rand(5))
 @test gradtest(x -> repeat(x; inner=(2,2,1), outer=(1,1,3)), rand(5,4,3))
 
+@test gradtest(tr, rand(4, 4))
+
 @testset "dot" begin
   rng = MersenneTwister(123456)
   @test gradtest((x, y)->dot(x[1], y[1]), [randn(rng)], [randn(rng)])
