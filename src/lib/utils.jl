@@ -4,7 +4,7 @@ hook(f, x) = x
 
 macro showgrad(x)
   :(hook($(esc(x))) do x̄
-      println($"D($x) = ", repr(x̄))
+      println($"∂($x) = ", repr(x̄))
       x̄
     end)
 end
