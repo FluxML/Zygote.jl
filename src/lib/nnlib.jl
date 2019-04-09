@@ -1,5 +1,10 @@
 using NNlib
-import NNlib: softmax, ∇softmax, logsoftmax, ∇logsoftmax, conv, maxpool, meanpool
+import NNlib: softmax, ∇softmax, logsoftmax, ∇logsoftmax, conv, maxpool, meanpool, σ
+
+@adjoint function σ(x::Real)
+    y = σ(x)
+    return y, Δ -> (Δ * y * (1 - y),)
+end
 
 @adjoint softmax(xs) = softmax(xs), Δ -> (∇softmax(Δ, xs),)
 
