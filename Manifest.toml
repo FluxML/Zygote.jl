@@ -160,6 +160,12 @@ version = "0.10.3"
 deps = ["LinearAlgebra", "SparseArrays"]
 uuid = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 
+[[TaylorSeries]]
+deps = ["InteractiveUtils", "LinearAlgebra", "Markdown", "Requires", "SparseArrays", "Test"]
+git-tree-sha1 = "22e0dafddd125a6bf27b12b41478ea130ecee163"
+uuid = "6aa5eb33-94cf-58f4-a9d0-e4b2c4fc25ea"
+version = "0.9.2"
+
 [[Test]]
 deps = ["Distributed", "InteractiveUtils", "Logging", "Random"]
 uuid = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
