@@ -38,10 +38,13 @@ function forward(f, args...)
   y, Δ -> tailmemaybe(back(Δ))
 end
 
+sensitivity(y::Number) = one(y)
+sensitivity(y::Complex) = error("Output is complex, so the gradient is not defined.")
+sensitivity(y) = error("Output should be scalar; gradients are not defined for output $y")
+
 function gradient(f, args...)
   y, back = forward(f, args...)
-  y isa Number || error("Function output is not scalar")
-  return back(Int8(1))
+  return back(sensitivity(y))
 end
 
 Base.adjoint(f::Function) = x -> gradient(f, x)[1]
