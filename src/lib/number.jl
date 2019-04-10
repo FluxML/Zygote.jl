@@ -2,17 +2,20 @@ using DiffRules, SpecialFunctions, NaNMath
 
 @nograd isinf, isnan, isfinite
 
-const non_holomorphic = :[abs2, abs].args
-
 # TODO use CSE here
 
 for (M, f, arity) in DiffRules.diffrules()
   arity == 1 || continue
+  Δ = :Δ
   dx = DiffRules.diffrule(M, f, :x)
-  f in non_holomorphic || (dx = :(conj($dx)))
+  if f in [:abs, :abs2]
+    Δ = :(real($Δ))
+  else
+    dx = :(conj($dx))
+  end
   @eval begin
     @adjoint $M.$f(x::Number) = $M.$f(x),
-      Δ -> (Δ * $dx,)
+      Δ -> ($Δ * $dx,)
   end
 end
 
@@ -47,7 +50,7 @@ end
 
 @adjoint (T::Type{<:Complex})(re, im) = T(re, im), c̄ -> (nothing, real(c̄), imag(c̄))
 
-@adjoint real(x::Complex) = real(x), r̄ -> (real(r̄) + zero(r̄)*im,)
-@adjoint imag(x::Complex) = imag(x), ī -> (zero(ī) + real(ī)*im,)
+@adjoint real(x::Complex) = real(x), r̄ -> (real(r̄),)
+@adjoint imag(x::Complex) = imag(x), ī -> (real(ī)*im,)
 
 DiffRules._abs_deriv(x::Complex) = x/abs(x)

@@ -17,6 +17,10 @@ end
   include("gradcheck.jl")
 end
 
+@teset "Complex" begin
+  include("complex.jl")
+end
+
 @testset "Compiler" begin
   include("compiler.jl")
 end
