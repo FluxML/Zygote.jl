@@ -2,7 +2,7 @@ using DiffRules, SpecialFunctions, NaNMath
 
 @nograd isinf, isnan, isfinite
 
-const non_holomorphic = :[abs].args
+const non_holomorphic = :[abs2, abs].args
 
 # TODO use CSE here
 
@@ -12,7 +12,7 @@ for (M, f, arity) in DiffRules.diffrules()
   f in non_holomorphic || (dx = :(conj($dx)))
   @eval begin
     @adjoint $M.$f(x::Number) = $M.$f(x),
-      Δ -> (Δ * conj($dx),)
+      Δ -> (Δ * $dx,)
   end
 end
 
@@ -49,3 +49,5 @@ end
 
 @adjoint real(x::Complex) = real(x), r̄ -> (real(r̄) + zero(r̄)*im,)
 @adjoint imag(x::Complex) = imag(x), ī -> (zero(ī) + real(ī)*im,)
+
+DiffRules._abs_deriv(x::Complex) = x/abs(x)
