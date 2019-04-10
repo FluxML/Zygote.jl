@@ -1,11 +1,11 @@
 import .StatsFuns
-using StatsFuns: xlogx, logistic, logit, log1psq, log1pexp, logsumexp
+using .StatsFuns: xlogx, logistic, logit, log1psq, log1pexp, logsumexp
 
 @adjoint function xlogx(x::Real)
     y = xlogx(x)
     return y, function(Δ::Real)
         return (x > zero(x) ? Δ * (log(x) + one(y)) : zero(y),)
-    end 
+    end
 end
 
 @adjoint function logistic(x::Real)

@@ -10,6 +10,7 @@ ismutvalue(x::AbstractArray) = !isimmutable(x)
 
 @adjoint copy(x::AbstractArray) = copy(x), ȳ -> (ȳ,)
 
+_zero(xs::AbstractArray{<:Integer}) = fill!(similar(xs, float(eltype(xs))), false)
 _zero(xs::AbstractArray{<:Number}) = zero(xs)
 _zero(xs::AbstractArray) = Any[nothing for x in xs]
 
@@ -39,7 +40,7 @@ end
 
 # General
 
-@adjoint collect(x) = collect(x), Δ -> (Δ,)
+@adjoint collect(x::Array) = collect(x), Δ -> (Δ,)
 
 @adjoint permutedims(xs, dims) = permutedims(xs, dims),
   Δ -> (permutedims(Δ, invperm(dims)), nothing)
@@ -82,6 +83,34 @@ end
   end
 end
 
+@adjoint getindex(i::Int, j::Int) = i[j], _ -> nothing
+
+function unzip(tuples)
+  map(1:length(first(tuples))) do i
+      map(tuple -> tuple[i], tuples)
+  end
+end
+@adjoint function map(f, args::AbstractArray...)
+  ys_and_backs = map((args...) -> _forward(__context__, f, args...), args...)
+  ys, backs = unzip(ys_and_backs)
+  ys, function (Δ)
+    Δf_and_args_zipped = map((f, δ) -> f(δ), backs, Δ)
+    Δf_and_args = unzip(Δf_and_args_zipped)
+    Δf = reduce(accum, Δf_and_args[1])
+    (Δf, Δf_and_args[2:end]...)
+  end
+end
+
+function _forward(cx::Context, ::typeof(collect), g::Base.Generator)
+  y, back = _forward(cx, map, g.f, g.iter)
+  y, function (ȳ)
+    _, f̄, x̄ = back(ȳ)
+    (nothing, (f = f̄, iter = x̄),)
+  end
+end
+
+@adjoint iterate(r::UnitRange, i...) = iterate(r, i...), _ -> nothing
+
 # Reductions
 
 @adjoint function sum(xs::AbstractArray; dims = :)
@@ -95,6 +124,10 @@ end
 function _forward(cx::Context, ::typeof(sum), f, xs::AbstractArray)
   y, back = forward(cx, (xs -> sum(f.(xs))), xs)
   y, ȳ -> (nothing, nothing, back(ȳ)...)
+end
+
+@adjoint function sum(::typeof(abs2), X::AbstractArray; dims = :)
+  return sum(abs2, X; dims=dims), Δ::Union{Number, AbstractArray}->(nothing, ((2Δ) .* X))
 end
 
 @adjoint function prod(xs; dims = :)
@@ -125,7 +158,14 @@ end
   end
 end
 
+@adjoint function mean(xs::AbstractArray; dims = :)
+  return mean(xs, dims=dims), Δ -> (_backmean(xs,Δ,dims),)
+end
+_backmean(xs, Δ, ::Colon) = zero(xs) .+ Δ ./ length(xs)
+_backmean(xs, Δ, dims) = zero(xs) .+ Δ ./ mapreduce(i -> size(xs,i),*,dims)
+
 # LinAlg
+# ======
 
 @adjoint function(a::AbstractVecOrMat * b::AbstractVecOrMat)
   return a * b, function(Δ)
@@ -139,6 +179,8 @@ end
 @adjoint Base.adjoint(x) = x', Δ -> (Δ',)
 @adjoint parent(x::LinearAlgebra.Adjoint) = parent(x), ȳ -> (LinearAlgebra.Adjoint(ȳ),)
 
+@adjoint dot(x::AbstractArray, y::AbstractArray) = dot(x, y), Δ->(Δ .* y, Δ .* x)
+
 function _kron(mat1::AbstractMatrix,mat2::AbstractMatrix)
     m1, n1 = size(mat1)
     mat1_rsh = reshape(mat1,(1,m1,1,n1))
@@ -151,15 +193,45 @@ end
 
 @adjoint kron(a::AbstractMatrix, b::AbstractMatrix) = forward(_kron, a, b)
 
-@adjoint iterate(r::UnitRange, i...) = iterate(r, i...), _ -> nothing
+@adjoint function Diagonal(d::AbstractVector)
+  back(Δ::NamedTuple) = (Δ.diag,)
+  back(Δ::AbstractMatrix) = (diag(Δ),)
+  return Diagonal(d), back
+end
 
 @adjoint diag(A::AbstractMatrix) = diag(A), Δ->(Diagonal(Δ),)
+
+@adjoint det(xs) = det(xs), Δ -> (Δ * det(xs) * transpose(inv(xs)),)
+
+@adjoint logdet(xs) = logdet(xs), Δ -> (Δ * transpose(inv(xs)),)
+
+@adjoint logabsdet(xs) = logabsdet(xs), Δ -> (Δ[1] * transpose(inv(xs)),)
+
+@adjoint function inv(A)
+    return inv(A), function (Δ)
+        Ainv = inv(A)
+        ∇A = - Ainv' * Δ * Ainv'
+        return (∇A, )
+    end
+end
 
 @adjoint function \(A::AbstractMatrix, B::AbstractVecOrMat)
   Y = A \ B
   return Y, function(Ȳ)
       B̄ = A' \ Ȳ
       return (-B̄ * Y', B̄)
+  end
+end
+
+# LinAlg Matrix Types
+# ===================
+
+# This is basically a hack while we don't have a working `ldiv!`.
+@adjoint function \(A::Cholesky, B::AbstractVecOrMat)
+  Y, back = Zygote.forward((U, B)->U \ (U' \ B), A.U, B)
+  return Y, function(Ȳ)
+    Ā_factors, B̄ = back(Ȳ)
+    return ((uplo=nothing, status=nothing, factors=Ā_factors), B̄)
   end
 end
 
@@ -172,17 +244,27 @@ end
 end
 
 _symmetric_back(Δ) = UpperTriangular(Δ) + LowerTriangular(Δ)' - Diagonal(Δ)
-_symmetric_back(Δ::UpperTriangular) = Δ
+_symmetric_back(Δ::Union{Diagonal, UpperTriangular}) = Δ
 @adjoint function Symmetric(A::AbstractMatrix)
   back(Δ::AbstractMatrix) = (_symmetric_back(Δ),)
   back(Δ::NamedTuple) = (_symmetric_back(Δ.data),)
   return Symmetric(A), back
 end
 
+@adjoint function cholesky(Σ::Real)
+  C = cholesky(Σ)
+  return C, Δ::NamedTuple->(Δ.factors[1, 1] / (2 * C.U[1, 1]),)
+end
+
+@adjoint function cholesky(Σ::Diagonal)
+  C = cholesky(Σ)
+  return C, Δ::NamedTuple->(Diagonal(diag(Δ.factors) .* inv.(2 .* C.factors.diag)),)
+end
+
 # Implementation due to Seeger, Matthias, et al. "Auto-differentiating linear algebra."
 @adjoint function cholesky(Σ::Union{StridedMatrix, Symmetric{<:Real, <:StridedMatrix}})
   C = cholesky(Σ)
-  return C, function(Δ)
+  return C, function(Δ::NamedTuple)
     U, Ū = C.U, Δ.factors
     Σ̄ = Ū * U'
     Σ̄ = copytri!(Σ̄, 'U')
@@ -195,9 +277,13 @@ end
   end
 end
 
-@adjoint function cholesky(Σ::Real)
-  C = cholesky(Σ)
-  return C, Δ::NamedTuple->(Δ.factors[1, 1] / (2 * C.U[1, 1]),)
+Zygote.@adjoint function LinearAlgebra.tr(x::AbstractMatrix)
+  # x is a squre matrix checked by tr,
+  # so we could just use Eye(size(x, 1))
+  # to create a Diagonal
+  tr(x), function (Δ::Number)
+    (Diagonal(FillArray(Δ, (size(x, 1), ))), )
+  end
 end
 
 # Various sensitivities for `literal_getproperty`, depending on the 2nd argument.
