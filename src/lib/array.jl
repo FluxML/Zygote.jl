@@ -156,7 +156,7 @@ _backmean(xs, Δ, dims) = zero(xs) .+ Δ ./ mapreduce(i -> size(xs,i),*,dims)
 
 @adjoint function(a::AbstractVecOrMat * b::AbstractVecOrMat)
   return a * b, function(Δ)
-    return (reshape(Δ * transpose(b), size(a)), reshape(transpose(a) * Δ, size(b)))
+    return (reshape(Δ * b', size(a)), reshape(a' * Δ, size(b)))
   end
 end
 
