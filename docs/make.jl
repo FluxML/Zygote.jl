@@ -7,7 +7,7 @@ makedocs(
         "Home" => "index.md",
         "Custom Adjoints" => "adjoints.md",
         "Utilities" => "utils.md",
-        "Complex AD" => "complex.md",
+        "Complex Differentiation" => "complex.md",
         "Profiling" => "profiling.md",
         "Internals" => "internals.md"],
   format = Documenter.HTML(prettyurls = haskey(ENV, "CI")))
