@@ -6,6 +6,7 @@ makedocs(
   pages = [
         "Home" => "index.md",
         "Custom Adjoints" => "adjoints.md",
+        "Utilities" => "utils.md",
         "Profiling" => "profiling.md",
         "Internals" => "internals.md"],
   format = Documenter.HTML(prettyurls = haskey(ENV, "CI")))
