@@ -46,18 +46,87 @@ function stacklines(adj::Adjoint)
   return recs
 end
 
+function do_dfs(cfg, bb)
+    # TODO: There are algorithms to this with much better
+    # asymptotics, but this'll do for now.
+    visited = Set{Int}(bb)
+    worklist = Int[bb]
+    while !isempty(worklist)
+      block = pop!(worklist)
+      for succ in cfg.blocks[block].succs
+        succ == bb && return nothing
+        (succ in visited) && continue
+        push!(visited, succ)
+        push!(worklist, succ)
+      end
+    end
+    return collect(visited)
+end
+
+function find_dominating_for_bb(domtree, bb, alpha_ssa, def_bb, phi_nodes)
+  # Ascend idoms, until we find another phi block or the def block
+  while bb != 0
+    if bb == def_bb
+      return alpha_ssa
+    elseif haskey(phi_nodes, bb)
+      return phi_nodes[bb][2]
+    end
+    bb = domtree.idoms[bb]
+  end
+  return nothing
+end
+
+function insert_phi_nest!(ir, domtree, T, def_bb, exit_bb, alpha_ssa, phi_blocks)
+  phi_nodes = Dict(bb => (pn = PhiNode(); ssa = insert_node!(ir, first(ir.cfg.blocks[bb].stmts), Union{T, Nothing}, pn); (pn, ssa)) for bb in phi_blocks)
+  # TODO: This could be more efficient by joint ascension of the domtree
+  for bb in phi_blocks
+    bb_phi, _ = phi_nodes[bb]
+    for pred in ir.cfg.blocks[bb].preds
+      dom = find_dominating_for_bb(domtree, pred, alpha_ssa, def_bb, phi_nodes)
+      if dom !== nothing
+        push!(bb_phi.edges, pred)
+        push!(bb_phi.values, dom)
+      else
+        push!(bb_phi.edges, pred)
+        push!(bb_phi.values, nothing)
+      end
+    end
+  end
+  exit_dom = find_dominating_for_bb(domtree, exit_bb, alpha_ssa, def_bb, phi_nodes)
+end
+
 function forward_stacks!(adj, F)
   stks, recs = [], []
-  for fb in adj.perm, α in alphauses(adj.back, invperm(adj.perm)[fb])
-    if fb == 1
-      pushfirst!(recs, α)
-    else
-      T = exprtype(adj.forw, α)
-      stk = insert_node!(adj.forw, 1, xstack(T)...)
-      pushfirst!(recs, stk)
-      insert_blockend!(adj.forw, blockidx(adj.forw, α.id), Any, xcall(Zygote, :_push!, stk, α))
+  fwd_cfg = adj.forw.cfg
+  domtree = construct_domtree(fwd_cfg)
+  exit_bb = length(fwd_cfg.blocks)
+  for fb in adj.perm
+    # TODO: do_dfs does double duty here, computing self reachability and giving
+    # us the set of live in nodes. There are better algorithms for the former
+    # and the latter shouldn't be necessary.
+    live_in = do_dfs(fwd_cfg, fb)
+    in_loop = live_in === nothing
+    if !in_loop
+      if dominates(domtree, fb, exit_bb)
+        phi_blocks = Int[]
+      else
+        # Liveness is trivial here, so we could specialize idf
+        # on that fact, but good enough for now.
+        phi_blocks = Core.Compiler.idf(fwd_cfg, Core.Compiler.BlockLiveness([fb], live_in), domtree)
+      end
     end
-    pushfirst!(stks, (invperm(adj.perm)[fb], alpha(α)))
+    for α in alphauses(adj.back, invperm(adj.perm)[fb])
+      T = exprtype(adj.forw, α)
+      if !in_loop
+        α′ = insert_phi_nest!(adj.forw, domtree, T, fb, exit_bb, SSAValue(α.id), phi_blocks)
+        pushfirst!(recs, α′)
+      else
+        stk = insert_node!(adj.forw, 1, xstack(T)...)
+        pushfirst!(recs, stk)
+        insert_blockend!(adj.forw, blockidx(adj.forw, α.id), Any, xcall(Zygote, :_push!, stk, α))
+      end
+      pushfirst!(stks, (invperm(adj.perm)[fb], alpha(α), in_loop))
+    end
   end
   args = [Argument(i) for i = 3:length(adj.forw.argtypes)]
   T = Tuple{concrete.(exprtype.((adj.forw,), recs))...}
@@ -80,17 +149,22 @@ function forward_stacks!(adj, F)
   return forw, stks
 end
 
+# If we had the type, we could make this a PiNode
+notnothing(x::Nothing) = error()
+notnothing(x) = x
+
 function reverse_stacks!(adj, stks)
   ir = adj.back
   t = insert_node!(ir, 1, Any, xcall(Base, :getfield, Argument(1), QuoteNode(:t)))
   for b = 1:length(ir.cfg.blocks)
     repl = Dict()
-    for (i, (b′, α)) in enumerate(stks)
+    for (i, (b′, α, use_stack)) in enumerate(stks)
       b == b′ || continue
       loc, attach_after = afterphi(ir, range(ir.cfg.blocks[b])[1])
       loc = max(2, loc)
-      if adj.perm[b′] == 1
+      if !use_stack
         val = insert_node!(ir, loc, Any, xcall(:getindex, t, i), attach_after)
+        val = insert_node!(ir, loc, Any, xcall(Zygote, :notnothing, val), attach_after)
       else
         stk = insert_node!(ir, 1, Any, xcall(:getindex, t, i))
         stk = insert_node!(ir, 1, Any, xcall(Zygote, :Stack, stk))
