@@ -52,6 +52,6 @@ end
 
 @adjoint real(x::Number) = real(x), r̄ -> (real(r̄),)
 @adjoint conj(x::Number) = conj(x), r̄ -> (conj(r̄),)
-@adjoint imag(x::Complex) = imag(x), ī -> (real(ī)*im,)
+@adjoint imag(x::Number) = imag(x), ī -> (real(ī)*im,)
 
 DiffRules._abs_deriv(x::Complex) = x/abs(x)
