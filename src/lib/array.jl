@@ -77,7 +77,7 @@ function unzip(tuples)
       map(tuple -> tuple[i], tuples)
   end
 end
-@adjoint function map(f, args::AbstractArray...)
+@adjoint function map(f, args...)
   ys_and_backs = map((args...) -> _forward(__context__, f, args...), args...)
   ys, backs = unzip(ys_and_backs)
   ys, function (Δ)

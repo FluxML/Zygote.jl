@@ -42,9 +42,9 @@ function forward_jacobian(f, x)
 end
 
 vec_scalar(x) = vec(x)
-vec_scalar(x::Real) = [x]
+vec_scalar(x::Number) = [x]
 reshape_scalar(x, y) = reshape(y, size(x))
-reshape_scalar(x::Real, y) = y[]
+reshape_scalar(x::Number, y) = y[]
 
 """
     forwarddiff(f, x) -> f(x)

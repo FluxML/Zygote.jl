@@ -54,4 +54,9 @@ end
 @adjoint conj(x::Number) = conj(x), r̄ -> (conj(r̄),)
 @adjoint imag(x::Number) = imag(x), ī -> (real(ī)*im,)
 
+# Improve Array `conj`, `real` and `imag` Performance
+@adjoint real(x::AbstractArray) = real(x), r̄ -> (real(r̄),)
+@adjoint conj(x::AbstractArray) = conj(x), r̄ -> (conj(r̄),)
+@adjoint imag(x::AbstractArray) = imag(x), ī -> (real(ī)*im,)
+
 DiffRules._abs_deriv(x::Complex) = x/abs(x)
