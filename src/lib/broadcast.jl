@@ -64,6 +64,13 @@ unbroadcast(x::Union{Number,Ref}, x̄) = accum_sum(x̄)
 @adjoint broadcasted(::typeof(*), x::Number, y::Number) = x.*y,
   z̄ -> (nothing, unbroadcast(x, z̄ .* conj(y)), unbroadcast(y, z̄ .* conj(x)))
 
+@adjoint broadcasted(::typeof(conj), x) = conj.(x),
+    z̄ -> (nothing, unbroadcast(x, conj.(z̄)))
+@adjoint broadcasted(::typeof(real), x) = real.(x),
+    z̄ -> (nothing, unbroadcast(x, real.(z̄)))
+@adjoint broadcasted(::typeof(imag), x) = imag.(x),
+    z̄ -> (nothing, unbroadcast(x, im .* real.(z̄)))
+
 # General Fallback
 # ================
 
