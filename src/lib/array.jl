@@ -38,6 +38,23 @@ end
   end
 end
 
+# Special case for potentially-undef arrays
+# TODO: clean this up and fold it into the normal version
+@adjoint! function setindex!(x::AbstractArray, v, i::Int...)
+  isdef = isassigned(x, i...)
+  isdef && (old = x[i...])
+  setindex!(x, v, i...), function (dx)
+    if dx !== nothing
+      dv = dx[i...]
+      ismutvalue(dx) && (view(dx, i...) .= 0)
+    else
+      dv = nothing
+    end
+    isdef && (x[i...] = old)
+    return (dx, dv, map(_ -> nothing, i)...)
+  end
+end
+
 @adjoint! function push!(xs::AbstractVector, x)
   push!(xs, x), function (dxs)
     dx = dxs === nothing ? nothing : dxs[end]
