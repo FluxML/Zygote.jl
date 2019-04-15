@@ -285,6 +285,12 @@ using LinearAlgebra
   y
 end == ([2, 4],)
 
+@test gradient(2) do x
+  xs = []
+  push!(xs, x)
+  pop!(xs)*x
+end == (4,)
+
 global_param = 3
 
 @testset "Global Params" begin

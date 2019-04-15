@@ -38,6 +38,29 @@ end
   end
 end
 
+@adjoint! function push!(xs::AbstractVector, x)
+  push!(xs, x), function (dxs)
+    dx = dxs === nothing ? nothing : dxs[end]
+    if ismutvalue(dxs)
+      pop!(dxs)
+    else
+      dxs = dxs[1:end-1]
+    end
+    pop!(xs)
+    return (dxs, dx)
+  end
+end
+
+@adjoint! function pop!(xs::AbstractVector)
+  x = pop!(xs)
+  x, function (dx)
+    dxs = _zero(xs)
+    push!(dxs, dx)
+    push!(xs, x)
+    return (dxs,)
+  end
+end
+
 # General
 
 @adjoint collect(x::Array) = collect(x), Δ -> (Δ,)
