@@ -225,11 +225,10 @@ function adjoint(pr::Primal)
         br′ = branchfor(pr.ir, br.block=>b.id)
         br′ == nothing && continue
         ins = br′.args
-        @assert length(unique(ins)) == length(ins)
+        # @assert length(unique(ins)) == length(ins)
         for i = 1:length(br.args)
-          j = findfirst(x -> x == sigs[br.block][i], ins)
-          j == nothing && continue
-          br.args[i] = gs[j]
+          ā = [gs[j] for j = 1:length(ins) if ins[j] == sigs[br.block][i]]
+          br.args[i] = xaccum(rb, ā...)
         end
       end
     else # Backprop function arguments
