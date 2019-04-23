@@ -53,22 +53,19 @@ unbroadcast(x::Union{Number,Ref}, x̄) = accum_sum(x̄)
 # to do CSE, then broadcast-ify the expression so that the closure captures the
 # right arrays.
 
-@adjoint broadcasted(::typeof(+), xs...) =
+Numeric{T<:Number} = Union{T,AbstractArray{<:T}}
+
+@adjoint broadcasted(::typeof(+), xs::Numeric...) =
   broadcast(+, xs...), ȳ -> (nothing, map(x -> unbroadcast(x, ȳ), xs)...)
 
-@adjoint broadcasted(::typeof(*), x, y) = x.*y,
-  z̄ -> (nothing, unbroadcast(x, z̄ .* y), unbroadcast(y, z̄ .* x))
+@adjoint broadcasted(::typeof(*), x::Numeric, y::Numeric) = x.*y,
+  z̄ -> (nothing, unbroadcast(x, z̄ .* conj.(y)), unbroadcast(y, z̄ .* conj.(x)))
 
-@adjoint broadcasted(::typeof(*), x::Array{<:Number}, y::Array{<:Number}) = x.*y,
-  z̄ -> (nothing, unbroadcast(x, z̄ .* conj(y)), unbroadcast(y, z̄ .* conj(x)))
-@adjoint broadcasted(::typeof(*), x::Number, y::Number) = x.*y,
-  z̄ -> (nothing, unbroadcast(x, z̄ .* conj(y)), unbroadcast(y, z̄ .* conj(x)))
-
-@adjoint broadcasted(::typeof(conj), x) = conj.(x),
+@adjoint broadcasted(::typeof(conj), x::Numeric) = conj.(x),
     z̄ -> (nothing, unbroadcast(x, conj.(z̄)))
-@adjoint broadcasted(::typeof(real), x) = real.(x),
+@adjoint broadcasted(::typeof(real), x::Numeric) = real.(x),
     z̄ -> (nothing, unbroadcast(x, real.(z̄)))
-@adjoint broadcasted(::typeof(imag), x) = imag.(x),
+@adjoint broadcasted(::typeof(imag), x::Numeric) = imag.(x),
     z̄ -> (nothing, unbroadcast(x, im .* real.(z̄)))
 
 # General Fallback
