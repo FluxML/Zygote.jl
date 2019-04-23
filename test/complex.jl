@@ -1,9 +1,9 @@
 using Zygote, Test
 
-# Gradients are defined as the backpropagation of the number 1. If C is seen as R^2, this means the first column of the transpose of the jacobian.
-# For C -> R functions f(x+iy), the Jacobian is (df/dx;df/dy), and so the gradient is df/dx + i df/dy
-# For complex valued functions, the gradient is the gradient of the real part. For C -> C functions u+iv=f(x+iy), the gradient is du/dx + i du/dy
-# For holomorphic functions, ∇f (as defined above) = du/dx + i du/dy = du/dx - i dv/dx = conj(f'), with f' the complex derivative
+@test gradient(x -> real(abs(x)*exp(im*angle(x))), 10+20im)[1] ≈ 1
+@test gradient(x -> imag(real(x)+0.3im), 0.3)[1] ≈ 0
+@test gradient(x -> imag(conj(x)+0.3im), 0.3)[1] ≈ -1im
+@test gradient(x -> abs((imag(x)+0.3)), 0.3)[1] == 1im
 
 fs_C_to_R = (real,
              imag,

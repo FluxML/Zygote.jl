@@ -1,4 +1,4 @@
-@adjoint (::Type{T})(args...) where T<:Array = T(args...), Δ -> nothing
+@adjoint (::Type{T})(::UndefInitializer, args...) where T<:Array = T(undef, args...), Δ -> nothing
 
 @nograd size, length, eachindex, Colon(), findfirst, randn, ones, zeros, one, zero,
   print, println
@@ -7,6 +7,8 @@
 @adjoint Base.vect(xs...) = Base.vect(xs...), Δ -> (Δ...,)
 
 @adjoint copy(x::AbstractArray) = copy(x), ȳ -> (ȳ,)
+
+@adjoint (::Type{T})(x::T) where T<:Array = T(x), ȳ -> (ȳ,)
 
 _zero(xs::AbstractArray{<:Integer}) = fill!(similar(xs, float(eltype(xs))), false)
 _zero(xs::AbstractArray{<:Number}) = zero(xs)
@@ -124,6 +126,11 @@ end
   end
 end
 
+function _forward(cx::Context, ::typeof(prod), f, xs::AbstractArray)
+  y, back = forward(cx, (xs -> prod(f.(xs))), xs)
+  y, ȳ -> (nothing, nothing, back(ȳ)...)
+end
+
 @adjoint function maximum(xs; dims = :)
   max, i = findmax(xs, dims = dims)
   max, function (Δ)
@@ -154,7 +161,7 @@ _backmean(xs, Δ, dims) = zero(xs) .+ Δ ./ mapreduce(i -> size(xs,i),*,dims)
 
 @adjoint function(a::AbstractVecOrMat * b::AbstractVecOrMat)
   return a * b, function(Δ)
-    return (reshape(Δ * transpose(b), size(a)), reshape(transpose(a) * Δ, size(b)))
+    return (reshape(Δ * b', size(a)), reshape(a' * Δ, size(b)))
   end
 end
 

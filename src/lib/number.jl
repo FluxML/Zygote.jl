@@ -50,7 +50,8 @@ end
 
 @adjoint (T::Type{<:Complex})(re, im) = T(re, im), c̄ -> (nothing, real(c̄), imag(c̄))
 
-@adjoint real(x::Complex) = real(x), r̄ -> (real(r̄),)
-@adjoint imag(x::Complex) = imag(x), ī -> (real(ī)*im,)
+@adjoint real(x::Number) = real(x), r̄ -> (real(r̄),)
+@adjoint conj(x::Number) = conj(x), r̄ -> (conj(r̄),)
+@adjoint imag(x::Number) = imag(x), ī -> (real(ī)*im,)
 
 DiffRules._abs_deriv(x::Complex) = x/abs(x)

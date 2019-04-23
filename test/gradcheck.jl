@@ -385,3 +385,28 @@ end
     @test gradient(x -> sum(sin.(x)), Diagonal(randn(3)))[1][2] == 1
   end
 end
+
+using Zygote: Buffer
+
+@testset "Buffer" begin
+  @test gradient([1, 2, 3]) do x
+    b = Buffer(x)
+    b[:] = x
+    return sum(copy(b))
+  end == ([1,1,1],)
+
+  function vstack(xs)
+    buf = Buffer(xs, length(xs), 5)
+    for i = 1:5
+      buf[:, i] = xs
+    end
+    return copy(buf)
+  end
+
+  @test gradient(x -> sum(vstack(x)), [1, 2, 3]) == ([5, 5, 5],)
+
+  buf = Buffer([1, 2, 3])
+  buf[1] = 1
+  copy(buf)
+  @test_throws ErrorException buf[1] = 1
+end
