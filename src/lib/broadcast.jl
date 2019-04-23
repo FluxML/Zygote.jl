@@ -34,8 +34,8 @@ accum_sum(xs; dims = :) = reduce(accum, xs, dims = dims)
 
 # Work around reducedim_init issue
 accum_sum(xs::AbstractArray{Nothing}; dims = :) = nothing
-accum_sum(xs::AbstractArray{<:Real}; dims = :) = sum(xs, dims = dims)
-accum_sum(xs::Real; dims = :) = xs
+accum_sum(xs::AbstractArray{<:Number}; dims = :) = sum(xs, dims = dims)
+accum_sum(xs::Number; dims = :) = xs
 
 trim(x, Δ) = reshape(Δ, ntuple(i -> size(Δ, i), Val(ndims(x))))
 
@@ -53,11 +53,22 @@ unbroadcast(x::Union{Number,Ref}, x̄) = accum_sum(x̄)
 # to do CSE, then broadcast-ify the expression so that the closure captures the
 # right arrays.
 
-@adjoint broadcasted(::typeof(+), xs...) =
+Numeric{T<:Number} = Union{T,AbstractArray{<:T}}
+
+@adjoint broadcasted(::typeof(+), xs::Numeric...) =
   broadcast(+, xs...), ȳ -> (nothing, map(x -> unbroadcast(x, ȳ), xs)...)
 
-@adjoint broadcasted(::typeof(*), x, y) = x.*y,
-  z̄ -> (nothing, unbroadcast(x, z̄ .* y), unbroadcast(y, z̄ .* x))
+@adjoint broadcasted(::typeof(*), x::Numeric, y::Numeric) = x.*y,
+  z̄ -> (nothing, unbroadcast(x, z̄ .* conj.(y)), unbroadcast(y, z̄ .* conj.(x)))
+
+@adjoint broadcasted(::typeof(conj), x::Numeric) =
+  conj.(x), z̄ -> (nothing, conj.(z̄))
+
+@adjoint broadcasted(::typeof(real), x::Numeric) =
+  real.(x), z̄ -> (nothing, real.(z̄))
+
+@adjoint broadcasted(::typeof(imag), x::Numeric) =
+  imag.(x), z̄ -> (nothing, im .* real.(z̄))
 
 # General Fallback
 # ================
