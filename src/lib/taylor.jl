@@ -4,7 +4,7 @@ import Base: *, +
 @adjoint Taylor1(order::Integer) = Taylor1(order), _ -> nothing
 @adjoint Taylor1(T::Type, order::Integer) = Taylor1(T, order), _ -> nothing
 
-struct TaylorAdjoint{T<:Number}
+struct TaylorAdjoint{T<:Number} <: Number
   adjoint::Vector{T}
 end
 
