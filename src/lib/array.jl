@@ -267,6 +267,29 @@ end
   end
 end
 
+@adjoint function lyap(A, C)
+  X = lyap(A, C)
+  return X, function (X̄)
+    C̄ = lyap(collect(A'), X̄)
+    Ā = C̄*X' + C̄'*X
+    return (Ā, C̄)
+  end
+end
+
+# Adjoint based on the Theano implementation, which uses the differential as described
+# in Brančík, "Matlab programs for matrix exponential function derivative evaluation"
+@adjoint exp(A) = exp(A), function(F̄)
+  n = size(A, 1)
+  E = eigen(A)
+  w = E.values
+  ew = exp.(w)
+  X = [i==j ? ew[i] : (ew[i]-ew[j])/(w[i]-w[j]) for i in 1:n,j=1:n]
+  VT = transpose(E.vectors)
+  VTF = factorize(collect(VT))
+  Ā = real.(VTF\(VT*F̄/VTF.*X)*VT)
+  (Ā, )
+end
+
 Zygote.@adjoint function LinearAlgebra.tr(x::AbstractMatrix)
   # x is a squre matrix checked by tr,
   # so we could just use Eye(size(x, 1))
