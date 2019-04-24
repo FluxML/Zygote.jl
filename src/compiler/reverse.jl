@@ -1,7 +1,7 @@
 using IRTools: IR, Variable, Argument, Pipe, xcall, arg, var, prewalk, postwalk,
   blocks, predecessors, successors, argument!, arguments, branches, argmap,
   exprtype, insertafter!, finish, allspats!, trimspats!, substitute!, substitute,
-  block, block!, branch!, return!
+  block, block!, branch!, return!, stmt
 using Base: @get!
 
 @inline tuple_va(N, xs) = xs
@@ -47,7 +47,7 @@ function instrument_global!(ir, v, ex)
   else
     ir[v] = prewalk(ex) do x
       istrackable(x) || return x
-      insert!(ir, v, xcall(Zygote, :unwrap, QuoteNode(x), x))
+      insert!(ir, v, stmt(xcall(Zygote, :unwrap, QuoteNode(x), x), type = exprtype(x)))
     end
   end
 end
@@ -70,7 +70,7 @@ function record_branches!(ir::IR)
   for bb in blocks(ir)
     preds = predecessors(bb)
     length(preds) > 1 || continue
-    brs[bb.id] = argument!(bb)
+    brs[bb.id] = argument!(bb, BranchNumber(0), BranchNumber)
     i = length(arguments(bb))
     n = 0
     for aa in blocks(ir), br in branches(aa)
@@ -114,19 +114,18 @@ function primal(ir::IR)
   for v in pr
     ex = ir[v].expr
     if isexpr(ex, :call) && !ignored(ir, ex)
-      # yT = exprtype(ir, v)
-      # T = _forward_type(exprtype.(Ref(ir), ex.args))
-      # if yT == Any || isvalidtype(T, yT)
+      yT = exprtype(ir, v)
+      T = _forward_type(exprtype.((ir,), ex.args))
+      if yT == Any || isvalidtype(T, yT)
         yJ = insert!(pr, v, xcall(Zygote, :_forward, Argument(0), ex.args...))
         pr[v] = xgetindex(yJ, 1)
-        # bT = T == Any ? Any : T.parameters[2]
-        pbs[v] = insertafter!(pr, v, xgetindex(yJ, 2))
-      # else
-      #   yJ = insert_node!(ir, i, Any, xcall(Zygote, :_forward, Argument(2), ex.args...))
-      #   y =  insert_node!(ir, i, Any, xgetindex(yJ, 1))
-      #   J =  insert_node!(ir, i, Any, xgetindex(yJ, 2))
-      #   ir[v] = xcall(Zygote, :typeassert, y, yT)
-      # end
+        pbs[v] = insertafter!(pr, v, stmt(xgetindex(yJ, 2), type = T == Any ? Any : T.parameters[2]))
+      else
+        yJ = insert!(pr, v, xcall(Zygote, :_forward, Argument(0), ex.args...))
+        y =  insert!(pr, v, xgetindex(yJ, 1))
+        J =  insert!(pr, v, xgetindex(yJ, 2))
+        pr[v] = xcall(Zygote, :typeassert, y, yT)
+      end
     end
   end
   pr = finish(pr)
@@ -177,6 +176,9 @@ function adjointcfg(pr::Primal)
         push!(rb, xcall(Base, :(!==), alpha(pr.branches[b.id]), BranchNumber(i)))
       branch!(rb, preds[i].id, unless = cond)
     end
+    if !isempty(branches(b)) && branches(b)[end] == IRTools.unreachable
+      branch!(rb, 0)
+    end
   end
   sigs = sig(pr)
   for b in blocks(ir)[1:end-1], i = 1:length(sigs[b.id])
@@ -212,8 +214,10 @@ function adjoint(pr::Primal)
           x isa Union{Variable,Argument} || continue
           grad(x, push!(rb, xgradindex(g, i)))
         end
+      elseif b[v].expr isa Core.PiNode
+        grads[b[v].expr.val] = grads[v]
       elseif isexpr(b[v].expr, GlobalRef, :call, :isdefined)
-      else # TODO: Pi nodes
+      else
         ex = b[v].expr
         desc = isexpr(ex) ? "$(ex.head) expression" : ex
         push!(rb, xcall(Base, :error, "Can't differentiate $desc"))
@@ -222,10 +226,10 @@ function adjoint(pr::Primal)
     if b.id > 1 # Backprop through (predecessor) branch arguments
       gs = grad.(arguments(b))
       for br in branches(rb)
+        br.block == 0 && continue
         br′ = branchfor(pr.ir, br.block=>b.id)
         br′ == nothing && continue
         ins = br′.args
-        # @assert length(unique(ins)) == length(ins)
         for i = 1:length(br.args)
           ā = [gs[j] for j = 1:length(ins) if ins[j] == sigs[br.block][i]]
           br.args[i] = xaccum(rb, ā...)
@@ -255,13 +259,4 @@ function Adjoint(ir::IR; varargs = nothing, normalise = true)
     adj = IRTools.domorder!(adj) |> IRTools.renumber
   end
   Adjoint(pr.pr, adj)
-end
-
-function pow(x, n)
-  r = 1
-  while n > 0
-    n -= 1
-    r *= x
-  end
-  return r
 end

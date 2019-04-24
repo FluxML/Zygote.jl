@@ -22,7 +22,7 @@ end
 
 # Emit
 
-xstack(T) = Expr(:call, Vector{T})
+xstack(T) = stmt(Expr(:call, Vector{T}), type = Vector{T})
 
 function alphauses(b)
   us = Set{Alpha}()
@@ -53,7 +53,7 @@ function forward_stacks!(adj, F)
     if runonce(b)
       push!(recs, Variable(α))
     else
-      T = Any#exprtype(pr, α)
+      T = exprtype(pr, Variable(α))
       stk = pushfirst!(pr, xstack(T))
       push!(recs, stk)
       push!(b, xcall(Zygote, :_push!, stk, Variable(α)))
@@ -61,18 +61,16 @@ function forward_stacks!(adj, F)
     push!(stks, (b.id, alpha(α)))
   end
   args = [arg(i) for i = 3:length(pr.args)]
-  T = Any#Tuple{concrete.(exprtype.((pr,), recs))...}
+  T = Tuple{concrete.(exprtype.((pr,), recs))...}
   isconcretetype(T) || (T = Any)
   rec = push!(pr, xtuple(recs...))
-  # if usetyped && length(adj.perm) > 1
-  #   rec = insert_node!(adj.forw, length(adj.forw.stmts), Pullback{F,T},
-  #                      Expr(:call, Pullback{F,T}, rec))
-  # else
+  if usetyped && length(pr.blocks) > 1
+    rec = push!(pr, Expr(:call, Pullback{F,T}, rec))
+  else
     P = length(pr.blocks) == 1 ? Pullback{F} : Pullback{F,Any}
     rec = push!(pr, Expr(:call, P, rec))
-  # end
+  end
   ret = xtuple(pr.blocks[end].branches[end].args[1], rec)
-  R = Any#exprtype(adj.forw, adj.forw.stmts[end].val)
   ret = push!(pr, ret)
   pr.blocks[end].branches[end].args[1] = ret
   return pr, stks
