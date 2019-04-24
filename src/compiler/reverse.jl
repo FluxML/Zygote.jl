@@ -54,8 +54,8 @@ end
 
 function instrument(ir::IR)
   pr = Pipe(ir)
-  for v in pr
-    ex = ir[v].expr
+  for (v, st) in pr
+    ex = st.expr
     ex = instrument_new!(pr, v, ex)
     ex = instrument_getproperty!(pr, v, ex)
     ex = instrument_global!(pr, v, ex)
@@ -111,8 +111,8 @@ function primal(ir::IR)
   for i = 0:length(ir.args)
     substitute!(pr, arg(i), arg(i+2))
   end
-  for v in pr
-    ex = ir[v].expr
+  for (v, st) in pr
+    ex = st.expr
     if isexpr(ex, :call) && !ignored(ir, ex)
       yT = exprtype(ir, v)
       T = _forward_type(exprtype.((ir,), ex.args))
@@ -120,14 +120,16 @@ function primal(ir::IR)
         yJ = insert!(pr, v, stmt(xcall(Zygote, :_forward, Argument(0), ex.args...),
                                  line = ir[v].line))
         pr[v] = xgetindex(yJ, 1)
-        pbs[v] = insertafter!(pr, v, stmt(xgetindex(yJ, 2),
-                                          type = T == Any ? Any : T.parameters[2],
-                                          line = ir[v].line))
+        J = insertafter!(pr, v, stmt(xgetindex(yJ, 2),
+                                     type = T == Any ? Any : T.parameters[2],
+                                     line = ir[v].line))
+        pbs[v] = substitute(pr, J)
       else
         yJ = insert!(pr, v, xcall(Zygote, :_forward, Argument(0), ex.args...))
         y =  insert!(pr, v, xgetindex(yJ, 1))
         J =  insert!(pr, v, stmt(xgetindex(yJ, 2), line = ir[v].line))
         pr[v] = xcall(Zygote, :typeassert, y, yT)
+        pbs[v] = substitute(pr, J)
       end
     end
   end
