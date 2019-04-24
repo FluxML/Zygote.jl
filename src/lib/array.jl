@@ -1,6 +1,6 @@
 ismutvalue(x::AbstractArray) = !isimmutable(x)
 
-@adjoint (::Type{T})(args...) where T<:Array = T(args...), Δ -> nothing
+@adjoint (::Type{T})(::UndefInitializer, args...) where T<:Array = T(undef, args...), Δ -> nothing
 
 @nograd size, length, eachindex, Colon(), findfirst, randn, ones, zeros, one, zero,
   print, println
@@ -9,6 +9,8 @@ ismutvalue(x::AbstractArray) = !isimmutable(x)
 @adjoint Base.vect(xs...) = Base.vect(xs...), Δ -> (Δ...,)
 
 @adjoint copy(x::AbstractArray) = copy(x), ȳ -> (ȳ,)
+
+@adjoint (::Type{T})(x::T) where T<:Array = T(x), ȳ -> (ȳ,)
 
 _zero(xs::AbstractArray{<:Integer}) = fill!(similar(xs, float(eltype(xs))), false)
 _zero(xs::AbstractArray{<:Number}) = zero(xs)
@@ -179,6 +181,11 @@ end
   end
 end
 
+function _forward(cx::Context, ::typeof(prod), f, xs::AbstractArray)
+  y, back = forward(cx, (xs -> prod(f.(xs))), xs)
+  y, ȳ -> (nothing, nothing, back(ȳ)...)
+end
+
 @adjoint function maximum(xs; dims = :)
   max, i = findmax(xs, dims = dims)
   max, function (Δ)
@@ -209,7 +216,7 @@ _backmean(xs, Δ, dims) = zero(xs) .+ Δ ./ mapreduce(i -> size(xs,i),*,dims)
 
 @adjoint function(a::AbstractVecOrMat * b::AbstractVecOrMat)
   return a * b, function(Δ)
-    return (reshape(Δ * transpose(b), size(a)), reshape(transpose(a) * Δ, size(b)))
+    return (reshape(Δ * b', size(a)), reshape(a' * Δ, size(b)))
   end
 end
 
@@ -315,6 +322,29 @@ end
     end
     return (UpperTriangular(Σ̄),)
   end
+end
+
+@adjoint function lyap(A, C)
+  X = lyap(A, C)
+  return X, function (X̄)
+    C̄ = lyap(collect(A'), X̄)
+    Ā = C̄*X' + C̄'*X
+    return (Ā, C̄)
+  end
+end
+
+# Adjoint based on the Theano implementation, which uses the differential as described
+# in Brančík, "Matlab programs for matrix exponential function derivative evaluation"
+@adjoint exp(A) = exp(A), function(F̄)
+  n = size(A, 1)
+  E = eigen(A)
+  w = E.values
+  ew = exp.(w)
+  X = [i==j ? ew[i] : (ew[i]-ew[j])/(w[i]-w[j]) for i in 1:n,j=1:n]
+  VT = transpose(E.vectors)
+  VTF = factorize(collect(VT))
+  Ā = real.(VTF\(VT*F̄/VTF.*X)*VT)
+  (Ā, )
 end
 
 Zygote.@adjoint function LinearAlgebra.tr(x::AbstractMatrix)

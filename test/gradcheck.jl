@@ -210,6 +210,23 @@ end
   end
 end
 
+@testset "lyap" begin
+  rng, N = MersenneTwister(6865943), 5
+  for i = 1:4
+    A = randn(rng, N, N)
+    C = randn(rng, N, N)
+    @test gradtest(lyap, A, C)
+  end
+end
+
+@testset "matrix exponential" begin
+  rng, N = MersenneTwister(6865931), 8
+  for i = 1:5
+    A = randn(rng, N, N)
+    @test gradtest(exp, A)
+  end
+end
+
 using Distances
 
 Zygote.refresh()
@@ -384,4 +401,29 @@ end
   if !Zygote.usetyped
     @test gradient(x -> sum(sin.(x)), Diagonal(randn(3)))[1][2] == 1
   end
+end
+
+using Zygote: Buffer
+
+@testset "Buffer" begin
+  @test gradient([1, 2, 3]) do x
+    b = Buffer(x)
+    b[:] = x
+    return sum(copy(b))
+  end == ([1,1,1],)
+
+  function vstack(xs)
+    buf = Buffer(xs, length(xs), 5)
+    for i = 1:5
+      buf[:, i] = xs
+    end
+    return copy(buf)
+  end
+
+  @test gradient(x -> sum(vstack(x)), [1, 2, 3]) == ([5, 5, 5],)
+
+  buf = Buffer([1, 2, 3])
+  buf[1] = 1
+  copy(buf)
+  @test_throws ErrorException buf[1] = 1
 end

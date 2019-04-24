@@ -1,3 +1,7 @@
+using IRTools: IR, Variable, Argument, Pipe, xcall, arg, var, prewalk, postwalk,
+  blocks, predecessors, successors, argument!, arguments, branches, argmap,
+  exprtype, insertafter!, finish, allspats!, trimspats!, substitute!, substitute,
+  block, block!, branch!, return!, stmt
 using Base: @get!
 
 @inline tuple_va(N, xs) = xs
@@ -6,103 +10,28 @@ using Base: @get!
 
 iscall(x, m::Module, n::Symbol) = isexpr(x, :call) && x.args[1] == GlobalRef(m, n)
 
-isreturn(x) = x isa ReturnNode && isdefined(x, :val)
-
-function isassert(ir, i)
-  ex = ir.stmts[i+3]
-  iscall(ex, Zygote, :typeassert)
-end
-
-# TODO: Move this to Base
-function append_node!(ir, @nospecialize(typ), @nospecialize(node), line)
-  @assert isempty(ir.new_nodes)
-  push!(ir.stmts, node)
-  push!(ir.types, typ)
-  push!(ir.lines, line)
-  push!(ir.flags, 0)
-  last_bb = ir.cfg.blocks[end]
-  ir.cfg.blocks[end] = BasicBlock(StmtRange(first(last_bb.stmts):length(ir.stmts)),
-      last_bb.preds,
-      last_bb.succs)
-  return SSAValue(length(ir.stmts))
-end
-
-function merge_returns(ir)
-  rs = findall(isreturn, ir.stmts)
-  length(rs) == 1 && isreturn(ir.stmts[end]) && return ir
-  bs = blockidx.(Ref(ir), rs)
-  xs = Any[]
-  bb = length(ir.cfg.blocks)+1
-  @assert length(unique(bs)) == length(bs)
-  push!(ir.cfg.blocks, BasicBlock(StmtRange(length(ir.stmts)+1, length(ir.stmts)), bs, []))
-  push!(ir.cfg.index, length(ir.stmts) + 1)
-  r = append_node!(ir, Any, nothing, ir.lines[end])
-  append_node!(ir, Any, ReturnNode(r), ir.lines[end])
-  for r in rs
-    x = ir.stmts[r].val
-    x = insert_node!(ir, r, Any, x)
-    push!(xs, x)
-    ir.stmts[r] = GotoNode(bb)
-  end
-  for b in bs
-    push!(ir.cfg.blocks[b].succs, bb)
-  end
-  ir.stmts[r.id] = PhiNode(bs, xs)
-  return compact!(ir)
-end
-
-function merge_entry(ir)
-  isempty(ir.cfg.blocks[1].preds) && return ir
-  ir = IncrementalCompact(ir)
-  insert_node_here!(ir, nothing, Nothing, Int32(0))
-  foreach(_ -> nothing, ir)
-  ir = finish(ir)
-  for i in 1:length(ir.cfg.blocks)
-    old = ir.cfg.blocks[i]
-    ir.cfg.blocks[i] = BasicBlock(old.stmts, old.preds .+ 1, old.succs .+ 1)
-  end
-  for i = 1:length(ir.stmts)
-    ex = ir.stmts[i]
-    ir.stmts[i] =
-      ex isa GotoNode ? GotoNode(ex.label+1) :
-      ex isa GotoIfNot ? GotoIfNot(ex.cond, ex.dest+1) :
-      ex
-  end
-  pushfirst!(ir.cfg.blocks, BasicBlock(StmtRange(1:1), [], [2]))
-  old = ir.cfg.blocks[2]
-  ir.cfg.blocks[2] = BasicBlock(StmtRange(2:last(old.stmts)), old.preds, old.succs)
-  pushfirst!(ir.cfg.blocks[2].preds, 1)
-  return ir
-end
-
-normalise(ir) = ir |> merge_entry |> merge_returns
-
-struct Alpha
-  id::Int
-end
-
-Base.show(io::IO, x::Alpha) = print(io, "@", x.id)
-
-alpha(x) = x
-alpha(x::SSAValue) = Alpha(x.id)
-
 gradindex(x, i) = x[i]
 gradindex(::Nothing, i) = nothing
-xgetindex(x, i...) = Expr(:call, GlobalRef(Base, :getindex), x, i...)
+xgetindex(x, i...) = xcall(Base, :getindex, x, i...)
 xgradindex(x, i) = xcall(Zygote, :gradindex, x, i)
 
-function record_branches!(ir::IRCode)
-  ir = IncrementalCompact(ir)
-  offset = 0
-  for (i, x) in ir
-    bi = findfirst(x -> x == i+1-offset, ir.ir.cfg.index)
-    bi == nothing && continue
-    preds = ir.ir.cfg.blocks[bi+1].preds
-    length(preds) > 1 || continue
-    insert_node_here!(ir, PhiNode(sort(preds), Int8.(1:length(preds))), Int8, ir.result_lines[i])
-    offset += 1
-  end
-  return finish_dc(ir)
+normalise!(ir) = ir |> IRTools.merge_entry! |> IRTools.merge_returns!
+
+function instrument_new!(ir, v, ex)
+  isexpr(ex, :new) ? (ir[v] = xcall(Zygote, :__new__, ex.args...)) :
+  isexpr(ex, :splatnew) ? (ir[v] = xcall(Zygote, :__splatnew__, ex.args...)) :
+  ex
+end
+
+# Hack to work around fragile constant prop through overloaded functions
+is_literal_getproperty(ex) =
+  (iscall(ex, Base, :getproperty) || iscall(ex, Core, :getfield)) &&
+  ex.args[3] isa QuoteNode
+
+function instrument_getproperty!(ir, v, ex)
+  is_literal_getproperty(ex) ?
+    (ir[v] = xcall(Zygote, :literal_getproperty, ex.args[2], Val(ex.args[3].value))) :
+    ex
 end
 
 function istrackable(x)
@@ -112,21 +41,43 @@ function istrackable(x)
   !(x isa Type || sizeof(x) == 0)
 end
 
-function record_globals!(ir::IRCode)
-  for i = 1:length(ir.stmts)
-    ex = ir[SSAValue(i)]
-    # TODO general globalrefs
-    if isexpr(ex, :call)
-      for j = 1:length(ex.args)
-        istrackable(ex.args[j]) || continue
-        ex.args[j] = insert_node!(ir, i, Any, xcall(Zygote, :unwrap, QuoteNode(ex.args[j]), ex.args[j]))
-      end
-    elseif isreturn(ex) && istrackable(ex.val)
-      x = insert_node!(ir, i, Any, xcall(Zygote, :unwrap, QuoteNode(ex.val), ex.val))
-      ir[SSAValue(i)] = ReturnNode(x)
+function instrument_global!(ir, v, ex)
+  if istrackable(ex)
+    ir[v] = xcall(Zygote, :unwrap, QuoteNode(ex), ex)
+  else
+    ir[v] = prewalk(ex) do x
+      istrackable(x) || return x
+      insert!(ir, v, stmt(xcall(Zygote, :unwrap, QuoteNode(x), x), type = exprtype(x)))
     end
   end
-  return compact!(ir)
+end
+
+function instrument(ir::IR)
+  pr = Pipe(ir)
+  for (v, st) in pr
+    ex = st.expr
+    ex = instrument_new!(pr, v, ex)
+    ex = instrument_getproperty!(pr, v, ex)
+    ex = instrument_global!(pr, v, ex)
+  end
+  return finish(pr)
+end
+
+const BranchNumber = UInt8
+
+function record_branches!(ir::IR)
+  brs = Dict{Int,Variable}()
+  for bb in blocks(ir)
+    preds = predecessors(bb)
+    length(preds) > 1 || continue
+    brs[bb.id] = argument!(bb, BranchNumber(0), BranchNumber)
+    i = length(arguments(bb))
+    n = 0
+    for aa in blocks(ir), br in branches(aa)
+      br.block == bb.id && (arguments(br)[i] = BranchNumber(n += 1))
+    end
+  end
+  return ir, brs
 end
 
 ignored_f(f) = f in (GlobalRef(Base, :not_int),
@@ -136,29 +87,13 @@ ignored_f(f) = f in (GlobalRef(Base, :not_int),
                      GlobalRef(Core, :typeof),
                      GlobalRef(Core, :throw),
                      GlobalRef(Base, :kwerr),
-                     GlobalRef(Core, :kwfunc))
+                     GlobalRef(Core, :kwfunc),
+                     GlobalRef(Core, :isdefined))
 ignored_f(ir, f) = ignored_f(f)
-ignored_f(ir, f::SSAValue) = ignored_f(ir[f])
+ignored_f(ir, f::Variable) = ignored_f(ir[f])
 
 ignored(ir, ex) = isexpr(ex, :call) && ignored_f(ir, ex.args[1])
-ignored(ir, ex::SSAValue) = ignored(ir, ir[ex])
-
-function valid_usages(ir)
-  r = Dict()
-  for (x, us) in usages(ir)
-    x isa Union{SSAValue,Argument} || continue
-    us′ = filter(i -> !ignored(ir, i), us)
-    isempty(us′) || (r[x] = us′)
-  end
-  return r
-end
-
-reachable(ir) = keys(valid_usages(ir))
-
-# Hack to work around fragile constant prop through overloaded functions
-is_literal_getproperty(ex) =
-  (iscall(ex, Base, :getproperty) || iscall(ex, Core, :getfield)) &&
-  ex.args[3] isa QuoteNode
+ignored(ir, ex::Variable) = ignored(ir, ir[ex])
 
 # TODO: remove this once we don't mess with type inference
 function _forward_type(Ts)
@@ -170,277 +105,166 @@ end
 
 isvalidtype(jT, yT) = jT <: Tuple && length(jT.parameters) == 2 && jT.parameters[1] <: yT
 
-function record!(ir::IRCode)
-  pushfirst!(ir.argtypes, typeof(_forward), Context)
-  xs = reachable(ir)
-  for i = 1:length(ir.stmts)
-    ex = argmap(x -> Argument(x.n+2), ir[SSAValue(i)])
-    isexpr(ex, :new) && (ex = ir[SSAValue(i)] = xcall(Zygote, :__new__, ex.args...))
-    isexpr(ex, :splatnew) && (ex = ir[SSAValue(i)] = xcall(Zygote, :__splatnew__, ex.args...))
-    is_literal_getproperty(ex) &&
-      (ex = ir[SSAValue(i)] = xcall(Zygote, :literal_getproperty, ex.args[2], Val(ex.args[3].value)))
+function primal(ir::IR)
+  pr = Pipe(ir)
+  pbs = Dict{Variable,Variable}()
+  for i = 0:length(ir.args)
+    substitute!(pr, arg(i), arg(i+2))
+  end
+  for (v, st) in pr
+    ex = st.expr
     if isexpr(ex, :call) && !ignored(ir, ex)
-      yT = widenconst(types(ir)[i])
-      T = _forward_type(exprtype.(Ref(ir), ex.args))
+      yT = exprtype(ir, v)
+      T = _forward_type(exprtype.((ir,), ex.args))
       if yT == Any || isvalidtype(T, yT)
-        yJ = insert_node!(ir, i, T, xcall(Zygote, :_forward, Argument(2), ex.args...))
-        ir[SSAValue(i)] = xgetindex(yJ, 1)
-        insert_node!(ir, i, T == Any ? Any : T.parameters[2], xgetindex(yJ, 2), true)
+        yJ = insert!(pr, v, stmt(xcall(Zygote, :_forward, Argument(0), ex.args...),
+                                 line = ir[v].line))
+        pr[v] = xgetindex(yJ, 1)
+        J = insertafter!(pr, v, stmt(xgetindex(yJ, 2),
+                                     type = T == Any ? Any : T.parameters[2],
+                                     line = ir[v].line))
+        pbs[v] = substitute(pr, J)
       else
-        yJ = insert_node!(ir, i, Any, xcall(Zygote, :_forward, Argument(2), ex.args...))
-        y =  insert_node!(ir, i, Any, xgetindex(yJ, 1))
-        J =  insert_node!(ir, i, Any, xgetindex(yJ, 2))
-        ir[SSAValue(i)] = xcall(Zygote, :typeassert, y, yT)
+        yJ = insert!(pr, v, xcall(Zygote, :_forward, Argument(0), ex.args...))
+        y =  insert!(pr, v, xgetindex(yJ, 1))
+        J =  insert!(pr, v, stmt(xgetindex(yJ, 2), line = ir[v].line))
+        pr[v] = xcall(Zygote, :typeassert, y, yT)
+        pbs[v] = substitute(pr, J)
       end
-    else
-      ir[SSAValue(i)] = ex
     end
   end
-  ir, m = _compact!(ir)
-  return ir, Set(x isa Argument ? Argument(x.n+2) : x for x in rename(xs, m))
+  pr = finish(pr)
+  pushfirst!(pr.args, typeof(_forward), Context)
+  pr, brs = record_branches!(pr)
+  return pr, brs, pbs
+end
+
+struct Primal
+  ir::IR
+  pr::IR
+  varargs::Union{Int,Nothing}
+  branches::Dict{Int,Variable}
+  pullbacks::Dict{Variable,Variable}
+end
+
+function Primal(ir::IR; varargs = nothing)
+  ir = instrument(normalise!(ir))
+  pr, brs, pbs = primal(ir)
+  Primal(allspats!(ir), pr, varargs, brs, pbs)
 end
 
 # Backwards Pass
 
-function reverse_cfg(cfg, perm)
-  newidx(i) = invperm(perm)[i]
-  CFG([BasicBlock(StmtRange(1,0),newidx.(b.succs),newidx.(b.preds)) for b in cfg.blocks[perm]])
+struct Alpha
+  id::Int
 end
 
-function reverse_order(cfg)
-  n = length(cfg.blocks)
-  perm = n:-1:1
-  guess = reverse_cfg(cfg, perm)
-  dt = construct_domtree(guess)
-  perm[sortperm(1:n, by = x -> dt.nodes[x].level)]
-end
+Base.show(io::IO, x::Alpha) = print(io, "@", x.id)
 
-struct Primal
-  forw::IRCode
-  perm::Vector{Int}
-  wrt::Set{Any}
-  varargs::Union{Int,Nothing}
-end
+alpha(x) = x
+alpha(x::Variable) = Alpha(x.id)
+Variable(a::Alpha) = Variable(a.id)
 
-Primal(ir::IRCode, xs, vs) = Primal(ir, reverse_order(ir.cfg), xs, vs)
+sig(b::IRTools.Block) = unique([arg for br in branches(b) for arg in br.args if arg isa Union{Argument,Variable}])
+sig(pr::Primal) = Dict(b.id => sig(b) for b in blocks(pr.ir))
 
-function Primal(ir::IRCode; varargs = nothing)
-  ir = normalise(ir)
-  forw, xs = record!(record_branches!(record_globals!(ir)))
-  Primal(forw, xs, varargs)
-end
-
-newblock(pr::Primal, b) = invperm(pr.perm)[b]
-oldblock(pr::Primal, b) = pr.perm[b]
-
-function blockinfo(pr::Primal)
-  preds(b) = pr.forw.cfg.blocks[b].preds
-  info = Dict(b => (phis=Dict(),partials=[],grads=[]) for b in 1:length(pr.forw.cfg.blocks))
-  append!(info[1].grads, filter(x -> x isa Argument, pr.wrt))
-  for b in 1:length(pr.forw.cfg.blocks), i in pr.forw.cfg.blocks[b].stmts
-    ex = pr.forw[SSAValue(i)]
-    if isreturn(ex)
-      ex.val in pr.wrt && push!(info[b].partials, ex.val)
-    elseif ex isa PiNode
-      (SSAValue(i) in pr.wrt && ex.val in pr.wrt) || continue
-      push!(info[b].grads, SSAValue(i))
-      push!(info[b].partials, ex.val)
-    elseif ex isa PhiNode
-      any(x -> x in pr.wrt, ex.values) && push!(info[b].grads, SSAValue(i))
-      for (c, x) in zip(ex.edges, ex.values)
-        x in pr.wrt && push!(@get!(info[b].phis, c, []), x)
-      end
-    elseif iscall(ex, Zygote, :_forward)
-      y = isassert(pr.forw, i) ? SSAValue(i+3) : SSAValue(i+1)
-      push!(info[b].grads, y)
-      for x in ex.args[3:end]
-        x in pr.wrt && push!(info[b].partials, x)
-      end
+# TODO unreachables?
+function adjointcfg(pr::Primal)
+  ir = empty(pr.ir)
+  return!(ir, nothing)
+  for b in blocks(pr.ir)[2:end]
+    block!(ir)
+    preds = predecessors(b)
+    rb = block(ir, b.id)
+    for i = 1:length(preds)
+      cond = i == length(preds) ? nothing :
+        push!(rb, xcall(Base, :(!==), alpha(pr.branches[b.id]), BranchNumber(i)))
+      branch!(rb, preds[i].id, unless = cond)
+    end
+    if !isempty(branches(b)) && branches(b)[end] == IRTools.unreachable
+      branch!(rb, 0)
     end
   end
-  worklist = collect(1:length(pr.forw.cfg.blocks))
-  while !isempty(worklist)
-    b = pop!(worklist)
-    for c in preds(b)
-      in = union(get(info[b].phis, c, []), setdiff(info[b].partials, info[b].grads))
-      out = union(info[c].partials, info[c].grads)
-      new = setdiff(in, out)
-      if !isempty(new)
-        append!(info[c].partials, new)
-        c ∉ worklist && push!(worklist, c)
-      end
-    end
+  sigs = sig(pr)
+  for b in blocks(ir)[1:end-1], i = 1:length(sigs[b.id])
+    argument!(b)
   end
-  return info
+  argument!(blocks(ir)[end])
+  return ir, sigs
 end
 
-function IRCode(ir::Primal)
-  stmts = []
-  blocks = []
-  newidx(i) = invperm(ir.perm)[i]
-  for block in ir.perm
-    old = ir.forw.cfg.blocks[block]
-    start = length(stmts)+1
-    block == length(ir.perm) && push!(stmts, :(Δ()))
-    preds, succs = newidx.(old.succs), newidx.(sort(old.preds))
-    if isempty(succs)
-      push!(stmts, nothing)
-    else
-      for (i, b) in enumerate(succs[1:end-1])
-        push!(stmts, xcall(Base, :(!==), Alpha(range(old)[1]), Int8(i)))
-        push!(stmts, GotoIfNot(SSAValue(length(stmts)), b))
-      end
-      push!(stmts, GotoNode(succs[end]))
-    end
-    push!(blocks, BasicBlock(StmtRange(start,length(stmts)), preds, succs))
-  end
-  ir = IRCode(ir.forw, stmts, Any[Any for _ in stmts], Int32[0 for _ in stmts],
-              [0x00 for _ in stmts], CFG(blocks), NewNode[])
-end
+branchfor(ir, (from,to)) =
+  get(filter(br -> br.block == to, branches(block(ir, from))), 1, nothing)
 
-function reverse_ir(pr::Primal)
-  ir = IRCode(pr)
-  grads = Dict()
-  partials = Dict(x => [] for x in pr.wrt)
-  phis = Dict()
-  for b in pr.perm
-    j = ir.cfg.blocks[newblock(pr, b)].stmts[1]
-    j = max(j, 2)
-    for i in reverse(pr.forw.cfg.blocks[b].stmts)
-      ex = pr.forw[SSAValue(i)]
-      if isreturn(ex)
-        ex.val in pr.wrt && push!(partials[ex.val], SSAValue(1))
-      elseif ex isa PiNode
-        (SSAValue(i) in pr.wrt && ex.val in pr.wrt) || continue
-        Δ = insert_node!(ir, j, Any, xcall(Zygote, :accum))
-        ir.lines[j] = pr.forw.lines[i]
-        grads[SSAValue(i)] = Δ
-        push!(partials[ex.val], Δ)
-      elseif ex isa PhiNode
-        any(x -> x in pr.wrt, ex.values) || continue
-        Δ = insert_node!(ir, j, Any, xcall(Zygote, :accum))
-        ir.lines[j] = pr.forw.lines[i]
-        grads[SSAValue(i)] = Δ
-        for (c, x) in zip(ex.edges, ex.values)
-          x in pr.wrt || continue
-          @assert !haskey(phis, (newblock(pr, b), newblock(pr, c), x)) "not implemented"
-          phis[(newblock(pr, b), newblock(pr, c), x)] = Δ
+xaccum(ir) = nothing
+xaccum(ir, x) = x
+xaccum(ir, xs...) = push!(ir, xcall(Zygote, :accum, xs...))
+
+function adjoint(pr::Primal)
+  ir, sigs = adjointcfg(pr)
+  for b in reverse(blocks(pr.ir))
+    rb = block(ir, b.id)
+    grads = Dict()
+    grad(x, x̄) = push!(get!(grads, x, []), x̄)
+    grad(x) = xaccum(rb, get(grads, x, [])...)
+    # Backprop through (successor) branch arguments
+    for i = 1:length(sigs[b.id])
+      grad(sigs[b.id][i], arguments(rb)[i])
+    end
+    # Backprop through statements
+    for v in reverse(keys(b))
+      if haskey(pr.pullbacks, v)
+        g = push!(rb, stmt(Expr(:call, alpha(pr.pullbacks[v]), grad(v)),
+                           line = b[v].line))
+        for (i, x) in enumerate(b[v].expr.args)
+          x isa Union{Variable,Argument} || continue
+          grad(x, push!(rb, stmt(xgradindex(g, i),
+                                 line = b[v].line)))
         end
-      elseif iscall(ex, Zygote, :_forward)
-        # TODO remove with type hacks above
-        y = isassert(pr.forw, i) ? SSAValue(i+3) : SSAValue(i+1)
-        J = Alpha(i+2)
-        dy = insert_node!(ir, j, Any, xcall(Zygote, :accum))
-        ir.lines[j] = pr.forw.lines[i]
-        dxs = insert_node!(ir, j, Any, Expr(:call, J, dy))
-        ir.lines[j] = pr.forw.lines[i]
-        grads[y] = dy
-        for (a, x) in enumerate(ex.args[3:end])
-          x in pr.wrt || continue
-          dx = insert_node!(ir, j, Any, xgradindex(dxs, a))
-          ir.lines[j] = pr.forw.lines[i]
-          push!(partials[x], dx)
-        end
-      elseif ex == unreachable
-        insert_node!(ir, j, Union{}, unreachable)
-      elseif isexpr(ex, :call, :isdefined, GotoIfNot, GotoNode, Nothing, GlobalRef)
-        # ignore it
+      elseif b[v].expr isa Core.PiNode
+        grads[b[v].expr.val] = grads[v]
+      elseif isexpr(b[v].expr, GlobalRef, :call, :isdefined)
       else
+        ex = b[v].expr
         desc = isexpr(ex) ? "$(ex.head) expression" : ex
-        insert_node!(ir, j, Any, xcall(Base, :error, "Can't differentiate $desc"))
-        ir.lines[j] = pr.forw.lines[i]
+        push!(rb, stmt(xcall(Base, :error, "Can't differentiate $desc"),
+                       line = b[v].line))
       end
     end
-    if b == 1
-      gs = []
-      for i = 3:length(pr.forw.argtypes)
-        Argument(i) in pr.wrt || (push!(gs, nothing); continue)
-        dx = insert_node!(ir, j, Any, xcall(Zygote, :accum))
-        grads[Argument(i)] = dx
-        push!(gs, dx)
+    if b.id > 1 # Backprop through (predecessor) branch arguments
+      gs = grad.(arguments(b))
+      for br in branches(rb)
+        br.block == 0 && continue
+        br′ = branchfor(pr.ir, br.block=>b.id)
+        br′ == nothing && continue
+        ins = br′.args
+        for i = 1:length(br.args)
+          ā = [gs[j] for j = 1:length(ins) if ins[j] == sigs[br.block][i]]
+          br.args[i] = xaccum(rb, ā...)
+        end
       end
-      if pr.varargs == nothing
-        Δ = insert_node!(ir, j, Any, xcall(Zygote, :tuple, gs...))
-      else
-        Δ = insert_node!(ir, j, Any, xcall(Zygote, :tuple_va, Val(pr.varargs), gs...))
-      end
-      insert_node!(ir, j, Any, ReturnNode(Δ))
+    else # Backprop function arguments
+      gs = [grad(arg(i)) for i = 1:length(pr.ir.args)]
+      Δ = push!(rb, pr.varargs == nothing ?
+                      xcall(Zygote, :tuple, gs...) :
+                      xcall(Zygote, :tuple_va, Val(pr.varargs), gs...))
+      branches(rb)[1].args[1] = Δ
     end
   end
-  ir, m = _compact!(ir)
-  return ir, rename(grads, m), rename(partials, m), rename(phis, m)
-end
-
-function simplify!(ir)
-  ir = IncrementalCompact(ir)
-  for (i, x) in ir
-    iscall(x, Zygote, :accum) || continue
-    filter!(x -> x != nothing, x.args)
-    nargs = length(x.args)-1
-    ir[i] = nargs == 0 ? nothing : nargs == 1 ? x.args[end] : x
-  end
-  return finish(ir)
-end
-
-function accumulators!(pr::Primal, ir::IRCode, grads, partials, phis)
-  blockpartials(b, x) = filter(x -> x.id in ir.cfg.blocks[b].stmts, get(partials, x, []))
-  accums = Dict()
-  info = blockinfo(pr)
-  for b = 1:length(ir.cfg.blocks), x in setdiff(info[b].partials, info[b].grads)
-    ps = blockpartials(newblock(pr, b), x)
-    p = insert_blockend!(ir, newblock(pr, b), Any, xcall(Zygote, :accum, ps...))
-    setdiff!(partials[x], ps)
-    push!(partials[x], p)
-    accums[(newblock(pr, b),x)] = p
-  end
-
-  # Work around ordering issues with `accum` stmts and phis
-  ir, m = _compact!(ir)
-  accums, phis, grads, partials = rename((accums, phis, grads, partials), m)
-
-  function predpartial(b, x)
-    function blockpartial(b, c, x)
-      if haskey(accums, (b, x))
-        @assert !haskey(phis, (b, c, x)) "not implemented"
-        return accums[(b, x)]
-      elseif haskey(phis, (b, c, x))
-        return phis[(b, c, x)]
-      end
-    end
-    preds = ir.cfg.blocks[b].preds
-    isempty(preds) && return
-    ps = map(c -> blockpartial(c, b, x), preds)
-    all(==(nothing), ps) && return
-    length(ps) == 1 ? ps[1] : insert_blockstart!(ir, b, Any, PhiNode(preds, ps))
-  end
-
-  for ((b, x), p) in accums
-    push!(ir[p].args, predpartial(b, x))
-  end
-  for (x, dx) in grads
-    b = blockidx(ir, dx)
-    append!(ir[dx].args, blockpartials(b, x))
-    push!(ir[dx].args, predpartial(b, x))
-  end
-  # https://github.com/FluxML/Zygote.jl/issues/129
-  return compact!(simplify!(ir))
+  return ir
 end
 
 struct Adjoint
-  forw::IRCode
-  back::IRCode
-  perm::Vector{Int}
+  primal::IR
+  adjoint::IR
 end
 
-function Adjoint(pr::Primal)
-  back = accumulators!(pr, reverse_ir(pr)...)
-  Adjoint(pr.forw, compact!(compact!(back)), pr.perm)
-end
-
-Adjoint(ir::IRCode; varargs = nothing) = Adjoint(Primal(ir, varargs = varargs))
-
-using InteractiveUtils
-
-macro code_adjoint(ex)
-  :(Adjoint($(code_irm(ex)), varargs = varargs($(esc(:($InteractiveUtils.@which $ex))), length(($(esc.(ex.args)...),)))))
+function Adjoint(ir::IR; varargs = nothing, normalise = true)
+  pr = Primal(ir, varargs = varargs)
+  adj = adjoint(pr) |> trimspats!
+  if normalise
+    permute!(adj, length(adj.blocks):-1:1)
+    adj = IRTools.domorder!(adj) |> IRTools.renumber
+  end
+  Adjoint(pr.pr, adj)
 end

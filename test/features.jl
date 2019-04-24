@@ -1,14 +1,9 @@
 using Zygote, Test
-using Zygote: Params, gradient, roundtrip, forwarddiff
+using Zygote: Params, gradient, forwarddiff
 
 add(a, b) = a+b
 _relu(x) = x > 0 ? x : 0
 f(a, b...) = +(a, b...)
-
-@test roundtrip(add, 1, 2) == 3
-@test roundtrip(_relu, 1) == 1
-@test roundtrip(Complex, 1, 2) == 1+2im
-@test roundtrip(f, 1, 2, 3) == 6
 
 y, back = forward(identity, 1)
 dx = back(2)
@@ -155,12 +150,9 @@ end
 D(f, x) = grad(f, x)[1]
 
 @test D(x -> D(sin, x), 0.5) == -sin(0.5)
-
-if VERSION > v"1.2-"
-  @test D(x -> x*D(y -> x+y, 1), 1) == 1
-  @test D(x -> x*D(y -> x*y, 1), 4) == 8
-  @test_broken sin'''(1.0) == -cos(1.0)
-end
+@test D(x -> x*D(y -> x+y, 1), 1) == 1
+@test D(x -> x*D(y -> x*y, 1), 4) == 8
+@test_broken sin'''(1.0) == -cos(1.0)
 
 f(x) = throw(DimensionMismatch("fubar"))
 
