@@ -69,7 +69,7 @@ end
 function profile(x::Pullback{T}, seen) where T
   ls = []
   for (c, l) in zip(x.t, stacklines(T))
-    c isa Vector{<:Integer} && continue
+    c isa Union{Integer,Vector{<:Integer}} && continue
     cs = c isa Vector ? merge(vcat(map(x -> profile(x, seen),c)...)) : profile(c, seen)
     push!(ls, Node(loc(x)[1],String(l.file),l.line,cs))
   end
