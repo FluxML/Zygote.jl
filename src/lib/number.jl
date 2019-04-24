@@ -35,7 +35,7 @@ for T in Base.uniontypes(Core.BuiltinInts)
     @adjoint (::Type{T})(x::Core.BuiltinInts) = T(x), Δ -> (Δ,)
 end
 
-@adjoint Base.:+(xs...) = +(xs...), Δ -> map(_ -> Δ, xs)
+@adjoint Base.:+(xs::Number...) = +(xs...), Δ -> map(_ -> Δ, xs)
 
 @adjoint function sincos(x)
   s, c = sincos(x)
