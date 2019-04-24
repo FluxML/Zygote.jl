@@ -36,14 +36,6 @@ concrete(T::DataType) = T
 concrete(::Type{Type{T}}) where T = typeof(T)
 concrete(T) = Any
 
-# function stacklines(adj::Adjoint)
-#   recs = []
-#   for fb in adj.perm, α in alphauses(adj.back, invperm(adj.perm)[fb])
-#     pushfirst!(recs, adj.forw.linetable[adj.forw.lines[α.id]])
-#   end
-#   return recs
-# end
-
 runonce(b) = b.id in (1, length(b.ir.blocks))
 
 function forward_stacks!(adj, F)
@@ -127,4 +119,11 @@ function _lookup_grad(T)
   m, forw, back
 end
 
-stacklines(T::Type) = stacklines(Adjoint(IR(meta(T))))
+function stacklines(T::Type)
+  adj = Adjoint(IR(meta(T)), normalise = false)
+  recs = []
+  for b in blocks(adj.adjoint), α in alphauses(b)
+    push!(recs, IRTools.exprline(adj.primal, Variable(α)))
+  end
+  return recs
+end

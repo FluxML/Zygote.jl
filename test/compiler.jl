@@ -33,7 +33,7 @@ y, back = forward(badly, 2)
 bt = try back(1) catch e stacktrace(catch_backtrace()) end
 
 @test trace_contains(bt, nothing, "compiler.jl", 20)
-@test_broken trace_contains(bt, :badly, "compiler.jl", 26)
+@test trace_contains(bt, :badly, "compiler.jl", 26)
 
 # Type inference checks
 

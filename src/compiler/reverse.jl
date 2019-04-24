@@ -117,13 +117,16 @@ function primal(ir::IR)
       yT = exprtype(ir, v)
       T = _forward_type(exprtype.((ir,), ex.args))
       if yT == Any || isvalidtype(T, yT)
-        yJ = insert!(pr, v, xcall(Zygote, :_forward, Argument(0), ex.args...))
+        yJ = insert!(pr, v, stmt(xcall(Zygote, :_forward, Argument(0), ex.args...),
+                                 line = ir[v].line))
         pr[v] = xgetindex(yJ, 1)
-        pbs[v] = insertafter!(pr, v, stmt(xgetindex(yJ, 2), type = T == Any ? Any : T.parameters[2]))
+        pbs[v] = insertafter!(pr, v, stmt(xgetindex(yJ, 2),
+                                          type = T == Any ? Any : T.parameters[2],
+                                          line = ir[v].line))
       else
         yJ = insert!(pr, v, xcall(Zygote, :_forward, Argument(0), ex.args...))
         y =  insert!(pr, v, xgetindex(yJ, 1))
-        J =  insert!(pr, v, xgetindex(yJ, 2))
+        J =  insert!(pr, v, stmt(xgetindex(yJ, 2), line = ir[v].line))
         pr[v] = xcall(Zygote, :typeassert, y, yT)
       end
     end
@@ -165,7 +168,7 @@ sig(pr::Primal) = Dict(b.id => sig(b) for b in blocks(pr.ir))
 
 # TODO unreachables?
 function adjointcfg(pr::Primal)
-  ir = IR()
+  ir = empty(pr.ir)
   return!(ir, nothing)
   for b in blocks(pr.ir)[2:end]
     block!(ir)
@@ -209,10 +212,12 @@ function adjoint(pr::Primal)
     # Backprop through statements
     for v in reverse(keys(b))
       if haskey(pr.pullbacks, v)
-        g = push!(rb, Expr(:call, alpha(pr.pullbacks[v]), grad(v)))
-        for (i, x) in enumerate(pr.ir[v].expr.args)
+        g = push!(rb, stmt(Expr(:call, alpha(pr.pullbacks[v]), grad(v)),
+                           line = b[v].line))
+        for (i, x) in enumerate(b[v].expr.args)
           x isa Union{Variable,Argument} || continue
-          grad(x, push!(rb, xgradindex(g, i)))
+          grad(x, push!(rb, stmt(xgradindex(g, i),
+                                 line = b[v].line)))
         end
       elseif b[v].expr isa Core.PiNode
         grads[b[v].expr.val] = grads[v]
@@ -220,7 +225,8 @@ function adjoint(pr::Primal)
       else
         ex = b[v].expr
         desc = isexpr(ex) ? "$(ex.head) expression" : ex
-        push!(rb, xcall(Base, :error, "Can't differentiate $desc"))
+        push!(rb, stmt(xcall(Base, :error, "Can't differentiate $desc"),
+                       line = b[v].line))
       end
     end
     if b.id > 1 # Backprop through (predecessor) branch arguments
