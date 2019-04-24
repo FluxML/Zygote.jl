@@ -210,6 +210,23 @@ end
   end
 end
 
+@testset "lyap" begin
+  rng, N = MersenneTwister(6865943), 5
+  for i = 1:4
+    A = randn(rng, N, N)
+    C = randn(rng, N, N)
+    @test gradtest(lyap, A, C)
+  end
+end
+
+@testset "matrix exponential" begin
+  rng, N = MersenneTwister(6865931), 8
+  for i = 1:5
+    A = randn(rng, N, N)
+    @test gradtest(exp, A)
+  end
+end
+
 using Distances
 
 Zygote.refresh()
