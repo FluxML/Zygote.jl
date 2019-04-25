@@ -212,11 +212,12 @@ end
 
 @testset "lyap" begin
   rng, N = MersenneTwister(6865943), 5
-  for i = 1:4
+  for i = 1:5
     A = randn(rng, N, N)
     C = randn(rng, N, N)
     @test gradtest(lyap, A, C)
   end
+  @test gradcheck(x->lyap(x[1],x[2]),[3.1,4.6])
 end
 
 @testset "matrix exponential" begin

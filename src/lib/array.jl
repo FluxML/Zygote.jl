@@ -267,7 +267,7 @@ end
   end
 end
 
-@adjoint function lyap(A, C)
+@adjoint function lyap(A::AbstractMatrix, C::AbstractMatrix)
   X = lyap(A, C)
   return X, function (X̄)
     C̄ = lyap(collect(A'), X̄)
