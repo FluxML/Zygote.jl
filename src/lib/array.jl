@@ -267,7 +267,7 @@ end
   end
 end
 
-@adjoint function lyap(A, C)
+@adjoint function lyap(A::AbstractMatrix, C::AbstractMatrix)
   X = lyap(A, C)
   return X, function (X̄)
     C̄ = lyap(collect(A'), X̄)
@@ -278,7 +278,7 @@ end
 
 # Adjoint based on the Theano implementation, which uses the differential as described
 # in Brančík, "Matlab programs for matrix exponential function derivative evaluation"
-@adjoint exp(A) = exp(A), function(F̄)
+@adjoint exp(A::AbstractMatrix) = exp(A), function(F̄)
   n = size(A, 1)
   E = eigen(A)
   w = E.values
