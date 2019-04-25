@@ -70,8 +70,8 @@ function zyg_update!(opt, model::AbstractArray, updates::AbstractArray)
 end
 
 
-# We will train for 50 epochs, with minibatches, using the `ADAM` optimizer to
-# nudge our weights toward perfection.
+# We will train for a number of epochs, with minibatches, using the `ADAM`
+# optimizer to nudge our weights toward perfection.
 opt = ADAM(0.001)
 num_epochs = 10
 @info("Training for $(num_epochs) epochs...")
