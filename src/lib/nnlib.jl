@@ -1,5 +1,5 @@
 using NNlib
-import NNlib: softmax, ∇softmax, logsoftmax, ∇logsoftmax, conv, maxpool, meanpool, σ
+import NNlib: softmax, ∇softmax, logsoftmax, ∇logsoftmax, conv, depthwiseconv, ∇conv_data, ∇depthwiseconv_data, maxpool, meanpool, σ
 
 @adjoint function σ(x::Real)
     y = σ(x)
@@ -30,6 +30,26 @@ end
        return (
            NNlib.conv(Δ, w, cdims; kw...),
            NNlib.∇conv_filter(Δ, x, cdims; kw...),
+           nothing,
+       )
+   end
+
+@adjoint depthwiseconv(x, w, cdims; kw...) =
+  depthwiseconv(x, w, cdims; kw...),
+    Δ -> begin
+       return (
+           NNlib.∇depthwiseconv_data(Δ, w, cdims; kw...),
+           NNlib.∇depthwiseconv_filter(x, Δ, cdims; kw...),
+           nothing,
+       )
+   end
+
+@adjoint ∇depthwiseconv_data(x, w, cdims; kw...) =
+  ∇depthwiseconv_data(x, w, cdims; kw...),
+    Δ -> begin
+       return (
+           NNlib.depthwiseconv(Δ, w, cdims; kw...),
+           NNlib.∇depthwiseconv_filter(Δ, x, cdims; kw...),
            nothing,
        )
    end
