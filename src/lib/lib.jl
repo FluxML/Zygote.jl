@@ -28,7 +28,8 @@ end
 # Core functions
 
 @nograd Core.apply_type, Core.typeof, nfields, fieldtype,
-  (==), (===), (>=), (<), (>), isempty, supertype, Base.typename, Base.parameter_upper_bound
+  (==), (===), (>=), (<), (>), isempty, supertype, Base.typename,
+  Base.parameter_upper_bound, eps
 
 @adjoint deepcopy(x) = deepcopy(x), ȳ -> (ȳ,)
 
@@ -230,7 +231,7 @@ end
   quote
     x̄ = $Δ
     $(G == Nothing || :($Δ = nt_nothing($Δ)))
-    (nothing, $(map(f -> :(x̄.$f), fieldnames(T))...))
+    (nothing, ($(map(f -> :(x̄.$f), fieldnames(T))...),))
   end
 end
 

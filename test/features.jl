@@ -292,3 +292,23 @@ global_param = 3
   @test back(1) == (nothing, 3)
   Zygote.globals(cx)[GlobalRef(Main, :global_param)] == 2
 end
+
+function pow_try(x)
+  try
+    2x
+  catch e
+    println("error")
+  end
+end
+
+@test_broken gradient(pow_try, 1) == (2,)
+
+function pow_simd(x, n)
+  r = 1
+  @simd for i = 1:n
+    r *= x
+  end
+  return r
+end
+
+@test_broken gradient(pow_simd, 2, 3) == (12,nothing)
