@@ -286,6 +286,12 @@ gradient(5) do x
   xs[1]*xs[2]
 end
 
+gradient(5) do x
+  xs = [0, 0]
+  copyto!(xs, [x, x])
+  return xs[1]*xs[2]
+end
+
 global_param = 3
 
 @testset "Global Params" begin
