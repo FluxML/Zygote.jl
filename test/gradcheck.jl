@@ -1,6 +1,6 @@
 using Zygote, NNlib, Test, Random, LinearAlgebra, Statistics
 using Zygote: gradient
-using NNlib: conv
+using NNlib: conv, ∇conv_data, depthwiseconv
 
 function ngradient(f, xs::AbstractArray...)
   grads = zero.(xs)
@@ -53,15 +53,27 @@ Random.seed!(0)
 @test gradtest(logdet, map(x -> x*x', (rand(4, 4),))[1])
 @test gradtest(x -> logabsdet(x)[1], (4, 4))
 
-@test gradtest(conv, rand(10, 3, 2), randn(Float64,2, 3, 2))
-@test gradtest(conv, rand(10, 10, 3, 2), randn(Float64,2, 2, 3, 2))
-@test gradtest(conv, rand(10, 10, 10, 3, 2), randn(Float64,2, 2, 2, 3, 2))
+@testset "conv" begin
+  for spatial_rank in (1, 2, 3)
+    x = rand(repeat([10], spatial_rank)..., 3, 2)
+    w = rand(repeat([3], spatial_rank)..., 3, 3)
+    cdims = DenseConvDims(x, w)
+    @test gradtest((x, w) -> conv(x, w, cdims), x, w)
+    y = conv(x, w, cdims)
+    @test gradtest((y, w) -> ∇conv_data(y, w, cdims), y, w)
+    dcdims = DepthwiseConvDims(x, w)
+    @test gradtest((x, w) -> depthwiseconv(x, w, dcdims), x, w)
+  end
+end
 
-@test gradtest(x -> maxpool(x, (2,2)), rand(10, 10, 3, 2))
-@test gradtest(x -> maxpool(x, (2,2,2)), rand(10, 10, 10, 3, 2))
-
-@test gradtest(x -> meanpool(x, (2,2)), rand(10, 10, 3, 2))
-@test gradtest(x -> meanpool(x, (2,2,2)), rand(5, 5, 5, 3, 2))
+@testset "pooling" begin
+  for spatial_rank in (1, 2)
+    x = rand(repeat([10], spatial_rank)..., 3, 2)
+    pdims = PoolDims(x, 2)
+    @test gradtest(x -> maxpool(x, pdims), x)
+    @test gradtest(x -> meanpool(x, pdims), x)
+  end
+end
 
 @test gradtest(x -> permutedims(x, [3,1,2]), rand(4,5,6))
 
