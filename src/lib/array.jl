@@ -24,7 +24,7 @@ end
 @adjoint (::Type{T})(::UndefInitializer, args...) where T<:Array = T(undef, args...), Δ -> nothing
 
 @nograd size, length, eachindex, Colon(), findfirst, randn, ones, zeros, one, zero,
-  print, println
+  print, println, show
 
 @adjoint Base.vect(xs...) = Base.vect(xs...), Δ -> (Δ...,)
 
@@ -101,12 +101,17 @@ end
   @assert n >= m
   resize!(xs, n), function (dxs)
     resize!(dxs, m)
-    return (dxs, nothing)
+    resize!(xs, m)
+    return dxs, nothing
   end
 end
 
 @adjoint! function copyto!(xs::AbstractArray, ys::AbstractArray)
-  copyto!(xs, ys), dxs -> (nothing, dxs)
+  xs_ = copy(xs)
+  copyto!(xs, ys), function (dxs)
+    copyto!(xs_, xs)
+    (nothing, dxs)
+  end
 end
 
 # General
