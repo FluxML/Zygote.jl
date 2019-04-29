@@ -14,7 +14,7 @@ for (M, f, arity) in DiffRules.diffrules()
     dx = :(conj($dx))
   end
   @eval begin
-    @adjoint $M.$f(x::Number) = $M.$f(x),
+    @adjoint $M.$f(x::Real) = $M.$f(x),
       Δ -> ($Δ * $dx,)
   end
 end
@@ -23,7 +23,7 @@ for (M, f, arity) in DiffRules.diffrules()
   arity == 2 || continue
   da, db = DiffRules.diffrule(M, f, :a, :b)
   @eval begin
-    @adjoint $M.$f(a::Number, b::Number) = $M.$f(a, b),
+    @adjoint $M.$f(a::Real, b::Real) = $M.$f(a, b),
       Δ -> (Δ * conj($da), Δ * conj($db))
   end
 end
@@ -35,7 +35,7 @@ for T in Base.uniontypes(Core.BuiltinInts)
     @adjoint (::Type{T})(x::Core.BuiltinInts) = T(x), Δ -> (Δ,)
 end
 
-@adjoint Base.:+(xs::Number...) = +(xs...), Δ -> map(_ -> Δ, xs)
+@adjoint Base.:+(xs::Real...) = +(xs...), Δ -> map(_ -> Δ, xs)
 
 @adjoint function sincos(x)
   s, c = sincos(x)

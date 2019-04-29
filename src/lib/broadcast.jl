@@ -53,7 +53,7 @@ unbroadcast(x::Union{Number,Ref}, x̄) = accum_sum(x̄)
 # to do CSE, then broadcast-ify the expression so that the closure captures the
 # right arrays.
 
-Numeric{T<:Number} = Union{T,AbstractArray{<:T}}
+Numeric{T<:Real} = Union{T,AbstractArray{<:T}}
 
 @adjoint broadcasted(::typeof(+), xs::Numeric...) =
   broadcast(+, xs...), ȳ -> (nothing, map(x -> unbroadcast(x, ȳ), xs)...)
