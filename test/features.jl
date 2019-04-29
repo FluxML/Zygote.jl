@@ -278,6 +278,14 @@ end == ([2, 4],)
   pop!(xs)*x
 end == (4,)
 
+gradient(5) do x
+  xs = []
+  resize!(xs, 2)
+  xs[1] = x
+  xs[2] = x
+  xs[1]*xs[2]
+end
+
 global_param = 3
 
 @testset "Global Params" begin

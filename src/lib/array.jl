@@ -96,6 +96,15 @@ end
   end
 end
 
+@adjoint! function resize!(xs::AbstractVector, n)
+  m = length(xs)
+  @assert n >= m
+  resize!(xs, n), function (dxs)
+    resize!(dxs, m)
+    return (dxs, nothing)
+  end
+end
+
 # General
 
 @adjoint collect(x::Array) = collect(x), Δ -> (Δ,)
