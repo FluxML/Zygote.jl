@@ -11,6 +11,7 @@ using LinearAlgebra: copytri!
 # has several caveats. Recursion will cause inference to stack overflow.
 # Gradient redefinitions may result in ugly type errors. And Jameson *will* know.
 const usetyped = get(ENV, "ZYGOTE_TYPED", false) == "true"
+const mutate = true
 
 using IRTools
 using MacroTools, Requires

@@ -36,13 +36,7 @@ end
 
 # Wrappers
 
-# TODO the case where we return a mutable value
-function _forward(f, args...)
-  cx = Context()
-  ks = mutkeys(f, args...)
-  y, back = _forward(cx, f, args...)
-  y, dy -> out_grad_mut(cx, ks, back(dy))
-end
+_forward(f, args...) = _forward(Context(), f, args...)
 
 tailmemaybe(::Nothing) = nothing
 tailmemaybe(x::Tuple) = Base.tail(x)
@@ -106,7 +100,7 @@ function forward(f, ps::Params)
   y, back = _forward(cx, f)
   y, function (Δ)
     for p in ps
-      cache(cx)[Key(p)] = nothing
+      cache(cx)[Key(p)] = ismutvalue(p) ? grad_mut(p) : nothing
     end
     back(Δ)
     Grads(cx.cache) # TODO make a copy

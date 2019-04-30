@@ -1,20 +1,36 @@
 ismutvalue(x::AbstractArray) = !isimmutable(x)
 
+_zero(xs::AbstractArray{<:Integer}) = fill!(similar(xs, float(eltype(xs))), false)
+_zero(xs::AbstractArray{<:Number}) = zero(xs)
+_zero(xs::AbstractArray) = Any[nothing for x in xs]
+
+grad_mut(xs::AbstractArray) = _zero(xs)
+
+function accum(x::AbstractArray, y::AbstractArray)
+  if ismutvalue(x) || ismutvalue(y)
+    @assert x === y
+    return x
+  else
+    accum.(x, y)
+  end
+end
+
+function accum!(x::AbstractArray, y)
+  x === y && return x
+  x .= accum.(x, y)
+  return x
+end
+
 @adjoint (::Type{T})(::UndefInitializer, args...) where T<:Array = T(undef, args...), Δ -> nothing
 
 @nograd size, length, eachindex, Colon(), findfirst, randn, ones, zeros, one, zero,
   print, println
-
 
 @adjoint Base.vect(xs...) = Base.vect(xs...), Δ -> (Δ...,)
 
 @adjoint copy(x::AbstractArray) = copy(x), ȳ -> (ȳ,)
 
 @adjoint (::Type{T})(x::T) where T<:Array = T(x), ȳ -> (ȳ,)
-
-_zero(xs::AbstractArray{<:Integer}) = fill!(similar(xs, float(eltype(xs))), false)
-_zero(xs::AbstractArray{<:Number}) = zero(xs)
-_zero(xs::AbstractArray) = Any[nothing for x in xs]
 
 # TODO a smarter implementation for mutable arrays
 # we should just grab `dxs` and mutate it
@@ -213,6 +229,9 @@ _backmean(xs, Δ, dims) = zero(xs) .+ Δ ./ mapreduce(i -> size(xs,i),*,dims)
 
 # LinAlg
 # ======
+
+ismutvalue(x::Transpose) = ismutvalue(x.parent)
+ismutvalue(x::LinearAlgebra.Adjoint) = ismutvalue(x.parent)
 
 @adjoint function(a::AbstractVecOrMat * b::AbstractVecOrMat)
   return a * b, function(Δ)

@@ -32,6 +32,7 @@ function gradm(ex, mut = false)
   !isempty(args) && isvararg(args[end]) && (argnames[end] = :($(argnames[end])...,))
   args = esc.(args)
   argnames = esc.(argnames)
+  ∂argnames = isclosure ? [f, argnames...] : argnames
   Ts = esc.(Ts)
   cx = :($(esc(:__context__))::Context)
   fargs = kw == nothing ? [cx, :($f::$T), args...] : [kw, cx, :($f::$T), args...]
@@ -41,18 +42,16 @@ function gradm(ex, mut = false)
   quote
     $adj
     @inline function Zygote._forward($cx, $f::$T, $(args...)) where $(Ts...)
-      ks = mutkeys($(argnames...))
       y, _back = adjoint(__context__, $f, $(argnames...))
       $(mut ? nothing : :(back(::Nothing) = nothing))
       back(Δ) = $gradtuple(_back(Δ))
-      return y, mutback($cx, $gradtuple(ks), mutkey(y), back)
+      return y, mutback($cx, $gradtuple(($(∂argnames...),)), y, back)
     end
     @inline function Zygote._forward($cx, ::$kT, kw, $f::$T, $(args...)) where $(Ts...)
-      ks = mutkeys($(argnames...))
       y, _back = adjoint(__context__, $f, $(argnames...); kw...)
       $(mut ? nothing : :(back(::Nothing) = nothing))
       back(Δ) = $gradtuplekw(_back(Δ))
-      return y, mutback($cx, $gradtuplekw(ks), mutkey(y), back)
+      return y, mutback($cx, $gradtuplekw(($(∂argnames...),)), y, back)
     end
     nothing
   end
