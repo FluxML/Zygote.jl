@@ -46,7 +46,7 @@ function forward(f, args...)
   y, Δ -> tailmemaybe(back(Δ))
 end
 
-sensitivity(y::Number) = one(y)
+sensitivity(y::Real) = one(y)
 sensitivity(y::Complex) = error("Output is complex, so the gradient is not defined.")
 sensitivity(y) = error("Output should be scalar; gradients are not defined for output $y")
 
