@@ -84,7 +84,12 @@ end
 
 Base.show(io::IO, ps::Grads) = print(io, "Grads(...)")
 
-@forward Grads.grads Base.setindex!, Base.getindex, Base.haskey
+@forward Grads.grads Base.getindex, Base.haskey
+
+function Base.getindex(gs::Grads, x)
+  isbits(x) && error("Only reference types can be differentiated with `Params`.")
+  return gs.grads[x]
+end
 
 function forward(f, ps::Params)
   cx = Context()
