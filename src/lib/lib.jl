@@ -6,8 +6,8 @@ accum() = nothing
 accum(x) = x
 
 accum(x, y) =
-  x == nothing ? y :
-  y == nothing ? x :
+  x in (0, nothing) ? y :
+  y in (0, nothing) ? x :
   x + y
 
 accum(x, y, zs...) = accum(accum(x, y), zs...)

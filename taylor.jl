@@ -42,4 +42,4 @@ f = t -> sum(derive.(taylor_highify(dudt,u0,p,t)))
 
 f(0.)
 
-Zygote.gradient(f,0.)
+gradient(f, 0.)

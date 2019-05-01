@@ -55,20 +55,20 @@ unbroadcast(x::Union{Number,Ref}, x̄) = accum_sum(x̄)
 
 Numeric{T<:Real} = Union{T,AbstractArray{<:T}}
 
-@adjoint broadcasted(::typeof(+), xs::Numeric...) =
-  broadcast(+, xs...), ȳ -> (nothing, map(x -> unbroadcast(x, ȳ), xs)...)
-
-@adjoint broadcasted(::typeof(*), x::Numeric, y::Numeric) = x.*y,
-  z̄ -> (nothing, unbroadcast(x, z̄ .* conj.(y)), unbroadcast(y, z̄ .* conj.(x)))
-
-@adjoint broadcasted(::typeof(conj), x::Numeric) =
-  conj.(x), z̄ -> (nothing, conj.(z̄))
-
-@adjoint broadcasted(::typeof(real), x::Numeric) =
-  real.(x), z̄ -> (nothing, real.(z̄))
-
-@adjoint broadcasted(::typeof(imag), x::Numeric) =
-  imag.(x), z̄ -> (nothing, im .* real.(z̄))
+# @adjoint broadcasted(::typeof(+), xs::Numeric...) =
+#   broadcast(+, xs...), ȳ -> (nothing, map(x -> unbroadcast(x, ȳ), xs)...)
+#
+# @adjoint broadcasted(::typeof(*), x::Numeric, y::Numeric) = x.*y,
+#   z̄ -> (nothing, unbroadcast(x, z̄ .* conj.(y)), unbroadcast(y, z̄ .* conj.(x)))
+#
+# @adjoint broadcasted(::typeof(conj), x::Numeric) =
+#   conj.(x), z̄ -> (nothing, conj.(z̄))
+#
+# @adjoint broadcasted(::typeof(real), x::Numeric) =
+#   real.(x), z̄ -> (nothing, real.(z̄))
+#
+# @adjoint broadcasted(::typeof(imag), x::Numeric) =
+#   imag.(x), z̄ -> (nothing, im .* real.(z̄))
 
 # General Fallback
 # ================
@@ -95,7 +95,7 @@ _broadcast(f::F, x...) where F = materialize(broadcasted(f, x...))
   ∂b = map(x -> x[2], y∂b)
   y, function (ȳ)
     dxs_zip = map((∂b, ȳ) -> ∂b(ȳ), ∂b, ȳ)
-    dxs = ntuple(i -> map(x -> x[i], dxs_zip), len)
+    dxs = ntuple(i -> map(x -> x === nothing ? x : x[i], dxs_zip), len)
     (nothing, accum_sum(dxs[1]), map(unbroadcast, args, Base.tail(dxs))...)
   end
 end
