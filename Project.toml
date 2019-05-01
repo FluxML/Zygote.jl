@@ -3,7 +3,9 @@ uuid = "e88e6eb3-aa80-5325-afca-941959d7151f"
 version = "0.3.0"
 
 [deps]
+DiffEqFlux = "aae7a2af-3d4f-5e19-a356-7da93b79d9d0"
 DiffRules = "b552c78f-8df3-52c6-915a-8e097449b14b"
+Flux = "587475ba-b771-5e3f-ad9e-33799f191a9c"
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 IRTools = "7869d1d1-7146-5819-86e3-90919afe41df"
 InteractiveUtils = "b77e0a4c-d291-57a0-90e8-8db25a27a240"
@@ -15,6 +17,7 @@ Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 Requires = "ae029012-a4dd-5104-9daa-d747884805df"
 SpecialFunctions = "276daf66-3868-5448-9aa4-cd146d93841b"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
+TaylorIntegration = "92b13dbe-c966-51a2-8445-caca9f8a7d42"
 TaylorSeries = "6aa5eb33-94cf-58f4-a9d0-e4b2c4fc25ea"
 
 [compat]
