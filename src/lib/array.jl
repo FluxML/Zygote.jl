@@ -1,7 +1,5 @@
 ismutvalue(x::AbstractArray) = !isimmutable(x)
 
-_zero(xs::AbstractArray{<:Integer}) = fill!(similar(xs, float(eltype(xs))), false)
-_zero(xs::AbstractArray{<:Number}) = zero(xs)
 _zero(xs::AbstractArray) = Any[nothing for x in xs]
 
 grad_mut(xs::AbstractArray) = _zero(xs)
@@ -251,7 +249,7 @@ _backmean(xs, Δ, dims) = zero(xs) .+ Δ ./ mapreduce(i -> size(xs,i),*,dims)
 ismutvalue(x::Transpose) = ismutvalue(x.parent)
 ismutvalue(x::LinearAlgebra.Adjoint) = ismutvalue(x.parent)
 
-@adjoint function(a::AbstractVecOrMat * b::AbstractVecOrMat)
+@adjoint function(a::AbstractVecOrMat{<:Real} * b::AbstractVecOrMat{<:Real})
   return a * b, function(Δ)
     return (reshape(Δ * b', size(a)), reshape(a' * Δ, size(b)))
   end
