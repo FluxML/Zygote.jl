@@ -1,6 +1,9 @@
 using TaylorSeries
 
-@adjoint deepcopy(x::Taylor1) = error("deepcopy not implemented")
+# This is used a lot by TaylorSeries.jl. A copy method would be better,
+# but we can just work around it for now.
+Base.deepcopy(x::Taylor1) =
+  typeof(x)(copy(x.coeffs), copy(x.order))
 
 taylorshift(x, n) = x + Taylor1(typeof(x), n)
 
