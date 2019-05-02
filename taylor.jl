@@ -28,12 +28,11 @@ dynamics_net = Chain(x -> x.^3,
 p = nothing
 t = nothing
 function model(u,p,t)
-    global nfe += 1
     return dynamics_net(u)
 end
 
 function dudt(du,u,p,t)
-    du .= Flux.data(model(u,p,t))
+    du[:] = Flux.data(model(u,p,t))
 end
 
 u0 = Float32[2.; 0.]
