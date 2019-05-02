@@ -41,4 +41,6 @@ f = t -> sum(derive.(taylor_highify(dudt,u0,p,t)))
 
 f(0.)
 
-gradient(f, 0.)
+gs = gradient(() -> f(0), params(dynamics_net))
+
+gs[dynamics_net[2].W]

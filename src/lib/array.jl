@@ -2,6 +2,9 @@ ismutvalue(x::AbstractArray) = !isimmutable(x)
 
 _zero(xs::AbstractArray) = Any[nothing for x in xs]
 
+_zero(xs::AbstractArray{<:Integer}) = fill!(similar(xs, float(eltype(xs))), false)
+_zero(xs::AbstractArray{<:Real}) = zero(xs)
+
 grad_mut(xs::AbstractArray) = _zero(xs)
 
 function accum(x::AbstractArray, y::AbstractArray)
@@ -14,6 +17,7 @@ function accum(x::AbstractArray, y::AbstractArray)
 end
 
 function accum!(x::AbstractArray, y)
+  y === nothing && return x
   x === y && return x
   x .= accum.(x, y)
   return x
