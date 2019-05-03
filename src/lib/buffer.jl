@@ -71,7 +71,12 @@ end
   setindex!(b, v, i...), function (_)
     grad = grad_mut(__context__, b)
     v̄ = grad[i...]
-    grad[i...] .= eltype(grad) <: Number ? 0 : nothing
+    zero = eltype(grad) <: Number ? 0 : nothing
+    if i isa NTuple{N,Integer} where N
+      grad[i...] = zero
+    else
+      grad[i...] .= zero
+    end
     (nothing, v̄, map(_->nothing, i)...)
   end
 end
