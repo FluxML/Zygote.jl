@@ -58,7 +58,7 @@ julia> function pow(x, n)
        end
 pow (generic function with 1 method)
 
-julia> gradient(x -> pow(x, 3), 5)
+julia> gradient(x -> pow(x, 3.0), 5)
 (75,)
 
 julia> pow2(x, n) = n <= 0 ? 1 : x*pow2(x, n-1)
