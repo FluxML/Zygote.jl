@@ -96,6 +96,14 @@ end
   end
 end
 
+@adjoint! function copyto!(xs::AbstractArray, ys::AbstractArray)
+  xs_ = copy(xs)
+  copyto!(xs, ys), function (dxs)
+    copyto!(xs_, xs)
+    (nothing, dxs)
+  end
+end
+
 # General
 
 @adjoint collect(x::Array) = collect(x), Δ -> (Δ,)
