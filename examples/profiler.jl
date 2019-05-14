@@ -1,3 +1,10 @@
+# Initialize environment in current directory
+@info("Ensuring example environment instantiated...")
+import Pkg
+Pkg.activate(@__DIR__)
+Pkg.instantiate()
+
+@info("Loading Zygote...")
 using Zygote
 
 function f(x)
