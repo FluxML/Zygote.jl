@@ -1,5 +1,5 @@
-using IRTools: IR, Variable, Argument, Pipe, xcall, arg, var, prewalk, postwalk,
-  blocks, predecessors, successors, argument!, arguments, branches, argmap,
+using IRTools: IR, Variable, Pipe, xcall, var, prewalk, postwalk,
+  blocks, predecessors, successors, argument!, arguments, branches,
   exprtype, insertafter!, finish, allspats!, trimspats!, substitute!, substitute,
   block, block!, branch!, return!, stmt
 using Base: @get!
@@ -15,7 +15,7 @@ gradindex(::Nothing, i) = nothing
 xgetindex(x, i...) = xcall(Base, :getindex, x, i...)
 xgradindex(x, i) = xcall(Zygote, :gradindex, x, i)
 
-normalise!(ir) = ir |> IRTools.merge_entry! |> IRTools.merge_returns!
+normalise!(ir) = ir |> IRTools.merge_returns!
 
 function instrument_new!(ir, v, ex)
   isexpr(ex, :new) ? (ir[v] = xcall(Zygote, :__new__, ex.args...)) :
@@ -92,7 +92,7 @@ ignored_f(f) = f in (GlobalRef(Base, :not_int),
                      GlobalRef(Core, :kwfunc),
                      GlobalRef(Core, :isdefined))
 ignored_f(ir, f) = ignored_f(f)
-ignored_f(ir, f::Variable) = ignored_f(ir[f])
+ignored_f(ir, f::Variable) = ignored_f(get(ir, f, nothing))
 
 ignored(ir, ex) = isexpr(ex, :call) && ignored_f(ir, ex.args[1])
 ignored(ir, ex::Variable) = ignored(ir, ir[ex])
@@ -110,16 +110,15 @@ isvalidtype(jT, yT) = jT <: Tuple && length(jT.parameters) == 2 && jT.parameters
 function primal(ir::IR)
   pr = Pipe(ir)
   pbs = Dict{Variable,Variable}()
-  for i = 0:length(ir.args)
-    substitute!(pr, arg(i), arg(i+2))
-  end
+  argument!(pr, at = 1)
+  cx = argument!(pr, Context, at = 2)
   for (v, st) in pr
     ex = st.expr
     if isexpr(ex, :call) && !ignored(ir, ex)
       yT = exprtype(ir, v)
       T = _forward_type(exprtype.((ir,), ex.args))
       if yT == Any || isvalidtype(T, yT)
-        yJ = insert!(pr, v, stmt(xcall(Zygote, :_forward, Argument(0), ex.args...),
+        yJ = insert!(pr, v, stmt(xcall(Zygote, :_forward, cx, ex.args...),
                                  line = ir[v].line))
         pr[v] = xgetindex(yJ, 1)
         J = insertafter!(pr, v, stmt(xgetindex(yJ, 2),
@@ -127,7 +126,7 @@ function primal(ir::IR)
                                      line = ir[v].line))
         pbs[v] = substitute(pr, J)
       else
-        yJ = insert!(pr, v, xcall(Zygote, :_forward, Argument(0), ex.args...))
+        yJ = insert!(pr, v, xcall(Zygote, :_forward, cx, ex.args...))
         y =  insert!(pr, v, xgetindex(yJ, 1))
         J =  insert!(pr, v, stmt(xgetindex(yJ, 2), line = ir[v].line))
         pr[v] = xcall(Zygote, :typeassert, y, yT)
@@ -136,7 +135,6 @@ function primal(ir::IR)
     end
   end
   pr = finish(pr)
-  pushfirst!(pr.args, typeof(_forward), Context)
   pr, brs = record_branches!(pr)
   return pr, brs, pbs
 end
@@ -167,7 +165,7 @@ alpha(x) = x
 alpha(x::Variable) = Alpha(x.id)
 Variable(a::Alpha) = Variable(a.id)
 
-sig(b::IRTools.Block) = unique([arg for br in branches(b) for arg in br.args if arg isa Union{Argument,Variable}])
+sig(b::IRTools.Block) = unique([arg for br in branches(b) for arg in br.args if arg isa Variable])
 sig(pr::Primal) = Dict(b.id => sig(b) for b in blocks(pr.ir))
 
 # TODO unreachables?
@@ -219,7 +217,7 @@ function adjoint(pr::Primal)
         g = push!(rb, stmt(Expr(:call, alpha(pr.pullbacks[v]), grad(v)),
                            line = b[v].line))
         for (i, x) in enumerate(b[v].expr.args)
-          x isa Union{Variable,Argument} || continue
+          x isa Variable || continue
           grad(x, push!(rb, stmt(xgradindex(g, i),
                                  line = b[v].line)))
         end
@@ -246,7 +244,7 @@ function adjoint(pr::Primal)
         end
       end
     else # Backprop function arguments
-      gs = [grad(arg(i)) for i = 1:length(pr.ir.args)]
+      gs = [grad(arg) for arg = arguments(pr.ir)]
       Δ = push!(rb, pr.varargs == nothing ?
                       xcall(Zygote, :tuple, gs...) :
                       xcall(Zygote, :tuple_va, Val(pr.varargs), gs...))
