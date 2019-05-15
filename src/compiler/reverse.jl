@@ -1,6 +1,6 @@
 using IRTools: IR, Variable, Pipe, xcall, var, prewalk, postwalk,
   blocks, predecessors, successors, argument!, arguments, branches,
-  exprtype, insertafter!, finish, allspats!, trimspats!, substitute!, substitute,
+  exprtype, insertafter!, finish, expand!, prune!, substitute!, substitute,
   block, block!, branch!, return!, stmt
 using Base: @get!
 
@@ -150,7 +150,7 @@ end
 function Primal(ir::IR; varargs = nothing)
   ir = instrument(normalise!(ir))
   pr, brs, pbs = primal(ir)
-  Primal(allspats!(ir), pr, varargs, brs, pbs)
+  Primal(expand!(ir), pr, varargs, brs, pbs)
 end
 
 # Backwards Pass
@@ -213,22 +213,23 @@ function adjoint(pr::Primal)
     end
     # Backprop through statements
     for v in reverse(keys(b))
+      ex = b[v].expr
       if haskey(pr.pullbacks, v)
         g = push!(rb, stmt(Expr(:call, alpha(pr.pullbacks[v]), grad(v)),
                            line = b[v].line))
-        for (i, x) in enumerate(b[v].expr.args)
+        for (i, x) in enumerate(ex.args)
           x isa Variable || continue
           grad(x, push!(rb, stmt(xgradindex(g, i),
                                  line = b[v].line)))
         end
-      elseif b[v].expr isa Core.PiNode
-        grads[b[v].expr.val] = grads[v]
-      elseif isexpr(b[v].expr, GlobalRef, :call, :isdefined)
-      else
-        ex = b[v].expr
-        desc = isexpr(ex) ? "$(ex.head) expression" : ex
-        push!(rb, stmt(xcall(Base, :error, "Can't differentiate $desc"),
+      elseif ex isa Core.PiNode
+        grads[ex.val] = grads[v]
+      elseif isexpr(ex, GlobalRef, :call, :isdefined, :inbounds, :meta)
+      elseif isexpr(ex)
+        push!(rb, stmt(xcall(Base, :error, "Can't differentiate $(ex.head) expression"),
                        line = b[v].line))
+      else # A literal value
+        continue
       end
     end
     if b.id > 1 # Backprop through (predecessor) branch arguments
@@ -261,7 +262,7 @@ end
 
 function Adjoint(ir::IR; varargs = nothing, normalise = true)
   pr = Primal(ir, varargs = varargs)
-  adj = adjoint(pr) |> trimspats!
+  adj = adjoint(pr) |> prune!
   if normalise
     permute!(adj, length(adj.blocks):-1:1)
     adj = IRTools.domorder!(adj) |> IRTools.renumber
