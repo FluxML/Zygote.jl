@@ -19,7 +19,6 @@ using MacroTools: @forward
 export Params, gradient, forward, @code_grad
 
 include("tools/idset.jl")
-# include("tools/fillarray.jl")
 
 include("compiler/reverse.jl")
 include("compiler/emit.jl")
