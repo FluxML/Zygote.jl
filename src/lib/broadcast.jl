@@ -14,6 +14,7 @@
 
 using Base.Broadcast
 using Base.Broadcast: AbstractArrayStyle, broadcasted, materialize
+using NNlib
 
 # There's a saying that debugging code is about twice as hard as writing it in
 # the first place. So if you're as clever as you can be when writing code, how
@@ -60,6 +61,16 @@ Numeric{T<:Number} = Union{T,AbstractArray{<:T}}
 
 @adjoint broadcasted(::typeof(*), x::Numeric, y::Numeric) = x.*y,
   z̄ -> (nothing, unbroadcast(x, z̄ .* conj.(y)), unbroadcast(y, z̄ .* conj.(x)))
+
+@adjoint function broadcasted(::typeof(σ), x::Numeric)
+  y = σ.(x)
+  y, ȳ -> (nothing, ȳ .* conj.(y .* (1 .- y)))
+end
+
+@adjoint function broadcasted(::typeof(tanh), x::Numeric)
+  y = tanh.(x)
+  y, ȳ -> (nothing, ȳ .* conj.(1 .- y.^2))
+end
 
 @adjoint broadcasted(::typeof(conj), x::Numeric) =
   conj.(x), z̄ -> (nothing, conj.(z̄))
