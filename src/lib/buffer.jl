@@ -54,6 +54,15 @@ function Base.copy(b::Buffer)
   return b.data
 end
 
+Base.eltype(b::Buffer) = eltype(b.data)
+Base.length(b::Buffer) = length(b.data)
+Base.ndims(b::Buffer) = ndims(b.data)
+Base.size(b::Buffer, n...) = size(b.data, n...)
+Base.axes(b::Buffer, n...) = axes(b.data, n...)
+Base.eachindex(b::Buffer, i...) = eachindex(b.data, i...)
+Base.stride(b::Buffer, k) = stride(b.data, k)
+Base.strides(b::Buffer) = strides(b.data)
+
 grad_mut(b::Buffer) = fill!(similar(b.data, Any), nothing)
 grad_mut(b::Buffer{T}) where T<:Number = fill!(similar(b.data, float(T)), 0)
 
