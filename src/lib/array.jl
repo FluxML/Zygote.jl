@@ -1,8 +1,30 @@
+ismutvalue(x::AbstractArray) = !isimmutable(x)
+
+_zero(xs::AbstractArray{<:Integer}) = fill!(similar(xs, float(eltype(xs))), false)
+_zero(xs::AbstractArray{<:Number}) = zero(xs)
+_zero(xs::AbstractArray) = Any[nothing for x in xs]
+
+grad_mut(xs::AbstractArray) = _zero(xs)
+
+function accum(x::AbstractArray, y::AbstractArray)
+  if ismutvalue(x) || ismutvalue(y)
+    @assert x === y
+    return x
+  else
+    accum.(x, y)
+  end
+end
+
+function accum!(x::AbstractArray, y)
+  x === y && return x
+  x .= accum.(x, y)
+  return x
+end
+
 @adjoint (::Type{T})(::UndefInitializer, args...) where T<:Array = T(undef, args...), Δ -> nothing
 
 @nograd size, length, eachindex, Colon(), findfirst, randn, ones, zeros, one, zero,
   print, println
-
 
 @adjoint Base.vect(xs...) = Base.vect(xs...), Δ -> (Δ...,)
 
@@ -10,11 +32,9 @@
 
 @adjoint (::Type{T})(x::T) where T<:Array = T(x), ȳ -> (ȳ,)
 
-_zero(xs::AbstractArray{<:Integer}) = fill!(similar(xs, float(eltype(xs))), false)
-_zero(xs::AbstractArray{<:Number}) = zero(xs)
-_zero(xs::AbstractArray) = Any[nothing for x in xs]
-
-@adjoint function getindex(xs::Array, i...)
+# TODO a smarter implementation for mutable arrays
+# we should just grab `dxs` and mutate it
+@adjoint function getindex(xs::AbstractArray, i...)
   xs[i...], function (Δ)
     Δ′ = _zero(xs)
     Δ′[i...] = Δ
@@ -22,8 +42,67 @@ _zero(xs::AbstractArray) = Any[nothing for x in xs]
   end
 end
 
-@adjoint! setindex!(xs::AbstractArray, x...) = setindex!(xs, x...),
-  _ -> error("Mutating arrays is not supported")
+@adjoint! function setindex!(x::AbstractArray, v, i...)
+  old = x[i...]
+  setindex!(x, v, i...), function (dx)
+    if dx !== nothing
+      dv = dx[i...]
+      ismutvalue(dx) && (view(dx, i...) .= 0)
+    else
+      dv = nothing
+    end
+    x[i...] = old
+    return (dx, dv, map(_ -> nothing, i)...)
+  end
+end
+
+# Special case for potentially-undef arrays
+# TODO: clean this up and fold it into the normal version
+@adjoint! function setindex!(x::AbstractArray, v, i::Int...)
+  isdef = isassigned(x, i...)
+  isdef && (old = x[i...])
+  setindex!(x, v, i...), function (dx)
+    if dx !== nothing
+      dv = dx[i...]
+      ismutvalue(dx) && (view(dx, i...) .= 0)
+    else
+      dv = nothing
+    end
+    isdef && (x[i...] = old)
+    return (dx, dv, map(_ -> nothing, i)...)
+  end
+end
+
+@adjoint! function push!(xs::AbstractVector, x)
+  push!(xs, x), function (dxs)
+    dx = dxs === nothing ? nothing : dxs[end]
+    if ismutvalue(dxs)
+      pop!(dxs)
+    else
+      dxs = dxs[1:end-1]
+    end
+    pop!(xs)
+    return (dxs, dx)
+  end
+end
+
+@adjoint! function pop!(xs::AbstractVector)
+  x = pop!(xs)
+  x, function (dx)
+    dxs = _zero(xs)
+    push!(dxs, dx)
+    push!(xs, x)
+    return (dxs,)
+  end
+end
+
+@adjoint! function copyto!(xs::AbstractArray, ys::AbstractArray)
+  xs_ = copy(xs)
+  copyto!(xs, ys), function (dxs)
+    copyto!(xs_, xs)
+    (nothing, dxs)
+  end
+end
 
 # General
 
@@ -159,11 +238,16 @@ _backmean(xs, Δ, dims) = zero(xs) .+ Δ ./ mapreduce(i -> size(xs,i),*,dims)
 # LinAlg
 # ======
 
+ismutvalue(x::Transpose) = ismutvalue(x.parent)
+ismutvalue(x::LinearAlgebra.Adjoint) = ismutvalue(x.parent)
+
 @adjoint function(a::AbstractVecOrMat * b::AbstractVecOrMat)
   return a * b, function(Δ)
     return (reshape(Δ * b', size(a)), reshape(a' * Δ, size(b)))
   end
 end
+
+@adjoint dot(xs, ys) = dot(xs, ys), Δ -> (Δ .* ys, Δ .* xs)
 
 @adjoint transpose(x) = transpose(x), Δ -> (transpose(Δ),)
 @adjoint Base.adjoint(x) = x', Δ -> (Δ',)

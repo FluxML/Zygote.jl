@@ -222,7 +222,7 @@ if !Zygote.usetyped
 end
 
 y, back = Zygote.forward(x->tuple(x...), [1, 2, 3])
-@test back((1, 1, 1)) == ((1,1,1),)
+@test back((1, 1, 1))[1] in ((1,1,1),[1,1,1])
 
 # Test for some compiler errors on complex CFGs
 function f(x)
@@ -233,11 +233,6 @@ function f(x)
 end
 
 @test Zygote.@code_adjoint(f(1)) isa Zygote.Adjoint
-
-@test_throws ErrorException Zygote.gradient(1) do x
-  push!([], x)
-  return x
-end
 
 @test gradient(1) do x
   stk = []
@@ -261,6 +256,27 @@ end == (10,)
   end
   x + x
 end == (2,)
+
+# Mutation
+
+@test gradient([1, 2],3) do x, y
+  x[1] = y
+  x[1] * x[2]
+end == ([0, 3], 2)
+
+using LinearAlgebra
+
+@test gradient([1, 2]) do x
+  y = x ⋅ x
+  x[1] = 3
+  y
+end == ([2, 4],)
+
+@test gradient(2) do x
+  xs = []
+  push!(xs, x)
+  pop!(xs)*x
+end == (4,)
 
 global_param = 3
 

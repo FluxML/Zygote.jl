@@ -4,8 +4,6 @@ using Base: @get!
 
 # Gradient of AD stacks
 
-grad_mut(::AbstractVector) = []
-
 @adjoint! function _push!(a::Vector, x)
   _push!(a, x), function (y)
     dstk = grad_mut(__context__, a)
@@ -14,9 +12,10 @@ grad_mut(::AbstractVector) = []
 end
 
 @adjoint! function pop!(stk::Stack)
+  i = stk.idx
   pop!(stk), function (Δ)
     dstk = grad_mut(__context__, stk.data)
-    push!(dstk, Δ)
+    dstk[i] = Δ
     return
   end
 end

@@ -13,7 +13,6 @@ accum(x, y) =
 accum(x, y, zs...) = accum(accum(x, y), zs...)
 
 accum(x::Tuple, y::Tuple) = accum.(x, y)
-accum(x::AbstractArray, y::AbstractArray) = accum.(x, y)
 
 @generated function accum(x::NamedTuple, y::NamedTuple)
   grad(x) = x in fieldnames(y) ? :(y.$x) : :nothing
@@ -42,9 +41,11 @@ end
 @adjoint Base.typeassert(x, T) = Base.typeassert(x, T), Δ -> (Δ, nothing)
 
 @generated function accum_param(cx::Context, x, Δ)
-  isbitstype(x) && return
+  isbitstype(x) && return :Δ
   quote
-    haskey(cache(cx), x) && (cache(cx)[x] = accum(cache(cx)[x],Δ))
+    ismutvalue(x) && return accum!(grad_mut(cx, x), Δ)
+    k = Key(x)
+    haskey(cache(cx), k) && (cache(cx)[k] = accum(cache(cx)[k],Δ))
     return
   end
 end
@@ -57,7 +58,7 @@ end
 
 unwrap(x) = x
 
-@adjoint unwrap(x) = unwrap(x), x̄ -> (accum_param(__context__, x, x̄); (x̄,))
+@adjoint unwrap(x) = unwrap(x), x̄ -> (accum_param(__context__, x, x̄),)
 
 unwrap(ref, x) = x
 
@@ -66,6 +67,7 @@ unwrap(ref, x) = x
 @adjoint unwrap(ref, x) = unwrap(x), function (x̄)
   accum_global(__context__, ref, x̄)
   accum_param(__context__, x, x̄)
+  return
 end
 
 # Tuples
@@ -161,11 +163,12 @@ end
 grad_mut(x) = Ref{Any}(nt_nothing(x))
 
 function grad_mut(cx::Context, x)
+  k = Key(x)
   ch = cache(cx)
-  if haskey(ch, x)
-    ch[x]
+  if haskey(ch, k)
+    ch[k]
   else
-    ch[x] = grad_mut(x)
+    ch[k] = grad_mut(x)
   end
 end
 
@@ -229,5 +232,39 @@ end
     x̄ = $Δ
     $(G == Nothing || :($Δ = nt_nothing($Δ)))
     (nothing, ($(map(f -> :(x̄.$f), fieldnames(T))...),))
+  end
+end
+
+# Mutable Primitives (e.g. arrays)
+
+ismutvalue(x) = false
+
+mutkey(x) = ismutvalue(x) ? Key(x) : nothing
+mutkeys(xs...) = map(mutkey, xs)
+
+function out_grad_mut(cx, x, x̄)
+  ismutvalue(x) || return x̄
+  Δ = grad_mut(cx, x)
+  accum!(Δ, x̄)
+  return Δ
+end
+
+out_grad_mut(cx, xs::Tuple, dxs) = map((x, dx) -> out_grad_mut(cx, x, dx), xs, dxs)
+out_grad_mut(cx, xs::Tuple, ::Nothing) = nothing
+
+function in_grad_mut(cx, x, x̄)
+  ismutvalue(x) || return x̄
+  return accum!(grad_mut(cx, x), x̄)
+end
+
+in_grad_mut(cx, xs::Tuple, dxs) = map((x, dx) -> in_grad_mut(cx, x, dx), xs, dxs)
+in_grad_mut(cx, ::Tuple, ::Nothing) = nothing
+
+mutback(cache, ks::NTuple{<:Any,Nothing}, ::Nothing, back) = back
+
+function mutback(cx, xs, y, back::F) where F
+  return function (ȳ)
+    dxs = back(out_grad_mut(cx, y, ȳ))
+    in_grad_mut(cx, xs, dxs)
   end
 end

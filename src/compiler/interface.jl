@@ -1,11 +1,19 @@
+struct Key
+  id::UInt64
+  Key(x) = new(objectid(x))
+end
+
+# Shaves some time on dict lookups (which is all we use this for).
+Base.hash(k::Key) = k.id
+
 mutable struct Context
-  cache::Union{IdDict{Any,Any},Nothing}
+  cache::Union{Dict{Key,Any},Nothing}
   globals::Union{Dict{GlobalRef,Any},Nothing}
 end
 
 Context() = Context(nothing, nothing)
 
-cache(cx::Context) = cx.cache === nothing ? (cx.cache = IdDict()) : cx.cache
+cache(cx::Context) = cx.cache === nothing ? (cx.cache = Dict{Key,Any}()) : cx.cache
 globals(cx::Context) = cx.globals === nothing ? (cx.globals = Dict{GlobalRef,Any}()) : cx.globals
 
 struct Pullback{S,T}
@@ -79,24 +87,24 @@ function Base.show(io::IO, ps::Params)
 end
 
 struct Grads
-  grads::IdDict{Any,Any}
+  grads::Dict{Key,Any}
 end
 
 Base.show(io::IO, ps::Grads) = print(io, "Grads(...)")
 
-@forward Grads.grads Base.getindex, Base.haskey
-
 function Base.getindex(gs::Grads, x)
   isbits(x) && error("Only reference types can be differentiated with `Params`.")
-  return gs.grads[x]
+  return gs.grads[Key(x)]
 end
+
+Base.haskey(gs::Grads, x) = haskey(gs.grads, Key(x))
 
 function forward(f, ps::Params)
   cx = Context()
   y, back = _forward(cx, f)
   y, function (Δ)
     for p in ps
-      cache(cx)[p] = nothing
+      cache(cx)[Key(p)] = ismutvalue(p) ? grad_mut(p) : nothing
     end
     back(Δ)
     Grads(cx.cache) # TODO make a copy
