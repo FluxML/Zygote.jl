@@ -41,12 +41,14 @@ function gradm(ex, mut = false)
   quote
     $adj
     @inline function Zygote._forward($cx, $f::$T, $(args...)) where $(Ts...)
+      record_op()
       y, _back = adjoint(__context__, $f, $(argnames...))
       $(mut ? nothing : :(back(::Nothing) = nothing))
       back(Δ) = $gradtuple(_back(Δ))
       return y, back
     end
     @inline function Zygote._forward($cx, ::$kT, kw, $f::$T, $(args...)) where $(Ts...)
+      record_op()
       y, _back = adjoint(__context__, $f, $(argnames...); kw...)
       $(mut ? nothing : :(back(::Nothing) = nothing))
       back(Δ) = $gradtuplekw(_back(Δ))
@@ -54,6 +56,17 @@ function gradm(ex, mut = false)
     end
     nothing
   end
+end
+
+num_ops = 0
+get_num_ops() = num_ops
+function record_op()
+  global num_ops
+  num_ops += 1
+end
+function reset_num_ops!()
+  global num_ops
+  num_ops = 0
 end
 
 macro adjoint(ex)
