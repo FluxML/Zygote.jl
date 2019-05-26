@@ -34,11 +34,8 @@ function forward_jacobian(f, x, ::Val{N}) where N
 end
 
 function forward_jacobian(f, x)
-  if length(x) < ForwardDiff.DEFAULT_CHUNK_THRESHOLD
-    forward_jacobian(f, x, Val(length(x)))
-  else
-    forward_jacobian(f, x, Val(ForwardDiff.DEFAULT_CHUNK_THRESHOLD))
-  end
+  len = min(length(x), ForwardDiff.DEFAULT_CHUNK_THRESHOLD)
+  forward_jacobian(f, x, Val(len))
 end
 
 vec_scalar(x) = vec(x)
