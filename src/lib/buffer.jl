@@ -54,6 +54,8 @@ function Base.copy(b::Buffer)
   return b.data
 end
 
+@forward Buffer.data Base.eltype, Base.length, Base.ndims, Base.size, Base.axes, Base.eachindex, Base.stride, Base.strides
+
 grad_mut(b::Buffer) = fill!(similar(b.data, Any), nothing)
 grad_mut(b::Buffer{T}) where T<:Number = fill!(similar(b.data, float(T)), 0)
 
