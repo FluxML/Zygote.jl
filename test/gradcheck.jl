@@ -1,4 +1,4 @@
-using Zygote, NNlib, Test, Random, LinearAlgebra, Statistics
+using Zygote, NNlib, Test, Random, LinearAlgebra, Statistics, FillArrays
 using Zygote: gradient
 using NNlib: conv, ∇conv_data, depthwiseconv
 
@@ -450,3 +450,8 @@ using Zygote: Buffer
   @test stride(buf, 2) === 3
   @test strides(buf) === (1, )
 end
+
+@testset "FillArrays" begin
+  gradcheck(x->sum(Fill(x[], (2, 2))), [0.1])
+end
+

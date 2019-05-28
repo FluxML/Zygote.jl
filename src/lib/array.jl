@@ -1,3 +1,5 @@
+using FillArrays
+
 @adjoint (::Type{T})(::UndefInitializer, args...) where T<:Array = T(undef, args...), Δ -> nothing
 
 @nograd size, length, eachindex, Colon(), findfirst, randn, ones, zeros, one, zero,
@@ -8,7 +10,9 @@
 
 @adjoint copy(x::AbstractArray) = copy(x), ȳ -> (ȳ,)
 
+# Array Constructors
 @adjoint (::Type{T})(x::T) where T<:Array = T(x), ȳ -> (ȳ,)
+@adjoint (::Type{T})(x::Number, sz) where {T <: Fill} = Fill(x, sz), Δ -> (sum(Δ), nothing)
 
 _zero(xs::AbstractArray{<:Integer}) = fill!(similar(xs, float(eltype(xs))), false)
 _zero(xs::AbstractArray{<:Number}) = zero(xs)
@@ -102,7 +106,7 @@ end
 
 @adjoint function sum(xs::AbstractArray; dims = :)
   if dims === (:)
-    sum(xs), Δ -> (FillArray(Δ, size(xs)),)
+    sum(xs), Δ -> (Fill(Δ, size(xs)),)
   else
     sum(xs, dims = dims), Δ -> (similar(xs) .= Δ,)
   end
@@ -300,7 +304,7 @@ Zygote.@adjoint function LinearAlgebra.tr(x::AbstractMatrix)
   # so we could just use Eye(size(x, 1))
   # to create a Diagonal
   tr(x), function (Δ::Number)
-    (Diagonal(FillArray(Δ, (size(x, 1), ))), )
+    (Diagonal(Fill(Δ, (size(x, 1), ))), )
   end
 end
 
