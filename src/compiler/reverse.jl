@@ -24,13 +24,25 @@ function instrument_new!(ir, v, ex)
 end
 
 # Hack to work around fragile constant prop through overloaded functions
+unwrapquote(x) = x
+unwrapquote(x::QuoteNode) = x.value
+
 is_literal_getproperty(ex) =
   (iscall(ex, Base, :getproperty) || iscall(ex, Core, :getfield)) &&
   ex.args[3] isa QuoteNode
 
 function instrument_getproperty!(ir, v, ex)
   is_literal_getproperty(ex) ?
-    (ir[v] = xcall(Zygote, :literal_getproperty, ex.args[2], Val(ex.args[3].value))) :
+    (ir[v] = xcall(Zygote, :literal_getproperty, ex.args[2], Val(unwrapquote(ex.args[3])))) :
+    ex
+end
+
+is_literal_getindex(ex) =
+  iscall(ex, Base, :getindex) && length(ex.args) == 3 && ex.args[3] isa Union{Integer,QuoteNode}
+
+function instrument_getindex!(ir, v, ex)
+  is_literal_getindex(ex) ?
+    (ir[v] = xcall(Zygote, :literal_getindex, ex.args[2], Val(unwrapquote(ex.args[3])))) :
     ex
 end
 
@@ -60,6 +72,7 @@ function instrument(ir::IR)
     isexpr(ex, :enter, :leave) && error("try/catch is not supported.")
     ex = instrument_new!(pr, v, ex)
     ex = instrument_getproperty!(pr, v, ex)
+    ex = instrument_getindex!(pr, v, ex)
     ex = instrument_global!(pr, v, ex)
   end
   return finish(pr)
