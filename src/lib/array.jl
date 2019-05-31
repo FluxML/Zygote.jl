@@ -13,6 +13,8 @@ using FillArrays
 # Array Constructors
 @adjoint (::Type{T})(x::T) where T<:Array = T(x), ȳ -> (ȳ,)
 @adjoint (::Type{T})(x::Number, sz) where {T <: Fill} = Fill(x, sz), Δ -> (sum(Δ), nothing)
+@adjoint (::Type{T})(sz) where {T<:Zeros} = Zeros(sz), Δ->(nothing,)
+@adjoint (::Type{T})(sz) where {T<:Ones} = Ones(sz), Δ->(nothing,)
 
 _zero(xs::AbstractArray{<:Integer}) = fill!(similar(xs, float(eltype(xs))), false)
 _zero(xs::AbstractArray{<:Number}) = zero(xs)

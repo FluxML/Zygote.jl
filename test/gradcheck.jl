@@ -453,5 +453,6 @@ end
 
 @testset "FillArrays" begin
   gradcheck(x->sum(Fill(x[], (2, 2))), [0.1])
+  @test first(Zygote.gradient(sz->sum(Ones(sz)), 6)) === nothing
+  @test first(Zygote.gradient(sz->sum(Zeros(sz)), 6)) === nothing
 end
-
