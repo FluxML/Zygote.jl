@@ -455,3 +455,8 @@ end
   gradcheck(x->sum(Fill(x[], (2, 2))), [0.1])
 end
 
+@testset "fix hvcat (issue #211)" begin
+    for i=1:6
+        @test gradtest(k -> [1k 2k 3k; 4k 5k 6k][i], 0.4)
+    end
+end
