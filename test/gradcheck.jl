@@ -457,6 +457,7 @@ end
 
 @testset "fix hvcat (issue #211)" begin
     for i=1:6
-        @test gradtest(k -> [1k 2k 3k; 4k 5k 6k][i], 0.4)
+        f = k -> [1k 2k 3k; 4k 5k 6k][i]
+        @test gradient(f, 0.4)[1] ≈ ngradient(f, [0.4])[1][]
     end
 end
