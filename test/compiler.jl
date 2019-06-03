@@ -74,6 +74,9 @@ y, back = @test_inferred forward(getx, (x=1,y=2.0))
 y, back = @test_inferred forward(x->x[1], (5,:a))
 @test_inferred back(1)
 
+y, back = @test_inferred forward(((a,b),) -> a, (5, 10))
+@test_inferred back(1)
+
 # Checks that use control flow
 if Zygote.usetyped
   include("typed.jl")
