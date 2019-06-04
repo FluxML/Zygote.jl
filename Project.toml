@@ -16,7 +16,7 @@ Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 Requires = "ae029012-a4dd-5104-9daa-d747884805df"
 SpecialFunctions = "276daf66-3868-5448-9aa4-cd146d93841b"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
-
+FFTW = "7a1cc6ca-52ef-59f5-83cd-3a7055c09341"
 [compat]
 IRTools = "0.2"
 NNlib = "0.6"
