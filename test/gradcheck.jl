@@ -456,7 +456,6 @@ end
 end
 
 @testset "FFTW" begin
-  x = [1.1,2,3]
   x=[-0.353213 -0.789656 -0.270151; -0.95719 -1.27933 0.223982]
   # gradient of ifft(rfft) must be 1
   @test gradient((x)->real(ifft(fft(x))[1]),x)[1][1] == 1.0+0.0im
@@ -464,7 +463,7 @@ end
 
   # check ffts for individual dimensions
   @test gradient((x)->sum(abs.(FFTW.fft(x))),x)[1] ≈ gradient((x)->sum(abs.(FFTW.fft(FFTW.fft(x,1),2))),x)[1]
-  @test gradient((x)->abs(sum((FFTW.fft(x))),x)[1] ≈ gradient((x)->abs(sum(FFTW.fft(FFTW.fft(x,1),2))),x)[1]
+  @test gradient((x)->abs(sum((FFTW.fft(x)))),x)[1] ≈ gradient((x)->abs(sum(FFTW.fft(FFTW.fft(x,1),2))),x)[1]
   @test gradient((x, dims)->sum(abs.(FFTW.fft(x,dims))),x,(1,2))[1] ≈ gradient((x)->sum(abs.(FFTW.fft(x))),x)[1]
   @test gradient((x)->sum(abs.(FFTW.fft(x,(1,2)))),x)[1] ≈ gradient((x)->sum(abs.(FFTW.fft(FFTW.fft(x,1),2))),x)[1]
   @test gradient((x, dims)->sum(abs.(FFTW.ifft(x,dims))),x,(1,2))[1] ≈ gradient((x)->sum(abs.(FFTW.ifft(x))),x)[1]

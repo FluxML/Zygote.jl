@@ -4,8 +4,8 @@ using FillArrays
 # FFTW functions do not work with FillArrays, which are needed
 # for some functionality of Zygote.. To make it work with FillArrays
 # as well, overload the functions
-FFTW.rfft(x::Fill) = FFTW.rfft(collect(x))
-FFTW.irfft(x::Fill) = FFTW.irfft(collect(x))
+FFTW.fft(x::Fill) = FFTW.fft(collect(x))
+FFTW.ifft(x::Fill) = FFTW.ifft(collect(x))
 FFTW.fft(x::Fill, dims) = FFTW.fft(collect(x), dims)
 FFTW.ifft(x::Fill, dims) = FFTW.ifft(collect(x), dims)
 
