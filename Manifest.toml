@@ -83,7 +83,7 @@ version = "0.10.3"
 
 [[IRTools]]
 deps = ["InteractiveUtils", "MacroTools", "Test"]
-git-tree-sha1 = "77c5a1c66cbda06966ec5049ce92c25fd1ac92fa"
+git-tree-sha1 = "09b9d429fd57ad899d579dbe6d0f68efd82e9ba4"
 repo-rev = "master"
 repo-url = "https://github.com/MikeInnes/IRTools.jl.git"
 uuid = "7869d1d1-7146-5819-86e3-90919afe41df"
