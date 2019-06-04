@@ -125,6 +125,8 @@ end
   @test gradtest(x -> maximum(x, dims=3), rand(2, 3, 4))
 
   @test gradtest(x -> maximum(x, dims=[1, 2]), rand(2, 3, 4))
+
+  @test gradient(x -> 1 / maximum(x), [1., 2, 3])[1] == [0, 0, -1/9]
 end
 
 @testset "minimum" begin
@@ -461,4 +463,3 @@ end
 @testset "FillArrays" begin
   gradcheck(x->sum(Fill(x[], (2, 2))), [0.1])
 end
-

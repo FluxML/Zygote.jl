@@ -138,7 +138,7 @@ end
 @adjoint function maximum(xs; dims = :)
   max, i = findmax(xs, dims = dims)
   max, function (Δ)
-    Δ isa Real && Δ <= sqrt(eps(float(Δ))) && return nothing
+    Δ isa Real && abs(Δ) <= sqrt(eps(float(Δ))) && return nothing
     Δ′ = zero(xs)
     Δ′[i] = Δ
     return (Δ′,)
