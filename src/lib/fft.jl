@@ -1,16 +1,51 @@
+
 using FFTW
 
 
-# FFTW functions do not work with FillArray. To make it work with FillArrays
-# as well, overload the functions
-FFTW.ifft(x::Zygote.FillArray) = FFTW.ifft(collect(x))
-FFTW.fft(x::Zygote.FillArray) = FFTW.fft(collect(x))
-FFTW.ifft(x::Zygote.FillArray, dims) = FFTW.ifft(collect(x), dims)
-FFTW.fft(x::Zygote.FillArray, dims) = FFTW.fft(collect(x), dims)
 
-# the gradient of an FFT with respect to its input is the reverse FFT of the
+
+# the adjoint jacobian of an FFT with respect to its input is the reverse FFT of the
 # gradient of its inputs.
-Zygote.@adjoint FFTW.fft(xs) = (FFTW.fft(xs), (Δ)-> (FFTW.ifft(Δ),))
-Zygote.@adjoint FFTW.ifft(xs) = (FFTW.ifft(xs), (Δ)-> (FFTW.fft(Δ),))
-Zygote.@adjoint FFTW.fft(xs,dims) = (FFTW.fft(xs,dims), (Δ)-> (FFTW.ifft(Δ,dims),))
-Zygote.@adjoint FFTW.ifft(xs,dims) = (FFTW.ifft(xs,dims), (Δ)-> (FFTW.fft(Δ,dims),))
+@adjoint function FFTW.fft(xs)
+    return FFTW.fft(xs), function(Δ)
+        N = length(xs)
+        return (N * FFTW.ifft(Δ),)
+    end
+end
+
+@adjoint function FFTW.ifft(xs)
+    return FFTW.ifft(xs), function(Δ)
+        N = length(xs)
+        return (1/N* FFTW.fft(Δ),)
+    end
+end
+
+@adjoint function FFTW.fft(xs, dims)
+    # up to now only works when dims is a single integer
+    return FFTW.fft(xs, dims), function(Δ)
+        # dims can be int, array or tuple,
+        # if it is not a single int, convert to array so that we can use it
+        # for indexing
+        if typeof(dims) != Int
+            dims = collect(dims)
+        end
+        # we need to multiply by all dimensions that we FFT over
+        N = prod(size(xs)[dims])
+        return (N * FFTW.ifft(Δ, dims), nothing)
+    end
+end
+
+@adjoint function FFTW.ifft(xs,dims)
+    # up to now only works when dims is a single integer
+    return FFTW.ifft(xs, dims), function(Δ)
+        # dims can be int, array or tuple,
+        # if it is not a single int, convert to array so that we can use it
+        # for indexing
+        if typeof(dims) != Int
+            dims = collect(dims)
+            end
+        # we need to divide by all dimensions that we FFT over
+        N = prod(size(xs)[dims])
+        return (1/N * FFTW.fft(Δ, dims),nothing)
+    end
+end
