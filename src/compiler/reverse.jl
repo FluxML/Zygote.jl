@@ -24,14 +24,42 @@ function instrument_new!(ir, v, ex)
 end
 
 # Hack to work around fragile constant prop through overloaded functions
+unwrapquote(x) = x
+unwrapquote(x::QuoteNode) = x.value
+
 is_literal_getproperty(ex) =
-  (iscall(ex, Base, :getproperty) || iscall(ex, Core, :getfield)) &&
-  ex.args[3] isa QuoteNode
+  (iscall(ex, Base, :getproperty) || iscall(ex, Core, :getfield) || iscall(ex, Base, :getfield)) &&
+  ex.args[3] isa Union{QuoteNode,Integer}
 
 function instrument_getproperty!(ir, v, ex)
   is_literal_getproperty(ex) ?
-    (ir[v] = xcall(Zygote, :literal_getproperty, ex.args[2], Val(ex.args[3].value))) :
+    (ir[v] = xcall(Zygote, :literal_getproperty, ex.args[2], Val(unwrapquote(ex.args[3])))) :
     ex
+end
+
+is_literal_getindex(ex) =
+  iscall(ex, Base, :getindex) && length(ex.args) == 3 && ex.args[3] isa Union{Integer,QuoteNode}
+
+function instrument_getindex!(ir, v, ex)
+  is_literal_getindex(ex) ?
+    (ir[v] = xcall(Zygote, :literal_getindex, ex.args[2], Val(unwrapquote(ex.args[3])))) :
+    ex
+end
+
+is_literal_iterate(ex) =
+  iscall(ex, Base, :indexed_iterate) && length(ex.args) >= 3 && ex.args[3] isa Union{Integer,QuoteNode}
+
+function instrument_iterate!(ir, v, ex)
+  is_literal_iterate(ex) ?
+    (ir[v] = xcall(Zygote, :literal_indexed_iterate, ex.args[2],
+                   Val(unwrapquote(ex.args[3])), ex.args[4:end]...)) :
+    ex
+end
+
+function instrument_literals!(ir, v, ex)
+  ex = instrument_getproperty!(ir, v, ex)
+  ex = instrument_getindex!(ir, v, ex)
+  ex = instrument_iterate!(ir, v, ex)
 end
 
 function istrackable(x)
@@ -59,7 +87,7 @@ function instrument(ir::IR)
     isexpr(ex, :foreigncall) && continue
     isexpr(ex, :enter, :leave) && error("try/catch is not supported.")
     ex = instrument_new!(pr, v, ex)
-    ex = instrument_getproperty!(pr, v, ex)
+    ex = instrument_literals!(pr, v, ex)
     ex = instrument_global!(pr, v, ex)
   end
   return finish(pr)
