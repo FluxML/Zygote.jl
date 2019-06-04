@@ -2,8 +2,8 @@
 using FFTW
 using FillArrays
 # FFTW functions do not work with FillArrays, which are needed
-# for some functionality of Zygote.. To make it work with FillArrays
-# as well, overload the functions
+# for some functionality of Zygote. To make it work with FillArrays
+# as well, overload the relevant functions
 FFTW.fft(x::Fill) = FFTW.fft(collect(x))
 FFTW.ifft(x::Fill) = FFTW.ifft(collect(x))
 FFTW.fft(x::Fill, dims) = FFTW.fft(collect(x), dims)
@@ -11,7 +11,7 @@ FFTW.ifft(x::Fill, dims) = FFTW.ifft(collect(x), dims)
 
 
 # the adjoint jacobian of an FFT with respect to its input is the reverse FFT of the
-# gradient of its inputs.
+# gradient of its inputs, but with different normalization factor
 @adjoint function FFTW.fft(xs)
     return FFTW.fft(xs), function(Δ)
         N = length(xs)
