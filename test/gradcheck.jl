@@ -469,4 +469,9 @@ end
   @test gradient((x, dims)->sum(abs.(FFTW.ifft(x,dims))),x,(1,2))[1] ≈ gradient((x)->sum(abs.(FFTW.ifft(x))),x)[1]
   @test gradient((x)->sum(abs.(FFTW.ifft(x,(1,2)))),x)[1] ≈ gradient((x)->sum(abs.(FFTW.ifft(FFTW.ifft(x,1),2))),x)[1]
 
+  @test gradcheck(x->sum(abs.(FFTW.fft(x))), x)
+  @test gradcheck(x->sum(abs.(FFTW.ifft(x))), x)
+  @test gradcheck(x->sum(abs.(FFTW.fft(x, 1))), x)
+  @test gradcheck(x->sum(abs.(FFTW.ifft(x, 1))), x)
+
 end
