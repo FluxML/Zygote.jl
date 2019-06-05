@@ -176,12 +176,12 @@ end
   back(Δ::NamedTuple{(:parent,)}) = (Δ.parent,)
   return transpose(x), back
 end
+
 @adjoint function Base.adjoint(x)
   back(Δ) = (Δ',)
   back(Δ::NamedTuple{(:parent,)}) = (Δ.parent,)
   return x', back
 end
-
 
 @adjoint parent(x::LinearAlgebra.Adjoint) = parent(x), ȳ -> (LinearAlgebra.Adjoint(ȳ),)
 
