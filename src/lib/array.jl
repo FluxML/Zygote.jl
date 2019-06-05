@@ -171,8 +171,12 @@ _backmean(xs, Δ, dims) = zero(xs) .+ Δ ./ mapreduce(i -> size(xs,i),*,dims)
   end
 end
 
-@adjoint transpose(x) = transpose(x), Δ -> (transpose(Δ),)
-@adjoint Base.adjoint(x) = x', Δ -> (Δ',)
+_transpose(x) = transpose(x)
+_transpose(x::NamedTuple{(:parent,),<:Any}) = x.parent
+@adjoint transpose(x) = transpose(x), Δ -> (_transpose(Δ),)
+_adjoint(x) = x'
+_adjoint(x::NamedTuple{(:parent,),<:Any}) = x.parent
+@adjoint Base.adjoint(x) = x', Δ -> (_adjoint(Δ),)
 @adjoint parent(x::LinearAlgebra.Adjoint) = parent(x), ȳ -> (LinearAlgebra.Adjoint(ȳ),)
 
 @adjoint dot(x::AbstractArray, y::AbstractArray) = dot(x, y), Δ->(Δ .* y, Δ .* x)

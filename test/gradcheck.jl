@@ -347,6 +347,19 @@ end
   @test Zygote.gradient(x->sum(zero(x)), randn(3))[1] isa Nothing
 end
 
+@testset "adjoint and transpose" begin
+    a = randn(2,2)
+    @test gradcheck(x -> x'[1],a)
+    @test gradcheck(x -> x'[2],a)
+    @test gradcheck(x -> x'[3],a)
+    @test gradcheck(x -> x'[4],a)
+
+    @test gradcheck(x -> transpose(x)[1],a)
+    @test gradcheck(x -> transpose(x)[2],a)
+    @test gradcheck(x -> transpose(x)[3],a)
+    @test gradcheck(x -> transpose(x)[4],a)
+end
+
 import StatsFuns
 
 Zygote.refresh()
