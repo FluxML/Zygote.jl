@@ -35,8 +35,13 @@ end
 
 @adjoint collect(x::Array) = collect(x), Δ -> (Δ,)
 
+@adjoint permutedims(xs) = permutedims(xs), Δ -> (permutedims(Δ),)
+
 @adjoint permutedims(xs, dims) = permutedims(xs, dims),
   Δ -> (permutedims(Δ, invperm(dims)), nothing)
+
+@adjoint PermutedDimsArray(xs, dims) = PermutedDimsArray(xs, dims),
+  Δ -> (PermutedDimsArray(Δ, invperm(dims)), nothing)
 
 @adjoint reshape(xs, dims...) = reshape(xs, dims...),
   Δ -> (reshape(Δ, size(xs)),map(_->nothing,dims)...)
