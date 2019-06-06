@@ -31,6 +31,14 @@ end
 @adjoint! setindex!(xs::AbstractArray, x...) = setindex!(xs, x...),
   _ -> error("Mutating arrays is not supported")
 
+@adjoint function view(x::AbstractArray, inds...; kw...)
+  view(x, inds...; kw...), dy -> begin
+    dx = _zero(x)
+    copyto!(view(dx, inds...; kw...), dy)
+    (dx, map(_->nothing, inds)...)
+  end
+end
+
 # General
 
 @adjoint collect(x::Array) = collect(x), Δ -> (Δ,)
