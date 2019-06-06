@@ -18,7 +18,7 @@ _zero(xs::AbstractArray{<:Integer}) = fill!(similar(xs, float(eltype(xs))), fals
 _zero(xs::AbstractArray{<:Number}) = zero(xs)
 _zero(xs::AbstractArray) = Any[nothing for x in xs]
 
-@adjoint function getindex(xs::Array, i...)
+@adjoint function getindex(xs::AbstractArray, i...)
   xs[i...], function (Δ)
     Δ′ = _zero(xs)
     Δ′[i...] = Δ

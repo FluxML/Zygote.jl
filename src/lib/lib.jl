@@ -28,7 +28,7 @@ end
 # Core functions
 
 @nograd Core.apply_type, Core.typeof, nfields, fieldtype,
-  (==), (===), (>=), (<), (>), isempty, supertype, Base.typename,
+  (==), (===), (>=), (<=), (<), (>), isless, isempty, supertype, Base.typename,
   Base.parameter_upper_bound, eps
 
 @adjoint deepcopy(x) = deepcopy(x), ȳ -> (ȳ,)
