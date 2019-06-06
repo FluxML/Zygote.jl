@@ -465,3 +465,11 @@ end
   @test first(Zygote.gradient(sz->sum(Ones(sz)), 6)) === nothing
   @test first(Zygote.gradient(sz->sum(Zeros(sz)), 6)) === nothing
 end
+
+@testset "AbstractArray Addition / Subtraction / Negation" begin
+  rng, M, N, P = MersenneTwister(123567), 3, 7, 11
+  A, B = randn(rng, M, N, P), randn(rng, M, N, P)
+  gradtest(+, A, B)
+  gradtest(-, A, B)
+  gradtest(-, A)
+end

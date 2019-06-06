@@ -343,3 +343,7 @@ end
 @adjoint function +(A::AbstractMatrix, S::UniformScaling)
   return A + S, Δ->(Δ, (λ=sum(view(Δ, diagind(Δ))),))
 end
+
+@adjoint +(A::AbstractArray, B::AbstractArray) = A + B, Δ->(Δ, Δ)
+@adjoint -(A::AbstractArray, B::AbstractArray) = A - B, Δ->(Δ, -Δ)
+@adjoint -(A::AbstractArray) = -A, Δ->(-Δ,)
