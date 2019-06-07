@@ -359,36 +359,36 @@ FFTW.ifft(x::Fill, dims...) = FFTW.ifft(collect(x), dims...)
 # gradient of its inputs, but with different normalization factor
 @adjoint function FFTW.fft(xs)
   return FFTW.fft(xs), function(Δ)
-      N = length(xs)
-      return (N * FFTW.ifft(Δ),)
+    N = length(xs)
+    return (N * FFTW.ifft(Δ),)
   end
 end
 
 @adjoint function FFTW.ifft(xs)
   return FFTW.ifft(xs), function(Δ)
-      N = length(xs)
-      return (1/N* FFTW.fft(Δ),)
+    N = length(xs)
+    return (1/N* FFTW.fft(Δ),)
   end
 end
 
 @adjoint function FFTW.fft(xs, dims)
   return FFTW.fft(xs, dims), function(Δ)
-  # dims can be int, array or tuple,
-  # convert to collection for use as index
-  dims = collect(dims)
-  # we need to multiply by all dimensions that we FFT over
-  N = prod(collect(size(xs))[dims])
-      return (N * FFTW.ifft(Δ, dims), nothing)
+    # dims can be int, array or tuple,
+    # convert to collection for use as index
+    dims = collect(dims)
+    # we need to multiply by all dimensions that we FFT over
+    N = prod(collect(size(xs))[dims])
+    return (N * FFTW.ifft(Δ, dims), nothing)
   end
 end
 
 @adjoint function FFTW.ifft(xs,dims)
   return FFTW.ifft(xs, dims), function(Δ)
-      # dims can be int, array or tuple,
-      # convert to collection for use as index
-      dims = collect(dims)
-      # we need to divide by all dimensions that we FFT over
-      N = prod(collect(size(xs))[dims])
-      return (1/N * FFTW.fft(Δ, dims),nothing)
+    # dims can be int, array or tuple,
+    # convert to collection for use as index
+    dims = collect(dims)
+    # we need to divide by all dimensions that we FFT over
+    N = prod(collect(size(xs))[dims])
+    return (1/N * FFTW.fft(Δ, dims),nothing)
   end
 end
