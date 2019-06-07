@@ -14,6 +14,8 @@ using FFTW
 # Array Constructors
 @adjoint (::Type{T})(x::T) where T<:Array = T(x), ȳ -> (ȳ,)
 @adjoint (::Type{T})(x::Number, sz) where {T <: Fill} = Fill(x, sz), Δ -> (sum(Δ), nothing)
+@adjoint (::Type{T})(sz) where {T<:Zeros} = Zeros(sz), Δ->(nothing,)
+@adjoint (::Type{T})(sz) where {T<:Ones} = Ones(sz), Δ->(nothing,)
 
 _zero(xs::AbstractArray{<:Integer}) = fill!(similar(xs, float(eltype(xs))), false)
 _zero(xs::AbstractArray{<:Number}) = zero(xs)
@@ -41,7 +43,7 @@ end
   Δ -> (reshape(Δ, size(xs)),map(_->nothing,dims)...)
 
 @adjoint function hvcat(rows::Tuple{Vararg{Int}}, xs::T...) where T<:Number
-  hvcat(rows, xs...), ȳ -> (nothing, ȳ...)
+  hvcat(rows, xs...), ȳ -> (nothing, permutedims(ȳ)...)
 end
 
 pull_block_vert(sz, Δ, A::AbstractVector) = Δ[sz-length(A)+1:sz]
@@ -139,7 +141,7 @@ end
 @adjoint function maximum(xs; dims = :)
   max, i = findmax(xs, dims = dims)
   max, function (Δ)
-    Δ isa Real && Δ <= sqrt(eps(float(Δ))) && return nothing
+    Δ isa Real && abs(Δ) <= sqrt(eps(float(Δ))) && return nothing
     Δ′ = zero(xs)
     Δ′[i] = Δ
     return (Δ′,)
@@ -343,6 +345,9 @@ end
   return A + S, Δ->(Δ, (λ=sum(view(Δ, diagind(Δ))),))
 end
 
+@adjoint +(A::AbstractArray, B::AbstractArray) = A + B, Δ->(Δ, Δ)
+@adjoint -(A::AbstractArray, B::AbstractArray) = A - B, Δ->(Δ, -Δ)
+@adjoint -(A::AbstractArray) = -A, Δ->(-Δ,)
 
 
 # FFTW
