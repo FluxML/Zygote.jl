@@ -125,6 +125,8 @@ end
   @test gradtest(x -> maximum(x, dims=3), rand(2, 3, 4))
 
   @test gradtest(x -> maximum(x, dims=[1, 2]), rand(2, 3, 4))
+
+  @test gradient(x -> 1 / maximum(x), [1., 2, 3])[1] == [0, 0, -1/9]
 end
 
 @testset "minimum" begin
@@ -331,6 +333,13 @@ end
   end
 end
 
+@testset "hvcat" begin
+  @test grad(xs -> hvcat((2,2),xs...)[1,1], [1,2,3,4])[1] == (1,0,0,0)
+  @test grad(xs -> hvcat((2,2),xs...)[2,1], [1,2,3,4])[1] == (0,0,1,0)
+  @test grad(xs -> hvcat((2,2),xs...)[1,2], [1,2,3,4])[1] == (0,1,0,0)
+  @test grad(xs -> hvcat((2,2),xs...)[2,2], [1,2,3,4])[1] == (0,0,0,1)
+end
+
 @testset "one(s) and zero(s)" begin
   @test Zygote.gradient(x->sum(ones(size(x))), randn(5))[1] isa Nothing
   @test Zygote.gradient(x->sum(one(x)), randn(3, 3))[1] isa Nothing
@@ -453,5 +462,14 @@ end
 
 @testset "FillArrays" begin
   gradcheck(x->sum(Fill(x[], (2, 2))), [0.1])
+  @test first(Zygote.gradient(sz->sum(Ones(sz)), 6)) === nothing
+  @test first(Zygote.gradient(sz->sum(Zeros(sz)), 6)) === nothing
 end
 
+@testset "AbstractArray Addition / Subtraction / Negation" begin
+  rng, M, N, P = MersenneTwister(123567), 3, 7, 11
+  A, B = randn(rng, M, N, P), randn(rng, M, N, P)
+  gradtest(+, A, B)
+  gradtest(-, A, B)
+  gradtest(-, A)
+end
