@@ -152,19 +152,25 @@ Random.seed!(0)
   X, Y, y = randn(rng, P, P), randn(rng, P, Q), randn(rng, P)
   A, B = randn(rng, P, M), randn(P, Q)
 
-  # # \ (square)
+  # \ (square)
   @test gradtest(\, X, Y)
   @test gradtest(\, X, y)
 
   # \ (rectangular)
-  @test gradtest(\, A, y)
+  @test gradtest(\, A, Y)
   @test gradtest(\, A, y)
   @test gradtest(\, B, Y)
   @test gradtest(\, B, y)
 
   # /
   @test gradtest(/, Y', X)
-  @test gradtest(/, y', X)
+  @test gradtest((y, X)->y' / X, y, X)
+
+  # / (rectangular)
+  @test gradtest(/, Y', A')
+  @test gradtest((y, A)->y' / A', y, A)
+  @test gradtest(/, Y', B')
+  @test gradtest((y, A)->y' / A', y, B)
 
   @testset "Cholesky" begin
 

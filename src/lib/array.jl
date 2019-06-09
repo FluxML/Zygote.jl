@@ -171,8 +171,18 @@ _backmean(xs, Δ, dims) = zero(xs) .+ Δ ./ mapreduce(i -> size(xs,i),*,dims)
   end
 end
 
-@adjoint transpose(x) = transpose(x), Δ -> (transpose(Δ),)
-@adjoint Base.adjoint(x) = x', Δ -> (Δ',)
+@adjoint function transpose(x)
+  back(Δ) = (transpose(Δ),)
+  back(Δ::NamedTuple{(:parent,)}) = (Δ.parent,)
+  return transpose(x), back
+end
+@adjoint function Base.adjoint(x)
+  back(Δ) = (Δ',)
+  back(Δ::NamedTuple{(:parent,)}) = (Δ.parent,)
+  return x', back
+end
+
+
 @adjoint parent(x::LinearAlgebra.Adjoint) = parent(x), ȳ -> (LinearAlgebra.Adjoint(ȳ),)
 
 @adjoint dot(x::AbstractArray, y::AbstractArray) = dot(x, y), Δ->(Δ .* y, Δ .* x)
@@ -253,14 +263,14 @@ end
   end
 end
 
-# really shouldn't have to implement this, based on the Julia implementation details.
-@adjoint function /(A::AbstractMatrix, B::AbstractMatrix)
-  Y = A / B
-  return Y, function(Ȳ)
-      Ā = Ȳ / B'
-      return (Ā, -Y' * Ā)
-  end
-end
+# # really shouldn't have to implement this, based on the Julia implementation details.
+# @adjoint function /(A::AbstractMatrix, B::AbstractMatrix)
+#   Y = A / B
+#   return Y, function(Ȳ)
+#       Ā = Ȳ / B'
+#       return (Ā, -Y' * Ā)
+#   end
+# end
 
 _symmetric_back(Δ) = UpperTriangular(Δ) + LowerTriangular(Δ)' - Diagonal(Δ)
 _symmetric_back(Δ::Union{Diagonal, UpperTriangular}) = Δ
