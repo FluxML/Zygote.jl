@@ -221,7 +221,11 @@ end
   end
 end
 
-# Defaults for atol and rtol copied directly from LinearAlgebra.
+# Defaults for atol and rtol copied directly from LinearAlgebra. See the following for
+# derivation:
+# Golub, Gene H., and Victor Pereyra. "The differentiation of pseudo-inverses and nonlinear
+# least squares problems whose variables separate." SIAM Journal on numerical analysis 10.2
+# (1973): 413-432.
 @adjoint function pinv(
   A::AbstractMatrix{T};
   atol::Real = 0.0,
