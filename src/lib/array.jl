@@ -231,6 +231,22 @@ end
   return Y, Δ->(-Y' * Δ * Y' + (I - A * Y) * Δ' * Y * Y' + Y' * Y * Δ' * (I - Y * A),)
 end
 
+@adjoint function \(A::Union{Diagonal, AbstractTriangular}, B::AbstractVecOrMat)
+  Y = A \ B
+  return Y, function(Ȳ)
+    B̄ = A' \ Ȳ
+    return (-B̄ * Y', B̄)
+  end 
+end
+
+@adjoint function /(A::AbstractMatrix, B::Union{Diagonal, AbstractTriangular})
+  Y = A / B
+  return Y, function(Ȳ)
+    Ā = Ȳ / B'
+    return (Ā, -Y' * Ā)
+  end
+end
+
 @adjoint function \(A::AbstractMatrix, B::AbstractVecOrMat)
   Z = A \ B
   return Z, function(Z̄)
@@ -253,6 +269,9 @@ end
 
 # LinAlg Matrix Types
 # ===================
+
+@adjoint LinearAlgebra.LowerTriangular(A) = LowerTriangular(A), Δ->(LowerTriangular(Δ),)
+@adjoint LinearAlgebra.UpperTriangular(A) = UpperTriangular(A), Δ->(UpperTriangular(Δ),)
 
 # This is basically a hack while we don't have a working `ldiv!`.
 @adjoint function \(A::Cholesky, B::AbstractVecOrMat)
