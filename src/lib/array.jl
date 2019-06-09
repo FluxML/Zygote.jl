@@ -204,18 +204,35 @@ end
 @adjoint logabsdet(xs) = logabsdet(xs), Δ -> (Δ[1] * transpose(inv(xs)),)
 
 @adjoint function inv(A)
-    return inv(A), function (Δ)
-        Ainv = inv(A)
-        ∇A = - Ainv' * Δ * Ainv'
-        return (∇A, )
-    end
+  return inv(A), function (Δ)
+    Ainv = inv(A)
+    ∇A = - Ainv' * Δ * Ainv'
+    return (∇A, )
+  end
+end
+
+# Defaults for atol and rtol copied directly from LinearAlgebra.
+@adjoint function pinv(
+  A::AbstractMatrix{T};
+  atol::Real = 0.0,
+  rtol::Real = (eps(real(float(one(T))))*min(size(A)...))*iszero(atol),
+) where {T}
+  Y = pinv(A)
+  return Y, Δ->(-Y' * Δ * Y' + (I - A * Y) * Δ' * Y * Y' + Y' * Y * Δ' * (I - Y * A),)
 end
 
 @adjoint function \(A::AbstractMatrix, B::AbstractVecOrMat)
-  Y = A \ B
-  return Y, function(Ȳ)
-      B̄ = A' \ Ȳ
-      return (-B̄ * Y', B̄)
+  Z = A \ B
+  return Z, function(Z̄)
+    B̄ = A' \ Z̄
+    if size(A, 1) == size(A, 2)
+      return (-B̄ * Z', B̄)
+    else
+      a = -B̄ * Z'
+      b = (B - A * Z) * B̄' / A'
+      c = A' \ Z * (Z̄' - B̄' * A)
+      return (a + b + c, B̄)
+    end
   end
 end
 
@@ -236,6 +253,7 @@ end
   end
 end
 
+# really shouldn't have to implement this, based on the Julia implementation details.
 @adjoint function /(A::AbstractMatrix, B::AbstractMatrix)
   Y = A / B
   return Y, function(Ȳ)
