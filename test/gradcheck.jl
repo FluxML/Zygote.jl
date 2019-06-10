@@ -139,21 +139,79 @@ end
   @test gradtest(x -> minimum(x, dims=[1, 2]), rand(2, 3, 4))
 end
 
-@testset "backsolve" begin
-  rng, P, Q = MersenneTwister(123456), 10, 9
-  X, Y, y = randn(rng, P, P), randn(rng, P, Q), randn(rng, P)
+@testset "(p)inv" begin
+  rng, P, Q = MersenneTwister(123456), 13, 11
+  A, B, C = randn(rng, P, Q), randn(rng, P, P), randn(Q, P)
+  @test gradtest(pinv, A)
+  @test gradtest(inv, B)
+  @test gradtest(pinv, C)
+end
 
-  # \
-  @test gradtest(X -> X \ Y, X)
-  @test gradtest(Y -> X \ Y, Y)
-  @test gradtest(X -> X \ y, X)
-  @test gradtest(y -> X \ y, y)
+@testset "backsolve" begin
+  rng, M, P, Q = MersenneTwister(123456), 13, 10, 9
+  X, Y, y = randn(rng, P, P), randn(rng, P, Q), randn(rng, P)
+  A, B = randn(rng, P, M), randn(P, Q)
+  D = collect(Diagonal(randn(rng, P)))
+  L = collect(LowerTriangular(randn(rng, P, P)))
+  L[diagind(L)] .= 1 .+ 0.01 .* randn(rng, P)
+  U = collect(UpperTriangular(randn(rng, P, P)))
+  U[diagind(U)] .= 1 .+ 0.01 .* randn(rng, P)
+
+  # \ (Dense square)
+  @test gradtest(\, X, Y)
+  @test gradtest(\, X, y)
+
+  # \ (Dense rectangular)
+  @test gradtest(\, A, Y)
+  @test gradtest(\, A, y)
+  @test gradtest(\, B, Y)
+  @test gradtest(\, B, y)
+
+  # \ (Diagonal)
+  @test gradtest(\, D, Y)
+  @test gradtest(\, D, y)
+  @test gradtest((D, Y)-> Diagonal(D) \ Y, D, Y)
+  @test gradtest((D, Y)-> Diagonal(D) \ Y, D, y)
+
+  # \ (LowerTriangular)
+  @test gradtest(\, L, Y)
+  @test gradtest(\, L, y)
+  @test gradtest((L, Y) -> LowerTriangular(L) \ Y, L, Y)
+  @test gradtest((L, Y) -> LowerTriangular(L) \ Y, L, y)
+
+  # \ (UpperTriangular)
+  @test gradtest(\, U, Y)
+  @test gradtest(\, U, y)
+  @test gradtest((U, Y) -> UpperTriangular(U) \ Y, U, Y)
+  @test gradtest((U, Y) -> UpperTriangular(U) \ Y, U, y)
 
   # /
-  @test gradtest(X -> Y' / X, X)
-  @test gradtest(Y -> Y' / X, Y)
-  @test gradtest(X -> y' / X, X)
-  @test gradtest(y -> y' / X, y)
+  @test gradtest(/, Y', X)
+  @test gradtest((y, X)->y' / X, y, X)
+
+  # / (rectangular)
+  @test gradtest(/, Y', A')
+  @test gradtest((y, A)->y' / A', y, A)
+  @test gradtest(/, Y', B')
+  @test gradtest((y, A)->y' / A', y, B)
+
+  # / (Diagonal)
+  @test gradtest((D, Y) -> Y' / D, D, Y)
+  @test gradtest((D, Y) -> Y' / D, D, y)
+  @test gradtest((D, Y)-> Y' / Diagonal(D), D, Y)
+  @test gradtest((D, Y)-> Y' / Diagonal(D), D, y)
+
+  # / (LowerTriangular)
+  @test gradtest((L, Y) -> Y' / L, L, Y)
+  @test gradtest((L, Y) -> Y' / L, L, y)
+  @test gradtest((L, Y) -> Y' / LowerTriangular(L), L, Y)
+  @test gradtest((L, Y) -> Y' / LowerTriangular(L), L, y)
+
+  # / (UpperTriangular)
+  @test gradtest((U, Y) -> Y' / U, U, Y)
+  @test gradtest((U, Y) -> Y' / U, U, y)
+  @test gradtest((U, Y) -> Y' / UpperTriangular(U), U, Y)
+  @test gradtest((U, Y) -> Y' / UpperTriangular(U), U, y)
 
   @testset "Cholesky" begin
 

@@ -171,8 +171,18 @@ _backmean(xs, Δ, dims) = zero(xs) .+ Δ ./ mapreduce(i -> size(xs,i),*,dims)
   end
 end
 
-@adjoint transpose(x) = transpose(x), Δ -> (transpose(Δ),)
-@adjoint Base.adjoint(x) = x', Δ -> (Δ',)
+@adjoint function transpose(x)
+  back(Δ) = (transpose(Δ),)
+  back(Δ::NamedTuple{(:parent,)}) = (Δ.parent,)
+  return transpose(x), back
+end
+
+@adjoint function Base.adjoint(x)
+  back(Δ) = (Δ',)
+  back(Δ::NamedTuple{(:parent,)}) = (Δ.parent,)
+  return x', back
+end
+
 @adjoint parent(x::LinearAlgebra.Adjoint) = parent(x), ȳ -> (LinearAlgebra.Adjoint(ȳ),)
 
 @adjoint dot(x::AbstractArray, y::AbstractArray) = dot(x, y), Δ->(Δ .* y, Δ .* x)
@@ -204,18 +214,55 @@ end
 @adjoint logabsdet(xs) = logabsdet(xs), Δ -> (Δ[1] * transpose(inv(xs)),)
 
 @adjoint function inv(A)
-    return inv(A), function (Δ)
-        Ainv = inv(A)
-        ∇A = - Ainv' * Δ * Ainv'
-        return (∇A, )
-    end
+  return inv(A), function (Δ)
+    Ainv = inv(A)
+    ∇A = - Ainv' * Δ * Ainv'
+    return (∇A, )
+  end
+end
+
+# Defaults for atol and rtol copied directly from LinearAlgebra. See the following for
+# derivation:
+# Golub, Gene H., and Victor Pereyra. "The differentiation of pseudo-inverses and nonlinear
+# least squares problems whose variables separate." SIAM Journal on numerical analysis 10.2
+# (1973): 413-432.
+@adjoint function pinv(
+  A::AbstractMatrix{T};
+  atol::Real = 0.0,
+  rtol::Real = (eps(real(float(one(T))))*min(size(A)...))*iszero(atol),
+) where {T}
+  Y = pinv(A)
+  return Y, Δ->(-Y' * Δ * Y' + (I - A * Y) * Δ' * Y * Y' + Y' * Y * Δ' * (I - Y * A),)
+end
+
+@adjoint function \(A::Union{Diagonal, AbstractTriangular}, B::AbstractVecOrMat)
+  Y = A \ B
+  return Y, function(Ȳ)
+    B̄ = A' \ Ȳ
+    return (-B̄ * Y', B̄)
+  end 
+end
+
+@adjoint function /(A::AbstractMatrix, B::Union{Diagonal, AbstractTriangular})
+  Y = A / B
+  return Y, function(Ȳ)
+    Ā = Ȳ / B'
+    return (Ā, -Y' * Ā)
+  end
 end
 
 @adjoint function \(A::AbstractMatrix, B::AbstractVecOrMat)
-  Y = A \ B
-  return Y, function(Ȳ)
-      B̄ = A' \ Ȳ
-      return (-B̄ * Y', B̄)
+  Z = A \ B
+  return Z, function(Z̄)
+    B̄ = A' \ Z̄
+    if size(A, 1) == size(A, 2)
+      return (-B̄ * Z', B̄)
+    else
+      a = -B̄ * Z'
+      b = (B - A * Z) * B̄' / A'
+      c = A' \ Z * (Z̄' - B̄' * A)
+      return (a + b + c, B̄)
+    end
   end
 end
 
@@ -227,20 +274,15 @@ end
 # LinAlg Matrix Types
 # ===================
 
+@adjoint LinearAlgebra.LowerTriangular(A) = LowerTriangular(A), Δ->(LowerTriangular(Δ),)
+@adjoint LinearAlgebra.UpperTriangular(A) = UpperTriangular(A), Δ->(UpperTriangular(Δ),)
+
 # This is basically a hack while we don't have a working `ldiv!`.
 @adjoint function \(A::Cholesky, B::AbstractVecOrMat)
   Y, back = Zygote.forward((U, B)->U \ (U' \ B), A.U, B)
   return Y, function(Ȳ)
     Ā_factors, B̄ = back(Ȳ)
     return ((uplo=nothing, status=nothing, factors=Ā_factors), B̄)
-  end
-end
-
-@adjoint function /(A::AbstractMatrix, B::AbstractMatrix)
-  Y = A / B
-  return Y, function(Ȳ)
-      Ā = Ȳ / B'
-      return (Ā, -Y' * Ā)
   end
 end
 
