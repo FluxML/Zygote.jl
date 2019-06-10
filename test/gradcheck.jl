@@ -1,6 +1,7 @@
 using Zygote, NNlib, Test, Random, LinearAlgebra, Statistics, FillArrays
 using Zygote: gradient
 using NNlib: conv, ∇conv_data, depthwiseconv
+using Base.Broadcast: broadcast_shape
 
 function ngradient(f, xs::AbstractArray...)
   grads = zero.(xs)
@@ -530,4 +531,57 @@ end
   gradtest(+, A, B)
   gradtest(-, A, B)
   gradtest(-, A)
+end
+
+@testset "FillArrays" begin
+  rng, M, N = MersenneTwister(123456), 7, 11
+  x, y = randn(rng), randn(rng)
+  @test Zygote.gradient(x->sum(Fill(x, N)), x)[1] == N
+  @test Zygote.gradient(x->sum(Fill(x, N, 3, 4)), x)[1] == N * 3 * 4
+  @test Zygote.gradient((x, y)->sum(Fill(x, N)), x, y) == (N, nothing)
+
+  let
+    out, back = Zygote.forward(sum, Fill(x, N))
+    @test back(nothing) isa Nothing
+  end
+
+  z = randn(rng, N)
+  @test gradtest(x->Fill(first(x), N), [x])
+  let
+    out, back = Zygote.forward(x->Fill(x, N), x)
+    @test out == Fill(x, N)
+    @test first(back(Fill(y, N))) ≈ y * N
+  end
+
+  # Test unary broadcasting gradients.
+  out, back = Zygote.forward(x->exp.(x), Fill(x, N))
+  @test out isa Fill
+  @test out == Fill(exp(x), N)
+  @test back(Ones(N))[1] isa Fill
+  @test back(Ones(N))[1] == Ones(N) .* exp(x)
+  @test back(ones(N))[1] isa Vector
+  @test back(ones(N))[1] == ones(N) .* exp(x)
+  @test gradtest(x->exp.(Fill(3 * first(x), N)), [x])
+
+  @testset "broadcast + and *" begin
+    for sx in [(M, N), (M, 1), (1, N), (1, 1)]
+      for sy in [(M, N), (M, 1), (1, N), (1, 1)]
+        z = randn(rng, broadcast_shape(sx, sy))
+
+        # Addition
+        @test gradtest((x, y)->Fill(first(x), sx...) .+ Fill(first(y), sy...), [x], [y])
+        @test gradtest(x->Fill(first(x), sx...) .+ Ones(sy...), [x])
+        @test gradtest(x->Fill(first(x), sx...) .+ Zeros(sy...), [x])
+        @test gradtest(y->Ones(sx...) .+ Fill(first(y), sy...), [y])
+        @test gradtest(y->Zeros(sx...) .+ Fill(first(y), sy...), [y])
+
+        # Multiplication
+        @test gradtest((x, y)->Fill(first(x), sx...) .* Fill(first(y), sy...), [x], [y])
+        @test gradtest(x->Fill(first(x), sx...) .* Ones(sy...), [x])
+        @test gradtest(x->Fill(first(x), sx...) .* Zeros(sy...), [x])
+        @test gradtest(y->Ones(sx...) .* Fill(first(y), sy...), [y])
+        @test gradtest(y->Zeros(sx...) .* Fill(first(y), sy...), [y])
+      end
+    end
+  end
 end
