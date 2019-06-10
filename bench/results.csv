@@ -1,0 +1,3 @@
+Benchmark,Time
+Feedforward,19.92
+LSTM,49.62

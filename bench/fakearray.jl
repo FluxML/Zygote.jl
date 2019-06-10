@@ -7,6 +7,8 @@ end
 FakeArray{T}(sz::Vararg{Int,N}) where {T,N} = FakeArray{T,N}(sz)
 FakeArray(sz::Vararg{Int,N}) where N = FakeArray{Float64}(sz...)
 
+FakeArray(x::AbstractArray) = FakeArray(size(x)...)
+
 Base.size(x::FakeArray) = x.size
 Base.show(io::IO, x::FakeArray) = print(io, typeof(x), "(", size(x), ")")
 Base.print_array(io::IO, x::FakeArray) = println(io, "(no data)")
@@ -30,13 +32,17 @@ Broadcast.materialize(bc::Broadcast.Broadcasted{Broadcast.ArrayStyle{FakeArray}}
 Base.reshape(x::FakeArray, i::Union{Int,Colon}...) = FakeArray(Base._reshape_uncolon(x, i)...)
 Base.reshape(x::FakeArray, i::Tuple{Vararg{Int}}) = FakeArray(i...)
 
+_mapreduce(f, op, x, dims::Colon) = FakeArray{eltype(x)}()
+_mapreduce(f, op, x, dims) = FakeArray(length.(Base.reduced_indices(x, dims))...)
+
 function Base.mapreduce(f, op, x::FakeArray; dims = :)
-  if dims === (:)
-    return FakeArray{eltype(x)}()
-  else
-    return FakeArray(length.(Base.reduced_indices(x, dims))...)
-  end
+  _mapreduce(f, op, x, dims)
 end
+
+using NNlib
+
+NNlib.softmax(x::FakeArray) = x
+NNlib.∇softmax(Δ, xs::FakeArray) = xs
 
 using Zygote
 

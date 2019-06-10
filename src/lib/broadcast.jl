@@ -72,6 +72,10 @@ end
   y, ȳ -> (nothing, ȳ .* conj.(1 .- y.^2))
 end
 
+@adjoint function broadcasted(::typeof(relu), x::Numeric)
+  relu.(x), ȳ -> (nothing, ȳ .* max.(x, zero(eltype(x))))
+end
+
 @adjoint broadcasted(::typeof(conj), x::Numeric) =
   conj.(x), z̄ -> (nothing, conj.(z̄))
 

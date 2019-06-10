@@ -1,5 +1,4 @@
-using Zygote, Flux, BenchmarkTools, Test, DataFrames, GLM, Statistics
-using Plots
+using Zygote, Flux, BenchmarkTools
 import Flux: gate
 
 include("fakearray.jl")

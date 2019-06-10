@@ -38,6 +38,10 @@ function gradm(ex, mut = false)
   gradtuple   = isclosure ? gradtuple0 : gradtuple1
   gradtuplekw = isclosure ? gradtuple2 : gradtuple3
   adj = @q @inline Zygote.adjoint($(fargs...)) where $(Ts...) = $(esc(body))
+  # adj = @q @inline function Zygote.adjoint($(fargs...)) where $(Ts...)
+  #   println($f)
+  #   $(esc(body))
+  # end
   quote
     $adj
     @inline function Zygote._forward($cx, $f::$T, $(args...)) where $(Ts...)
