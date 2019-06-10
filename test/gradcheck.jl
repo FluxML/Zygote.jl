@@ -85,9 +85,9 @@ end
 
 @testset "fill" begin
   rng, N, M, P = MersenneTwister(123456), 11, 6, 5
-  gradtest(x->fill(first(x), N), randn(rng, 1))
-  gradtest(x->fill(first(x), N, M), randn(rng, 1))
-  gradtest(x->fill(first(x), N, M, P), randn(rng, 1))
+  @test gradtest(x->fill(first(x), N), randn(rng, 1))
+  @test gradtest(x->fill(first(x), N, M), randn(rng, 1))
+  @test gradtest(x->fill(first(x), N, M, P), randn(rng, 1))
 end
 
 @testset "dot" begin
