@@ -1,0 +1,5 @@
+[deps]
+Flux = "587475ba-b771-5e3f-ad9e-33799f191a9c"
+Juno = "e5e0dc1b-0480-54bc-9374-aad01c23163d"
+ProgressMeter = "92933f4c-e287-5a05-a399-4b506db050ca"
+Zygote = "e88e6eb3-aa80-5325-afca-941959d7151f"

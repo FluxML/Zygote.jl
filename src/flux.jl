@@ -1,8 +1,7 @@
-using .Flux
-using .Flux.Tracker: TrackedArray, TrackedReal
+using .Tracker: TrackedArray, TrackedReal
 
 if !usetyped
-  unwrap(x::Union{TrackedArray,TrackedReal}) = Flux.data(x)
+  unwrap(x::Union{TrackedArray,TrackedReal}) = Tracker.data(x)
 end
 
-forward(f, ps::Flux.Tracker.Params) = forward(f, Params(ps))
+forward(f, ps::Tracker.Params) = forward(f, Params(ps))

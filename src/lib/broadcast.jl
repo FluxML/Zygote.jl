@@ -13,103 +13,111 @@
 #                                 `--'  `"                               `--'  `"             `'-'
 
 using Base.Broadcast
-using Base.Broadcast: Broadcasted, DefaultArrayStyle, instantiate
+using Base.Broadcast: AbstractArrayStyle, broadcasted, materialize
+using NNlib
 
-# Structural utilities
+# There's a saying that debugging code is about twice as hard as writing it in
+# the first place. So if you're as clever as you can be when writing code, how
+# will you ever debug it?
 
-using Base: tail
+# AD faces a similar dilemma: if you write code that's as clever as the compiler
+# can handle, how will you ever differentiate it? Differentiating makes clever
+# code that bit more complex and the compiler gives up, usually resulting in
+# 100x worse performance.
 
-tcat(x) = x
-tcat(x, y, z...) = tcat((x..., y...), z...)
+# Base's broadcasting is very cleverly written, and this makes differentiating
+# it... somewhat tricky.
 
-broadcast_args(x) = (x,)
-broadcast_args(bc::Broadcasted) = tcat(map(broadcast_args, bc.args)...)
+# Utilities
+# =========
 
-accum_sum(xs, dims = :) = reduce(accum, xs, dims = dims)
+accum_sum(xs; dims = :) = reduce(accum, xs, dims = dims)
+
+# Work around reducedim_init issue
+accum_sum(xs::AbstractArray{Nothing}; dims = :) = nothing
+accum_sum(xs::AbstractArray{<:Number}; dims = :) = sum(xs, dims = dims)
+accum_sum(xs::Number; dims = :) = xs
 
 trim(x, Δ) = reshape(Δ, ntuple(i -> size(Δ, i), Val(ndims(x))))
 
-unbroadcast(x::AbstractArray, Δ) =
-  size(x) == size(Δ) ? Δ :
-  length(x) == length(Δ) ? trim(x, Δ) :
-    trim(x, sum(Δ, dims = ntuple(i -> size(x, i) == 1 ? i : ndims(Δ)+1, Val(ndims(Δ)))))
+unbroadcast(x::AbstractArray, x̄) =
+  size(x) == size(x̄) ? x̄ :
+  length(x) == length(x̄) ? trim(x, x̄) :
+    trim(x, accum_sum(x̄, dims = ntuple(i -> size(x, i) == 1 ? i : ndims(x̄)+1, Val(ndims(x̄)))))
 
-unbroadcast(x::Union{Number,Ref}, Δ) = sum(Δ)
+unbroadcast(x::Union{Number,Ref}, x̄) = accum_sum(x̄)
 
-# Trivial Special Cases
-# TODO fix this up and use it
+# Split Reverse Mode
+# ==================
 
-Jtrivial(f, a...) = nothing
-Jtrivial(::typeof(+), a...) = a
-Jtrivial(::typeof(-), a, b) = (a..., .-b...)
+# TODO: use DiffRules here. It's complicated a little by the fact that we need
+# to do CSE, then broadcast-ify the expression so that the closure captures the
+# right arrays.
 
-trivia(_) = (1,)
-function trivia(bc::Broadcasted)
-  t = map(trivia, bc.args)
-  any(t -> t === nothing, t) && return
-  Jtrivial(bc.f, t...)
+Numeric{T<:Number} = Union{T,AbstractArray{<:T}}
+
+@adjoint broadcasted(::typeof(+), xs::Numeric...) =
+  broadcast(+, xs...), ȳ -> (nothing, map(x -> unbroadcast(x, ȳ), xs)...)
+
+@adjoint broadcasted(::typeof(*), x::Numeric, y::Numeric) = x.*y,
+  z̄ -> (nothing, unbroadcast(x, z̄ .* conj.(y)), unbroadcast(y, z̄ .* conj.(x)))
+
+@adjoint function broadcasted(::typeof(σ), x::Numeric)
+  y = σ.(x)
+  y, ȳ -> (nothing, ȳ .* conj.(y .* (1 .- y)))
 end
 
-Joutput(f, a...) = nothing
-Joutput(::typeof(exp), x) = map(t -> y -> y*t, x)
-
-function Jbroadcast(bc::Broadcasted)
-  t = map(trivia, bc.args)
-  any(t -> t === nothing, t) && return
-  Joutput(bc.f, t...)
+@adjoint function broadcasted(::typeof(tanh), x::Numeric)
+  y = tanh.(x)
+  y, ȳ -> (nothing, ȳ .* conj.(1 .- y.^2))
 end
 
-@inline function unbroadcast_t(x, y, ȳ, j::J) where J
-  trim(x, j.(y).*ȳ)
-end
+@adjoint broadcasted(::typeof(conj), x::Numeric) =
+  conj.(x), z̄ -> (nothing, conj.(z̄))
 
-@inline function unbroadcast_t(x::Number, y, ȳ, j::J) where J
-  x̄ = zero(float(x))
-  @simd for I in eachindex(y)
-    @inbounds x̄ += j(y[I])*ȳ[I]
-  end
-  return x̄
-end
+@adjoint broadcasted(::typeof(real), x::Numeric) =
+  real.(x), z̄ -> (nothing, real.(z̄))
 
-function ∇broadcast_t(bc::Broadcasted, J)
-  y = copy(instantiate(bc))
-  back(ȳ) = map(unbroadcast_t, broadcast_args(bc), map(_ -> y, J), map(_ -> ȳ, J), J)
-  return y, back
-end
+@adjoint broadcasted(::typeof(imag), x::Numeric) =
+  imag.(x), z̄ -> (nothing, im .* real.(z̄))
 
-# Reverse Mode
+# General Fallback
+# ================
 
-# TODO: forward context appropriately
-# multi-output map for better performance
-function ∇broadcast_r(bc::Broadcasted)
-  bc′, unflatten = _forward(Broadcast.flatten, bc)
-  len = Val(length(bc′.args)+1)
-  y∂b = broadcast(_forward, bc′.f, bc′.args...)
+# The fused reverse mode implementation is the most general but currently has
+# poor performance. It works by flattening the broadcast and mapping the call to
+# `_forward` over the input.
+
+# However, the core call
+# broadcast(_forward, (cx,), f, args...)
+# is already 10x slower than a simple broadcast (presumably due to inlining
+# issues, or something similar) and the other operations needed take it to about
+# 100x overhead.
+
+@generated inclen(::NTuple{N,Any}) where N = Val(N+1)
+
+# Avoid hitting special cases for `Adjoint` etc.
+_broadcast(f::F, x...) where F = materialize(broadcasted(f, x...))
+
+@adjoint function broadcasted(::AbstractArrayStyle, f, args...)
+  len = inclen(args)
+  y∂b = _broadcast((x...) -> _forward(__context__, f, x...), args...)
   y = map(x -> x[1], y∂b)
   ∂b = map(x -> x[2], y∂b)
   y, function (ȳ)
     dxs_zip = map((∂b, ȳ) -> ∂b(ȳ), ∂b, ȳ)
     dxs = ntuple(i -> map(x -> x[i], dxs_zip), len)
-    (f = accum_sum(dxs[1]),
-     args = map(unbroadcast, bc′.args, Base.tail(dxs)),
-     axes = nothing) |> unflatten |> Base.tail
+    (nothing, accum_sum(dxs[1]), map(unbroadcast, args, Base.tail(dxs))...)
   end
 end
 
-function ∇broadcast_r(bc::Broadcasted{<:DefaultArrayStyle{0}})
-  bc′, unflatten = _forward(Broadcast.flatten, bc)
-  len = Val(length(bc′.args)+1)
-  y, ∂b = broadcast(_forward, bc′.f, bc′.args...)
+@adjoint function broadcasted(::AbstractArrayStyle{0}, f, args...)
+  len = inclen(args)
+  y, ∂b = _broadcast((x...) -> _forward(__context__, f, x...), args...)
   y, function (ȳ)
     dxs = ∂b(ȳ)
-    (f = dxs[1],
-     args = Base.tail(dxs),
-     axes = nothing) |> unflatten |> Base.tail
+    (nothing, dxs...)
   end
 end
 
-∇broadcast(bc::Broadcasted, ::Nothing) = ∇broadcast_r(bc)
-∇broadcast(bc::Broadcasted, J) = ∇broadcast_t(bc, J)
-∇broadcast(bc::Broadcasted) = ∇broadcast(bc, Jbroadcast(bc))
-
-@adjoint Broadcast.materialize(bc::Broadcasted{<:DefaultArrayStyle}) = ∇broadcast_r(bc)
+@adjoint! (b::typeof(broadcast))(f, args...) = _forward(__context__, broadcasted, f, args...)

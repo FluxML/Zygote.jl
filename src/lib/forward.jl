@@ -46,6 +46,55 @@ vec_scalar(x::Real) = [x]
 reshape_scalar(x, y) = reshape(y, size(x))
 reshape_scalar(x::Real, y) = y[]
 
+"""
+    forwarddiff(f, x) -> f(x)
+
+Runs `f(x)` as usual, but instructs Zygote to differentiate `f` using forward
+mode, rather than the usual reverse mode.
+
+Forward mode takes time linear in `length(x)` but only has constant memory
+overhead, and is very efficient for scalars, so in some cases this can be a
+useful optimisation.
+
+```julia
+julia> function pow(x, n)
+         r = one(x)
+         for i = 1:n
+           r *= x
+         end
+         return r
+       end
+pow (generic function with 1 method)
+
+julia> gradient(5) do x
+         forwarddiff(x) do x
+           pow(x, 2)
+         end
+       end
+(10,)
+```
+
+Note that the function `f` will *drop gradients* for any closed-over values.
+
+```julia
+julia> gradient(2, 3) do a, b
+         forwarddiff(a) do a
+           a*b
+         end
+       end
+(3, nothing)
+```
+
+This can be rewritten by explicitly passing through `b`, i.e.
+
+```julia
+gradient(2, 3) do a, b
+  forwarddiff([a, b]) do (a, b)
+    a*b
+  end
+end
+```
+"""
 forwarddiff(f, x) = f(x)
 
 @adjoint function forwarddiff(f, x)

@@ -1,3 +1,5 @@
+using IRTools: argnames!, varargs!, inlineable!, pis!, slots!
+
 ignore(T) = all(T -> T <: Type, T.parameters)
 
 @generated function _forward(ctx::Context, f, args...)
@@ -8,6 +10,7 @@ ignore(T) = all(T -> T <: Type, T.parameters)
   meta, forw, _ = g
   argnames!(meta, Symbol("#self#"), :ctx, :f, :args)
   forw = varargs!(meta, forw, 3)
+  IRTools.verify(forw)
   forw = slots!(pis!(inlineable!(forw)))
   return IRTools.update!(meta, forw)
 end
@@ -23,8 +26,8 @@ end
     return :(error("Non-differentiable function $(j.t[1])"))
   end
   meta, _, back = g
-  resize!(back.argtypes, 2)
   argnames!(meta, Symbol("#self#"), :Δ)
+  IRTools.verify(back)
   back = slots!(inlineable!(back))
   return IRTools.update!(meta, back)
 end

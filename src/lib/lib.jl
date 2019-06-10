@@ -1,3 +1,5 @@
+using Base: RefValue
+
 # Interfaces
 
 accum() = nothing
@@ -18,16 +20,24 @@ accum(x::AbstractArray, y::AbstractArray) = accum.(x, y)
   Expr(:tuple, [:($f=accum(x.$f, $(grad(f)))) for f in fieldnames(x)]...)
 end
 
+function accum(x::RefValue, y::RefValue)
+  @assert x === y
+  return x
+end
+
 # Core functions
 
 @nograd Core.apply_type, Core.typeof, nfields, fieldtype,
-  (==), (===), (>=), (<), (>), isempty, supertype, Base.typename, Base.parameter_upper_bound
+  (==), (===), (>=), (<), (>), isempty, supertype, Base.typename,
+  Base.parameter_upper_bound, eps
+
+@adjoint deepcopy(x) = deepcopy(x), ȳ -> (ȳ,)
 
 @adjoint (::Type{V})(x...) where V<:Val = V(x...), _ -> nothing
 
 @adjoint ifelse(cond::Bool, t, f) =
   ifelse(cond, t, f),
-  Δ -> cond ? (Δ, zero(Δ)) : (zero(Δ), Δ)
+  Δ -> cond ? (nothing, Δ, zero(Δ)) : (nothing, zero(Δ), Δ)
 
 @adjoint Base.typeassert(x, T) = Base.typeassert(x, T), Δ -> (Δ, nothing)
 
@@ -60,10 +70,33 @@ end
 
 # Tuples
 
+using Base: tail
+
 @adjoint tuple(xs...) = xs, identity
+
+literal_getindex(x, ::Val{i}) where i = getindex(x, i)
+literal_indexed_iterate(x, ::Val{i}) where i = Base.indexed_iterate(x, i)
+literal_indexed_iterate(x, ::Val{i}, state) where i = Base.indexed_iterate(x, i, state)
+
+@adjoint literal_getindex(xs::NTuple{N,Any}, ::Val{i}) where {N,i} =
+  (xs[i], Δ -> (ntuple(j -> i == j ? Δ : nothing, Val(N)), nothing))
 
 @adjoint getindex(xs::NTuple{N,Any}, i::Integer) where N =
   (xs[i], Δ -> (ntuple(j -> i == j ? Δ : nothing, Val(N)), nothing))
+
+function _forward(cx::Context, ::typeof(literal_indexed_iterate), xs::Tuple, ::Val{i}) where i
+  y, b = _forward(cx, literal_getindex, xs, Val(i))
+  back(::Nothing) = nothing
+  back(ȳ) = b(ȳ[1])
+  (y, i+1), back
+end
+
+function _forward(cx::Context, ::typeof(literal_indexed_iterate), xs::Tuple, ::Val{i}, st) where i
+  y, b = _forward(cx, literal_getindex, xs, Val(i))
+  back(::Nothing) = nothing
+  back(ȳ) = (b(ȳ[1])..., nothing)
+  (y, i+1), back
+end
 
 # Needed for iteration lowering
 @adjoint Core.getfield(xs::NTuple{N,Any}, i::Integer) where N =
@@ -112,23 +145,6 @@ end
 
 @generated pair(::Val{k}, v) where k = :($k = v,)
 
-# TODO make this inferrable
-# Right now constant prop is too fragile ...
-@adjoint function getfield(x, f::Symbol)
-  val = getfield(x, f)
-  unwrap(val), function (Δ)
-    accum_param(__context__, val, Δ)
-    if isimmutable(x)
-      ((;nt_nothing(x)...,pair(Val(f), Δ)...), nothing)
-    else
-      dx = getfield(grad_mut(__context__, x), f)
-      dx[] = accum(dx[], Δ)
-      return
-    end
-  end
-end
-
-# ... so we have Zygote call this version where we can.
 literal_getproperty(x, ::Val{f}) where f = getproperty(x, f)
 
 @adjoint function literal_getproperty(x, ::Val{f}) where f
@@ -138,23 +154,32 @@ literal_getproperty(x, ::Val{f}) where f = getproperty(x, f)
     if isimmutable(x)
       ((;nt_nothing(x)...,pair(Val(f), Δ)...), nothing)
     else
-      dx = getfield(grad_mut(__context__, x), f)
-      dx[] = accum(dx[], Δ)
-      return
+      dx = grad_mut(__context__, x)
+      dx[] = (;dx[]...,pair(Val(f),accum(getfield(dx[], f), Δ))...)
+      return (dx,nothing)
     end
   end
   unwrap(val), back
 end
 
-@generated function grad_mut(x)
-  Expr(:tuple, [:($f = Ref{Any}(nothing)) for f in fieldnames(x)]...)
-end
+_forward(cx::Context, ::typeof(getproperty), x, f::Symbol) =
+  _forward(cx, literal_getproperty, x, Val(f))
+
+_forward(cx::Context, ::typeof(getfield), x, f::Symbol) =
+  _forward(cx, literal_getproperty, x, Val(f))
+
+_forward(cx::Context, ::typeof(literal_getindex), x::NamedTuple, ::Val{f}) where f =
+  _forward(cx, literal_getproperty, x, Val(f))
+
+_forward(cx::Context, ::typeof(literal_getproperty), x::Tuple, ::Val{f}) where f =
+  _forward(cx, literal_getindex, x, Val(f))
+
+grad_mut(x) = Ref{Any}(nt_nothing(x))
 
 function grad_mut(cx::Context, x)
-  T = Core.Compiler.return_type(grad_mut, Tuple{typeof(x)})
   ch = cache(cx)
   if haskey(ch, x)
-    ch[x]::T
+    ch[x]
   else
     ch[x] = grad_mut(x)
   end
@@ -164,8 +189,8 @@ end
   y = setfield!(x, f, val)
   g = grad_mut(__context__, x)
   y, function (_)
-    r = getfield(g, f)
-    Δ = deref!(r)
+    Δ = getfield(g[], f)
+    g[] = (;g[]...,pair(Val(f),nothing)...)
     (nothing, nothing, Δ)
   end
 end
@@ -203,14 +228,22 @@ end
 end
 
 # TODO captured mutables + multiple calls to `back`
-@generated function (back::Jnew{T,G,false})(Δ::Union{NamedTuple,Nothing}) where {T,G}
+@generated function (back::Jnew{T,G,false})(Δ::Union{NamedTuple,Nothing,RefValue}) where {T,G}
   !T.mutable && Δ == Nothing && return :nothing
-  Δ = G == Nothing ? :Δ : :(back.g)
-  :(nothing, $(map(f -> :(deref!($Δ.$f)), fieldnames(T))...))
+  Δ = G == Nothing ? :Δ : :(back.g[])
+  quote
+    x̄ = $Δ
+    $(G == Nothing || :($Δ = nt_nothing($Δ)))
+    (nothing, $(map(f -> :(x̄.$f), fieldnames(T))...))
+  end
 end
 
-@generated function (back::Jnew{T,G,true})(Δ::Union{NamedTuple,Nothing}) where {T,G}
+@generated function (back::Jnew{T,G,true})(Δ::Union{NamedTuple,Nothing,RefValue}) where {T,G}
   !T.mutable && Δ == Nothing && return :nothing
   Δ = G == Nothing ? :Δ : :(back.g)
-  :(nothing, ($(map(f -> :(deref!($Δ.$f)), fieldnames(T))...),))
+  quote
+    x̄ = $Δ
+    $(G == Nothing || :($Δ = nt_nothing($Δ)))
+    (nothing, ($(map(f -> :(x̄.$f), fieldnames(T))...),))
+  end
 end

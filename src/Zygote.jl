@@ -1,7 +1,7 @@
 module Zygote
 
-using LinearAlgebra
-using LinearAlgebra: copytri!
+using LinearAlgebra, Statistics
+using LinearAlgebra: copytri!, AbstractTriangular
 
 # This flag enables Zygote to grab extra type inference information during
 # compiles. When control flow is present, this can give gradient code a
@@ -16,12 +16,9 @@ using IRTools
 using MacroTools, Requires
 using MacroTools: @forward
 
-export Params, gradient, derivative, forward, @code_grad
+export Params, gradient, forward, @code_grad
 
 include("tools/idset.jl")
-include("tools/ir.jl")
-include("tools/reflection.jl")
-include("tools/fillarray.jl")
 
 include("compiler/reverse.jl")
 include("compiler/emit.jl")
@@ -30,10 +27,10 @@ include("compiler/show.jl")
 
 include("lib/grad.jl")
 include("lib/lib.jl")
-include("lib/real.jl")
-include("lib/complex.jl")
+include("lib/number.jl")
 include("lib/base.jl")
 include("lib/array.jl")
+include("lib/buffer.jl")
 include("lib/nnlib.jl")
 include("lib/broadcast.jl")
 include("lib/forward.jl")
@@ -47,8 +44,8 @@ usetyped || include("precompile.jl")
 
 include("profiler/Profile.jl")
 
-@init @require Flux="587475ba-b771-5e3f-ad9e-33799f191a9c" begin
-  isdefined(Flux, :Tracker) && include("flux.jl")
+@init @require Tracker="9f7883ad-71c0-57eb-9f7f-b5c9e6d3789c" begin
+  include("flux.jl")
 end
 
 # helps to work around 265-y issues
