@@ -469,9 +469,11 @@ end
 @testset "AbstractArray Addition / Subtraction / Negation" begin
   rng, M, N, P = MersenneTwister(123567), 3, 7, 11
   A, B = randn(rng, M, N, P), randn(rng, M, N, P)
-  gradtest(+, A, B)
-  gradtest(-, A, B)
-  gradtest(-, A)
+  @test gradtest(+, A, B)
+  @test gradtest(-, A, B)
+  @test gradtest(-, A)
+end
+
 @testset "FFTW" begin
   x=[-0.353213 -0.789656 -0.270151; -0.95719 -1.27933 0.223982]
   # gradient of ifft(rfft) must be 1
