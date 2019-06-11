@@ -35,6 +35,8 @@ end
 
 @adjoint collect(x::Array) = collect(x), Δ -> (Δ,)
 
+@adjoint fill(x::Real, dims...) = fill(x, dims...), Δ->(sum(Δ), map(_->nothing, dims)...)
+
 @adjoint permutedims(xs, dims) = permutedims(xs, dims),
   Δ -> (permutedims(Δ, invperm(dims)), nothing)
 
