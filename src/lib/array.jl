@@ -397,69 +397,8 @@ end
 # =======================
 
 @adjoint function broadcasted(op, r::AbstractFill{<:Real})
-    y, _back = Zygote.forward(op, getindex_value(r))
-    back(Δ::AbstractFill) = (nothing, Fill(_back(getindex_value(Δ))[1], size(r)))
-    back(Δ::AbstractArray) = (nothing, getindex.(_back.(Δ), 1))
-    return Fill(y, size(r)), back
-end
-
-function harmonised_dims(a::AbstractArray, b::AbstractArray)
-    δ = ndims(a) - ndims(b)
-    if δ > 0
-        new_b_dims = (size(b)..., ntuple(_->1, abs(δ))...)
-        return size(a), new_b_dims
-    elseif δ < 0
-        new_a_dims = (size(a)..., ntuple(_->1, abs(δ))...)
-        return new_a_dims, size(b)
-    else
-        return a, b
-    end
-end
-
-function dims_to_reduce(broadcast_dims, original_dims)
-    return findall(map(==, broadcast_dims, original_dims))
-end
-
-@adjoint function broadcasted(::typeof(+), a::AbstractFill, b::AbstractFill)
-    return broadcasted(+, a, b), function(Δ)
-        a_broadcast_dims, b_broadcast_dims = harmonised_dims(a, b)
-        reduce_dims_a = dims_to_reduce(size(Δ), a_broadcast_dims)
-        reduce_dims_b = dims_to_reduce(size(Δ), b_broadcast_dims)
-        return (nothing, sum(Δ; dims=reduce_dims_a), sum(Δ; dims=reduce_dims_b))
-    end
-end
-
-@adjoint function broadcasted(::typeof(*), a::AbstractFill{<:Real}, b::AbstractFill{<:Real})
-    return broadcasted(*, a, b), function(Δ)
-        a_broadcast_dims, b_broadcast_dims = harmonised_dims(a, b)
-        reduce_dims_a = dims_to_reduce(size(Δ), a_broadcast_dims)
-        reduce_dims_b = dims_to_reduce(size(Δ), b_broadcast_dims)
-        ā = sum(Δ .* b; dims=reduce_dims_a)
-        b̄ = sum(Δ .* a; dims=reduce_dims_b)
-        return (nothing, ā, b̄)
-    end
-end
-
-function _zero_mul_adjoint(a::AbstractArray{T}, b::Zeros{V}) where {T, V}
-    return broadcasted(*, a, b), Δ->(nothing, Zeros{T}(size(a)), Zeros{V}(size(b)))
-end
-function _zero_mul_adjoint(a::Zeros{T}, b::AbstractArray{V}) where {T, V}
-    return broadcasted(*, a, b), Δ->(nothing, Zeros{T}(size(a)), Zeros{V}(size(b)))
-end
-
-@adjoint function broadcasted(::typeof(*), a::AbstractArray{<:Real}, b::Zeros{<:Real})
-    return _zero_mul_adjoint(a, b)
-end
-@adjoint function broadcasted(::typeof(*), a::AbstractFill{<:Real}, b::Zeros{<:Real})
-    return _zero_mul_adjoint(a, b)
-end
-@adjoint function broadcasted(::typeof(*), a::Zeros{<:Real}, b::AbstractArray{<:Real})
-    return _zero_mul_adjoint(a, b)
-end
-@adjoint function broadcasted(::typeof(*), a::Zeros{<:Real}, b::AbstractFill{<:Real})
-    return _zero_mul_adjoint(a, b)
-end
-
-@adjoint function broadcasted(::typeof(inv), X::Fill)
-    return broadcast(inv, X), Δ->(nothing, -Δ * abs2(inv(getindex_value(X))))
+  y, _back = Zygote.forward(op, getindex_value(r))
+  back(Δ::AbstractFill) = (nothing, Fill(_back(getindex_value(Δ))[1], size(r)))
+  back(Δ::AbstractArray) = (nothing, getindex.(_back.(Δ), 1))
+  return Fill(y, size(r)), back
 end
