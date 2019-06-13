@@ -1,4 +1,6 @@
 using FillArrays
+using FillArrays: AbstractFill, getindex_value
+using Base.Broadcast: broadcasted, broadcast_shape
 
 @adjoint (::Type{T})(::UndefInitializer, args...) where T<:Array = T(undef, args...), Δ -> nothing
 
@@ -391,3 +393,14 @@ end
 @adjoint +(A::AbstractArray, B::AbstractArray) = A + B, Δ->(Δ, Δ)
 @adjoint -(A::AbstractArray, B::AbstractArray) = A - B, Δ->(Δ, -Δ)
 @adjoint -(A::AbstractArray) = -A, Δ->(-Δ,)
+
+
+# FillArray functionality
+# =======================
+
+@adjoint function broadcasted(op, r::AbstractFill{<:Real})
+  y, _back = Zygote.forward(op, getindex_value(r))
+  back(Δ::AbstractFill) = (nothing, Fill(_back(getindex_value(Δ))[1], size(r)))
+  back(Δ::AbstractArray) = (nothing, getindex.(_back.(Δ), 1))
+  return Fill(y, size(r)), back
+end
