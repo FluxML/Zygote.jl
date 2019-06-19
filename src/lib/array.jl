@@ -47,8 +47,13 @@ end
 
 @adjoint fill(x::Real, dims...) = fill(x, dims...), Δ->(sum(Δ), map(_->nothing, dims)...)
 
+@adjoint permutedims(xs) = permutedims(xs), Δ -> (permutedims(Δ),)
+
 @adjoint permutedims(xs, dims) = permutedims(xs, dims),
   Δ -> (permutedims(Δ, invperm(dims)), nothing)
+
+@adjoint PermutedDimsArray(xs, dims) = PermutedDimsArray(xs, dims),
+  Δ -> (PermutedDimsArray(Δ, invperm(dims)), nothing)
 
 @adjoint reshape(xs, dims...) = reshape(xs, dims...),
   Δ -> (reshape(Δ, size(xs)),map(_->nothing,dims)...)
