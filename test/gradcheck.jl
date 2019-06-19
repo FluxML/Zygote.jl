@@ -54,6 +54,9 @@ Random.seed!(0)
 @test gradtest(logdet, map(x -> x*x', (rand(4, 4),))[1])
 @test gradtest(x -> logabsdet(x)[1], (4, 4))
 
+@test gradtest(x -> view(x,:,2,:), (3,4,5))
+@test gradtest(x -> view(x,1:2,3:4), (3,4))
+
 @testset "conv" begin
   for spatial_rank in (1, 2, 3)
     x = rand(repeat([10], spatial_rank)..., 3, 2)
