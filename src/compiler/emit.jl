@@ -52,7 +52,7 @@ function forward_stacks!(adj, F)
     end
     push!(stks, (b.id, alpha(α)))
   end
-  args = [arg(i) for i = 3:length(pr.args)]
+  args = arguments(pr)[3:end]
   T = Tuple{concrete.(exprtype.((pr,), recs))...}
   isconcretetype(T) || (T = Any)
   rec = push!(pr, xtuple(recs...))
@@ -70,8 +70,9 @@ end
 
 function reverse_stacks!(adj, stks)
   ir = adj.adjoint
-  t = pushfirst!(blocks(ir)[end], xcall(:getfield, Argument(1), QuoteNode(:t)))
   entry = blocks(ir)[end]
+  self = argument!(entry, at = 1)
+  t = pushfirst!(blocks(ir)[end], xcall(:getfield, self, QuoteNode(:t)))
   repl = Dict()
   runonce(b) = b.id in (1, length(ir.blocks))
   for b in blocks(ir)
@@ -87,8 +88,6 @@ function reverse_stacks!(adj, stks)
       repl[α] = val
     end
   end
-  repl[arguments(entry)[1]] = arg(2)
-  empty!(arguments(entry))
   return IRTools.prewalk!(x -> get(repl, x, x), ir)
 end
 

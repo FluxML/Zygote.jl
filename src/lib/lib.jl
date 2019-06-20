@@ -74,8 +74,29 @@ using Base: tail
 
 @adjoint tuple(xs...) = xs, identity
 
+literal_getindex(x, ::Val{i}) where i = getindex(x, i)
+literal_indexed_iterate(x, ::Val{i}) where i = Base.indexed_iterate(x, i)
+literal_indexed_iterate(x, ::Val{i}, state) where i = Base.indexed_iterate(x, i, state)
+
+@adjoint literal_getindex(xs::NTuple{N,Any}, ::Val{i}) where {N,i} =
+  (xs[i], Δ -> (ntuple(j -> i == j ? Δ : nothing, Val(N)), nothing))
+
 @adjoint getindex(xs::NTuple{N,Any}, i::Integer) where N =
   (xs[i], Δ -> (ntuple(j -> i == j ? Δ : nothing, Val(N)), nothing))
+
+function _forward(cx::Context, ::typeof(literal_indexed_iterate), xs::Tuple, ::Val{i}) where i
+  y, b = _forward(cx, literal_getindex, xs, Val(i))
+  back(::Nothing) = nothing
+  back(ȳ) = b(ȳ[1])
+  (y, i+1), back
+end
+
+function _forward(cx::Context, ::typeof(literal_indexed_iterate), xs::Tuple, ::Val{i}, st) where i
+  y, b = _forward(cx, literal_getindex, xs, Val(i))
+  back(::Nothing) = nothing
+  back(ȳ) = (b(ȳ[1])..., nothing)
+  (y, i+1), back
+end
 
 # Needed for iteration lowering
 @adjoint Core.getfield(xs::NTuple{N,Any}, i::Integer) where N =
@@ -124,23 +145,6 @@ end
 
 @generated pair(::Val{k}, v) where k = :($k = v,)
 
-# TODO make this inferrable
-# Right now constant prop is too fragile ...
-@adjoint function getfield(x, f::Symbol)
-  val = getfield(x, f)
-  unwrap(val), function (Δ)
-    accum_param(__context__, val, Δ)
-    if isimmutable(x)
-      ((;nt_nothing(x)...,pair(Val(f), Δ)...), nothing)
-    else
-      dx = grad_mut(__context__, x)
-      dx[] = (;dx[]...,pair(Val(f),accum(getfield(dx[], f), Δ))...)
-      return (dx,nothing)
-    end
-  end
-end
-
-# ... so we have Zygote call this version where we can.
 literal_getproperty(x, ::Val{f}) where f = getproperty(x, f)
 
 @adjoint function literal_getproperty(x, ::Val{f}) where f
@@ -157,6 +161,18 @@ literal_getproperty(x, ::Val{f}) where f = getproperty(x, f)
   end
   unwrap(val), back
 end
+
+_forward(cx::Context, ::typeof(getproperty), x, f::Symbol) =
+  _forward(cx, literal_getproperty, x, Val(f))
+
+_forward(cx::Context, ::typeof(getfield), x, f::Symbol) =
+  _forward(cx, literal_getproperty, x, Val(f))
+
+_forward(cx::Context, ::typeof(literal_getindex), x::NamedTuple, ::Val{f}) where f =
+  _forward(cx, literal_getproperty, x, Val(f))
+
+_forward(cx::Context, ::typeof(literal_getproperty), x::Tuple, ::Val{f}) where f =
+  _forward(cx, literal_getindex, x, Val(f))
 
 grad_mut(x) = Ref{Any}(nt_nothing(x))
 

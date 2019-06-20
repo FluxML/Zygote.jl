@@ -1,7 +1,7 @@
 module Zygote
 
 using LinearAlgebra, Statistics
-using LinearAlgebra: copytri!
+using LinearAlgebra: copytri!, AbstractTriangular
 
 # This flag enables Zygote to grab extra type inference information during
 # compiles. When control flow is present, this can give gradient code a
@@ -19,7 +19,6 @@ using MacroTools: @forward
 export Params, gradient, forward, @code_grad
 
 include("tools/idset.jl")
-include("tools/fillarray.jl")
 
 include("compiler/reverse.jl")
 include("compiler/emit.jl")

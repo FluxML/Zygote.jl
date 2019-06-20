@@ -26,7 +26,6 @@ end
     return :(error("Non-differentiable function $(j.t[1])"))
   end
   meta, _, back = g
-  resize!(back.args, 2)
   argnames!(meta, Symbol("#self#"), :Δ)
   IRTools.verify(back)
   back = slots!(inlineable!(back))
