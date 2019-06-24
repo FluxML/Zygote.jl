@@ -28,6 +28,7 @@ for (M, f, arity) in DiffRules.diffrules()
   end
 end
 
+@adjoint Base.literal_pow(::typeof(^), x::Real, ::Val{p}) where {p} = x^p, Δ -> (nothing, p * x ^ (p - 1), nothing)
 @adjoint Base.convert(T::Type{<:Real}, x::Real) = convert(T, x), ȳ -> (nothing, ȳ)
 @adjoint (T::Type{<:Real})(x::Real) = T(x), ȳ -> (nothing, ȳ)
 
