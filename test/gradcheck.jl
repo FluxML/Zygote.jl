@@ -152,6 +152,15 @@ end
   @test gradtest(x -> minimum(x, dims=[1, 2]), rand(2, 3, 4))
 end
 
+@testset "literal_pow" begin
+  f(x) = x .^ 2
+  h(x) = 2 .^ x
+  @test gradient(f, Float16(-2))[1] == -4
+  @test gradient(f, Float32(-2))[1] == -4
+  @test gradient(h, Float16(2))[1] == 2.772588722239781
+  @test gradient(h, Float32(2))[1] == 2.772588722239781
+end
+
 @testset "(p)inv" begin
   rng, P, Q = MersenneTwister(123456), 13, 11
   A, B, C = randn(rng, P, Q), randn(rng, P, P), randn(Q, P)
