@@ -252,6 +252,7 @@ end
   return Y, Δ->(-Y' * Δ * Y' + (I - A * Y) * Δ' * Y * Y' + Y' * Y * Δ' * (I - Y * A),)
 end
 
+# When `A` is guaranteed to be square, definitely use the simple expression for the adjoint.
 @adjoint function \(
   A::Union{
     Diagonal,
