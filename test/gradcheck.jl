@@ -157,8 +157,8 @@ end
   h(x) = 2 .^ x
   @test gradient(f, Float16(-2))[1] == -4
   @test gradient(f, Float32(-2))[1] == -4
-  @test gradient(h, Float16(2))[1] == 2.772588722239781
-  @test gradient(h, Float32(2))[1] == 2.772588722239781
+  @test gradient(h, Float16(2))[1] == 4*log(2)
+  @test gradient(h, Float32(2))[1] == 4*log(2)
 end
 
 @testset "(p)inv" begin
