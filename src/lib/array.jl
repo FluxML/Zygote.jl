@@ -104,12 +104,16 @@ function unzip(tuples)
 end
 @adjoint function map(f, args::Union{AbstractArray,Tuple}...)
   ys_and_backs = map((args...) -> _forward(__context__, f, args...), args...)
-  ys, backs = unzip(ys_and_backs)
-  ys, function (Δ)
-    Δf_and_args_zipped = map((f, δ) -> f(δ), backs, Δ)
-    Δf_and_args = unzip(Δf_and_args_zipped)
-    Δf = reduce(accum, Δf_and_args[1])
-    (Δf, Δf_and_args[2:end]...)
+  if isempty(ys_and_backs)
+    ys_and_backs, _ -> nothing
+  else
+    ys, backs = unzip(ys_and_backs)
+    ys, function (Δ)
+      Δf_and_args_zipped = map((f, δ) -> f(δ), backs, Δ)
+      Δf_and_args = unzip(Δf_and_args_zipped)
+      Δf = reduce(accum, Δf_and_args[1])
+      (Δf, Δf_and_args[2:end]...)
+    end
   end
 end
 
