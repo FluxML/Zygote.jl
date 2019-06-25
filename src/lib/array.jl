@@ -49,6 +49,8 @@ end
 
 @adjoint permutedims(xs) = permutedims(xs), Δ -> (permutedims(Δ),)
 
+@adjoint permutedims(xs::AbstractVector) = permutedims(xs), Δ -> (vec(permutedims(Δ)),)
+
 @adjoint permutedims(xs, dims) = permutedims(xs, dims),
   Δ -> (permutedims(Δ, invperm(dims)), nothing)
 
@@ -182,10 +184,16 @@ _backmean(xs, Δ, dims) = zero(xs) .+ Δ ./ mapreduce(i -> size(xs,i),*,dims)
 # LinAlg
 # ======
 
-@adjoint function(a::AbstractVecOrMat * b::AbstractVecOrMat)
-  return a * b, function(Δ)
-    return (reshape(Δ * b', size(a)), reshape(a' * Δ, size(b)))
-  end
+@adjoint function(A::AbstractMatrix * B::AbstractMatrix)
+  return A * B, Δ::AbstractMatrix->(Δ * B', A' * Δ)
+end
+
+@adjoint function(A::AbstractMatrix * x::AbstractVector)
+  return A * x, Δ::AbstractVector->(Δ * x', A' * Δ)
+end
+
+@adjoint function(a::AbstractVector * x::AbstractMatrix)
+  return a * x, Δ::AbstractMatrix->(vec(Δ * x'), a' * Δ)
 end
 
 @adjoint function transpose(x)

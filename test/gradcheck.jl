@@ -79,9 +79,14 @@ end
   end
 end
 
+@test gradtest(x -> permutedims(x), rand(2))
 @test gradtest(x -> permutedims(x), rand(2,3))
 @test gradtest(x -> permutedims(x, [3,1,2]), rand(4,5,6))
 @test gradtest(x -> PermutedDimsArray(x, (3,1,2)), rand(4,5,6))
+let
+  y, back = Zygote.forward(permutedims, randn(3))
+  @test first(back(randn(1, 3))) isa Vector
+end
 
 @test gradtest(x -> repeat(x; inner=2), rand(5))
 @test gradtest(x -> repeat(x; inner=2, outer=3), rand(5))
@@ -158,6 +163,25 @@ end
   @test gradtest(pinv, A)
   @test gradtest(inv, B)
   @test gradtest(pinv, C)
+end
+
+@testset "multiplication" begin
+  @testset "matrix-matrix" begin
+    rng, M, P, Q = MersenneTwister(123456), 13, 7, 11
+    @test gradtest(*, randn(rng, M, P), randn(rng, P, Q))
+    @test gradtest(*, randn(rng, M, P), randn(rng, P))
+    @test gradtest(*, randn(rng, M, 1), randn(rng, 1, Q))
+    @test gradtest(*, randn(rng, M), randn(rng, 1, Q))
+
+    let
+      y, back = Zygote.forward(*, randn(rng, M, P), randn(rng, P))
+      @test last(back(randn(rng, M))) isa Vector
+    end
+    let
+      y, back = Zygote.forward(*, randn(rng, M), randn(rng, 1, P))
+      @test first(back(randn(rng, M, P))) isa Vector
+    end
+  end
 end
 
 @testset "backsolve" begin
