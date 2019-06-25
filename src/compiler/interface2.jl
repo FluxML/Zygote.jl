@@ -10,7 +10,7 @@ ignore(T) = all(T -> T <: Type, T.parameters)
   meta, forw, _ = g
   argnames!(meta, Symbol("#self#"), :ctx, :f, :args)
   forw = varargs!(meta, forw, 3)
-  IRTools.verify(forw)
+  # IRTools.verify(forw)
   forw = slots!(pis!(inlineable!(forw)))
   return IRTools.update!(meta, forw)
 end
@@ -27,7 +27,7 @@ end
   end
   meta, _, back = g
   argnames!(meta, Symbol("#self#"), :Δ)
-  IRTools.verify(back)
+  # IRTools.verify(back)
   back = slots!(inlineable!(back))
   return IRTools.update!(meta, back)
 end
