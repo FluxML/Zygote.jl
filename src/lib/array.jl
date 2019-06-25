@@ -252,12 +252,20 @@ end
   return Y, Δ->(-Y' * Δ * Y' + (I - A * Y) * Δ' * Y * Y' + Y' * Y * Δ' * (I - Y * A),)
 end
 
-@adjoint function \(A::Union{Diagonal, AbstractTriangular}, B::AbstractVecOrMat)
+@adjoint function \(
+  A::Union{
+    Diagonal,
+    AbstractTriangular,
+    LinearAlgebra.Adjoint{<:Any, <:AbstractTriangular},
+    Transpose{<:Any, <:AbstractTriangular},
+  },
+  B::AbstractVecOrMat,
+)
   Y = A \ B
   return Y, function(Ȳ)
     B̄ = A' \ Ȳ
     return (-B̄ * Y', B̄)
-  end 
+  end
 end
 
 @adjoint function /(A::AbstractMatrix, B::Union{Diagonal, AbstractTriangular})
