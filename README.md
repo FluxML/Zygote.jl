@@ -32,7 +32,7 @@ Without compromising on performance, Zygote supports the full flexibility and dy
 ```julia
 julia> fs = Dict("sin" => sin, "cos" => cos, "tan" => tan);
 
-julia> derivative(x -> fs[readline()](x), 1)
+julia> gradient(x -> fs[readline()](x), 1)
 sin
 0.5403023058681398
 ```
