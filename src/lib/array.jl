@@ -4,6 +4,8 @@ using Base.Broadcast: broadcasted, broadcast_shape
 
 @adjoint (::Type{T})(::UndefInitializer, args...) where T<:Array = T(undef, args...), Δ -> nothing
 
+@adjoint Array(xs::AbstractArray) = Array(xs), ȳ -> (ȳ,)
+
 @nograd size, length, eachindex, Colon(), findfirst, randn, ones, zeros, one, zero,
   print, println
 
