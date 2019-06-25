@@ -102,7 +102,7 @@ function unzip(tuples)
       map(tuple -> tuple[i], tuples)
   end
 end
-@adjoint function map(f, args::AbstractArray...)
+@adjoint function map(f, args::Union{AbstractArray,Tuple}...)
   ys_and_backs = map((args...) -> _forward(__context__, f, args...), args...)
   ys, backs = unzip(ys_and_backs)
   ys, function (Δ)
@@ -113,13 +113,15 @@ end
   end
 end
 
-function _forward(cx::Context, ::typeof(collect), g::Base.Generator)
-  y, back = _forward(cx, map, g.f, g.iter)
-  y, function (ȳ)
-    _, f̄, x̄ = back(ȳ)
-    (nothing, (f = f̄, iter = x̄),)
-  end
-end
+# `collect` and `map` seems to call each other in some convoluted way,
+# which makes it harder than it needs to be to define adjoints.
+# function _forward(cx::Context, ::typeof(collect), g::Base.Generator)
+#   y, back = _forward(cx, map, g.f, g.iter)
+#   y, function (ȳ)
+#     _, f̄, x̄ = back(ȳ)
+#     (nothing, (f = f̄, iter = x̄),)
+#   end
+# end
 
 @adjoint iterate(r::UnitRange, i...) = iterate(r, i...), _ -> nothing
 
