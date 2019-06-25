@@ -144,7 +144,7 @@ end
   return sum(abs2, X; dims=dims), Δ::Union{Number, AbstractArray}->(nothing, ((2Δ) .* X))
 end
 
-@adjoint function prod(xs; dims = :)
+@adjoint function prod(xs::AbstractArray{<:Number}; dims = :)
   if dims === (:)
     prod(xs), Δ -> (prod(xs) ./ xs .* Δ,)
   else
@@ -267,7 +267,7 @@ end
   return Y, function(Ȳ)
     B̄ = A' \ Ȳ
     return (-B̄ * Y', B̄)
-  end 
+  end
 end
 
 @adjoint function /(A::AbstractMatrix, B::Union{Diagonal, AbstractTriangular})
