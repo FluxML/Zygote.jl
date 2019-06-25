@@ -247,3 +247,5 @@ end
     (nothing, ($(map(f -> :(x̄.$f), fieldnames(T))...),))
   end
 end
+
+(back::Jnew{T})(Δ) where T = error("Need an adjoint for constructor $T. Gradient is of type $(typeof(Δ))")
