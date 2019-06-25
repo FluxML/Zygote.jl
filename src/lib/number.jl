@@ -37,6 +37,9 @@ end
 
 @adjoint Base.:+(xs::Number...) = +(xs...), Δ -> map(_ -> Δ, xs)
 
+@adjoint Base.muladd(x::Number, y::Number, z::Number) =
+  Base.muladd(x, y, z), ō -> (y'ō, x'ō, ō)
+
 @adjoint function sincos(x)
   s, c = sincos(x)
   (s, c), ((s̄, c̄),) -> (s̄*c - c̄*s,)
