@@ -23,7 +23,7 @@ end
   end
   if g == nothing
     Δ == Nothing && return :nothing
-    return :(error("Non-differentiable function $(j.t[1])"))
+    return :(error("Non-differentiable function $(repr(j.t[1]))"))
   end
   meta, _, back = g
   argnames!(meta, Symbol("#self#"), :Δ)
