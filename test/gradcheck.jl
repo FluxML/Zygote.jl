@@ -172,6 +172,7 @@ end
     @test gradtest(*, randn(rng, M, P), randn(rng, P))
     @test gradtest(*, randn(rng, M, 1), randn(rng, 1, Q))
     @test gradtest(*, randn(rng, M), randn(rng, 1, Q))
+    @test gradtest(*, randn(rng, 10)', randn(rng, 10))
 
     let
       y, back = Zygote.forward(*, randn(rng, M, P), randn(rng, P))

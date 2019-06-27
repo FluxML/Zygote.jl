@@ -202,6 +202,12 @@ end
   return A * x, Δ::AbstractVector->(Δ * x', A' * Δ)
 end
 
+@adjoint function *(x::Union{Transpose{<:Any, <:AbstractVector},
+                             LinearAlgebra.Adjoint{<:Any, <:AbstractVector}},
+                    y::AbstractVector)
+  return x * y, Δ->(Δ * y', x' * Δ)
+end
+
 @adjoint function(a::AbstractVector * x::AbstractMatrix)
   return a * x, Δ::AbstractMatrix->(vec(Δ * x'), a' * Δ)
 end
