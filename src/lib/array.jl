@@ -104,8 +104,8 @@ function unzip(tuples)
       map(tuple -> tuple[i], tuples)
   end
 end
-@adjoint function map(f, args::Union{AbstractArray,Tuple}...)
-  ys_and_backs = map((args...) -> _forward(__context__, f, args...), args...)
+function ∇map(cx, f, args...)
+  ys_and_backs = map((args...) -> _forward(cx, f, args...), args...)
   if isempty(ys_and_backs)
     ys_and_backs, _ -> nothing
   else
@@ -119,15 +119,17 @@ end
   end
 end
 
-# `collect` and `map` seems to call each other in some convoluted way,
-# which makes it harder than it needs to be to define adjoints.
-# function _forward(cx::Context, ::typeof(collect), g::Base.Generator)
-#   y, back = _forward(cx, map, g.f, g.iter)
-#   y, function (ȳ)
-#     _, f̄, x̄ = back(ȳ)
-#     (nothing, (f = f̄, iter = x̄),)
-#   end
-# end
+@adjoint function map(f, args::Union{AbstractArray,Tuple}...)
+  ∇map(__context__, f, args...)
+end
+
+function _forward(cx::Context, ::typeof(collect), g::Base.Generator)
+  y, back = ∇map(cx, g.f, g.iter)
+  y, function (ȳ)
+    f̄, x̄ = back(ȳ)
+    (nothing, (f = f̄, iter = x̄),)
+  end
+end
 
 @adjoint iterate(r::UnitRange, i...) = iterate(r, i...), _ -> nothing
 
