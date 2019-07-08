@@ -1,4 +1,4 @@
-using Zygote, NNlib, Test, Random, LinearAlgebra, Statistics, FillArrays
+using Zygote, NNlib, Test, Random, LinearAlgebra, Statistics, FillArrays, FFTW
 using Zygote: gradient
 using NNlib: conv, ∇conv_data, depthwiseconv
 using Base.Broadcast: broadcast_shape
@@ -563,7 +563,7 @@ using Zygote: Buffer
 end
 
 @testset "FillArrays" begin
-  gradcheck(x->sum(Fill(x[], (2, 2))), [0.1])
+  @test gradcheck(x->sum(Fill(x[], (2, 2))), [0.1])
   @test first(Zygote.gradient(sz->sum(Ones(sz)), 6)) === nothing
   @test first(Zygote.gradient(sz->sum(Zeros(sz)), 6)) === nothing
 end
@@ -571,9 +571,30 @@ end
 @testset "AbstractArray Addition / Subtraction / Negation" begin
   rng, M, N, P = MersenneTwister(123567), 3, 7, 11
   A, B = randn(rng, M, N, P), randn(rng, M, N, P)
-  gradtest(+, A, B)
-  gradtest(-, A, B)
-  gradtest(-, A)
+  @test gradtest(+, A, B)
+  @test gradtest(-, A, B)
+  @test gradtest(-, A)
+end
+
+@testset "FFTW" begin
+  x=[-0.353213 -0.789656 -0.270151; -0.95719 -1.27933 0.223982]
+  # gradient of ifft(rfft) must be 1
+  @test gradient((x)->real(ifft(fft(x))[1]),x)[1][1] == 1.0+0.0im
+  @test gradient((x)->real(fft(ifft(x))[1]),x)[1][1] == 1.0+0.0im
+
+  # check ffts for individual dimensions
+  @test gradient((x)->sum(abs.(FFTW.fft(x))),x)[1] ≈ gradient((x)->sum(abs.(FFTW.fft(FFTW.fft(x,1),2))),x)[1]
+  @test gradient((x)->abs(sum((FFTW.fft(x)))),x)[1] ≈ gradient((x)->abs(sum(FFTW.fft(FFTW.fft(x,1),2))),x)[1]
+  @test gradient((x, dims)->sum(abs.(FFTW.fft(x,dims))),x,(1,2))[1] ≈ gradient((x)->sum(abs.(FFTW.fft(x))),x)[1]
+  @test gradient((x)->sum(abs.(FFTW.fft(x,(1,2)))),x)[1] ≈ gradient((x)->sum(abs.(FFTW.fft(FFTW.fft(x,1),2))),x)[1]
+  @test gradient((x, dims)->sum(abs.(FFTW.ifft(x,dims))),x,(1,2))[1] ≈ gradient((x)->sum(abs.(FFTW.ifft(x))),x)[1]
+  @test gradient((x)->sum(abs.(FFTW.ifft(x,(1,2)))),x)[1] ≈ gradient((x)->sum(abs.(FFTW.ifft(FFTW.ifft(x,1),2))),x)[1]
+
+  @test gradcheck(x->sum(abs.(FFTW.fft(x))), x)
+  @test gradcheck(x->sum(abs.(FFTW.ifft(x))), x)
+  @test gradcheck(x->sum(abs.(FFTW.fft(x, 1))), x)
+  @test gradcheck(x->sum(abs.(FFTW.ifft(x, 1))), x)
+
 end
 
 @testset "FillArrays" begin
