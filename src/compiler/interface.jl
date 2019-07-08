@@ -40,7 +40,7 @@ end
 
 sensitivity(y::Number) = one(y)
 sensitivity(y::Complex) = error("Output is complex, so the gradient is not defined.")
-sensitivity(y) = error("Output should be scalar; gradients are not defined for output $y")
+sensitivity(y) = error("Output should be scalar; gradients are not defined for output $(repr(y))")
 
 function gradient(f, args...)
   y, back = forward(f, args...)

@@ -62,6 +62,11 @@ Numeric{T<:Number} = Union{T,AbstractArray{<:T}}
 @adjoint broadcasted(::typeof(*), x::Numeric, y::Numeric) = x.*y,
   z̄ -> (nothing, unbroadcast(x, z̄ .* conj.(y)), unbroadcast(y, z̄ .* conj.(x)))
 
+@adjoint function broadcasted(::typeof(/), x::Numeric, y::Numeric)
+  res = x ./ y
+  res, Δ -> (nothing, unbroadcast(x, Δ ./ y), unbroadcast(y, -Δ .* res ./ y))
+end
+
 @adjoint function broadcasted(::typeof(σ), x::Numeric)
   y = σ.(x)
   y, ȳ -> (nothing, ȳ .* conj.(y .* (1 .- y)))
