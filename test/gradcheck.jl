@@ -1059,6 +1059,17 @@ end
   @test gradcheck(x -> sum(sum(diag.([x] .* a))), b)
 end
 
+using Zygote: forwarddiff
+
+@testset "forwarddiff" begin
+  f(x) = exp.(x ./ 2)
+  @test gradtest(x -> sum(forwarddiff(f,x)), (4,))
+  g(x,y) = (x .+ y').^2
+  @test gradtest(x -> sum(forwarddiff(g,x,x)), (3,3))
+  h(x,y,z) = @. x + 2y * z^3
+  @test gradtest(x -> sum(forwarddiff(h,x,2x,3x)), (2,3))
+end
+
 using Zygote: Buffer
 
 @testset "Buffer" begin

@@ -48,6 +48,7 @@ reshape_scalar(x::Real, y) = y[]
 
 """
     forwarddiff(f, x) -> f(x)
+    forwarddiff(f, xs...) -> f(xs...)
 
 Runs `f(x)` as usual, but instructs Zygote to differentiate `f` using pullback
 mode, rather than the usual reverse mode.
@@ -96,8 +97,16 @@ end
 ```
 """
 forwarddiff(f, x) = f(x)
+forwarddiff(f, xs...) = f(xs...)
 
 @adjoint function forwarddiff(f, x)
   y, J = forward_jacobian(f, x)
   return y, ȳ -> (nothing, reshape_scalar(x, J*vec_scalar(ȳ)))
+end
+
+@adjoint function forwarddiff(f, xs...)
+  ifun(i) = x -> f(xs[1:i-1]..., x, xs[i+1:end]...)
+  yJs = ntuple(i -> forward_jacobian(ifun(i), xs[i]), length(xs))
+  y = first(yJs[1])
+  return y, ȳ -> (nothing, ntuple(i -> reshape_scalar(xs[i], last(yJs[i])*vec_scalar(ȳ)), length(xs))...)
 end

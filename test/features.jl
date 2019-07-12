@@ -248,6 +248,10 @@ end == (1,)
   forwarddiff(x -> x^2, x)
 end == (10,)
 
+@test gradient(5,7) do x,y
+  forwarddiff((x,y) -> x^2 + 3y, x,y)
+end == (10, 3)
+
 @test gradient(1) do x
   if true
   elseif true
