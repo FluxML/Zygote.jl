@@ -127,7 +127,8 @@ unapply(t, xs) = _unapply(t, xs)[1]
   st = map(_empty, args)
   y, function (Δ)
     Δ = back(Δ)
-    (first(Δ), unapply(st, Base.tail(Δ))...)
+    Δ === nothing ? nothing :
+      (first(Δ), unapply(st, Base.tail(Δ))...)
   end
 end
 

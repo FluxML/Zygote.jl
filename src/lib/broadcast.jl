@@ -13,7 +13,7 @@
 #                                 `--'  `"                               `--'  `"             `'-'
 
 using Base.Broadcast
-using Base.Broadcast: AbstractArrayStyle, broadcasted, materialize
+using Base.Broadcast: Broadcasted, AbstractArrayStyle, broadcasted, materialize
 using NNlib
 
 # There's a saying that debugging code is about twice as hard as writing it in
@@ -126,3 +126,40 @@ end
 end
 
 @adjoint! (b::typeof(broadcast))(f, args...) = _forward(__context__, broadcasted, f, args...)
+
+# Forward Mode (mainly necessary for CUDA)
+
+import ForwardDiff
+using ForwardDiff: Dual
+
+dual(x, p) = x
+dual(x::Real, p) = Dual(x, p)
+
+dualtype(::Type{Dual{G,T,P}}) where {G,T,P} = T
+dualtype(T) = T
+
+function dual_function(f::F) where F
+  function (args::Vararg{Any,N}) where N
+    ds = map(args, ntuple(identity,Val(N))) do x, i
+      dual(x, ntuple(j -> i==j, Val(N)))
+    end
+    return f(ds...)
+  end
+end
+
+@inline function broadcast_forward(f, args::Vararg{Any,N}) where N
+  T = Broadcast.combine_eltypes(f, args)
+  out = dual_function(f).(args...)
+  eltype(out) <: Dual || return (out, _ -> nothing)
+  y = map(x -> x.value, out)
+  _back(ȳ, i) = unbroadcast(args[i], ((a, b) -> a*b.partials[i]).(ȳ, out))
+  back(ȳ) = ntuple(i -> _back(ȳ, i), N)
+  return y, back
+end
+
+@init @require CuArrays="3a865a2d-5b23-5a0f-bc46-62713ec82fae" begin
+  @adjoint function broadcasted(::Broadcast.ArrayStyle{CuArrays.CuArray}, f, args...)
+    y, back = broadcast_forward(f, args...)
+    y, ȳ -> (nothing, nothing, back(ȳ)...)
+  end
+end
