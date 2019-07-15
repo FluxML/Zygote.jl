@@ -22,7 +22,7 @@ julia> y
 To make this concrete, take the function ``y = \sin(x)``. ``\frac{\partial y}{\partial x} = \cos(x)``, so the pullback is ``\bar{y} \cos(x)``. In other words `forward(sin, x)` behaves the same as
 
 ```julia
-dsin(x) = sin(x), ȳ -> (ȳ * cos(x),)
+dsin(x) = sin(x), ȳ -> (ȳ * cos(x),)
 ```
 
 `gradient` takes a function ``l = f(x)`` and assumes ``l̄ = \frac{\partial l}{\partial l} = 1`` and feeds this in to the pullback. In the case of `sin`,
@@ -56,9 +56,9 @@ julia> mygradient(sin, 0.5)
 
 The rest of this section contains more technical detail. It can be skipped if you only need an intuition for pullbacks; you generally won't need to worry about it as a user.
 
-If ``x`` and ``y`` are vectors, ``\frac{\partial y}{\partial x}`` becomes a Jacobian. Importantly, because we are implementing reverse mode we actually left-multiply the Jacobian, i.e. `v'J`, rather than the more usual `J*v`. Transposing `v` to a row vector and back `(v'J)'` is equivalent to `J'v` so our gradient rules actually implement the *adjoint* of the Jacobian. This is relevant even for scalar code: the adjoint for `y = sin(x)` is `x̄ = sin(x)'*ȳ`; the conjugation is usually moot but gives the correct behaviour for complex code. "Pullbacks" are therefore sometimes called "vector-Jacobian products" (VJPs), and we refer to the reverse mode rules themselves as "adjoints".
+If ``x`` and ``y`` are vectors, ``\frac{\partial y}{\partial x}`` becomes a Jacobian. Importantly, because we are implementing reverse mode we actually left-multiply the Jacobian, i.e. `v'J`, rather than the more usual `J*v`. Transposing `v` to a row vector and back `(v'J)'` is equivalent to `J'v` so our gradient rules actually implement the *adjoint* of the Jacobian. This is relevant even for scalar code: the adjoint for `y = sin(x)` is `x̄ = sin(x)'*ȳ`; the conjugation is usually moot but gives the correct behaviour for complex code. "Pullbacks" are therefore sometimes called "vector-Jacobian products" (VJPs), and we refer to the reverse mode rules themselves as "adjoints".
 
-Zygote has many adjoints for non-mathematical operations such as for indexing and data structures. Though these can still be seen as linear functions of vectors, it's not particularly enlightening to implement them with an actual matrix multiply. In these cases it's easiest to think of the adjoint as a kind of inverse. For example, the gradient of a function that takes a tuple to a struct (e.g. `y = Complex(a, b)`) will generally take a struct to a tuple (`(ȳ.re, ȳ.im)`). The gradient of a `getindex` `y = x[i...]` is a `setindex!` `x̄[i...] = ȳ`, etc.
+Zygote has many adjoints for non-mathematical operations such as for indexing and data structures. Though these can still be seen as linear functions of vectors, it's not particularly enlightening to implement them with an actual matrix multiply. In these cases it's easiest to think of the adjoint as a kind of inverse. For example, the gradient of a function that takes a tuple to a struct (e.g. `y = Complex(a, b)`) will generally take a struct to a tuple (`(ȳ.re, ȳ.im)`). The gradient of a `getindex` `y = x[i...]` is a `setindex!` `x̄[i...] = ȳ`, etc.
 
 ## Custom Adjoints
 
@@ -114,7 +114,7 @@ We can overload this by modifying the getters `height` and `width`.
 ```julia
 julia> @adjoint width(p::Point) = p.x, x̄ -> (Point(x̄, 0),)
 
-julia> @adjoint height(p::Point) = p.y, ȳ -> (Point(0, ȳ),)
+julia> @adjoint height(p::Point) = p.y, ȳ -> (Point(0, ȳ),)
 
 julia> Zygote.refresh() # currently needed when defining new adjoints
 
@@ -136,7 +136,7 @@ julia> @adjoint literal_getproperty(p::Point, ::Val{:x}) =
            getproperty(p, :x), x̄ -> (Point(x̄, 0),)
 
 julia> @adjoint literal_getproperty(p::Point, ::Val{:y}) =
-           getproperty(p, :x), ȳ -> (Point(0, ȳ),)
+           getproperty(p, :y), ȳ -> (Point(0, ȳ),)
 
 julia> dist2(p::Point) = sqrt(p.x^2 + p.y^2)
 dist2 (generic function with 1 method)
@@ -181,7 +181,7 @@ julia> gradient((a, b) -> hook(-, a)*b, 2, 3)
 We could use this for debugging or modifying gradients (e.g. gradient clipping).
 
 ```julia
-julia> gradient((a, b) -> hook(ā -> @show(ā), a)*b, 2, 3)
+julia> gradient((a, b) -> hook(ā -> @show(ā), a)*b, 2, 3)
 ā = 3
 (3, 2)
 ```
@@ -196,7 +196,7 @@ A more advanced example is checkpointing, in which we save memory by re-computin
 julia> checkpoint(f, x) = f(x)
 checkpoint (generic function with 1 method)
 
-julia> @adjoint checkpoint(f, x) = f(x), ȳ -> Zygote._forward(f, x)[2](ȳ)
+julia> @adjoint checkpoint(f, x) = f(x), ȳ -> Zygote._forward(f, x)[2](ȳ)
 
 julia> gradient(x -> checkpoint(sin, x), 1)
 (0.5403023058681398,)
