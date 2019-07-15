@@ -125,6 +125,29 @@ julia> gradient(a -> dist(a), Point(1, 2))[1]
 Point(0.4472135954999579, 0.8944271909999159)
 ```
 
+`Zygote.literal_getproperty` can be used to achieve the same result, without having to
+define getter functions for our fields. The following code excerpt achieves the same result
+as the one above. 
+
+```julia
+julia> using Zygote: literal_getproperty
+
+julia> @adjoint literal_getproperty(p::Point, ::Val{:x}) =
+           getproperty(p, :x), x̄ -> (Point(x̄, 0),)
+
+julia> @adjoint literal_getproperty(p::Point, ::Val{:y}) =
+           getproperty(p, :x), ȳ -> (Point(0, ȳ),)
+
+julia> dist2(p::Point) = sqrt(p.x^2 + p.y^2)
+dist2 (generic function with 1 method)
+
+julia> gradient(a -> a.y, Point(1, 2))
+(Point(0.0, 1.0),)
+
+julia> gradient(a -> dist2(a), Point(1, 2))[1]
+Point(0.4472135954999579, 0.8944271909999159)
+```
+
 If you do this you should also overload the `Point` constructor, so that it can handle a `Point` gradient (otherwise this function will error).
 
 ```julia
@@ -133,6 +156,7 @@ julia> @adjoint Point(a, b) = Point(a, b), p̄ -> (p̄.x, p̄.y)
 julia> gradient(x -> dist(Point(x, 1)), 1)
 (0.7071067811865475,)
 ```
+
 
 ## Advanced Adjoints
 
