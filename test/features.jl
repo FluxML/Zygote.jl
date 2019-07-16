@@ -154,7 +154,7 @@ D(f, x) = grad(f, x)[1]
 @test D(x -> x*D(y -> x*y, 1), 4) == 8
 
 if VERSION >= v"1.1"
-  @test_broken sin'''(1.0) ==  -cos(1.0)
+  @test sin'''(1.0) ==  -cos(1.0)
 end
 
 f(x) = throw(DimensionMismatch("fubar"))
