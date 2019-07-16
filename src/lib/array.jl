@@ -7,7 +7,7 @@ using Base.Broadcast: broadcasted, broadcast_shape
 @adjoint Array(xs::AbstractArray) = Array(xs), ȳ -> (ȳ,)
 
 @nograd size, length, eachindex, Colon(), findfirst, randn, ones, zeros, one, zero,
-  print, println
+  print, println, div
 
 
 @adjoint Base.vect(xs...) = Base.vect(xs...), Δ -> (Δ...,)
