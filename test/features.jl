@@ -152,7 +152,10 @@ D(f, x) = grad(f, x)[1]
 @test D(x -> D(sin, x), 0.5) == -sin(0.5)
 @test D(x -> x*D(y -> x+y, 1), 1) == 1
 @test D(x -> x*D(y -> x*y, 1), 4) == 8
-@test_broken sin'''(1.0) == -cos(1.0)
+
+if VERSION >= v"1.1"
+  @test_broken sin'''(1.0) ==  -cos(1.0)
+end
 
 f(x) = throw(DimensionMismatch("fubar"))
 
