@@ -185,6 +185,10 @@ end
   end
 end
 
+@adjoint function dropdims(xs::AbstractArray; dims)
+  dropdims(xs, dims = dims), Δ -> (reshape(Δ, size(xs)...),)
+end
+
 @adjoint function mean(xs::AbstractArray; dims = :)
   return mean(xs, dims=dims), Δ -> (_backmean(xs,Δ,dims),)
 end
