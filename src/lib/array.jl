@@ -358,8 +358,6 @@ end
       Σ̄[n] /= 2
     end
     return (UpperTriangular(Σ̄),)
-    # Σ̄ ./= 2
-    # return (Σ̄,)
   end
 end
 
