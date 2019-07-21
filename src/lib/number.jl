@@ -1,6 +1,6 @@
 using DiffRules, SpecialFunctions, NaNMath
 
-@nograd isinf, isnan, isfinite
+@nograd isinf, isnan, isfinite, div
 
 # TODO use CSE here
 
