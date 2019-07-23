@@ -626,17 +626,17 @@ end
   x = [-0.353213 -0.789656 -0.270151; -0.95719 -1.27933 0.223982]  
   # check ffts for individual dimensions
   for trans in (fft, ifft, bfft)
-    @test gradient((x)->sum(abs.(trans(x))), cu(x))[1] ≈
-      gradient( (x) -> sum(abs.(trans(trans(x,1),2))),  cu(x))[1]
+    @test gradient((x)->sum(abs.(trans(x))), x)[1] ≈
+      gradient( (x) -> sum(abs.(trans(trans(x,1),2))),  x)[1]
     # switch sum abs order
     @test gradient((x)->abs(sum((trans(x)))),x)[1] ≈
-      gradient( (x) -> abs(sum(trans(trans(x,1),2))),  cu(x))[1]
+      gradient( (x) -> abs(sum(trans(trans(x,1),2))),  x)[1]
     # dims parameter for the function
     @test gradient((x, dims)->sum(abs.(trans(x,dims))), x, (1,2))[1] ≈
-      gradient( (x) -> sum(abs.(trans(x))), cu(x))[1]
+      gradient( (x) -> sum(abs.(trans(x))), x)[1]
     # (1,2) should be the same as no index
-    @test gradient( (x) -> sum(abs.(trans(x,(1,2)))), cu(x))[1] ≈
-      gradient( (x) -> sum(abs.(trans(trans(x,1),2))), cu(x))[1]
+    @test gradient( (x) -> sum(abs.(trans(x,(1,2)))), x)[1] ≈
+      gradient( (x) -> sum(abs.(trans(trans(x,1),2))), x)[1]
     @test gradcheck(x->sum(abs.(trans(x))), x)
     @test gradcheck(x->sum(abs.(trans(x, 2))), x)
   end
