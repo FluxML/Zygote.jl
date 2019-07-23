@@ -1,4 +1,4 @@
-using Zygote, NNlib, Test, Random, LinearAlgebra, Statistics, FillArrays, FFTW
+using Zygote, NNlib, Test, Random, LinearAlgebra, Statistics, FillArrays, AbstractFFTs, FFTW
 using Zygote: gradient
 using NNlib: conv, ∇conv_data, depthwiseconv
 using Base.Broadcast: broadcast_shape
@@ -605,25 +605,46 @@ end
   @test gradtest(-, A)
 end
 
-@testset "FFTW" begin
-  x=[-0.353213 -0.789656 -0.270151; -0.95719 -1.27933 0.223982]
-  # gradient of ifft(rfft) must be 1
-  @test gradient((x)->real(ifft(fft(x))[1]),x)[1][1] == 1.0+0.0im
-  @test gradient((x)->real(fft(ifft(x))[1]),x)[1][1] == 1.0+0.0im
-
+@testset "AbstractFFTs" begin
+  for sizeX in [(2,3), (10,10), (13,15)]
+    X = randn(sizeX)
+    X̂r = rfft(X)
+    X̂ = fft(X)
+    for i=1:size(X,1), j=1:size(X,2)
+      indicateMat = [(k==i) && (l==j) ? 1.0 : 0.0 for k=1:size(X, 1),
+                     l=1:size(X,2)]
+      # gradient of ifft(fft) must be (approximately) 1 (for various cases)
+      @test gradient((X)->real.(ifft(fft(X))[i, j]), X)[1] ≈ indicateMat
+      # same for the inverse
+      @test gradient((X̂)->real.(fft(ifft(X̂))[i, j]), X̂)[1] ≈ indicateMat
+      # same for rfft(irfft)
+      @test gradient((X)->real.(irfft(rfft(X), size(X,1)))[i, j], X)[1] ≈ real.(indicateMat)
+      #@test gradient((X)->real.(rfft(irfft(X, size(X,1))))[i, j], X)[1] ≈ real.(indicateMat)
+      # rfft isn't actually surjective, so rffft(irfft) can't really be tested this way.
+    end
+  end
+  x = [-0.353213 -0.789656 -0.270151; -0.95719 -1.27933 0.223982]  
   # check ffts for individual dimensions
-  @test gradient((x)->sum(abs.(FFTW.fft(x))),x)[1] ≈ gradient((x)->sum(abs.(FFTW.fft(FFTW.fft(x,1),2))),x)[1]
-  @test gradient((x)->abs(sum((FFTW.fft(x)))),x)[1] ≈ gradient((x)->abs(sum(FFTW.fft(FFTW.fft(x,1),2))),x)[1]
-  @test gradient((x, dims)->sum(abs.(FFTW.fft(x,dims))),x,(1,2))[1] ≈ gradient((x)->sum(abs.(FFTW.fft(x))),x)[1]
-  @test gradient((x)->sum(abs.(FFTW.fft(x,(1,2)))),x)[1] ≈ gradient((x)->sum(abs.(FFTW.fft(FFTW.fft(x,1),2))),x)[1]
-  @test gradient((x, dims)->sum(abs.(FFTW.ifft(x,dims))),x,(1,2))[1] ≈ gradient((x)->sum(abs.(FFTW.ifft(x))),x)[1]
-  @test gradient((x)->sum(abs.(FFTW.ifft(x,(1,2)))),x)[1] ≈ gradient((x)->sum(abs.(FFTW.ifft(FFTW.ifft(x,1),2))),x)[1]
-
-  @test gradcheck(x->sum(abs.(FFTW.fft(x))), x)
-  @test gradcheck(x->sum(abs.(FFTW.ifft(x))), x)
-  @test gradcheck(x->sum(abs.(FFTW.fft(x, 1))), x)
-  @test gradcheck(x->sum(abs.(FFTW.ifft(x, 1))), x)
-
+  for trans in (fft, ifft, bfft)
+    @test gradient((x)->sum(abs.(trans(x))), cu(x))[1] ≈
+      gradient( (x) -> sum(abs.(trans(trans(x,1),2))),  cu(x))[1]
+    # switch sum abs order
+    @test gradient((x)->abs(sum((trans(x)))),x)[1] ≈
+      gradient( (x) -> abs(sum(trans(trans(x,1),2))),  cu(x))[1]
+    # dims parameter for the function
+    @test gradient((x, dims)->sum(abs.(trans(x,dims))), x, (1,2))[1] ≈
+      gradient( (x) -> sum(abs.(trans(x))), cu(x))[1]
+    # (1,2) should be the same as no index
+    @test gradient( (x) -> sum(abs.(trans(x,(1,2)))), cu(x))[1] ≈
+      gradient( (x) -> sum(abs.(trans(trans(x,1),2))), cu(x))[1]
+    @test gradcheck(x->sum(abs.(trans(x))), x)
+    @test gradcheck(x->sum(abs.(trans(x, 2))), x)
+  end
+  
+  @test gradient((x)->sum(abs.(rfft(x))), x)[1] ≈
+    gradient( (x) -> sum(abs.(fft(rfft(x,1),2))),  x)[1]
+  @test gradient((x, dims)->sum(abs.(rfft(x,dims))), x, (1,2))[1] ≈
+    gradient( (x) -> sum(abs.(rfft(x))), x)[1]
 end
 
 @testset "FillArrays" begin
