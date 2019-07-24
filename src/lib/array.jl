@@ -468,10 +468,26 @@ AbstractFFTs.brfft(x::Fill, d, dims...) = AbstractFFTs.brfft(collect(x), d, dims
 # gradient of its inputs, but with different normalization factor
 @adjoint function fft(xs)
   return AbstractFFTs.fft(xs), function(Δ)
-    N = length(xs)
     return (AbstractFFTs.bfft(Δ),)
   end
 end
+
+# all of the plans normalize their inverse, while we need the unnormalized one.
+@adjoint function *(P::AbstractFFTs.Plan, xs)
+  return P * xs, function(Δ)
+    N = length(xs)
+    return (nothing, N * (P \ Δ))
+  end
+end
+
+@adjoint function \(P::AbstractFFTs.Plan, xs)
+  return P \ xs, function(Δ)
+    N = length(Δ)
+    return (nothing, 1/N * (P * Δ))
+  end
+end
+
+
 
 @adjoint function ifft(xs)
   return AbstractFFTs.ifft(xs), function(Δ)
@@ -491,13 +507,13 @@ end
   return AbstractFFTs.rfft(xs), function(Δ)
     N = length(Δ)
     originalSize = size(xs,1)
-    return (N*AbstractFFTs.irfft(Δ, originalSize),)
+    return (AbstractFFTs.brfft(Δ, originalSize),)
   end
 end
 
 @adjoint function irfft(xs, d)
   return AbstractFFTs.irfft(xs, d), function(Δ)
-    total = length(xs)
+    total = length(Δ)
     fullTransform = 1/total * AbstractFFTs.rfft(real.(Δ))
     return (fullTransform, nothing)
   end
@@ -557,8 +573,6 @@ end
     return (AbstractFFTs.rfft(Δ, dims), nothing, nothing)
   end
 end
-
-
 
 
 
