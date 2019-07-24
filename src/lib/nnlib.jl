@@ -1,22 +1,65 @@
 using NNlib
-import NNlib: softmax, ∇softmax, logsoftmax, ∇logsoftmax, conv, maxpool, meanpool
+import NNlib: softmax, ∇softmax, logsoftmax, ∇logsoftmax, conv, depthwiseconv, ∇conv_data, ∇depthwiseconv_data, maxpool, meanpool, σ
+
+@adjoint function σ(x::Real)
+    y = σ(x)
+    return y, Δ -> (Δ * y * (1 - y),)
+end
 
 @adjoint softmax(xs) = softmax(xs), Δ -> (∇softmax(Δ, xs),)
 
 @adjoint logsoftmax(xs) = logsoftmax(xs), Δ -> (∇logsoftmax(Δ, xs),)
 
-@adjoint conv(x, w; kw...) =
-  conv(x, w; kw...),
-    Δ ->
-      (NNlib.∇conv_data(Δ, x, w; kw...),
-       NNlib.∇conv_filter(Δ, x, w; kw...))
+@adjoint NNlib.DenseConvDims(args...; kwargs...) = NNlib.DenseConvDims(args...; kwargs...), _ -> nothing
+@adjoint NNlib.DepthwiseConvDims(args...; kwargs...) = NNlib.DepthwiseConvDims(args...; kwargs...), _ -> nothing
+@adjoint NNlib.PoolDims(args...; kwargs...) = NNlib.PoolDims(args...; kwargs...), _ -> nothing
 
-@adjoint function maxpool(x, k; kw...)
-  y = maxpool(x, k; kw...)
-  y, Δ -> (NNlib.∇maxpool(Δ, y, x, k; kw...), nothing)
+@adjoint conv(x, w, cdims; kw...) =
+  conv(x, w, cdims; kw...),
+    Δ -> begin
+       return (
+           NNlib.∇conv_data(Δ, w, cdims; kw...),
+           NNlib.∇conv_filter(x, Δ, cdims; kw...),
+           nothing,
+       )
+   end
+
+@adjoint ∇conv_data(x, w, cdims; kw...) =
+  ∇conv_data(x, w, cdims; kw...),
+    Δ -> begin
+       return (
+           NNlib.conv(Δ, w, cdims; kw...),
+           NNlib.∇conv_filter(Δ, x, cdims; kw...),
+           nothing,
+       )
+   end
+
+@adjoint depthwiseconv(x, w, cdims; kw...) =
+  depthwiseconv(x, w, cdims; kw...),
+    Δ -> begin
+       return (
+           NNlib.∇depthwiseconv_data(Δ, w, cdims; kw...),
+           NNlib.∇depthwiseconv_filter(x, Δ, cdims; kw...),
+           nothing,
+       )
+   end
+
+@adjoint ∇depthwiseconv_data(x, w, cdims; kw...) =
+  ∇depthwiseconv_data(x, w, cdims; kw...),
+    Δ -> begin
+       return (
+           NNlib.depthwiseconv(Δ, w, cdims; kw...),
+           NNlib.∇depthwiseconv_filter(Δ, x, cdims; kw...),
+           nothing,
+       )
+   end
+
+@adjoint function maxpool(x, pdims; kw...)
+  y = maxpool(x, pdims; kw...)
+  y, Δ -> (NNlib.∇maxpool(Δ, y, x, pdims; kw...), nothing)
 end
 
-@adjoint function meanpool(x, k; kw...)
-  y = meanpool(x, k; kw...)
-  y, Δ -> (NNlib.∇meanpool(Δ, y, x, k; kw...), nothing)
+@adjoint function meanpool(x, pdims; kw...)
+  y = meanpool(x, pdims; kw...)
+  y, Δ -> (NNlib.∇meanpool(Δ, y, x, pdims; kw...), nothing)
 end

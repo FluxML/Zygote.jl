@@ -61,7 +61,7 @@ pow (generic function with 1 method)
 julia> gradient(x -> pow(x, 3), 5)
 (75,)
 
-julia> pow2(x, n) = n <= 0 ? 1 : x*pow(x, n-1)
+julia> pow2(x, n) = n <= 0 ? 1 : x*pow2(x, n-1)
 pow2 (generic function with 1 method)
 
 julia> gradient(x -> pow2(x, 3), 5)
@@ -116,6 +116,18 @@ julia> gradient(a -> dist(a + b), a)[1]
 ```
 
 Zygote's default representation of the "point adjoint" is a named tuple with gradients for both fields, but this can of course be customised too.
+
+This means we can do something very powerful: differentiating through Julia libraries, even if they weren't designed for this. For example, `colordiff` might be a smarter loss function on colours than simple mean-squared-error:
+
+```julia
+julia> using Colors
+
+julia> colordiff(RGB(1, 0, 0), RGB(0, 1, 0))
+86.60823557376344
+
+julia> gradient(colordiff, RGB(1, 0, 0), RGB(0, 1, 0))
+((r = 0.4590887719632896, g = -9.598786801605689, b = 14.181383399012862), (r = -1.7697549557037275, g = 28.88472330558805, b = -0.044793892637761346))
+```
 
 ## Gradients of ML models
 

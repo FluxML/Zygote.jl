@@ -1,9 +1,9 @@
 using MacroTools
-using MacroTools: combinedef
+using MacroTools: @q, combinedef
 
 named(arg) = isexpr(arg, :(::)) && length(arg.args) == 1 ? :($(gensym())::$(arg.args[1])) : arg
 
-typeless(x) = MacroTools.prewalk(x -> isexpr(x, :(::)) ? x.args[1] : x, x)
+typeless(x) = MacroTools.postwalk(x -> isexpr(x, :(::), :kw) ? x.args[1] : x, x)
 isvararg(x) = isexpr(x, :(::)) && namify(x.args[2]) == :Vararg
 
 for n = 0:3
@@ -37,8 +37,9 @@ function gradm(ex, mut = false)
   fargs = kw == nothing ? [cx, :($f::$T), args...] : [kw, cx, :($f::$T), args...]
   gradtuple   = isclosure ? gradtuple0 : gradtuple1
   gradtuplekw = isclosure ? gradtuple2 : gradtuple3
+  adj = @q @inline Zygote.adjoint($(fargs...)) where $(Ts...) = $(esc(body))
   quote
-    @inline Zygote.adjoint($(fargs...)) where $(Ts...) = $(esc(body))
+    $adj
     @inline function Zygote._forward($cx, $f::$T, $(args...)) where $(Ts...)
       y, _back = adjoint(__context__, $f, $(argnames...))
       $(mut ? nothing : :(back(::Nothing) = nothing))
@@ -71,4 +72,9 @@ macro nograd(ex)
     push!(blk.args, :(@inline Zygote._forward(::Context, ::Core.Typeof($(esc(f))), args...) = $(esc(f))(args...), $back))
   end
   return blk
+end
+
+macro which(ex)
+  @capture(ex, f_(args__)) || error("Zygote.@which f(args...)")
+  :(InteractiveUtils.@which adjoint(Context(), $(esc(f)), $(esc.(args)...)))
 end

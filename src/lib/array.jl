@@ -1,4 +1,10 @@
-@adjoint (::Type{T})(args...) where T<:Array = T(args...), Δ -> nothing
+using FillArrays, FFTW
+using FillArrays: AbstractFill, getindex_value
+using Base.Broadcast: broadcasted, broadcast_shape
+
+@adjoint (::Type{T})(::UndefInitializer, args...) where T<:Array = T(undef, args...), Δ -> nothing
+
+@adjoint Array(xs::AbstractArray) = Array(xs), ȳ -> (ȳ,)
 
 @nograd size, length, eachindex, Colon(), findfirst, randn, ones, zeros, one, zero,
   print, println
@@ -10,6 +16,15 @@
 
 _zero(xs::AbstractArray{<:Integer}, T) = fill!(similar(xs, float(eltype(xs))), false)
 _zero(xs::AbstractArray{<:Number}, T) = zero(xs)
+
+# Array Constructors
+@adjoint (::Type{T})(x::T) where T<:Array = T(x), ȳ -> (ȳ,)
+@adjoint (::Type{T})(x::Number, sz) where {T <: Fill} = Fill(x, sz), Δ -> (sum(Δ), nothing)
+@adjoint (::Type{T})(sz) where {T<:Zeros} = Zeros(sz), Δ->(nothing,)
+@adjoint (::Type{T})(sz) where {T<:Ones} = Ones(sz), Δ->(nothing,)
+
+_zero(xs::AbstractArray{<:Integer}) = fill!(similar(xs, float(eltype(xs))), false)
+_zero(xs::AbstractArray{<:Number}) = zero(xs)
 _zero(xs::AbstractArray, T) = T[nothing for x in xs]
 
 @adjoint function getindex(xs::Array, i...)
@@ -28,18 +43,35 @@ end
 @adjoint! setindex!(xs::AbstractArray, x...) = setindex!(xs, x...),
   _ -> error("Mutating arrays is not supported")
 
+@adjoint function view(x::AbstractArray, inds...; kw...)
+  view(x, inds...; kw...), dy -> begin
+    dx = _zero(x)
+    copyto!(view(dx, inds...; kw...), dy)
+    (dx, map(_->nothing, inds)...)
+  end
+end
+
 # General
 
 @adjoint collect(x::Array) = collect(x), Δ -> (Δ,)
 
+@adjoint fill(x::Real, dims...) = fill(x, dims...), Δ->(sum(Δ), map(_->nothing, dims)...)
+
+@adjoint permutedims(xs) = permutedims(xs), Δ -> (permutedims(Δ),)
+
+@adjoint permutedims(xs::AbstractVector) = permutedims(xs), Δ -> (vec(permutedims(Δ)),)
+
 @adjoint permutedims(xs, dims) = permutedims(xs, dims),
   Δ -> (permutedims(Δ, invperm(dims)), nothing)
+
+@adjoint PermutedDimsArray(xs, dims) = PermutedDimsArray(xs, dims),
+  Δ -> (PermutedDimsArray(Δ, invperm(dims)), nothing)
 
 @adjoint reshape(xs, dims...) = reshape(xs, dims...),
   Δ -> (reshape(Δ, size(xs)),map(_->nothing,dims)...)
 
 @adjoint function hvcat(rows::Tuple{Vararg{Int}}, xs::T...) where T<:Number
-  hvcat(rows, xs...), ȳ -> (nothing, ȳ...)
+  hvcat(rows, xs...), ȳ -> (nothing, permutedims(ȳ)...)
 end
 
 pull_block_vert(sz, Δ, A::AbstractVector) = Δ[sz-length(A)+1:sz]
@@ -80,21 +112,29 @@ function unzip(tuples)
       map(tuple -> tuple[i], tuples)
   end
 end
-@adjoint function map(f, args::AbstractArray...)
-  ys_and_backs = map((args...) -> _forward(__context__, f, args...), args...)
-  ys, backs = unzip(ys_and_backs)
-  ys, function (Δ)
-    Δf_and_args_zipped = map((f, δ) -> f(δ), backs, Δ)
-    Δf_and_args = unzip(Δf_and_args_zipped)
-    Δf = reduce(accum, Δf_and_args[1])
-    (Δf, Δf_and_args[2:end]...)
+function ∇map(cx, f, args...)
+  ys_and_backs = map((args...) -> _forward(cx, f, args...), args...)
+  if isempty(ys_and_backs)
+    ys_and_backs, _ -> nothing
+  else
+    ys, backs = unzip(ys_and_backs)
+    ys, function (Δ)
+      Δf_and_args_zipped = map((f, δ) -> f(δ), backs, Δ)
+      Δf_and_args = unzip(Δf_and_args_zipped)
+      Δf = reduce(accum, Δf_and_args[1])
+      (Δf, Δf_and_args[2:end]...)
+    end
   end
 end
 
+@adjoint function map(f, args::Union{AbstractArray,Tuple}...)
+  ∇map(__context__, f, args...)
+end
+
 function _forward(cx::Context, ::typeof(collect), g::Base.Generator)
-  y, back = _forward(cx, map, g.f, g.iter)
+  y, back = ∇map(cx, g.f, g.iter)
   y, function (ȳ)
-    _, f̄, x̄ = back(ȳ)
+    f̄, x̄ = back(ȳ)
     (nothing, (f = f̄, iter = x̄),)
   end
 end
@@ -105,7 +145,7 @@ end
 
 @adjoint function sum(xs::AbstractArray; dims = :)
   if dims === (:)
-    sum(xs), Δ -> (FillArray(Δ, size(xs)),)
+    sum(xs), Δ -> (Fill(Δ, size(xs)),)
   else
     sum(xs, dims = dims), Δ -> (similar(xs) .= Δ,)
   end
@@ -120,7 +160,7 @@ end
   return sum(abs2, X; dims=dims), Δ::Union{Number, AbstractArray}->(nothing, ((2Δ) .* X))
 end
 
-@adjoint function prod(xs; dims = :)
+@adjoint function prod(xs::AbstractArray{<:Number}; dims = :)
   if dims === (:)
     prod(xs), Δ -> (prod(xs) ./ xs .* Δ,)
   else
@@ -129,10 +169,15 @@ end
   end
 end
 
+function _forward(cx::Context, ::typeof(prod), f, xs::AbstractArray)
+  y, back = forward(cx, (xs -> prod(f.(xs))), xs)
+  y, ȳ -> (nothing, nothing, back(ȳ)...)
+end
+
 @adjoint function maximum(xs; dims = :)
   max, i = findmax(xs, dims = dims)
   max, function (Δ)
-    Δ isa Real && Δ <= sqrt(eps(float(Δ))) && return nothing
+    Δ isa Real && abs(Δ) <= sqrt(eps(float(Δ))) && return nothing
     Δ′ = zero(xs)
     Δ′[i] = Δ
     return (Δ′,)
@@ -157,14 +202,36 @@ _backmean(xs, Δ, dims) = zero(xs) .+ Δ ./ mapreduce(i -> size(xs,i),*,dims)
 # LinAlg
 # ======
 
-@adjoint function(a::AbstractVecOrMat * b::AbstractVecOrMat)
-  return a * b, function(Δ)
-    return (reshape(Δ * transpose(b), size(a)), reshape(transpose(a) * Δ, size(b)))
-  end
+@adjoint function(A::AbstractMatrix * B::AbstractMatrix)
+  return A * B, Δ::AbstractMatrix->(Δ * B', A' * Δ)
 end
 
-@adjoint transpose(x) = transpose(x), Δ -> (transpose(Δ),)
-@adjoint Base.adjoint(x) = x', Δ -> (Δ',)
+@adjoint function(A::AbstractMatrix * x::AbstractVector)
+  return A * x, Δ::AbstractVector->(Δ * x', A' * Δ)
+end
+
+@adjoint function *(x::Union{Transpose{<:Any, <:AbstractVector},
+                             LinearAlgebra.Adjoint{<:Any, <:AbstractVector}},
+                    y::AbstractVector)
+  return x * y, Δ->(Δ * y', x' * Δ)
+end
+
+@adjoint function(a::AbstractVector * x::AbstractMatrix)
+  return a * x, Δ::AbstractMatrix->(vec(Δ * x'), a' * Δ)
+end
+
+@adjoint function transpose(x)
+  back(Δ) = (transpose(Δ),)
+  back(Δ::NamedTuple{(:parent,)}) = (Δ.parent,)
+  return transpose(x), back
+end
+
+@adjoint function Base.adjoint(x)
+  back(Δ) = (Δ',)
+  back(Δ::NamedTuple{(:parent,)}) = (Δ.parent,)
+  return x', back
+end
+
 @adjoint parent(x::LinearAlgebra.Adjoint) = parent(x), ȳ -> (LinearAlgebra.Adjoint(ȳ),)
 
 @adjoint dot(x::AbstractArray, y::AbstractArray) = dot(x, y), Δ->(Δ .* y, Δ .* x)
@@ -196,23 +263,68 @@ end
 @adjoint logabsdet(xs) = logabsdet(xs), Δ -> (Δ[1] * transpose(inv(xs)),)
 
 @adjoint function inv(A)
-    return inv(A), function (Δ)
-        Ainv = inv(A)
-        ∇A = - Ainv' * Δ * Ainv'
-        return (∇A, )
-    end
+  return inv(A), function (Δ)
+    Ainv = inv(A)
+    ∇A = - Ainv' * Δ * Ainv'
+    return (∇A, )
+  end
+end
+
+# Defaults for atol and rtol copied directly from LinearAlgebra. See the following for
+# derivation:
+# Golub, Gene H., and Victor Pereyra. "The differentiation of pseudo-inverses and nonlinear
+# least squares problems whose variables separate." SIAM Journal on numerical analysis 10.2
+# (1973): 413-432.
+@adjoint function pinv(
+  A::AbstractMatrix{T};
+  atol::Real = 0.0,
+  rtol::Real = (eps(real(float(one(T))))*min(size(A)...))*iszero(atol),
+) where {T}
+  Y = pinv(A)
+  return Y, Δ->(-Y' * Δ * Y' + (I - A * Y) * Δ' * Y * Y' + Y' * Y * Δ' * (I - Y * A),)
+end
+
+@adjoint function \(A::Union{Diagonal, AbstractTriangular}, B::AbstractVecOrMat)
+  Y = A \ B
+  return Y, function(Ȳ)
+    B̄ = A' \ Ȳ
+    return (-B̄ * Y', B̄)
+  end
+end
+
+@adjoint function /(A::AbstractMatrix, B::Union{Diagonal, AbstractTriangular})
+  Y = A / B
+  return Y, function(Ȳ)
+    Ā = Ȳ / B'
+    return (Ā, -Y' * Ā)
+  end
 end
 
 @adjoint function \(A::AbstractMatrix, B::AbstractVecOrMat)
-  Y = A \ B
-  return Y, function(Ȳ)
-      B̄ = A' \ Ȳ
-      return (-B̄ * Y', B̄)
+  Z = A \ B
+  return Z, function(Z̄)
+    B̄ = A' \ Z̄
+    if size(A, 1) == size(A, 2)
+      return (-B̄ * Z', B̄)
+    else
+      a = -B̄ * Z'
+      b = (B - A * Z) * B̄' / A'
+      c = A' \ Z * (Z̄' - B̄' * A)
+      return (a + b + c, B̄)
+    end
   end
+end
+
+function _forward(cx::Context, ::typeof(norm), x::AbstractArray, p::Real = 2)
+  fallback = (x, p) -> sum(abs.(x).^p .+ eps(0f0))^(1/p) # avoid d(sqrt(x))/dx == Inf at 0
+  _forward(cx, fallback, x, p)
 end
 
 # LinAlg Matrix Types
 # ===================
+
+@adjoint LinearAlgebra.LowerTriangular(A) = LowerTriangular(A), Δ->(LowerTriangular(Δ),)
+@adjoint LinearAlgebra.UpperTriangular(A) = UpperTriangular(A), Δ->(UpperTriangular(Δ),)
 
 # This is basically a hack while we don't have a working `ldiv!`.
 @adjoint function \(A::Cholesky, B::AbstractVecOrMat)
@@ -220,14 +332,6 @@ end
   return Y, function(Ȳ)
     Ā_factors, B̄ = back(Ȳ)
     return ((uplo=nothing, status=nothing, factors=Ā_factors), B̄)
-  end
-end
-
-@adjoint function /(A::AbstractMatrix, B::AbstractMatrix)
-  Y = A / B
-  return Y, function(Ȳ)
-      Ā = Ȳ / B'
-      return (Ā, -Y' * Ā)
   end
 end
 
@@ -265,6 +369,38 @@ end
   end
 end
 
+@adjoint function lyap(A::AbstractMatrix, C::AbstractMatrix)
+  X = lyap(A, C)
+  return X, function (X̄)
+    C̄ = lyap(collect(A'), X̄)
+    Ā = C̄*X' + C̄'*X
+    return (Ā, C̄)
+  end
+end
+
+# Adjoint based on the Theano implementation, which uses the differential as described
+# in Brančík, "Matlab programs for matrix exponential function derivative evaluation"
+@adjoint exp(A::AbstractMatrix) = exp(A), function(F̄)
+  n = size(A, 1)
+  E = eigen(A)
+  w = E.values
+  ew = exp.(w)
+  X = [i==j ? ew[i] : (ew[i]-ew[j])/(w[i]-w[j]) for i in 1:n,j=1:n]
+  VT = transpose(E.vectors)
+  VTF = factorize(collect(VT))
+  Ā = real.(VTF\(VT*F̄/VTF.*X)*VT)
+  (Ā, )
+end
+
+Zygote.@adjoint function LinearAlgebra.tr(x::AbstractMatrix)
+  # x is a squre matrix checked by tr,
+  # so we could just use Eye(size(x, 1))
+  # to create a Diagonal
+  tr(x), function (Δ::Number)
+    (Diagonal(Fill(Δ, (size(x, 1), ))), )
+  end
+end
+
 # Various sensitivities for `literal_getproperty`, depending on the 2nd argument.
 @adjoint function literal_getproperty(C::Cholesky, ::Val{:uplo})
   return literal_getproperty(C, Val(:uplo)), function(Δ)
@@ -297,4 +433,66 @@ end
 
 @adjoint function +(A::AbstractMatrix, S::UniformScaling)
   return A + S, Δ->(Δ, (λ=sum(view(Δ, diagind(Δ))),))
+end
+
+@adjoint +(A::AbstractArray, B::AbstractArray) = A + B, Δ->(Δ, Δ)
+@adjoint -(A::AbstractArray, B::AbstractArray) = A - B, Δ->(Δ, -Δ)
+@adjoint -(A::AbstractArray) = -A, Δ->(-Δ,)
+
+# FFTW
+# ===================
+
+# FFTW functions do not work with FillArrays, which are needed
+# for some functionality of Zygote. To make it work with FillArrays
+# as well, overload the relevant functions
+FFTW.fft(x::Fill, dims...) = FFTW.fft(collect(x), dims...)
+FFTW.ifft(x::Fill, dims...) = FFTW.ifft(collect(x), dims...)
+
+
+# the adjoint jacobian of an FFT with respect to its input is the reverse FFT of the
+# gradient of its inputs, but with different normalization factor
+@adjoint function FFTW.fft(xs)
+  return FFTW.fft(xs), function(Δ)
+    N = length(xs)
+    return (N * FFTW.ifft(Δ),)
+  end
+end
+
+@adjoint function FFTW.ifft(xs)
+  return FFTW.ifft(xs), function(Δ)
+    N = length(xs)
+    return (1/N* FFTW.fft(Δ),)
+  end
+end
+
+@adjoint function FFTW.fft(xs, dims)
+  return FFTW.fft(xs, dims), function(Δ)
+    # dims can be int, array or tuple,
+    # convert to collection for use as index
+    dims = collect(dims)
+    # we need to multiply by all dimensions that we FFT over
+    N = prod(collect(size(xs))[dims])
+    return (N * FFTW.ifft(Δ, dims), nothing)
+  end
+end
+
+@adjoint function FFTW.ifft(xs,dims)
+  return FFTW.ifft(xs, dims), function(Δ)
+    # dims can be int, array or tuple,
+    # convert to collection for use as index
+    dims = collect(dims)
+    # we need to divide by all dimensions that we FFT over
+    N = prod(collect(size(xs))[dims])
+    return (1/N * FFTW.fft(Δ, dims),nothing)
+  end
+end
+
+# FillArray functionality
+# =======================
+
+@adjoint function broadcasted(op, r::AbstractFill{<:Real})
+  y, _back = Zygote.forward(op, getindex_value(r))
+  back(Δ::AbstractFill) = (nothing, Fill(_back(getindex_value(Δ))[1], size(r)))
+  back(Δ::AbstractArray) = (nothing, getindex.(_back.(Δ), 1))
+  return Fill(y, size(r)), back
 end

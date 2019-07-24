@@ -13,7 +13,8 @@
 #                                 `--'  `"                               `--'  `"             `'-'
 
 using Base.Broadcast
-using Base.Broadcast: AbstractArrayStyle, broadcasted, materialize
+using Base.Broadcast: Broadcasted, AbstractArrayStyle, broadcasted, materialize
+using NNlib
 
 # There's a saying that debugging code is about twice as hard as writing it in
 # the first place. So if you're as clever as you can be when writing code, how
@@ -34,8 +35,8 @@ accum_sum(xs; dims = :) = reduce(accum, xs, dims = dims)
 
 # Work around reducedim_init issue
 accum_sum(xs::AbstractArray{Nothing}; dims = :) = nothing
-accum_sum(xs::AbstractArray{<:Real}; dims = :) = sum(xs, dims = dims)
-accum_sum(xs::Real; dims = :) = xs
+accum_sum(xs::AbstractArray{<:Number}; dims = :) = sum(xs, dims = dims)
+accum_sum(xs::Number; dims = :) = xs
 
 trim(x, Δ) = reshape(Δ, ntuple(i -> size(Δ, i), Val(ndims(x))))
 
@@ -53,11 +54,37 @@ unbroadcast(x::Union{Number,Ref}, x̄) = accum_sum(x̄)
 # to do CSE, then broadcast-ify the expression so that the closure captures the
 # right arrays.
 
-@adjoint broadcasted(::typeof(+), xs...) =
+Numeric{T<:Number} = Union{T,AbstractArray{<:T}}
+
+@adjoint broadcasted(::typeof(+), xs::Numeric...) =
   broadcast(+, xs...), ȳ -> (nothing, map(x -> unbroadcast(x, ȳ), xs)...)
 
-@adjoint broadcasted(::typeof(*), x, y) = x.*y,
-  z̄ -> (nothing, unbroadcast(x, z̄ .* y), unbroadcast(y, z̄ .* x))
+@adjoint broadcasted(::typeof(*), x::Numeric, y::Numeric) = x.*y,
+  z̄ -> (nothing, unbroadcast(x, z̄ .* conj.(y)), unbroadcast(y, z̄ .* conj.(x)))
+
+@adjoint function broadcasted(::typeof(/), x::Numeric, y::Numeric)
+  res = x ./ y
+  res, Δ -> (nothing, unbroadcast(x, Δ ./ y), unbroadcast(y, -Δ .* res ./ y))
+end
+
+@adjoint function broadcasted(::typeof(σ), x::Numeric)
+  y = σ.(x)
+  y, ȳ -> (nothing, ȳ .* conj.(y .* (1 .- y)))
+end
+
+@adjoint function broadcasted(::typeof(tanh), x::Numeric)
+  y = tanh.(x)
+  y, ȳ -> (nothing, ȳ .* conj.(1 .- y.^2))
+end
+
+@adjoint broadcasted(::typeof(conj), x::Numeric) =
+  conj.(x), z̄ -> (nothing, conj.(z̄))
+
+@adjoint broadcasted(::typeof(real), x::Numeric) =
+  real.(x), z̄ -> (nothing, real.(z̄))
+
+@adjoint broadcasted(::typeof(imag), x::Numeric) =
+  imag.(x), z̄ -> (nothing, im .* real.(z̄))
 
 # General Fallback
 # ================
@@ -99,3 +126,40 @@ end
 end
 
 @adjoint! (b::typeof(broadcast))(f, args...) = _forward(__context__, broadcasted, f, args...)
+
+# Forward Mode (mainly necessary for CUDA)
+
+import ForwardDiff
+using ForwardDiff: Dual
+
+dual(x, p) = x
+dual(x::Real, p) = Dual(x, p)
+
+dualtype(::Type{Dual{G,T,P}}) where {G,T,P} = T
+dualtype(T) = T
+
+function dual_function(f::F) where F
+  function (args::Vararg{Any,N}) where N
+    ds = map(args, ntuple(identity,Val(N))) do x, i
+      dual(x, ntuple(j -> i==j, Val(N)))
+    end
+    return f(ds...)
+  end
+end
+
+@inline function broadcast_forward(f, args::Vararg{Any,N}) where N
+  T = Broadcast.combine_eltypes(f, args)
+  out = dual_function(f).(args...)
+  eltype(out) <: Dual || return (out, _ -> nothing)
+  y = map(x -> x.value, out)
+  _back(ȳ, i) = unbroadcast(args[i], ((a, b) -> a*b.partials[i]).(ȳ, out))
+  back(ȳ) = ntuple(i -> _back(ȳ, i), N)
+  return y, back
+end
+
+@init @require CuArrays="3a865a2d-5b23-5a0f-bc46-62713ec82fae" begin
+  @adjoint function broadcasted(::Broadcast.ArrayStyle{CuArrays.CuArray}, f, args...)
+    y, back = broadcast_forward(f, args...)
+    y, ȳ -> (nothing, nothing, back(ȳ)...)
+  end
+end
