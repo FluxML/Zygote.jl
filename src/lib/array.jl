@@ -14,7 +14,7 @@ _zero(xs::AbstractArray, T) = T[nothing for x in xs]
 
 @adjoint function getindex(xs::Array, i...)
   xs[i...], function (Δ)
-    if i isa NTuple{Integer}
+    if i isa NTuple{<:Any, Integer}
       T = Union{Nothing, eltype(Δ)}
     else
       T = Union{Nothing, typeof(Δ)}
