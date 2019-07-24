@@ -31,4 +31,4 @@ Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 FFTW = "7a1cc6ca-52ef-59f5-83cd-3a7055c09341"
 
 [targets]
-test = ["Test", "Distances", "StatsFuns"]
+test = ["Test", "Distances", "StatsFuns", "FFTW"]
