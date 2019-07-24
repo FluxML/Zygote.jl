@@ -1,4 +1,5 @@
-using Zygote, NNlib, Test, Random, LinearAlgebra, Statistics, FillArrays, AbstractFFTs, FFTW
+using Zygote, NNlib, Test, Random, LinearAlgebra, Statistics, FillArrays,
+    AbstractFFTs, FFTW
 using Zygote: gradient
 using NNlib: conv, ∇conv_data, depthwiseconv
 using Base.Broadcast: broadcast_shape
