@@ -25,4 +25,8 @@ end
   include("compiler.jl")
 end
 
+@testset "Distributions" begin
+  include("distributions.jl")
+end
+
 end
