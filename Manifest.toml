@@ -82,10 +82,10 @@ deps = ["Random", "Serialization", "Sockets"]
 uuid = "8ba89e20-285c-5b6f-9357-94700520ee1b"
 
 [[FFTW]]
-deps = ["AbstractFFTs", "BinaryProvider", "Compat", "Conda", "Libdl", "LinearAlgebra", "Reexport", "Test"]
-git-tree-sha1 = "29cda58afbf62f35b1a094882ad6c745a47b2eaa"
+deps = ["AbstractFFTs", "BinaryProvider", "Conda", "Libdl", "LinearAlgebra", "Reexport", "Test"]
+git-tree-sha1 = "e1a479d3c972f20c9a70563eec740bbfc786f515"
 uuid = "7a1cc6ca-52ef-59f5-83cd-3a7055c09341"
-version = "0.2.4"
+version = "0.3.0"
 
 [[FillArrays]]
 deps = ["LinearAlgebra", "Random", "SparseArrays", "Test"]
