@@ -3,6 +3,8 @@ module Zygote
 using LinearAlgebra, Statistics
 using LinearAlgebra: copytri!, AbstractTriangular
 
+import ZygoteRules: @adjoint, @adjoint!, AContext, adjoint, _forward
+
 # This flag enables Zygote to grab extra type inference information during
 # compiles. When control flow is present, this can give gradient code a
 # performance boost.

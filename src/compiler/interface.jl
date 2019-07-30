@@ -1,4 +1,4 @@
-mutable struct Context
+mutable struct Context <: AContext
   cache::Union{IdDict{Any,Any},Nothing}
   globals::Union{Dict{GlobalRef,Any},Nothing}
 end

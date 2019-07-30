@@ -259,3 +259,11 @@ deps = ["Compat"]
 git-tree-sha1 = "c9d5aa108588b978bd859554660c8a5c4f2f7669"
 uuid = "81def892-9a0e-5fdd-b105-ffc91e053289"
 version = "1.1.3"
+
+[[ZygoteRules]]
+deps = ["MacroTools"]
+git-tree-sha1 = "24edeee7ac0e5537ce87054b0a6eda1c30cabfac"
+repo-rev = "master"
+repo-url = "https://github.com/FluxML/ZygoteRules.jl"
+uuid = "700de1a5-db45-46bc-99cf-38207098b444"
+version = "0.1.0"

@@ -123,7 +123,7 @@ end
   ∇map(__context__, f, args...)
 end
 
-function _forward(cx::Context, ::typeof(collect), g::Base.Generator)
+function _forward(cx::AContext, ::typeof(collect), g::Base.Generator)
   y, back = ∇map(cx, g.f, g.iter)
   y, function (ȳ)
     f̄, x̄ = back(ȳ)
@@ -143,7 +143,7 @@ end
   end
 end
 
-function _forward(cx::Context, ::typeof(sum), f, xs::AbstractArray)
+function _forward(cx::AContext, ::typeof(sum), f, xs::AbstractArray)
   y, back = forward(cx, (xs -> sum(f.(xs))), xs)
   y, ȳ -> (nothing, nothing, back(ȳ)...)
 end
@@ -161,7 +161,7 @@ end
   end
 end
 
-function _forward(cx::Context, ::typeof(prod), f, xs::AbstractArray)
+function _forward(cx::AContext, ::typeof(prod), f, xs::AbstractArray)
   y, back = forward(cx, (xs -> prod(f.(xs))), xs)
   y, ȳ -> (nothing, nothing, back(ȳ)...)
 end
@@ -307,7 +307,7 @@ end
   end
 end
 
-function _forward(cx::Context, ::typeof(norm), x::AbstractArray, p::Real = 2)
+function _forward(cx::AContext, ::typeof(norm), x::AbstractArray, p::Real = 2)
   fallback = (x, p) -> sum(abs.(x).^p .+ eps(0f0))^(1/p) # avoid d(sqrt(x))/dx == Inf at 0
   _forward(cx, fallback, x, p)
 end
