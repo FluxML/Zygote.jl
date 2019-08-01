@@ -84,6 +84,9 @@ literal_indexed_iterate(x, ::Val{i}, state) where i = Base.indexed_iterate(x, i,
 @adjoint getindex(xs::NTuple{N,Any}, i::Integer) where N =
   (xs[i], Δ -> (ntuple(j -> i == j ? Δ : nothing, Val(N)), nothing))
 
+@adjoint getindex(xs::NTuple{N,Any}, r::AbstractUnitRange) where N =
+  (xs[r], Δ -> (ntuple(j -> j in r ? Δ[findfirst(isequal(j), r)] : nothing, Val(N)), nothing))
+
 function _forward(cx::Context, ::typeof(literal_indexed_iterate), xs::Tuple, ::Val{i}) where i
   y, b = _forward(cx, literal_getindex, xs, Val(i))
   back(::Nothing) = nothing
