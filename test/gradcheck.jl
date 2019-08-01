@@ -85,6 +85,11 @@ end
 @test gradtest(x -> prod(x), (3,4))
 @test gradient(x -> prod(x), (1,2,3))[1] == (6,3,2)
 
+@test gradtest(x -> cumsum(x, dims=2), (3,4,5))
+@test gradtest(x -> cumsum(x, dims=1), (3,))
+@test gradtest(x -> cumsum(x), (4,))
+@test gradtest(x -> cumsum(x, dims=2), (5,))
+
 @test gradtest(x -> softmax(x).*(1:3), 3)
 @test gradtest(x -> softmax(x).*(1:3), (3,5))
 @test gradtest(x -> softmax(x, dims=2).*(1:3), (3,5))
