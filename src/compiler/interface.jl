@@ -50,7 +50,9 @@ function conventionalize(crules::Tuple)
   function(∇)
     ntuple(length(crules) + 1) do ii
       # first arg is nothing. See TODO above.
-      ii==1 ? nothing : conventionalize1(crule(∇))
+      ii==1 && return nothing
+      crule = crules[ii - 1]
+      conventionalize1(crule(∇))
     end
   end
 end
