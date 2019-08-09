@@ -28,7 +28,39 @@ end
 
 # Wrappers
 
-_forward(f, args...) = _forward(Context(), f, args...)
+# Note: the ZygoteRules.@adjoint directly overloads this, directly.
+function _forward(f, args...)
+  # First we see if ChainRules has an answer
+  res = rrule(f, args...)
+  if res!==nothing
+    y, crule = res
+    return y, conventionalize(crule)
+  else
+    # No answer from ChainRules, must do nontrival AD
+    return _forward(Context(), f, args...)
+  end
+end
+
+# Convert chainrules into zygote rules
+#TODO: The `nothing` first-arg is not correct in the case of closures
+# ChainRules needs to handle this still
+# See https://github.com/JuliaDiff/ChainRulesCore.jl/issues/4
+conventionalize(crule) = ∇ -> (nothing, conventionalize1(crule(∇)))
+function conventionalize(crules::Tuple)
+  function(∇)
+    ntuple(length(crules) + 1) do ii
+      # first arg is nothing. See TODO above.
+      ii==1 ? nothing : conventionalize1(crule(∇))
+    end
+  end
+end
+
+conventionalize1(x) = extern(x)
+conventionalize1(::ChainRules.Zero) = nothing  # Zygote is weird in this way.
+# If it wasn't for Zygote instantiating all partials at once, DNE could just be left to error on extern
+conventionalize1(::ChainRules.DNE) = nothing
+
+
 
 tailmemaybe(::Nothing) = nothing
 tailmemaybe(x::Tuple) = Base.tail(x)

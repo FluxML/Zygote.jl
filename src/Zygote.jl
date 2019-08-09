@@ -3,6 +3,7 @@ module Zygote
 using LinearAlgebra, Statistics
 using LinearAlgebra: copytri!, AbstractTriangular
 
+using ChainRules
 import ZygoteRules: @adjoint, @adjoint!, AContext, adjoint, _forward
 
 # This flag enables Zygote to grab extra type inference information during

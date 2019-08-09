@@ -73,6 +73,10 @@ end
 
 @test gradient(x -> x.re*x.im, 2+3im) == ((re = 3, im = 2),)
 
+# This tests hitting ChainRules, as without ChainRules rrule definition it would be 1
+# TODO: more clear test, that just defines a ChainRule that has a side-effect we can test for
+@test gradient(abs, 0) == (0,)
+
 struct Foo{T}
   a::T
   b::T
