@@ -29,7 +29,7 @@ end
 
 @nograd Core.apply_type, Core.typeof, nfields, fieldtype,
   (==), (===), (>=), (<=), (<), (>), isless, isempty, supertype, Base.typename,
-  Base.parameter_upper_bound, eps
+  Base.parameter_upper_bound, eps, Meta.parse, Base.eval
 
 @adjoint deepcopy(x) = deepcopy(x), ȳ -> (ȳ,)
 
@@ -127,7 +127,8 @@ unapply(t, xs) = _unapply(t, xs)[1]
   st = map(_empty, args)
   y, function (Δ)
     Δ = back(Δ)
-    (first(Δ), unapply(st, Base.tail(Δ))...)
+    Δ === nothing ? nothing :
+      (first(Δ), unapply(st, Base.tail(Δ))...)
   end
 end
 
@@ -247,3 +248,5 @@ end
     (nothing, ($(map(f -> :(x̄.$f), fieldnames(T))...),))
   end
 end
+
+(back::Jnew{T})(Δ) where T = error("Need an adjoint for constructor $T. Gradient is of type $(typeof(Δ))")

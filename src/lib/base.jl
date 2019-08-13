@@ -40,7 +40,9 @@ end
 end
 
 @adjoint! function setindex!(d::AbstractDict, v, k)
-  setindex!(d, v, k), function (Δ)
-    (nothing, get(grad_mut(__context__, d), k, nothing), nothing)
+  setindex!(d, v, k), function (_)
+    Δ = get(grad_mut(__context__, d), k, nothing)
+    delete!(grad_mut(__context__, d), k)
+    (nothing, Δ, nothing)
   end
 end
