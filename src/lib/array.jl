@@ -9,6 +9,7 @@ using Base.Broadcast: broadcasted, broadcast_shape
 @nograd size, length, eachindex, Colon(), findfirst, randn, ones, zeros, one, zero,
   print, println, any, all
 
+@adjoint rand(dims::Integer...) = rand(dims...), _ -> nothing
 
 @adjoint Base.vect(xs...) = Base.vect(xs...), Δ -> (Δ...,)
 
