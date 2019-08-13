@@ -4,7 +4,7 @@ using Base.Broadcast: broadcasted, broadcast_shape
 
 @adjoint (::Type{T})(::UndefInitializer, args...) where T<:Array = T(undef, args...), Δ -> nothing
 
-@adjoint Array(xs::AbstractArray) = Array(xs), ȳ -> (ȳ,)
+@adjoint Array(xs::AbstractArray) = Array(xs), ȳ -> (ȳ,)
 
 @nograd size, length, eachindex, Colon(), findfirst, randn, ones, zeros, one, zero,
   print, println, any, all
@@ -12,10 +12,10 @@ using Base.Broadcast: broadcasted, broadcast_shape
 
 @adjoint Base.vect(xs...) = Base.vect(xs...), Δ -> (Δ...,)
 
-@adjoint copy(x::AbstractArray) = copy(x), ȳ -> (ȳ,)
+@adjoint copy(x::AbstractArray) = copy(x), ȳ -> (ȳ,)
 
 # Array Constructors
-@adjoint (::Type{T})(x::T) where T<:Array = T(x), ȳ -> (ȳ,)
+@adjoint (::Type{T})(x::T) where T<:Array = T(x), ȳ -> (ȳ,)
 @adjoint (::Type{T})(x::Number, sz) where {T <: Fill} = Fill(x, sz), Δ -> (sum(Δ), nothing)
 @adjoint (::Type{T})(sz) where {T<:Zeros} = Zeros(sz), Δ->(nothing,)
 @adjoint (::Type{T})(sz) where {T<:Ones} = Ones(sz), Δ->(nothing,)
@@ -63,7 +63,7 @@ end
   Δ -> (reshape(Δ, size(xs)),map(_->nothing,dims)...)
 
 @adjoint function hvcat(rows::Tuple{Vararg{Int}}, xs::T...) where T<:Number
-  hvcat(rows, xs...), ȳ -> (nothing, permutedims(ȳ)...)
+  hvcat(rows, xs...), ȳ -> (nothing, permutedims(ȳ)...)
 end
 
 pull_block_vert(sz, Δ, A::AbstractVector) = Δ[sz-length(A)+1:sz]
@@ -125,8 +125,8 @@ end
 
 function _forward(cx::AContext, ::typeof(collect), g::Base.Generator)
   y, back = ∇map(cx, g.f, g.iter)
-  y, function (ȳ)
-    f̄, x̄ = back(ȳ)
+  y, function (ȳ)
+    f̄, x̄ = back(ȳ)
     (nothing, (f = f̄, iter = x̄),)
   end
 end
@@ -145,7 +145,7 @@ end
 
 function _forward(cx::AContext, ::typeof(sum), f, xs::AbstractArray)
   y, back = forward(cx, (xs -> sum(f.(xs))), xs)
-  y, ȳ -> (nothing, nothing, back(ȳ)...)
+  y, ȳ -> (nothing, nothing, back(ȳ)...)
 end
 
 @adjoint function sum(::typeof(abs2), X::AbstractArray; dims = :)
@@ -163,7 +163,7 @@ end
 
 function _forward(cx::AContext, ::typeof(prod), f, xs::AbstractArray)
   y, back = forward(cx, (xs -> prod(f.(xs))), xs)
-  y, ȳ -> (nothing, nothing, back(ȳ)...)
+  y, ȳ -> (nothing, nothing, back(ȳ)...)
 end
 
 @adjoint function maximum(xs; dims = :)
@@ -224,7 +224,7 @@ end
   return x', back
 end
 
-@adjoint parent(x::LinearAlgebra.Adjoint) = parent(x), ȳ -> (LinearAlgebra.Adjoint(ȳ),)
+@adjoint parent(x::LinearAlgebra.Adjoint) = parent(x), ȳ -> (LinearAlgebra.Adjoint(ȳ),)
 
 @adjoint dot(x::AbstractArray, y::AbstractArray) = dot(x, y), Δ->(Δ .* y, Δ .* x)
 
@@ -278,17 +278,17 @@ end
 
 @adjoint function \(A::Union{Diagonal, AbstractTriangular}, B::AbstractVecOrMat)
   Y = A \ B
-  return Y, function(Ȳ)
-    B̄ = A' \ Ȳ
+  return Y, function(Ȳ)
+    B̄ = A' \ Ȳ
     return (-B̄ * Y', B̄)
   end
 end
 
 @adjoint function /(A::AbstractMatrix, B::Union{Diagonal, AbstractTriangular})
   Y = A / B
-  return Y, function(Ȳ)
-    Ā = Ȳ / B'
-    return (Ā, -Y' * Ā)
+  return Y, function(Ȳ)
+    Ā = Ȳ / B'
+    return (Ā, -Y' * Ā)
   end
 end
 
@@ -321,9 +321,9 @@ end
 # This is basically a hack while we don't have a working `ldiv!`.
 @adjoint function \(A::Cholesky, B::AbstractVecOrMat)
   Y, back = Zygote.forward((U, B)->U \ (U' \ B), A.U, B)
-  return Y, function(Ȳ)
-    Ā_factors, B̄ = back(Ȳ)
-    return ((uplo=nothing, status=nothing, factors=Ā_factors), B̄)
+  return Y, function(Ȳ)
+    Ā_factors, B̄ = back(Ȳ)
+    return ((uplo=nothing, status=nothing, factors=Ā_factors), B̄)
   end
 end
 
@@ -349,8 +349,8 @@ end
 @adjoint function cholesky(Σ::Union{StridedMatrix, Symmetric{<:Real, <:StridedMatrix}})
   C = cholesky(Σ)
   return C, function(Δ::NamedTuple)
-    U, Ū = C.U, Δ.factors
-    Σ̄ = Ū * U'
+    U, Ū = C.U, Δ.factors
+    Σ̄ = Ū * U'
     Σ̄ = copytri!(Σ̄, 'U')
     Σ̄ = ldiv!(U, Σ̄)
     BLAS.trsm!('R', 'U', 'T', 'N', one(eltype(Σ)), U.data, Σ̄)
@@ -365,8 +365,8 @@ end
   X = lyap(A, C)
   return X, function (X̄)
     C̄ = lyap(collect(A'), X̄)
-    Ā = C̄*X' + C̄'*X
-    return (Ā, C̄)
+    Ā = C̄*X' + C̄'*X
+    return (Ā, C̄)
   end
 end
 
@@ -380,8 +380,8 @@ end
   X = [i==j ? ew[i] : (ew[i]-ew[j])/(w[i]-w[j]) for i in 1:n,j=1:n]
   VT = transpose(E.vectors)
   VTF = factorize(collect(VT))
-  Ā = real.(VTF\(VT*F̄/VTF.*X)*VT)
-  (Ā, )
+  Ā = real.(VTF\(VT*F̄/VTF.*X)*VT)
+  (Ā, )
 end
 
 Zygote.@adjoint function LinearAlgebra.tr(x::AbstractMatrix)
@@ -502,7 +502,7 @@ reversesumscan_(x::AbstractArray; dims::Integer) =
     end
 end
 
-@adjoint function cumprod(A::AbstractArray, dims::Integer)
+@adjoint function cumprod(A::AbstractArray; dims::Integer)
     return cumprod(A; dims=dims), function (∆)
         dim_size = size(A, dims)
         if dim_size == 1
