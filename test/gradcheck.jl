@@ -457,6 +457,11 @@ end
   @test Zygote.gradient(x->sum(zero(x)), randn(3))[1] isa Nothing
 end
 
+@testset "fma and muladd" begin
+    @test gradcheck(x -> fma(x[1], x[2], x[3]), [2.0, 3.0, 5.0])
+    @test gradcheck(x -> muladd(x[1], x[2], x[3]), [2.0, 3.0, 5.0])
+end
+
 import StatsFuns
 
 Zygote.refresh()
