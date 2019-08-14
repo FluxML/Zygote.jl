@@ -305,6 +305,8 @@ end
     @test cholesky(A' * A + I) == first(Zygote.forward(A->cholesky(A' * A + I), A))
     @test gradtest(A->cholesky(A' * A + I).U, A)
     @test gradtest(A->logdet(cholesky(A' * A + I)), A)
+    @test gradtest(B->cholesky(Symmetric(B)).U, A * A' + I)
+    @test gradtest(B->logdet(cholesky(Symmetric(B))), A * A' + I)
   end
   @testset "cholesky - scalar" begin
     rng = MersenneTwister(123456)

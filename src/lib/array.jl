@@ -7,8 +7,9 @@ using Base.Broadcast: broadcasted, broadcast_shape
 @adjoint Array(xs::AbstractArray) = Array(xs), ȳ -> (ȳ,)
 
 @nograd size, length, eachindex, Colon(), findfirst, randn, ones, zeros, one, zero,
-  print, println
+  print, println, any, all
 
+@adjoint rand(dims::Integer...) = rand(dims...), _ -> nothing
 
 @adjoint Base.vect(xs...) = Base.vect(xs...), Δ -> (Δ...,)
 
@@ -123,7 +124,7 @@ end
   ∇map(__context__, f, args...)
 end
 
-function _forward(cx::Context, ::typeof(collect), g::Base.Generator)
+function _forward(cx::AContext, ::typeof(collect), g::Base.Generator)
   y, back = ∇map(cx, g.f, g.iter)
   y, function (ȳ)
     f̄, x̄ = back(ȳ)
@@ -143,7 +144,7 @@ end
   end
 end
 
-function _forward(cx::Context, ::typeof(sum), f, xs::AbstractArray)
+function _forward(cx::AContext, ::typeof(sum), f, xs::AbstractArray)
   y, back = forward(cx, (xs -> sum(f.(xs))), xs)
   y, ȳ -> (nothing, nothing, back(ȳ)...)
 end
@@ -161,7 +162,7 @@ end
   end
 end
 
-function _forward(cx::Context, ::typeof(prod), f, xs::AbstractArray)
+function _forward(cx::AContext, ::typeof(prod), f, xs::AbstractArray)
   y, back = forward(cx, (xs -> prod(f.(xs))), xs)
   y, ȳ -> (nothing, nothing, back(ȳ)...)
 end
@@ -311,7 +312,7 @@ end
   end
 end
 
-function _forward(cx::Context, ::typeof(norm), x::AbstractArray, p::Real = 2)
+function _forward(cx::AContext, ::typeof(norm), x::AbstractArray, p::Real = 2)
   fallback = (x, p) -> sum(abs.(x).^p .+ eps(0f0))^(1/p) # avoid d(sqrt(x))/dx == Inf at 0
   _forward(cx, fallback, x, p)
 end
@@ -358,8 +359,10 @@ end
     Σ̄ = copytri!(Σ̄, 'U')
     Σ̄ = ldiv!(U, Σ̄)
     BLAS.trsm!('R', 'U', 'T', 'N', one(eltype(Σ)), U.data, Σ̄)
-    Σ̄ ./= 2
-    return (Σ̄,)
+    @inbounds for n in diagind(Σ̄)
+      Σ̄[n] /= 2
+    end
+    return (UpperTriangular(Σ̄),)
   end
 end
 
