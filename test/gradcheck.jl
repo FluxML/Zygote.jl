@@ -158,9 +158,9 @@ end
 end
 
 @testset "dropdims" begin
-    @test gradtest(x -> dropdims(x, dims = 3), rand(2, 2, 1, 2))
-    @test gradtest(x -> dropdims(x, dims = (2, 3)), rand(2, 1, 1, 3))
-    @test gradtest(x -> dropdims(x, dims = (1, 2, 3)), rand(1, 1, 1, 3))
+  @test gradtest(x -> dropdims(x, dims = 3), rand(2, 2, 1, 2))
+  @test gradtest(x -> dropdims(x, dims = (2, 3)), rand(2, 1, 1, 3))
+  @test gradtest(x -> dropdims(x, dims = (1, 2, 3)), rand(1, 1, 1, 3))
 end
 
 @testset "(p)inv" begin
