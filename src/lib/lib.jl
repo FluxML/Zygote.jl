@@ -49,6 +49,16 @@ end
   end
 end
 
+@generated function accum_param(cx::Context, xs::Tuple, Δ)
+  return quote
+    haskey(cache(cx), xs) && (cache(cx)[xs] = accum(cache(cx)[xs],Δ))
+    for (x, d) in zip(xs, Δ)
+      accum_param(cx, x, d)
+    end
+    return
+  end
+end
+
 function accum_global(cx::Context, ref, x̄)
   gs = globals(cx)
   gs[ref] = accum(get(gs, ref, nothing), x̄)
