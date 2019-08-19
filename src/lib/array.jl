@@ -281,7 +281,16 @@ end
   return Y, Δ->(-Y' * Δ * Y' + (I - A * Y) * Δ' * Y * Y' + Y' * Y * Δ' * (I - Y * A),)
 end
 
-@adjoint function \(A::Union{Diagonal, AbstractTriangular}, B::AbstractVecOrMat)
+# When `A` is guaranteed to be square, definitely use the simple expression for the adjoint.
+@adjoint function \(
+  A::Union{
+    Diagonal,
+    AbstractTriangular,
+    LinearAlgebra.Adjoint{<:Any, <:AbstractTriangular},
+    Transpose{<:Any, <:AbstractTriangular},
+  },
+  B::AbstractVecOrMat,
+)
   Y = A \ B
   return Y, function(Ȳ)
     B̄ = A' \ Ȳ
