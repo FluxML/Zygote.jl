@@ -27,4 +27,8 @@ end
 
 @test gradient(tasks3, 5) == (10,)
 
+tasks4(x) = fetch(@async x^2)
+
+@test gradient(tasks4, 5) == (10,)
+
 VERSION > v"1.3-" && include("threads.jl")

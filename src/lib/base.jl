@@ -69,19 +69,18 @@ end
 
 @adjoint! function Task(f)
   t = Task(f)
-  f̄ = nothing
   t.code = function ()
     y, back = _forward(__context__, f)
-    cache(__context__)[t] = Task() do
-      f̄ = back(nothing)
-    end
-    return
+    cache(__context__)[t] = Task(back)
+    return y
   end
-  t, _ -> (wait(cache(__context__)[t]); f̄)
+  t, _ -> fetch(cache(__context__)[t])
 end
 
-function runadjoint(cx, t)
+function runadjoint(cx, t, ȳ = nothing)
   t̄ = cache(cx)[t]
+  f = t̄.code
+  t̄.code = () -> f(ȳ)
   @static if VERSION > v"1.3-"
     t̄.sticky = t.sticky
   end
@@ -90,6 +89,10 @@ end
 
 @adjoint! function wait(t::Task)
   wait(t), _ -> (runadjoint(__context__, t); nothing)
+end
+
+@adjoint! function fetch(t::Task)
+  fetch(t), ȳ -> (runadjoint(__context__, t, ȳ); nothing)
 end
 
 @adjoint! function Base.sync_end(refs)
