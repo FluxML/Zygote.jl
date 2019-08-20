@@ -36,6 +36,11 @@ end
 @adjoint! setindex!(xs::AbstractArray, x...) = setindex!(xs, x...),
   _ -> error("Mutating arrays is not supported")
 
+for f in [push!, pop!, pushfirst!, popfirst!]
+  @eval @adjoint! $f(xs::Vector, x...) =
+    push!(xs, x...), _ -> error("Mutating arrays is not supported")
+end
+
 @adjoint function view(x::AbstractArray, inds...; kw...)
   view(x, inds...; kw...), dy -> begin
     dx = _zero(x)

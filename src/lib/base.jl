@@ -49,7 +49,7 @@ end
 
 # Channels
 
-@nograd Channel
+@nograd Channel, schedule
 
 grad_mut(ch::Channel) = Channel(ch.sz_max)
 
@@ -66,3 +66,30 @@ end
     return
   end
 end
+
+@adjoint! function Task(f)
+  t = Task(f)
+  f̄ = nothing
+  t.code = function ()
+    y, back = _forward(__context__, f)
+    cache(__context__)[t] = Task() do
+      f̄ = back(nothing)
+    end
+    return
+  end
+  t, _ -> (wait(cache(__context__)[t]); f̄)
+end
+
+runadjoint(cx, t) = schedule(cache(cx)[t])
+
+@adjoint! function wait(t::Task)
+  wait(t), _ -> (runadjoint(__context__, t); nothing)
+end
+
+@adjoint! function Base.sync_end(refs)
+  Base.sync_end(refs), _ -> foreach(t -> runadjoint(__context__, t), refs)
+end
+
+# Make @sync work
+# Safe as long as other kinds of mutation are disallowed
+@adjoint push!(refs::Vector{Any}, t::Task) = push!(refs, t), _ -> nothing
