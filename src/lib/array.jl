@@ -25,7 +25,7 @@ _zero(xs::AbstractArray{<:Integer}) = fill!(similar(xs, float(eltype(xs))), fals
 _zero(xs::AbstractArray{<:Number}) = zero(xs)
 _zero(xs::AbstractArray) = Any[nothing for x in xs]
 
-@adjoint function getindex(xs::Array, i...)
+@adjoint function getindex(xs::AbstractArray, i...)
   xs[i...], function (Δ)
     Δ′ = _zero(xs)
     Δ′[i...] = Δ
@@ -35,6 +35,11 @@ end
 
 @adjoint! setindex!(xs::AbstractArray, x...) = setindex!(xs, x...),
   _ -> error("Mutating arrays is not supported")
+
+for f in [push!, pop!, pushfirst!, popfirst!]
+  @eval @adjoint! $f(xs::Vector, x...) =
+    push!(xs, x...), _ -> error("Mutating arrays is not supported")
+end
 
 @adjoint function view(x::AbstractArray, inds...; kw...)
   view(x, inds...; kw...), dy -> begin
@@ -281,7 +286,16 @@ end
   return Y, Δ->(-Y' * Δ * Y' + (I - A * Y) * Δ' * Y * Y' + Y' * Y * Δ' * (I - Y * A),)
 end
 
-@adjoint function \(A::Union{Diagonal, AbstractTriangular}, B::AbstractVecOrMat)
+# When `A` is guaranteed to be square, definitely use the simple expression for the adjoint.
+@adjoint function \(
+  A::Union{
+    Diagonal,
+    AbstractTriangular,
+    LinearAlgebra.Adjoint{<:Any, <:AbstractTriangular},
+    Transpose{<:Any, <:AbstractTriangular},
+  },
+  B::AbstractVecOrMat,
+)
   Y = A \ B
   return Y, function(Ȳ)
     B̄ = A' \ Ȳ

@@ -13,6 +13,10 @@ end
   include("features.jl")
 end
 
+@testset "Data Structures" begin
+  include("structures.jl")
+end
+
 @testset "Gradients" begin
   include("gradcheck.jl")
 end

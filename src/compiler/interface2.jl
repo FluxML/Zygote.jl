@@ -12,7 +12,7 @@ ignore(T) = all(T -> T <: Type, T.parameters)
   forw = varargs!(meta, forw, 3)
   # IRTools.verify(forw)
   forw = slots!(pis!(inlineable!(forw)))
-  return IRTools.update!(meta, forw)
+  return IRTools.update!(meta.code, forw)
 end
 
 @generated function (j::Pullback{T})(Δ) where T
@@ -29,5 +29,5 @@ end
   argnames!(meta, Symbol("#self#"), :Δ)
   # IRTools.verify(back)
   back = slots!(inlineable!(back))
-  return IRTools.update!(meta, back)
+  return IRTools.update!(meta.code, back)
 end

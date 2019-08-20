@@ -42,6 +42,8 @@ end
 Buffer(xs::AbstractArray, args...) =
   Buffer(similar(xs, args...), false)
 
+bufferfrom(xs::AbstractArray) = Buffer(xs, false)
+
 Base.getindex(b::Buffer, i...) = b.data[i...]
 
 function Base.setindex!(b::Buffer, v, i...)
@@ -62,8 +64,8 @@ grad_mut(b::Buffer{T}) where T<:Number = fill!(similar(b.data, float(T)), 0)
 @nograd Buffer
 
 @adjoint function getindex(b::Buffer, i...)
-  d[k], function (Δ)
-    grad = grad_mut(__context__, d)
+  b[i...], function (Δ)
+    grad = grad_mut(__context__, b)
     grad[i...] = accum(grad[i...], Δ)
     return
   end

@@ -84,7 +84,7 @@ function instrument(ir::IR)
   pr = Pipe(ir)
   for (v, st) in pr
     ex = st.expr
-    isexpr(ex, :foreigncall) && continue
+    isexpr(ex, :foreigncall, :isdefined) && continue
     isexpr(ex, :enter, :leave) && error("try/catch is not supported.")
     ex = instrument_new!(pr, v, ex)
     ex = instrument_literals!(pr, v, ex)
