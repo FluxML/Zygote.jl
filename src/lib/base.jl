@@ -82,7 +82,9 @@ end
 
 function runadjoint(cx, t)
   t̄ = cache(cx)[t]
-  t̄.sticky = t.sticky
+  @static if VERSION > v"1.3-"
+    t̄.sticky = t.sticky
+  end
   schedule(t̄)
 end
 
