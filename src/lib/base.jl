@@ -46,3 +46,23 @@ end
     (nothing, Δ, nothing)
   end
 end
+
+# Channels
+
+@nograd Channel
+
+grad_mut(ch::Channel) = Channel(ch.sz_max)
+
+@adjoint! function put!(ch::Channel, x)
+  put!(ch, x), function (ȳ)
+    x̄ = take!(grad_mut(__context__, ch))
+    (nothing, accum(x̄, ȳ), nothing)
+  end
+end
+
+@adjoint! function take!(ch::Channel)
+  take!(ch), function (x̄)
+    put!(grad_mut(__context__, ch), x̄)
+    return
+  end
+end
