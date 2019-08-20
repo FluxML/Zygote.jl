@@ -80,7 +80,11 @@ end
   t, _ -> (wait(cache(__context__)[t]); f̄)
 end
 
-runadjoint(cx, t) = schedule(cache(cx)[t])
+function runadjoint(cx, t)
+  t̄ = cache(cx)[t]
+  t̄.sticky = t.sticky
+  schedule(t̄)
+end
 
 @adjoint! function wait(t::Task)
   wait(t), _ -> (runadjoint(__context__, t); nothing)

@@ -1,13 +1,13 @@
 using Zygote, Test
 
-function f(x)
+function tasks1(x)
   ch = Channel(Inf)
   put!(ch, x^2) + take!(ch)
 end
 
-@test gradient(f, 5) == (20,)
+@test gradient(tasks1, 5) == (20,)
 
-function f(x)
+function tasks2(x)
   ch = Channel(0)
   t = @async put!(ch, x^2)
   y = take!(ch)
@@ -15,9 +15,9 @@ function f(x)
   return y
 end
 
-@test gradient(f, 5) == (10,)
+@test gradient(tasks2, 5) == (10,)
 
-function f(x)
+function tasks3(x)
   ch = Channel(0)
   @sync begin
     @async put!(ch, x^2)
@@ -25,4 +25,14 @@ function f(x)
   end
 end
 
-@test gradient(f, 5) == (10,)
+@test gradient(tasks3, 5) == (10,)
+
+function tasks4(x)
+  ch = Channel(Inf)
+  @sync begin
+    t = @spawn put!(ch, x^2)
+    take!(ch)
+  end
+end
+
+@test gradient(tasks4, 5) == (10,)
