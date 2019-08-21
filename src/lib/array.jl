@@ -201,6 +201,21 @@ end
 _backmean(xs, Δ, ::Colon) = zero(xs) .+ Δ ./ length(xs)
 _backmean(xs, Δ, dims) = zero(xs) .+ Δ ./ mapreduce(i -> size(xs,i),*,dims)
 
+@adjoint function Statistics.var(xs::AbstractArray; corrected::Bool=true, mean=nothing, dims=:)
+    return Statistics.var(xs; corrected=corrected, mean=mean, dims=dims), Δ -> _backvar(xs, Δ, corrected, mean, dims)
+end
+_backvar(xs, Δ, corrected::Bool, ::Nothing, dims)    = _backvar(xs, Δ, corrected, mean(xs, dims=dims), dims)
+_backvar(xs, Δ, corrected::Bool, ::Nothing, ::Colon) = _backvar(xs, Δ, corrected, mean(xs), :)
+_backvar(xs, Δ, corrected::Bool, mean, dims)         = _backvar(xs, Δ, mapreduce(i -> size(xs,i),*,dims) - corrected, mean)
+_backvar(xs, Δ, corrected::Bool, mean, ::Colon)      = _backvar(xs, Δ, length(xs) - corrected, mean)
+_backvar(xs, Δ, N::Int, mean) = (convert(eltype(xs), 2/N) .* Δ .* (xs .- mean),)
+
+@adjoint function Statistics.std(xs::AbstractArray; corrected::Bool=true, mean=nothing, dims=:)
+    s = Statistics.std(xs; corrected=corrected, mean=mean, dims=dims)
+    return s, Δ -> _backvar(xs, Δ ./ (2 .* s), corrected, mean, dims)
+end
+
+
 # LinAlg
 # ======
 
