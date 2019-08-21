@@ -41,6 +41,9 @@ end
 
 @adjoint Base.typeassert(x, T) = Base.typeassert(x, T), Δ -> (Δ, nothing)
 
+accum_param(cx::Context, x, Δ::Nothing) = nothing
+accum_param(cx::Context, xs::Tuple, Δ::Nothing) = nothing
+
 @generated function accum_param(cx::Context, x, Δ)
   isbitstype(x) && return
   quote
