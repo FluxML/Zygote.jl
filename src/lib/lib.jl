@@ -75,8 +75,13 @@ using Base: tail
 @adjoint tuple(xs...) = xs, identity
 
 literal_getindex(x, ::Val{i}) where i = getindex(x, i)
-literal_indexed_iterate(x, ::Val{i}) where i = Base.indexed_iterate(x, i)
-literal_indexed_iterate(x, ::Val{i}, state) where i = Base.indexed_iterate(x, i, state)
+literal_indexed_iterate(x, ::Val{i}) where i = indexed_iterate(x, Val(i),1)
+literal_indexed_iterate(x, ::Val{i}, state) where i = indexed_iterate(x, Val(i), state)
+indexed_iterate(t::NamedTuple, ::Val{i}, state) where {i}= ( mygetfield(t, Val(i)), i+1)
+mygetfield( t::NamedTuple{N,T}, ::Val{i} ) where {N,T,i} = getfield(t,i)
+@adjoint function mygetfield( t::NamedTuple{N,T}, ::Val{i} ) where {N,T,i}
+    t[i], Δ -> ( (;nt_nothing(t)...,pair( Val(N[i]),Δ)...),nothing)
+end
 
 @adjoint literal_getindex(xs::NTuple{N,Any}, ::Val{i}) where {N,i} =
   (xs[i], Δ -> (ntuple(j -> i == j ? Δ : nothing, Val(N)), nothing))

@@ -304,3 +304,18 @@ end
   @test gradient((x,y,z) -> sum((x,y,z)[1:2]), 7, 8.8, 9.9) == (1.0, 1.0, nothing)
   @test gradient((x,y,z) -> sum((x,y,z)[[1,2,1]]), 1,2,3) == (2, 1, nothing)
 end
+
+@testset "NamedTuples destructuring" begin
+  begin
+    foo( (a,b) ) = a
+    fooTarget( t ) = t.a
+    nt = (a=1.0, b=1.0)
+    @test gradient(foo, nt) == gradient(fooTarget,nt)
+  end
+  begin
+    foo( (a, b, c) ) = b*b + c.a*c.b
+    fooTarget( t ) = t.b * t.b + t.c.a * t.c.b
+    nt = (a=2.0,b=3.0,c=(a=1.0,b=4.0,d=nothing))
+    @test gradient(foo, nt) == gradient(fooTarget,nt)
+  end
+end
