@@ -110,6 +110,8 @@ end
   first(xs), Δ -> ((Δ, drest...),)
 end
 
+@adjoint Base.tail(xs::Tuple) = tail(xs), x̄s -> ((nothing, x̄s...),)
+
 _empty(x) = length(x)
 _empty(x::Tuple) = map(_->nothing, x)
 
