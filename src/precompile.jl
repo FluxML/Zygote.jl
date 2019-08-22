@@ -1,14 +1,5 @@
 using InteractiveUtils
 
-function pow(x, n)
-  r = 1
-  while n > 0
-    n -= 1
-    r *= x
-  end
-  return r
-end
-
 # Invoking the compiler outside of the genfuncs appears
 # to make the specialised versions visible inside them,
 # leading to a significant first-compile speedup.

@@ -42,7 +42,6 @@ include("lib/utils.jl")
 
 # we need to define this late, so that the genfuncs see lib.jl
 include("compiler/interface2.jl")
-usetyped || include("precompile.jl")
 
 include("profiler/Profile.jl")
 
@@ -50,10 +49,15 @@ include("profiler/Profile.jl")
   include("flux.jl")
 end
 
+precompile() = usetyped || include(joinpath(@__DIR__, "precompile.jl"))
+
+precompile()
+@init precompile()
+
 # helps to work around 265-y issues
 function refresh()
   include(joinpath(@__DIR__, "compiler/interface2.jl"))
-  usetyped || include(joinpath(@__DIR__, "precompile.jl"))
+  precompile()
   return
 end
 
