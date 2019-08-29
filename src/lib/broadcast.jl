@@ -42,12 +42,35 @@ accum_sum(xs::Number; dims = :) = xs
 
 trim(x, Δ) = reshape(Δ, ntuple(i -> size(Δ, i), Val(ndims(x))))
 
+_unbroadcast(x, x̄) = unbroadcast(x, x̄)
+_unbroadcast(x, ::Nothing) = nothing
+
 unbroadcast(x::AbstractArray, x̄) =
   size(x) == size(x̄) ? x̄ :
   length(x) == length(x̄) ? trim(x, x̄) :
     trim(x, accum_sum(x̄, dims = ntuple(i -> size(x, i) == 1 ? i : ndims(x̄)+1, Val(ndims(x̄)))))
 
 unbroadcast(x::Union{Number,Ref}, x̄) = accum_sum(x̄)
+
+"""
+    prefernothing.(Δ, broadcasting_expression)
+
+Return `nothing` if `Δ` is `nothing` or array of `nothing`s without evaluating
+`broadcasting_expression`.
+"""
+function prefernothing end
+Broadcast.broadcasted(::typeof(prefernothing), Δ, bc) =
+  if Δ === nothing || Δ isa AbstractArray{Nothing}
+    nothing
+  else
+    # Otherwise, replace the entries of type `nothing` with `false` lazily:
+    _zeronothing(Δ, bc)
+  end
+_zeronothing(Δ, bc::Broadcasted) =
+  broadcasted(bc.f, map(x -> _zeronothing(Δ, x), bc.args)...)
+_zeronothing(Δ, x) = Δ === x ? broadcasted(__zeronothing, Δ) : x
+__zeronothing(::Nothing) = false
+__zeronothing(x) = x
 
 # Split Reverse Mode
 # ==================
@@ -59,34 +82,38 @@ unbroadcast(x::Union{Number,Ref}, x̄) = accum_sum(x̄)
 Numeric{T<:Number} = Union{T,AbstractArray{<:T}}
 
 @adjoint broadcasted(::typeof(+), xs::Numeric...) =
-  broadcast(+, xs...), ȳ -> (nothing, map(x -> unbroadcast(x, ȳ), xs)...)
+  broadcast(+, xs...), ȳ -> (nothing, map(x -> _unbroadcast(x, ȳ), xs)...)
 
 @adjoint broadcasted(::typeof(*), x::Numeric, y::Numeric) = x.*y,
-  z̄ -> (nothing, unbroadcast(x, z̄ .* conj.(y)), unbroadcast(y, z̄ .* conj.(x)))
+  z̄ -> (nothing,
+        _unbroadcast(x, prefernothing.(z̄, z̄ .* conj.(y))),
+        _unbroadcast(y, prefernothing.(z̄, z̄ .* conj.(x))))
 
 @adjoint function broadcasted(::typeof(/), x::Numeric, y::Numeric)
   res = x ./ y
-  res, Δ -> (nothing, unbroadcast(x, Δ ./ y), unbroadcast(y, -Δ .* res ./ y))
+  res, Δ -> (nothing,
+             _unbroadcast(x, prefernothing.(Δ, Δ ./ y)),
+             _unbroadcast(y, prefernothing.(Δ, .-Δ .* res ./ y)))
 end
 
 @adjoint function broadcasted(::typeof(σ), x::Numeric)
   y = σ.(x)
-  y, ȳ -> (nothing, ȳ .* conj.(y .* (1 .- y)))
+  y, ȳ -> (nothing, prefernothing.(ȳ, ȳ .* conj.(y .* (1 .- y))))
 end
 
 @adjoint function broadcasted(::typeof(tanh), x::Numeric)
   y = tanh.(x)
-  y, ȳ -> (nothing, ȳ .* conj.(1 .- y.^2))
+  y, ȳ -> (nothing, prefernothing.(ȳ, ȳ .* conj.(1 .- y.^2)))
 end
 
 @adjoint broadcasted(::typeof(conj), x::Numeric) =
-  conj.(x), z̄ -> (nothing, conj.(z̄))
+  conj.(x), z̄ -> (nothing, prefernothing.(z̄, conj.(z̄)))
 
 @adjoint broadcasted(::typeof(real), x::Numeric) =
-  real.(x), z̄ -> (nothing, real.(z̄))
+  real.(x), z̄ -> (nothing, prefernothing.(z̄, real.(z̄)))
 
 @adjoint broadcasted(::typeof(imag), x::Numeric) =
-  imag.(x), z̄ -> (nothing, im .* real.(z̄))
+  imag.(x), z̄ -> (nothing, prefernothing.(z̄, im .* real.(z̄)))
 
 # General Fallback
 # ================
@@ -114,7 +141,7 @@ _broadcast(f::F, x...) where F = materialize(broadcasted(f, x...))
   y, function (ȳ)
     dxs_zip = map((∂b, ȳ) -> ∂b(ȳ), ∂b, ȳ)
     dxs = ntuple(i -> map(x -> x[i], dxs_zip), len)
-    (nothing, accum_sum(dxs[1]), map(unbroadcast, args, Base.tail(dxs))...)
+    (nothing, accum_sum(dxs[1]), map(_unbroadcast, args, Base.tail(dxs))...)
   end
 end
 
@@ -154,7 +181,7 @@ end
   out = dual_function(f).(args...)
   eltype(out) <: Dual || return (out, _ -> nothing)
   y = map(x -> x.value, out)
-  _back(ȳ, i) = unbroadcast(args[i], ((a, b) -> a*b.partials[i]).(ȳ, out))
+  _back(ȳ, i) = _unbroadcast(args[i], ((a, b) -> a*b.partials[i]).(ȳ, out))
   back(ȳ) = ntuple(i -> _back(ȳ, i), N)
   return y, back
 end
