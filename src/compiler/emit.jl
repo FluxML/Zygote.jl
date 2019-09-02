@@ -59,8 +59,8 @@ function forward_stacks!(adj, F)
   if usetyped && length(pr.blocks) > 1
     rec = push!(pr, Expr(:call, Pullback{F,T}, rec))
   else
-    # P = length(pr.blocks) == 1 ? Pullback{F} : Pullback{F,Any}
-    P = Pullback{F,Any} # reduce specialisation for now
+    P = length(pr.blocks) == 1 ? Pullback{F} : Pullback{F,Any}
+    # P = Pullback{F,Any} # reduce specialisation
     rec = push!(pr, Expr(:call, P, rec))
   end
   ret = xtuple(pr.blocks[end].branches[end].args[1], rec)
