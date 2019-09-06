@@ -36,6 +36,7 @@ using NNlib
 accum_sum(xs; dims = :) = reduce(accum, xs, dims = dims)
 
 # Work around reducedim_init issue
+accum_sum(xs::Nothing; dims = :) = nothing
 accum_sum(xs::AbstractArray{Nothing}; dims = :) = nothing
 accum_sum(xs::AbstractArray{<:Number}; dims = :) = sum(xs, dims = dims)
 accum_sum(xs::Number; dims = :) = xs
@@ -48,6 +49,8 @@ unbroadcast(x::AbstractArray, x̄) =
     trim(x, accum_sum(x̄, dims = ntuple(i -> size(x, i) == 1 ? i : ndims(x̄)+1, Val(ndims(x̄)))))
 
 unbroadcast(x::Union{Number,Ref}, x̄) = accum_sum(x̄)
+
+unbroadcast(x::AbstractArray, x̄::Nothing) = nothing
 
 # Split Reverse Mode
 # ==================
@@ -106,6 +109,11 @@ end
 # Avoid hitting special cases for `Adjoint` etc.
 _broadcast(f::F, x...) where F = materialize(broadcasted(f, x...))
 
+_get(x::Tuple, i) = x[i]
+_get(::Nothing, i) = nothing
+collapse_nothings(xs::Vector{Nothing}) = nothing
+collapse_nothings(xs) = xs
+
 @adjoint function broadcasted(::AbstractArrayStyle, f, args...)
   len = inclen(args)
   y∂b = _broadcast((x...) -> _forward(__context__, f, x...), args...)
@@ -113,7 +121,7 @@ _broadcast(f::F, x...) where F = materialize(broadcasted(f, x...))
   ∂b = map(x -> x[2], y∂b)
   y, function (ȳ)
     dxs_zip = map((∂b, ȳ) -> ∂b(ȳ), ∂b, ȳ)
-    dxs = ntuple(i -> map(x -> x[i], dxs_zip), len)
+    dxs = collapse_nothings.(ntuple(i -> map(x -> _get(x, i), dxs_zip), len))
     (nothing, accum_sum(dxs[1]), map(unbroadcast, args, Base.tail(dxs))...)
   end
 end
