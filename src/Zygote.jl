@@ -51,7 +51,7 @@ end
 
 precompile() = usetyped || include(joinpath(@__DIR__, "precompile.jl"))
 
-precompile()
+# precompile()
 @init precompile()
 
 # helps to work around 265-y issues
