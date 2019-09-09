@@ -587,6 +587,19 @@ end
 end
 
 
+@adjoint function fftshift(x, dims)
+    return fftshift(x), function(Δ)
+        return (ifftshift(Δ, dims), nothing)
+    end
+end
+
+@adjoint function ifftshift(x, dims)
+    return ifftshift(x), function(Δ)
+        return (fftshift(Δ, dims), nothing)
+    end
+end
+
+
 
 # FillArray functionality
 # =======================
