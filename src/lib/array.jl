@@ -527,6 +527,18 @@ end
 end
 
 
+@adjoint function fftshift(x)
+    return fftshift(x), function(Δ)
+        return (ifftshift(Δ),)
+    end
+end
+
+@adjoint function ifftshift(x)
+    return ifftshift(x), function(Δ)
+        return (fftshift(Δ),)
+    end
+end
+
 # if we're specifying the dimensions
 @adjoint function fft(xs, dims)
   return AbstractFFTs.fft(xs, dims), function(Δ)
@@ -573,8 +585,6 @@ end
     return (AbstractFFTs.rfft(Δ, dims), nothing, nothing)
   end
 end
-
-
 
 
 
