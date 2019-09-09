@@ -388,6 +388,22 @@ Zygote.refresh()
    # Check unary pairwise.
   @test gradtest(X->pairwise(SqEuclidean(), X; dims=2), randn(rng, D, P))
   @test gradtest(Xt->pairwise(SqEuclidean(), Xt; dims=1), randn(rng, P, D))
+
+  @testset "colwise(::Euclidean, X, Y; dims=2)" begin
+    rng, D, P = MersenneTwister(123456), 2, 3
+    X, Y, D̄ = randn(rng, D, P), randn(rng, D, P), randn(rng, P)
+    gradtest((X, Y)->colwise(Euclidean(), X, Y), X, Y)
+  end
+  @testset "pairwise(::Euclidean, X, Y; dims=2)" begin
+    rng, D, P, Q = MersenneTwister(123456), 2, 3, 5
+    X, Y, D̄ = randn(rng, D, P), randn(rng, D, Q), randn(rng, P, Q)
+    gradtest((X, Y)->pairwise(Euclidean(), X, Y; dims=2), X, Y)
+  end
+  @testset "pairwise(::Euclidean, X; dims=2)" begin
+    rng, D, P = MersenneTwister(123456), 2, 3
+    X, D̄ = randn(rng, D, P), randn(rng, P, P)
+    gradtest(X->pairwise(Euclidean(), X; dims=2), X)
+  end
 end
 
 function cat_test(f, A::Union{AbstractVector, AbstractMatrix}...)
