@@ -32,3 +32,17 @@ tasks4(x) = fetch(@async x^2)
 @test gradient(tasks4, 5) == (10,)
 
 VERSION > v"1.3-" && include("threads.jl")
+
+# Checking a corner case of map implementation.
+# See: Handle nothings more gracefully in unzip
+#      https://github.com/FluxML/Zygote.jl/pull/321
+let xs = ones(3),
+    ys = ones(3)
+    @test gradient(1) do a
+        p0 = (xs, ys, a)
+        sum(zip(p0[1], p0[2])) do (x, y)
+            p1 = (p0..., x)
+            p1[end]
+        end
+    end === (nothing,)
+end

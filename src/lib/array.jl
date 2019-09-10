@@ -105,9 +105,10 @@ end
 
 @adjoint getindex(i::Int, j::Int) = i[j], _ -> nothing
 
+unzip(xs::Tuple{Vararg{Nothing}}) = xs
 function unzip(tuples)
-  map(1:length(first(tuples))) do i
-      map(tuple -> tuple[i], tuples)
+  map(1:length(first(x for x in tuples if x !== nothing))) do i
+      map(tuple -> tuple === nothing ? nothing : tuple[i], tuples)
   end
 end
 function ∇map(cx, f, args...)
