@@ -463,7 +463,6 @@ AbstractFFTs.rfft(x::Fill, dims...) = AbstractFFTs.rfft(collect(x), dims...)
 AbstractFFTs.irfft(x::Fill, d, dims...) = AbstractFFTs.irfft(collect(x), d, dims...)
 AbstractFFTs.brfft(x::Fill, d, dims...) = AbstractFFTs.brfft(collect(x), d, dims...)
 
-
 # the adjoint jacobian of an FFT with respect to its input is the reverse FFT of the
 # gradient of its inputs, but with different normalization factor
 @adjoint function fft(xs)
@@ -472,23 +471,21 @@ AbstractFFTs.brfft(x::Fill, d, dims...) = AbstractFFTs.brfft(collect(x), d, dims
   end
 end
 
-# all of the plans normalize their inverse, while we need the unnormalized one.
 @adjoint function *(P::AbstractFFTs.Plan, xs)
   return P * xs, function(Δ)
-    N = length(xs)
+    N = prod(size(xs)[P.region])
     return (nothing, N * (P \ Δ))
   end
 end
 
 @adjoint function \(P::AbstractFFTs.Plan, xs)
   return P \ xs, function(Δ)
-    N = length(Δ)
+    N = prod(size(Δ)[P.region])
     return (nothing, 1/N * (P * Δ))
   end
 end
 
-
-
+# all of the plans normalize their inverse, while we need the unnormalized one.
 @adjoint function ifft(xs)
   return AbstractFFTs.ifft(xs), function(Δ)
     N = length(xs)
@@ -501,6 +498,19 @@ end
     return (AbstractFFTs.fft(Δ),)
   end
 end
+
+@adjoint function fftshift(x)
+    return fftshift(x), function(Δ)
+        return (ifftshift(Δ),)
+    end
+end
+
+@adjoint function ifftshift(x)
+    return ifftshift(x), function(Δ)
+        return (fftshift(Δ),)
+    end
+end
+
 
 # to actually use rfft, one needs to insure that everything that happens in the Fourier domain could've been done in the space domain with real numbers. This means enforcing conjugate symmetry along all transformed dimensions besides the first. Otherwise this is going to result in *very* weird behavior.
 @adjoint function rfft(xs::AbstractArray{<:Real})
@@ -526,18 +536,6 @@ end
   end
 end
 
-
-@adjoint function fftshift(x)
-    return fftshift(x), function(Δ)
-        return (ifftshift(Δ),)
-    end
-end
-
-@adjoint function ifftshift(x)
-    return ifftshift(x), function(Δ)
-        return (fftshift(Δ),)
-    end
-end
 
 # if we're specifying the dimensions
 @adjoint function fft(xs, dims)
@@ -598,6 +596,14 @@ end
         return (fftshift(Δ, dims), nothing)
     end
 end
+
+
+
+
+
+
+
+
 
 
 
