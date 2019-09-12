@@ -403,6 +403,24 @@ end
   (Ā, )
 end
 
+@adjoint function LinearAlgebra.eigen(A::AbstractMatrix)
+  eV = eigen(A)
+  e,V = eV
+  n = size(A,1)
+  eV, function (Δ)
+    Δe, ΔV = Δ
+    if ΔV === nothing
+      (inv(V)'*Diagonal(Δe)*V', )
+    elseif Δe === nothing
+      F = [i==j ? 0 : inv(e[j] - e[i]) for i=1:n, j=1:n]
+      (inv(V)'*(F .* (V'ΔV))*V', )
+    else
+      F = [i==j ? 0 : inv(e[j] - e[i]) for i=1:n, j=1:n]
+      (inv(V)'*(Diagonal(Δe) + F .* (V'ΔV))*V', )
+    end
+  end
+end
+
 Zygote.@adjoint function LinearAlgebra.tr(x::AbstractMatrix)
   # x is a squre matrix checked by tr,
   # so we could just use Eye(size(x, 1))

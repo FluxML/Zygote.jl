@@ -352,6 +352,18 @@ end
   end
 end
 
+@testset "eigen" begin
+  rng, N = MersenneTwister(6865931), 8
+  for i = 1:5
+    A = randn(rng, N, N)
+    @test gradtest(A->abs.(eigen(A).values), A)
+    @test gradcheck(A) do A
+      e = eigen(A)
+      sum(real.(e.values)) + sum(real.(e.vectors))
+    end
+  end
+end
+
 using Distances
 
 Zygote.refresh()
