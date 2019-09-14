@@ -90,6 +90,6 @@ w: \mathbb{C} \rightarrow \mathbb{C} \\[1.2em]
 \end{align*}
 ```
 
-If `w` is not holomorphic, the pullback map ``\overline{f \circ w} \mapsto \overline{f}`` is not ``\mathbb{C}``-linear and can therefore not be expressed simply as a multiple of ``\overline{f}``, like in the holomorphic case.
+If `w` is not holomorphic, the pullback map ``\overline{f} \mapsto \overline{f \circ w}`` is not ``\mathbb{C}``-linear and can therefore not be expressed simply as a multiple of ``\overline{f}``, like in the holomorphic case.
 
 Attention has to be paid, when comparing Zygote to other AD-tools, since they might use different definitions for complex gradients.
