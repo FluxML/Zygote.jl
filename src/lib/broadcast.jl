@@ -96,10 +96,10 @@ end
 
 # The fused reverse mode implementation is the most general but currently has
 # poor performance. It works by flattening the broadcast and mapping the call to
-# `_forward` over the input.
+# `_pullback` over the input.
 
 # However, the core call
-# broadcast(_forward, (cx,), f, args...)
+# broadcast(_pullback, (cx,), f, args...)
 # is already 10x slower than a simple broadcast (presumably due to inlining
 # issues, or something similar) and the other operations needed take it to about
 # 100x overhead.
@@ -116,7 +116,7 @@ collapse_nothings(xs) = xs
 
 @adjoint function broadcasted(::AbstractArrayStyle, f, args...)
   len = inclen(args)
-  y∂b = _broadcast((x...) -> _forward(__context__, f, x...), args...)
+  y∂b = _broadcast((x...) -> _pullback(__context__, f, x...), args...)
   y = map(x -> x[1], y∂b)
   ∂b = map(x -> x[2], y∂b)
   y, function (ȳ)
@@ -128,14 +128,14 @@ end
 
 @adjoint function broadcasted(::AbstractArrayStyle{0}, f, args...)
   len = inclen(args)
-  y, ∂b = _broadcast((x...) -> _forward(__context__, f, x...), args...)
+  y, ∂b = _broadcast((x...) -> _pullback(__context__, f, x...), args...)
   y, function (ȳ)
     dxs = ∂b(ȳ)
     (nothing, dxs...)
   end
 end
 
-@adjoint! (b::typeof(broadcast))(f, args...) = _forward(__context__, broadcasted, f, args...)
+@adjoint! (b::typeof(broadcast))(f, args...) = _pullback(__context__, broadcasted, f, args...)
 
 # Forward Mode (mainly necessary for CUDA)
 

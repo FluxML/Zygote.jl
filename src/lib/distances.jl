@@ -22,8 +22,8 @@ end
     return pairwise(s, x, y; dims=dims), ∇pairwise(s, x, y, identity)
   end
 end
-  
-∇pairwise(s, x, y, f) = 
+
+∇pairwise(s, x, y, f) =
   function(Δ)
     x̄ = 2 .* (x * Diagonal(vec(sum(Δ; dims=2))) .- y * transpose(Δ))
     ȳ = 2 .* (y * Diagonal(vec(sum(Δ; dims=1))) .- x * Δ)
@@ -38,7 +38,7 @@ end
   end
 end
 
-∇pairwise(s, x, f) = 
+∇pairwise(s, x, f) =
   function(Δ)
     d1 = Diagonal(vec(sum(Δ; dims=1)))
     d2 = Diagonal(vec(sum(Δ; dims=2)))
@@ -55,14 +55,14 @@ end
 
 @adjoint function pairwise(::Euclidean, X::AbstractMatrix, Y::AbstractMatrix; dims=2)
   @assert dims == 2
-  D, back = forward((X, Y)->pairwise(SqEuclidean(), X, Y; dims=2), X, Y)
+  D, back = pullback((X, Y)->pairwise(SqEuclidean(), X, Y; dims=2), X, Y)
   D .= sqrt.(D)
   return D, Δ -> (nothing, back(Δ ./ (2 .* D))...)
 end
 
 @adjoint function pairwise(::Euclidean, X::AbstractMatrix; dims=2)
   @assert dims == 2
-  D, back = forward(X->pairwise(SqEuclidean(), X; dims=2), X)
+  D, back = pullback(X->pairwise(SqEuclidean(), X; dims=2), X)
   D .= sqrt.(D)
   return D, function(Δ)
     Δ = Δ ./ (2 .* D)

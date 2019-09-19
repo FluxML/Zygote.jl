@@ -28,7 +28,7 @@ function J(::typeof(foo), x)
 end
 ```
 
-Thus, where the forward pass calculates `x -> a -> b`, the backwards takes `b̄ -> ā -> x̄` via the pullbacks. The AD transform is recursive; we'll differentiate `bar` and `baz` in the same way, until we hit a case where gradient is explicitly defined.
+Thus, where the pullback pass calculates `x -> a -> b`, the backwards takes `b̄ -> ā -> x̄` via the pullbacks. The AD transform is recursive; we'll differentiate `bar` and `baz` in the same way, until we hit a case where gradient is explicitly defined.
 
 Here's a working example that illustrates the concepts.
 
@@ -57,10 +57,10 @@ Now, clearly this is a mechanical transformation, so the only remaining thing is
 
 ## Closures
 
-The `J` function here corresponds to `forward` in Zygote. However, `forward` actually a wrapper around the lower level `_forward` function.
+The `J` function here corresponds to `pullback` in Zygote. However, `pullback` actually a wrapper around the lower level `_pullback` function.
 
 ```julia
-julia> y, back = Zygote._forward(sin, 0.5);
+julia> y, back = Zygote._pullback(sin, 0.5);
 
 julia> back(1)
 (nothing, 0.8775825618903728)
@@ -72,13 +72,13 @@ Why the extra `nothing` here? This actually represents the gradient of the funct
 julia> f = let a = 3; x -> x*a; end
 #19 (generic function with 1 method)
 
-julia> y, back = Zygote._forward(f, 2);
+julia> y, back = Zygote._pullback(f, 2);
 
 julia> back(1)
 ((a = 2,), 3)
 ```
 
-This is a minor point for the most part, but `_forward` will come up in future examples.
+This is a minor point for the most part, but `_pullback` will come up in future examples.
 
 ## Entry Points
 
@@ -110,16 +110,16 @@ The code is then differentiated by the code in `compiler/reverse.jl`. You can se
 
 ```julia
 julia> Zygote.@code_adjoint foo(1)
-1 1 ─ %1  = (Zygote._forward)(_2, Zygote.unwrap, Main.bar)::Any
+1 1 ─ %1  = (Zygote._pullback)(_2, Zygote.unwrap, Main.bar)::Any
   │   %2  = (Base.getindex)(%1, 1)::Any
   │         (Base.getindex)(%1, 2)::Any
-  │   %4  = (Zygote._forward)(_2, %2, _4)::Any
+  │   %4  = (Zygote._pullback)(_2, %2, _4)::Any
   │   %5  = (Base.getindex)(%4, 1)::Any
   │         (Base.getindex)(%4, 2)::Any
-  │   %7  = (Zygote._forward)(_2, Zygote.unwrap, Main.baz)::Any
+  │   %7  = (Zygote._pullback)(_2, Zygote.unwrap, Main.baz)::Any
   │   %8  = (Base.getindex)(%7, 1)::Any
   │         (Base.getindex)(%7, 2)::Any
-  │   %10 = (Zygote._forward)(_2, %8, %5)::Any
+  │   %10 = (Zygote._pullback)(_2, %8, %5)::Any
   │   %11 = (Base.getindex)(%10, 1)::Any
   │         (Base.getindex)(%10, 2)::Any
   └──       return %11
@@ -137,7 +137,7 @@ julia> Zygote.@code_adjoint foo(1)
 , [1])
 ```
 
-This code is quite verbose, mainly due to all the tuple unpacking (`gradindex` is just like `getindex`, but handles `nothing` gracefully). The are two pieces of IR here, one for the modified forward pass and one for the pullback closure. The `@` nodes allow the closure to refer to values from the forward pass, and the `Δ()` represents the incoming gradient `ȳ`. In essence, this is just what we wrote above by hand for `J(::typeof(foo), x)`.
+This code is quite verbose, mainly due to all the tuple unpacking (`gradindex` is just like `getindex`, but handles `nothing` gracefully). The are two pieces of IR here, one for the modified pullback pass and one for the pullback closure. The `@` nodes allow the closure to refer to values from the pullback pass, and the `Δ()` represents the incoming gradient `ȳ`. In essence, this is just what we wrote above by hand for `J(::typeof(foo), x)`.
 
 `compiler/emit.jl` lowers this code into runnable IR (e.g. by turning `@` references into `getfield`s and stacks), and it's then turned back into lowered code for Julia to run.
 
@@ -188,24 +188,24 @@ foo(x) = bad(sin(x))
 gradient(foo, 1) # error!
 ```
 
-Zygote can usually give a stacktrace pointing right to the issue here, but in some cases there are compiler crashes that make this harder. In these cases it's best to (a) use `_forward` and (b) take advantage of Zygote's recursion to narrow down the problem function.
+Zygote can usually give a stacktrace pointing right to the issue here, but in some cases there are compiler crashes that make this harder. In these cases it's best to (a) use `_pullback` and (b) take advantage of Zygote's recursion to narrow down the problem function.
 
 ```julia
-julia> y, back = Zygote._forward(foo, 1);
+julia> y, back = Zygote._pullback(foo, 1);
 
 julia> back(1) # just make up a value here, it just needs to look similar to `y`
 ERROR: bad
 
 # Ok, so we try functions that foo calls
 
-julia> y, back = Zygote._forward(sin, 1);
+julia> y, back = Zygote._pullback(sin, 1);
 
 julia> back(1)
 (nothing, 0.5403023058681398)
 
 # Looks like that's fine
 
-julia> y, back = Zygote._forward(bad, 1);
+julia> y, back = Zygote._pullback(bad, 1);
 
 julia> back(1) # ok, here's our issue. Lather, rinse, repeat.
 ERROR: bad
