@@ -552,7 +552,7 @@ end
 
 @testset "broadcast" begin
   if !Zygote.usetyped
-    @test gradient(x -> sum(sin.(x)), Diagonal(randn(3)))[1][2] == 1
+    @test gradient(x -> sum(sin.(x)), Diagonal(randn(3)))[1][2] == 0
   end
 end
 

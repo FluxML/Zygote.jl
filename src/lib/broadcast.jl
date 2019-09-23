@@ -34,6 +34,7 @@ using NNlib
 # =========
 
 accum_sum(xs; dims = :) = reduce(accum, xs, dims = dims)
+accum_sum(xs::Tuple; dims = :) = reduce(accum, xs)
 
 # Work around reducedim_init issue
 accum_sum(xs::Nothing; dims = :) = nothing
@@ -50,7 +51,9 @@ unbroadcast(x::AbstractArray, x̄) =
 
 unbroadcast(x::Union{Number,Ref}, x̄) = accum_sum(x̄)
 
-unbroadcast(x::AbstractArray, x̄::Nothing) = nothing
+unbroadcast(x::Union{AbstractArray, Tuple}, x̄::Nothing) = nothing
+
+unbroadcast(x::NTuple{N}, x̄::NTuple{N}) where N = x̄
 
 # Split Reverse Mode
 # ==================
@@ -104,7 +107,129 @@ end
 # issues, or something similar) and the other operations needed take it to about
 # 100x overhead.
 
+abstract type ArgPlaceholder end
+struct FDiffable <: ArgPlaceholder end
+struct NonFDiffable <: ArgPlaceholder end
+struct ConstantArg <: ArgPlaceholder end
+
+struct DualArg{P} <: ArgPlaceholder
+  partials::P
+end
+
+struct FlatFunction{F, Args <: Tuple{Vararg{ArgPlaceholder}}} <: ArgPlaceholder
+  f::F
+  args::Args
+
+  # This is to match the layout of `FlatFunction` to `Broadcasted` so
+  # that the pullback would create the named tuple usable for
+  # `Broadcasted`:
+  axes::Nothing
+end
+
+FlatFunction(f, args) = FlatFunction(f, args, nothing)
+
+@inline foldlargs(op, x) = x
+@inline foldlargs(op, x1, x2, xs...) = foldlargs(op, op(x1, x2), xs...)
+
+consume(::ArgPlaceholder, x, rest...) = x, rest
+consume(d::DualArg, x, rest...) = Dual(x, d.partials), rest
+@inline function consume(ff::FlatFunction, args0...)
+  args, rest = foldlargs(((), args0), ff.args...) do (args, rest), g
+    a, r = consume(g, rest...)
+    ((args..., a), r)
+  end
+  return (ff.f(args...), rest)
+end
+
+@inline function (ff::FlatFunction)(args...)
+  y, rest = consume(ff, args...)
+  @assert length(rest) == 0
+  return y
+end
+
+@inline isconstant(x) = isconstanttype(typeof(x))
+@inline isconstanttype(::Type) = false
+@inline isconstanttype(::Type{<:Union{
+  # From `Broadcast.broadcastable`:
+  Symbol,
+  AbstractString,
+  UndefInitializer,
+  Nothing,
+  RoundingMode,
+  Missing,
+  Val,
+  Ptr,
+  Regex,
+  Type,
+}}) = true
+
+@inline ArgPlaceholder(x) =
+  isconstant(x) ? ConstantArg() : NonFDiffable()
+@inline ArgPlaceholder(::Union{Real, AbstractArray{<:Real}}) = FDiffable()
+@inline ArgPlaceholder(bc::Broadcasted) =
+  FlatFunction(bc.f, map(ArgPlaceholder, bc.args))
+
+fdiffables(_) = 0
+fdiffables(::FDiffable) = 1
+@inline fdiffables(ff::FlatFunction) = sum(fdiffables, ff.args)
+
+@inline fillpartials(ff::FlatFunction) = _fillpartials(Val(fdiffables(ff)), 1, ff)[1]
+
+@inline function _fillpartials(npartials, i, ff::FlatFunction)
+  args, i = foldlargs(((), i), ff.args...) do (args, i), x
+    if x isa FlatFunction
+      a, i = fillpartials(npartials, i, x)
+      (args..., a), i
+    elseif x isa FDiffable
+      (args..., DualArg(ntuple(j -> i == j, npartials))), i + 1
+    else
+      (args..., x), i
+    end
+  end
+  return FlatFunction(ff.f, args), i
+end
+
+isfdiffable(_) = false
+isfdiffable(::FDiffable) = true
+@inline isfdiffable(ff::FlatFunction) =
+  all(isfdiffable, ff.args) && Base.issingletontype(typeof(ff.f))
+
 @generated inclen(::NTuple{N,Any}) where N = Val(N+1)
+
+bcstyle(::Broadcasted{Style}) where Style = Style
+
+flatargs(x) = (x,)
+flatargs(bc::Broadcasted) = foldlargs((), bc.args...) do args, x
+  (args..., flatargs(x)...)
+end
+
+@inline function back_materialize(bc::Broadcasted, ȳ, out, i=1)
+  args, i = foldlargs(((), i), bc.args...) do (args, i), x
+    if x isa Broadcasted
+      a, i = back_materialize(x, ȳ, out, i)
+      (args..., a), i
+    elseif ArgPlaceholder(x) isa FDiffable
+      (args..., unbroadcast(x, ((a, b) -> a*b.partials[i]).(ȳ, out))), i + 1
+    else
+      (args..., nothing), i
+    end
+  end
+  return (f=nothing, args=args, axes=nothing), i
+end
+
+function unflatten(bc, dargs)
+  dbc, rest = _unflatten(bc, dargs...)
+  @assert length(rest) == 0
+  return dbc
+end
+@inline _unflatten(_, d, rest...) = d, rest
+@inline function _unflatten(bc::Broadcasted, dargs0...)
+  dargs, rest = foldlargs(((), dargs0), bc.args...) do (dargs, rest), x
+    a, r = _unflatten(x, rest...)
+    ((dargs..., a), r)
+  end
+  return (f=nothing, args=dargs, axes=nothing), rest
+end
 
 # Avoid hitting special cases for `Adjoint` etc.
 _broadcast(f::F, x...) where F = materialize(broadcasted(f, x...))
@@ -114,15 +239,28 @@ _get(::Nothing, i) = nothing
 collapse_nothings(xs::Vector{Nothing}) = nothing
 collapse_nothings(xs) = xs
 
-@adjoint function broadcasted(::AbstractArrayStyle, f, args...)
-  len = inclen(args)
-  y∂b = _broadcast((x...) -> _pullback(__context__, f, x...), args...)
-  y = map(x -> x[1], y∂b)
-  ∂b = map(x -> x[2], y∂b)
-  y, function (ȳ)
-    dxs_zip = map((∂b, ȳ) -> ∂b(ȳ), ∂b, ȳ)
-    dxs = collapse_nothings.(ntuple(i -> map(x -> _get(x, i), dxs_zip), len))
-    (nothing, accum_sum(dxs[1]), map(unbroadcast, args, Base.tail(dxs))...)
+@adjoint function copy(bc::Broadcasted)
+  ff0 = ArgPlaceholder(bc)
+  if isfdiffable(ff0)
+    ff = fillpartials(ff0)
+    out = copy(Broadcasted{bcstyle(bc)}(ff, flatargs(bc), bc.axes))
+    eltype(out) <: Dual || out <: Dual || return (out, _ -> nothing)
+    y = map(x -> x.value, out)
+    back(ȳ) = back_materialize(bc, ȳ, out)
+    return y, back
+  else
+    y∂b = _broadcast((x...) -> _pullback(__context__, ff0, x...), flatargs(bc)...)
+    y = map(x -> x[1], y∂b)
+    ∂b = map(x -> x[2], y∂b)
+    y, function (ȳ)
+      dxs_zip = map((∂b, ȳ) -> ∂b(ȳ), ∂b, ȳ)
+      fargs = flatargs(bc)
+      len = inclen(fargs)
+      dxs = collapse_nothings.(ntuple(i -> map(x -> _get(x, i), dxs_zip), len))
+      dargs = map(unbroadcast, fargs, Base.tail(dxs))
+      (accum(accum_sum(dxs[1]), unflatten(bc, dargs)),)
+      # Note: relying on that `dxs[1]`, `ff0`, and `bc0` have same shape
+    end
   end
 end
 
