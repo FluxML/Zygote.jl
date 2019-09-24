@@ -6,7 +6,7 @@ using Base.Broadcast: broadcasted, broadcast_shape
 
 @adjoint Array(xs::AbstractArray) = Array(xs), ȳ -> (ȳ,)
 
-@nograd size, length, eachindex, Colon(), findfirst, randn, ones, zeros, one, zero,
+@nograd size, length, eachindex, Colon(), findfirst, findlast, findall, randn, ones, zeros, one, zero,
   print, println, any, all
 
 @adjoint rand(dims::Integer...) = rand(dims...), _ -> nothing
