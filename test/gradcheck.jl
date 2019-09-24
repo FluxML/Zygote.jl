@@ -678,3 +678,9 @@ end
     end
   end
 end
+
+@testset "@nograd" begin
+  @test gradient(x -> findfirst(ismissing, x), [1, missing]) == (nothing,)
+  @test gradient(x -> findlast(ismissing, x), [1, missing]) == (nothing,)
+  @test gradient(x -> findall(ismissing, x)[1], [1, missing]) == (nothing,)
+end
