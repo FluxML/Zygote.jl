@@ -127,12 +127,3 @@ end
 macro code_adjoint(ex)
   :(Adjoint($(code_irm(ex)), varargs = varargs($(esc(:($InteractiveUtils.@which $ex))), length(($(esc.(ex.args)...),)))))
 end
-
-function pow(x, n)
-  r = 1
-  while n > 0
-    n -= 1
-    r *= x
-  end
-  return r
-end
