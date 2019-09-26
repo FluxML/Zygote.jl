@@ -379,8 +379,8 @@ end
     @test gradtest(x->imag(Hermitian(complex.(x, Im), uplo)), Re)
     @test gradtest(x->real(Hermitian(complex.(Re, x), uplo)), Im)
     @test gradtest(x->imag(Hermitian(complex.(Re, x), uplo)), Im)
-    y, back = Zygote.forward(Hermitian, A, uplo)
-    _, back_sym = Zygote.forward(Symmetric, A, uplo)
+    y, back = Zygote.pullback(Hermitian, A, uplo)
+    _, back_sym = Zygote.pullback(Symmetric, A, uplo)
     @test y isa Hermitian
 
     @testset "back" begin
