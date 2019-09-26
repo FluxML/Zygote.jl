@@ -3,7 +3,7 @@ module Zygote
 using LinearAlgebra, Statistics
 using LinearAlgebra: copytri!, AbstractTriangular
 
-import ZygoteRules: @adjoint, @adjoint!, AContext, adjoint, _forward
+import ZygoteRules: @adjoint, @adjoint!, AContext, adjoint, _pullback, pullback
 
 # This flag enables Zygote to grab extra type inference information during
 # compiles. When control flow is present, this can give gradient code a
@@ -18,7 +18,7 @@ using IRTools
 using MacroTools, Requires
 using MacroTools: @forward
 
-export Params, gradient, forward, @code_grad
+export Params, gradient, pullback, @code_grad
 
 include("tools/idset.jl")
 
@@ -64,7 +64,7 @@ end
 macro profile(ex)
   @capture(ex, f_(x__)) || error("@profile f(args...)")
   quote
-    _, back = _forward($(esc(f)), $(esc.(x)...))
+    _, back = _pullback($(esc(f)), $(esc.(x)...))
     Profile.juno(Profile.profile(back))
   end
 end

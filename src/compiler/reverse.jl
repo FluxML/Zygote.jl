@@ -129,7 +129,7 @@ ignored(ir, ex::Variable) = ignored(ir, ir[ex])
 function _forward_type(Ts)
   usetyped || return Any
   all(T -> isconcretetype(T) || T <: DataType, Ts) || return Any
-  T = Core.Compiler.return_type(_forward, Tuple{Context,Ts...})
+  T = Core.Compiler.return_type(_pullback, Tuple{Context,Ts...})
   return T == Union{} ? Any : T
 end
 
@@ -146,7 +146,7 @@ function primal(ir::IR)
       yT = exprtype(ir, v)
       T = _forward_type(exprtype.((ir,), ex.args))
       if yT == Any || isvalidtype(T, yT)
-        yJ = insert!(pr, v, stmt(xcall(Zygote, :_forward, cx, ex.args...),
+        yJ = insert!(pr, v, stmt(xcall(Zygote, :_pullback, cx, ex.args...),
                                  line = ir[v].line))
         pr[v] = xgetindex(yJ, 1)
         J = insertafter!(pr, v, stmt(xgetindex(yJ, 2),
@@ -154,7 +154,7 @@ function primal(ir::IR)
                                      line = ir[v].line))
         pbs[v] = substitute(pr, J)
       else
-        yJ = insert!(pr, v, xcall(Zygote, :_forward, cx, ex.args...))
+        yJ = insert!(pr, v, xcall(Zygote, :_pullback, cx, ex.args...))
         y =  insert!(pr, v, xgetindex(yJ, 1))
         J =  insert!(pr, v, stmt(xgetindex(yJ, 2), line = ir[v].line))
         pr[v] = xcall(Zygote, :typeassert, y, yT)

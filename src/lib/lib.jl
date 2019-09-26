@@ -87,15 +87,15 @@ literal_indexed_iterate(x, ::Val{i}, state) where i = Base.indexed_iterate(x, i,
 @adjoint getindex(xs::NTuple{N,Any}, r::AbstractUnitRange) where N =
   (xs[r], Δ -> (ntuple(j -> j in r ? Δ[findfirst(isequal(j), r)] : nothing, Val(N)), nothing))
 
-function _forward(cx::Context, ::typeof(literal_indexed_iterate), xs::Tuple, ::Val{i}) where i
-  y, b = _forward(cx, literal_getindex, xs, Val(i))
+function _pullback(cx::Context, ::typeof(literal_indexed_iterate), xs::Tuple, ::Val{i}) where i
+  y, b = _pullback(cx, literal_getindex, xs, Val(i))
   back(::Nothing) = nothing
   back(ȳ) = b(ȳ[1])
   (y, i+1), back
 end
 
-function _forward(cx::Context, ::typeof(literal_indexed_iterate), xs::Tuple, ::Val{i}, st) where i
-  y, b = _forward(cx, literal_getindex, xs, Val(i))
+function _pullback(cx::Context, ::typeof(literal_indexed_iterate), xs::Tuple, ::Val{i}, st) where i
+  y, b = _pullback(cx, literal_getindex, xs, Val(i))
   back(::Nothing) = nothing
   back(ȳ) = (b(ȳ[1])..., nothing)
   (y, i+1), back
@@ -128,7 +128,7 @@ end
 unapply(t, xs) = _unapply(t, xs)[1]
 
 @adjoint function Core._apply(f, args...)
-  y, back = Core._apply(_forward, (__context__, f), args...)
+  y, back = Core._apply(_pullback, (__context__, f), args...)
   st = map(_empty, args)
   y, function (Δ)
     Δ = back(Δ)
@@ -168,17 +168,17 @@ literal_getproperty(x, ::Val{f}) where f = getproperty(x, f)
   unwrap(val), back
 end
 
-_forward(cx::Context, ::typeof(getproperty), x, f::Symbol) =
-  _forward(cx, literal_getproperty, x, Val(f))
+_pullback(cx::Context, ::typeof(getproperty), x, f::Symbol) =
+  _pullback(cx, literal_getproperty, x, Val(f))
 
-_forward(cx::Context, ::typeof(getfield), x, f::Symbol) =
-  _forward(cx, literal_getproperty, x, Val(f))
+_pullback(cx::Context, ::typeof(getfield), x, f::Symbol) =
+  _pullback(cx, literal_getproperty, x, Val(f))
 
-_forward(cx::Context, ::typeof(literal_getindex), x::NamedTuple, ::Val{f}) where f =
-  _forward(cx, literal_getproperty, x, Val(f))
+_pullback(cx::Context, ::typeof(literal_getindex), x::NamedTuple, ::Val{f}) where f =
+  _pullback(cx, literal_getproperty, x, Val(f))
 
-_forward(cx::Context, ::typeof(literal_getproperty), x::Tuple, ::Val{f}) where f =
-  _forward(cx, literal_getindex, x, Val(f))
+_pullback(cx::Context, ::typeof(literal_getproperty), x::Tuple, ::Val{f}) where f =
+  _pullback(cx, literal_getindex, x, Val(f))
 
 grad_mut(x) = Ref{Any}(nt_nothing(x))
 

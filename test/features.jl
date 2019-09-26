@@ -5,13 +5,13 @@ add(a, b) = a+b
 _relu(x) = x > 0 ? x : 0
 f(a, b...) = +(a, b...)
 
-y, back = forward(identity, 1)
+y, back = pullback(identity, 1)
 dx = back(2)
 @test y == 1
 @test dx == (2,)
 
 mul(a, b) = a*b
-y, back = forward(mul, 2, 3)
+y, back = pullback(mul, 2, 3)
 dx = back(4)
 @test y == 6
 @test dx == (12, 8)
@@ -21,7 +21,7 @@ dx = back(4)
 bool = true
 b(x) = bool ? 2x : x
 
-y, back = forward(b, 3)
+y, back = pullback(b, 3)
 dx = back(4)
 @test y == 6
 @test dx == (8,)
@@ -33,12 +33,12 @@ gglobal = x -> fglobal(x)
 
 global bool = false
 
-y, back = forward(b, 3)
+y, back = pullback(b, 3)
 dx = back(4)
 @test y == 3
 @test getindex.(dx) == (4,)
 
-y, back = forward(x -> sum(x.*x), [1, 2, 3])
+y, back = pullback(x -> sum(x.*x), [1, 2, 3])
 dxs = back(1)
 @test y == 14
 @test dxs == ([2,4,6],)
@@ -143,7 +143,7 @@ end
 
 # For nested AD, until we support errors
 function grad(f, args...)
-  y, back = forward(f, args...)
+  y, back = pullback(f, args...)
   return back(1)
 end
 
@@ -170,13 +170,13 @@ end
 W = [1 0; 0 1]
 x = [1, 2]
 
-y, back = forward(() -> W * x, Params([W]))
+y, back = pullback(() -> W * x, Params([W]))
 @test y == [1, 2]
 @test back([1, 1])[W] == [1 2; 1 2]
 
 layer = Layer(W)
 
-y, back = forward(() -> layer(x), Params([W]))
+y, back = pullback(() -> layer(x), Params([W]))
 @test y == [1, 2]
 @test back([1, 1])[W] == [1 2; 1 2]
 
@@ -224,7 +224,7 @@ if !Zygote.usetyped
   @test gradient(x -> invoke(invokable, Tuple{Any}, x), 5) == (2,)
 end
 
-y, back = Zygote.forward(x->tuple(x...), [1, 2, 3])
+y, back = Zygote.pullback(x->tuple(x...), [1, 2, 3])
 @test back((1, 1, 1)) == ((1,1,1),)
 
 # Test for some compiler errors on complex CFGs
@@ -269,7 +269,7 @@ global_param = 3
 
 @testset "Global Params" begin
   cx = Zygote.Context()
-  y, back = Zygote._forward(cx, x -> x*global_param, 2)
+  y, back = Zygote._pullback(cx, x -> x*global_param, 2)
   @test y == 6
   @test back(1) == (nothing, 3)
   Zygote.globals(cx)[GlobalRef(Main, :global_param)] == 2

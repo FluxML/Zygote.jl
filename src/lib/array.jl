@@ -5,8 +5,9 @@ using Base.Broadcast: broadcasted, broadcast_shape
 @adjoint (::Type{T})(::UndefInitializer, args...) where T<:Array = T(undef, args...), Δ -> nothing
 
 @adjoint Array(xs::AbstractArray) = Array(xs), ȳ -> (ȳ,)
+@adjoint Array(xs::Array) = Array(xs), ȳ -> (ȳ,)
 
-@nograd size, length, eachindex, Colon(), findfirst, randn, ones, zeros, one, zero,
+@nograd size, length, eachindex, Colon(), findfirst, findlast, findall, randn, ones, zeros, one, zero,
   print, println, any, all
 
 @adjoint rand(dims::Integer...) = rand(dims...), _ -> nothing
@@ -111,7 +112,7 @@ function unzip(tuples)
   end
 end
 function ∇map(cx, f, args...)
-  ys_and_backs = map((args...) -> _forward(cx, f, args...), args...)
+  ys_and_backs = map((args...) -> _pullback(cx, f, args...), args...)
   if isempty(ys_and_backs)
     ys_and_backs, _ -> nothing
   else
@@ -129,7 +130,7 @@ end
   ∇map(__context__, f, args...)
 end
 
-function _forward(cx::AContext, ::typeof(collect), g::Base.Generator)
+function _pullback(cx::AContext, ::typeof(collect), g::Base.Generator)
   y, back = ∇map(cx, g.f, g.iter)
   y, function (ȳ)
     f̄, x̄ = back(ȳ)
@@ -149,8 +150,8 @@ end
   end
 end
 
-function _forward(cx::AContext, ::typeof(sum), f, xs::AbstractArray)
-  y, back = forward(cx, (xs -> sum(f.(xs))), xs)
+function _pullback(cx::AContext, ::typeof(sum), f, xs::AbstractArray)
+  y, back = pullback(cx, (xs -> sum(f.(xs))), xs)
   y, ȳ -> (nothing, nothing, back(ȳ)...)
 end
 
@@ -167,8 +168,8 @@ end
   end
 end
 
-function _forward(cx::AContext, ::typeof(prod), f, xs::AbstractArray)
-  y, back = forward(cx, (xs -> prod(f.(xs))), xs)
+function _pullback(cx::AContext, ::typeof(prod), f, xs::AbstractArray)
+  y, back = pullback(cx, (xs -> prod(f.(xs))), xs)
   y, ȳ -> (nothing, nothing, back(ȳ)...)
 end
 
@@ -200,6 +201,19 @@ end
 end
 _backmean(xs, Δ, ::Colon) = zero(xs) .+ Δ ./ length(xs)
 _backmean(xs, Δ, dims) = zero(xs) .+ Δ ./ mapreduce(i -> size(xs,i),*,dims)
+
+@adjoint function Statistics.var(xs::AbstractArray; corrected::Bool=true, dims=:, mean=mean(xs, dims=dims))
+    return Statistics.var(xs; corrected=corrected, mean=mean, dims=dims), Δ -> _backvar(xs, Δ, corrected, mean, dims)
+end
+_backvar(xs, Δ, corrected::Bool, mean, dims)         = _backvar(xs, Δ, mapreduce(i -> size(xs,i),*,dims) - corrected, mean)
+_backvar(xs, Δ, corrected::Bool, mean, ::Colon)      = _backvar(xs, Δ, length(xs) - corrected, mean)
+_backvar(xs, Δ, N::Int, mean) = (convert(eltype(xs), 2/N) .* Δ .* (xs .- mean),)
+
+@adjoint function Statistics.std(xs::AbstractArray; corrected::Bool=true, dims=:, mean=mean(xs, dims=dims))
+    s = Statistics.std(xs; corrected=corrected, mean=mean, dims=dims)
+    return s, Δ -> _backvar(xs, Δ ./ (2 .* s), corrected, mean, dims)
+end
+
 
 # LinAlg
 # ======
@@ -248,7 +262,7 @@ function _kron(mat1::AbstractMatrix,mat2::AbstractMatrix)
     return reshape(mat1_rsh.*mat2_rsh, (m1*m2,n1*n2))
 end
 
-@adjoint kron(a::AbstractMatrix, b::AbstractMatrix) = forward(_kron, a, b)
+@adjoint kron(a::AbstractMatrix, b::AbstractMatrix) = pullback(_kron, a, b)
 
 @adjoint function Diagonal(d::AbstractVector)
   back(Δ::NamedTuple) = (Δ.diag,)
@@ -326,9 +340,9 @@ end
   end
 end
 
-function _forward(cx::AContext, ::typeof(norm), x::AbstractArray, p::Real = 2)
+function _pullback(cx::AContext, ::typeof(norm), x::AbstractArray, p::Real = 2)
   fallback = (x, p) -> sum(abs.(x).^p .+ eps(0f0))^(1/p) # avoid d(sqrt(x))/dx == Inf at 0
-  _forward(cx, fallback, x, p)
+  _pullback(cx, fallback, x, p)
 end
 
 # LinAlg Matrix Types
@@ -339,7 +353,7 @@ end
 
 # This is basically a hack while we don't have a working `ldiv!`.
 @adjoint function \(A::Cholesky, B::AbstractVecOrMat)
-  Y, back = Zygote.forward((U, B)->U \ (U' \ B), A.U, B)
+  Y, back = Zygote.pullback((U, B)->U \ (U' \ B), A.U, B)
   return Y, function(Ȳ)
     Ā_factors, B̄ = back(Ȳ)
     return ((uplo=nothing, status=nothing, factors=Ā_factors), B̄)
@@ -533,7 +547,7 @@ end
 # =======================
 
 @adjoint function broadcasted(op, r::AbstractFill{<:Real})
-  y, _back = Zygote.forward(op, getindex_value(r))
+  y, _back = Zygote.pullback(op, getindex_value(r))
   back(Δ::AbstractFill) = (nothing, Fill(_back(getindex_value(Δ))[1], size(r)))
   back(Δ::AbstractArray) = (nothing, getindex.(_back.(Δ), 1))
   return Fill(y, size(r)), back

@@ -84,7 +84,7 @@ end
 @test gradtest(x -> permutedims(x, [3,1,2]), rand(4,5,6))
 @test gradtest(x -> PermutedDimsArray(x, (3,1,2)), rand(4,5,6))
 let
-  y, back = Zygote.forward(permutedims, randn(3))
+  y, back = Zygote.pullback(permutedims, randn(3))
   @test first(back(randn(1, 3))) isa Vector
 end
 
@@ -121,7 +121,7 @@ end
     bar = (x) -> x*y
     sum(map(bar, 1:5))
   end
-  @test gradtest(foo, 3)
+  Zygote.usetyped || @test gradtest(foo, 3) #TODO
   @test gradient(v -> sum([x for x in v]), [1.1,2.2,3.3]) == ([1, 1, 1],)
 end
 
@@ -133,6 +133,60 @@ end
   @test gradtest(x -> mean(x, dims=3), rand(2, 3, 4))
 
   @test gradtest(x -> mean(x, dims=[1, 2]), rand(2, 3, 4))
+end
+
+@testset "var" begin
+  @test gradtest(var, rand(2, 3))
+  @test gradtest(x -> var(x, dims=1), rand(2, 3))
+  @test gradtest(x -> var(x, dims=2), rand(2, 3))
+  @test gradtest(x -> var(x, dims=3), rand(2, 3, 4))
+  @test gradtest(x -> var(x, dims=[1, 2]), rand(2, 3, 4))
+
+
+  @test gradtest(x -> var(x, corrected=false), rand(2, 3))
+  @test gradtest(x -> var(x, dims=1, corrected=false), rand(2, 3))
+  @test gradtest(x -> var(x, dims=2, corrected=false), rand(2, 3))
+  @test gradtest(x -> var(x, dims=3, corrected=false), rand(2, 3, 4))
+  @test gradtest(x -> var(x, dims=[1, 2], corrected=false), rand(2, 3, 4))
+
+  @test gradtest(x -> var(x, mean=mean(x)), rand(2, 3))
+  @test gradtest(x -> var(x, dims=1, mean=mean(x, dims=1)), rand(2, 3))
+  @test gradtest(x -> var(x, dims=2, mean=mean(x, dims=2)), rand(2, 3))
+  @test gradtest(x -> var(x, dims=3, mean=mean(x, dims=3)), rand(2, 3, 4))
+  @test gradtest(x -> var(x, dims=[1, 2], mean=mean(x, dims=[1, 2])), rand(2, 3, 4))
+
+  @test gradtest(x -> var(x, corrected=false, mean=mean(x)), rand(2, 3))
+  @test gradtest(x -> var(x, dims=1, corrected=false, mean=mean(x, dims=1)), rand(2, 3))
+  @test gradtest(x -> var(x, dims=2, corrected=false, mean=mean(x, dims=2)), rand(2, 3))
+  @test gradtest(x -> var(x, dims=3, corrected=false, mean=mean(x, dims=3)), rand(2, 3, 4))
+  @test gradtest(x -> var(x, dims=[1, 2], corrected=false, mean=mean(x, dims=[1, 2])), rand(2, 3, 4))
+end
+
+@testset "std" begin
+  @test gradtest(std, rand(2, 3))
+  @test gradtest(x -> std(x, dims=1), rand(2, 3))
+  @test gradtest(x -> std(x, dims=2), rand(2, 3))
+  @test gradtest(x -> std(x, dims=3), rand(2, 3, 4))
+  @test gradtest(x -> std(x, dims=[1, 2]), rand(2, 3, 4))
+
+
+  @test gradtest(x -> std(x, corrected=false), rand(2, 3))
+  @test gradtest(x -> std(x, dims=1, corrected=false), rand(2, 3))
+  @test gradtest(x -> std(x, dims=2, corrected=false), rand(2, 3))
+  @test gradtest(x -> std(x, dims=3, corrected=false), rand(2, 3, 4))
+  @test gradtest(x -> std(x, dims=[1, 2], corrected=false), rand(2, 3, 4))
+
+  @test gradtest(x -> std(x, mean=mean(x)), rand(2, 3))
+  @test gradtest(x -> std(x, dims=1, mean=mean(x, dims=1)), rand(2, 3))
+  @test gradtest(x -> std(x, dims=2, mean=mean(x, dims=2)), rand(2, 3))
+  @test gradtest(x -> std(x, dims=3, mean=mean(x, dims=3)), rand(2, 3, 4))
+  @test gradtest(x -> std(x, dims=[1, 2], mean=mean(x, dims=[1, 2])), rand(2, 3, 4))
+
+  @test gradtest(x -> std(x, corrected=false, mean=mean(x)), rand(2, 3))
+  @test gradtest(x -> std(x, dims=1, corrected=false, mean=mean(x, dims=1)), rand(2, 3))
+  @test gradtest(x -> std(x, dims=2, corrected=false, mean=mean(x, dims=2)), rand(2, 3))
+  @test gradtest(x -> std(x, dims=3, corrected=false, mean=mean(x, dims=3)), rand(2, 3, 4))
+  @test gradtest(x -> std(x, dims=[1, 2], corrected=false, mean=mean(x, dims=[1, 2])), rand(2, 3, 4))
 end
 
 @testset "maximum" begin
@@ -181,11 +235,11 @@ end
     @test gradtest(*, randn(rng, 10)', randn(rng, 10))
 
     let
-      y, back = Zygote.forward(*, randn(rng, M, P), randn(rng, P))
+      y, back = Zygote.pullback(*, randn(rng, M, P), randn(rng, P))
       @test last(back(randn(rng, M))) isa Vector
     end
     let
-      y, back = Zygote.forward(*, randn(rng, M), randn(rng, 1, P))
+      y, back = Zygote.pullback(*, randn(rng, M), randn(rng, 1, P))
       @test first(back(randn(rng, M, P))) isa Vector
     end
   end
@@ -260,7 +314,7 @@ end
   @testset "Cholesky" begin
 
     # Check that the forwards pass computes the correct thing.
-    @test Zygote.forward(X->cholesky(X * X' + I) \ Y, X)[1] == cholesky(X * X' + I) \ Y
+    @test Zygote.pullback(X->cholesky(X * X' + I) \ Y, X)[1] == cholesky(X * X' + I) \ Y
     @test gradtest(X->cholesky(X * X' + I) \ Y, X)
     @test gradtest(Y->cholesky(X * X' + I) \ Y, Y)
     @test gradtest(X->cholesky(X * X' + I) \ y, X)
@@ -362,7 +416,7 @@ end
   rng, P = MersenneTwister(123456), 10
   d = randn(rng, P)
   @test gradtest(Diagonal, d)
-  y, back = Zygote.forward(Diagonal, d)
+  y, back = Zygote.pullback(Diagonal, d)
   D̄ = randn(rng, P, P)
   @test back(D̄) == back(Diagonal(D̄))
   @test back(D̄) == back((diag=diag(D̄),))
@@ -379,7 +433,7 @@ end
   @testset "cholesky - dense" begin
     rng, N = MersenneTwister(123456), 5
     A = randn(rng, N, N)
-    @test cholesky(A' * A + I) == first(Zygote.forward(A->cholesky(A' * A + I), A))
+    @test cholesky(A' * A + I) == first(Zygote.pullback(A->cholesky(A' * A + I), A))
     @test gradtest(A->cholesky(A' * A + I).U, A)
     @test gradtest(A->logdet(cholesky(A' * A + I)), A)
     @test gradtest(B->cholesky(Symmetric(B)).U, A * A' + I)
@@ -387,8 +441,8 @@ end
   end
   @testset "cholesky - scalar" begin
     rng = MersenneTwister(123456)
-    y, back = Zygote.forward(cholesky, 5.0 * ones(1, 1))
-    y′, back′ = Zygote.forward(cholesky, 5.0)
+    y, back = Zygote.pullback(cholesky, 5.0 * ones(1, 1))
+    y′, back′ = Zygote.pullback(cholesky, 5.0)
     C̄ = randn(rng, 1, 1)
     @test back′((factors=C̄,))[1] isa Real
     @test back′((factors=C̄,))[1] ≈ back((factors=C̄,))[1][1, 1]
@@ -397,8 +451,8 @@ end
     rng, N = MersenneTwister(123456), 3
     D = Diagonal(exp.(randn(rng, N)))
     Dmat = Matrix(D)
-    y, back = Zygote.forward(cholesky, Dmat)
-    y′, back′ = Zygote.forward(cholesky, D)
+    y, back = Zygote.pullback(cholesky, Dmat)
+    y′, back′ = Zygote.pullback(cholesky, D)
     C̄ = (factors=randn(rng, N, N),)
     @test back′(C̄)[1] isa Diagonal
     @test diag(back′(C̄)[1]) ≈ diag(back(C̄)[1])
@@ -479,7 +533,7 @@ end
 
 function cat_test(f, A::Union{AbstractVector, AbstractMatrix}...)
   @test gradtest(f, A...)
-  Z, back = Zygote.forward(f, A...)
+  Z, back = Zygote.pullback(f, A...)
   Ā = back(randn(size(Z)))
   @test all(map((a, ā)->ā isa typeof(a), A, Ā))
 end
@@ -705,20 +759,20 @@ end
   @test Zygote.gradient((x, y)->sum(Fill(x, N)), x, y) == (N, nothing)
 
   let
-    out, back = Zygote.forward(sum, Fill(x, N))
+    out, back = Zygote.pullback(sum, Fill(x, N))
     @test back(nothing) isa Nothing
   end
 
   z = randn(rng, N)
   @test gradtest(x->Fill(first(x), N), [x])
   let
-    out, back = Zygote.forward(x->Fill(x, N), x)
+    out, back = Zygote.pullback(x->Fill(x, N), x)
     @test out == Fill(x, N)
     @test first(back(Fill(y, N))) ≈ y * N
   end
 
   # Test unary broadcasting gradients.
-  out, back = Zygote.forward(x->exp.(x), Fill(x, N))
+  out, back = Zygote.pullback(x->exp.(x), Fill(x, N))
   @test out isa Fill
   @test out == Fill(exp(x), N)
   @test back(Ones(N))[1] isa Fill
@@ -748,4 +802,10 @@ end
       end
     end
   end
+end
+
+@testset "@nograd" begin
+  @test gradient(x -> findfirst(ismissing, x), [1, missing]) == (nothing,)
+  @test gradient(x -> findlast(ismissing, x), [1, missing]) == (nothing,)
+  @test gradient(x -> findall(ismissing, x)[1], [1, missing]) == (nothing,)
 end
