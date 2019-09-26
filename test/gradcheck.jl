@@ -327,7 +327,7 @@ end
     rng, P = MersenneTwister(123456), 7
     A = randn(rng, P, P)
     @test gradtest(Symmetric, A)
-    y, back = Zygote.forward(Symmetric, A)
+    y, back = Zygote.pullback(Symmetric, A)
 
     @testset "back(::Diagonal)" begin
       D̄ = Diagonal(randn(rng, P))
@@ -352,7 +352,7 @@ end
     @test gradtest(x->imag(Symmetric(complex.(x, Im))), Re)
     @test gradtest(x->real(Symmetric(complex.(Re, x))), Im)
     @test gradtest(x->imag(Symmetric(complex.(Re, x))), Im)
-    y, back = Zygote.forward(Symmetric, A)
+    y, back = Zygote.pullback(Symmetric, A)
 
     @testset "back(::Diagonal)" begin
       D̄ = Diagonal(complex.(randn(rng, P), randn(rng, P)))
