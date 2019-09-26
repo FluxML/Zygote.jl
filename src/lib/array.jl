@@ -346,12 +346,21 @@ end
   end
 end
 
-_symmetric_back(Δ) = UpperTriangular(Δ) + LowerTriangular(Δ)' - Diagonal(Δ)
-_symmetric_back(Δ::Union{Diagonal, UpperTriangular}) = Δ
-@adjoint function Symmetric(A::AbstractMatrix)
-  back(Δ::AbstractMatrix) = (_symmetric_back(Δ),)
-  back(Δ::NamedTuple) = (_symmetric_back(Δ.data),)
-  return Symmetric(A), back
+function _symmetric_back(Δ, uplo)
+  L, U, D = LowerTriangular(Δ), UpperTriangular(Δ), Diagonal(Δ)
+  return uplo == 'U' ? U + transpose(L) - D : L + transpose(U) - D
+end
+_symmetric_back(Δ::Diagonal, uplo) = Δ
+_symmetric_back(Δ::UpperTriangular, uplo) = collect(uplo == 'U' ? Δ : transpose(Δ))
+_symmetric_back(Δ::LowerTriangular, uplo) = collect(uplo == 'U' ? transpose(Δ) : Δ)
+
+@adjoint function Symmetric(A::AbstractMatrix, uplo=:U)
+  S = Symmetric(A, uplo)
+  back(Δ::AbstractMatrix) = (_symmetric_back(Δ, S.uplo), nothing)
+  back(Δ::NamedTuple) = (_symmetric_back(Δ.data, S.uplo), nothing)
+  return S, back
+end
+
 end
 
 @adjoint function cholesky(Σ::Real)

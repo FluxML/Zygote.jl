@@ -269,15 +269,49 @@ end
 end
 
 @testset "Symmetric" begin
-  rng, P = MersenneTwister(123456), 7
-  A = randn(rng, P, P)
-  @test gradtest(Symmetric, A)
-  y, back = Zygote.forward(Symmetric, A)
+  @testset "real" begin
+    rng, P = MersenneTwister(123456), 7
+    A = randn(rng, P, P)
+    @test gradtest(Symmetric, A)
+    y, back = Zygote.forward(Symmetric, A)
 
-  @testset "back(::Diagonal)" begin
-    D̄ = Diagonal(randn(rng, P))
-    @test back(Diagonal(D̄))[1] isa Diagonal
-    @test back(Diagonal(D̄))[1] ≈ back(Matrix(D̄))[1]
+    @testset "back(::Diagonal)" begin
+      D̄ = Diagonal(randn(rng, P))
+      @test back(Diagonal(D̄))[1] isa Diagonal
+      @test back(Diagonal(D̄))[1] ≈ back(Matrix(D̄))[1]
+    end
+
+    @testset "back(::$TTri)" for TTri in (LowerTriangular,UpperTriangular)
+      D̄ = TTri(randn(rng, P, P))
+      @test back(D̄)[1] isa Matrix
+      @test back(D̄)[2] === nothing
+      @test back(D̄)[1] ≈ back(Matrix(D̄))[1]
+    end
+  end
+
+  @testset "complex" begin
+    rng, P = MersenneTwister(123456), 7
+    Re = randn(rng, P, P)
+    Im = randn(rng, P, P)
+    A = complex.(Re, Im)
+    @test gradtest(x->real(Symmetric(complex.(x, Im))), Re)
+    @test gradtest(x->imag(Symmetric(complex.(x, Im))), Re)
+    @test gradtest(x->real(Symmetric(complex.(Re, x))), Im)
+    @test gradtest(x->imag(Symmetric(complex.(Re, x))), Im)
+    y, back = Zygote.forward(Symmetric, A)
+
+    @testset "back(::Diagonal)" begin
+      D̄ = Diagonal(complex.(randn(rng, P), randn(rng, P)))
+      @test back(Diagonal(D̄))[1] isa Diagonal
+      @test back(Diagonal(D̄))[1] ≈ back(Matrix(D̄))[1]
+    end
+
+    @testset "back(::$TTri)" for TTri in (LowerTriangular,UpperTriangular)
+      D̄ = TTri(complex.(randn(rng, P, P), randn(rng, P, P)))
+      @test back(D̄)[1] isa Matrix
+      @test back(D̄)[2] === nothing
+      @test back(D̄)[1] ≈ back(Matrix(D̄))[1]
+    end
   end
 end
 
