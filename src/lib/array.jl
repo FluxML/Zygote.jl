@@ -7,6 +7,12 @@ using Base.Broadcast: broadcasted, broadcast_shape
 @adjoint Array(xs::AbstractArray) = Array(xs), ȳ -> (ȳ,)
 @adjoint Array(xs::Array) = Array(xs), ȳ -> (ȳ,)
 
+@adjoint Vector(xs::AbstractVector) = Vector(xs), ȳ -> (ȳ,)
+@adjoint Vector(xs::Vector) = Vector(xs), ȳ -> (ȳ,)
+
+@adjoint Matrix(xs::AbstractMatrix) = Matrix(xs), ȳ -> (ȳ,)
+@adjoint Matrix(xs::Matrix) = Matrix(xs), ȳ -> (ȳ,)
+
 @nograd size, length, eachindex, Colon(), findfirst, findlast, findall, randn, ones, zeros, one, zero,
   print, println, any, all
 

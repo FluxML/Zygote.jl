@@ -34,3 +34,7 @@ tasks4(x) = fetch(@async x^2)
 VERSION > v"1.3-" && include("threads.jl")
 
 @test Zygote.pullback(Array, [1f0])[1] == [1f0]
+
+@test Zygote.pullback(Vector, [1f0])[1] == [1f0]
+
+@test Zygote.pullback(Matrix, [1f0][:,:])[1] == [1f0][:,:]
