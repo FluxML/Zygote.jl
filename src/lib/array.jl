@@ -361,6 +361,28 @@ _symmetric_back(Δ::LowerTriangular, uplo) = collect(uplo == 'U' ? transpose(Δ)
   return S, back
 end
 
+_extract_imag(x) = (x->complex(0, imag(x))).(x)
+function _hermitian_back(Δ, uplo)
+  isreal(Δ) && return _symmetric_back(Δ, uplo)
+  L, U, rD = LowerTriangular(Δ), UpperTriangular(Δ), real(Diagonal(Δ))
+  return uplo == 'U' ? U + L' - rD : L + U' - rD
+end
+_hermitian_back(Δ::Diagonal, uplo) = real(Δ)
+function _hermitian_back(Δ::LinearAlgebra.AbstractTriangular, uplo)
+  isreal(Δ) && return _symmetric_back(Δ, uplo)
+  ŪL̄ = Δ - Diagonal(_extract_imag(diag(Δ)))
+  if istriu(Δ)
+    return collect(uplo == 'U' ? ŪL̄ : ŪL̄')
+  else
+    return collect(uplo == 'U' ? ŪL̄' : ŪL̄)
+  end
+end
+
+@adjoint function LinearAlgebra.Hermitian(A::AbstractMatrix, uplo=:U)
+  H = Hermitian(A, uplo)
+  back(Δ::AbstractMatrix) = (_hermitian_back(Δ, H.uplo), nothing)
+  back(Δ::NamedTuple) = (_hermitian_back(Δ.data, H.uplo), nothing)
+  return H, back
 end
 
 @adjoint function cholesky(Σ::Real)
