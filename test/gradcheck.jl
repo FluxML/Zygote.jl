@@ -352,10 +352,10 @@ end
     Im = randn(rng, P, P)
     A = complex.(Re, Im)
     @testset "uplo=$uplo" for uplo in (:U, :L)
-      @test gradcheck(Re,Im) do Re,Im
-        A = Symmetric(complex.(Re, Im), uplo)
-        B = exp.(A)
-        sum(real(B) + imag(B))
+      @test gradcheck(Re,Im) do a, b
+        c = Symmetric(complex.(a, b), uplo)
+        d = exp.(c)
+        sum(real(d) + imag(d))
       end
       y, back = Zygote.pullback(Symmetric, A, uplo)
       @test y isa Symmetric
@@ -382,10 +382,10 @@ end
   Im = randn(rng, P, P)
   A = complex.(Re, Im)
   @testset "uplo=$uplo" for uplo in (:U, :L)
-    @test gradcheck(Re,Im) do Re,Im
-      A = Hermitian(complex.(Re, Im), uplo)
-      B = exp.(A)
-      sum(real(B) + imag(B))
+    @test gradcheck(Re,Im) do a, b
+      c = Hermitian(complex.(a, b), uplo)
+      d = exp.(c)
+      sum(real(d) + imag(d))
     end
     y, back = Zygote.pullback(Hermitian, A, uplo)
     _, back_sym = Zygote.pullback(Symmetric, A, uplo)
