@@ -362,7 +362,7 @@ end
 
 function _symmetric_back(Δ, uplo)
   L, U, D = LowerTriangular(Δ), UpperTriangular(Δ), Diagonal(Δ)
-  return uplo == 'U' ? U + transpose(L) - D : L + transpose(U) - D
+  return uplo == 'U' ? U .+ transpose(L) - D : L .+ transpose(U) - D
 end
 _symmetric_back(Δ::Diagonal, uplo) = Δ
 _symmetric_back(Δ::UpperTriangular, uplo) = collect(uplo == 'U' ? Δ : transpose(Δ))
@@ -378,13 +378,13 @@ end
 _extract_imag(x) = (x->complex(0, imag(x))).(x)
 function _hermitian_back(Δ, uplo)
   isreal(Δ) && return _symmetric_back(Δ, uplo)
-  L, U, rD = LowerTriangular(Δ), UpperTriangular(Δ), real(Diagonal(Δ))
-  return uplo == 'U' ? U + L' - rD : L + U' - rD
+  L, U, rD = LowerTriangular(Δ), UpperTriangular(Δ), real.(Diagonal(Δ))
+  return uplo == 'U' ? U .+ L' - rD : L .+ U' - rD
 end
-_hermitian_back(Δ::Diagonal, uplo) = real(Δ)
+_hermitian_back(Δ::Diagonal, uplo) = real.(Δ)
 function _hermitian_back(Δ::LinearAlgebra.AbstractTriangular, uplo)
   isreal(Δ) && return _symmetric_back(Δ, uplo)
-  ŪL̄ = Δ - Diagonal(_extract_imag(diag(Δ)))
+  ŪL̄ = Δ .- Diagonal(_extract_imag(diag(Δ)))
   if istriu(Δ)
     return collect(uplo == 'U' ? ŪL̄ : ŪL̄')
   else
