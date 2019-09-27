@@ -355,7 +355,7 @@ end
       @test gradcheck(Re,Im) do a, b
         c = Symmetric(complex.(a, b), uplo)
         d = exp.(c)
-        sum(real(d) + imag(d))
+        sum(real.(d) + imag.(d))
       end
       y, back = Zygote.pullback(Symmetric, A, uplo)
       @test y isa Symmetric
@@ -385,7 +385,7 @@ end
     @test gradcheck(Re,Im) do a, b
       c = Hermitian(complex.(a, b), uplo)
       d = exp.(c)
-      sum(real(d) + imag(d))
+      sum(real.(d) + imag.(d))
     end
     y, back = Zygote.pullback(Hermitian, A, uplo)
     _, back_sym = Zygote.pullback(Symmetric, A, uplo)
