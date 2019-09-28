@@ -415,7 +415,7 @@ end
       @test gradcheck(A, B) do a,b
         c = complex.(a, b)
         d = exp(c)
-        return sum(real.(d) + 2*imag.(d))
+        return sum(real.(d) + 2 .* imag.(d))
       end
     end
   end
