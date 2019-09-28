@@ -399,10 +399,25 @@ end
 end
 
 @testset "matrix exponential" begin
-  rng, N = MersenneTwister(6865931), 8
-  for i = 1:5
-    A = randn(rng, N, N)
-    @test gradtest(exp, A)
+  @testset "real dense" begin
+    rng, N = MersenneTwister(6865931), 8
+    for i = 1:5
+      A = randn(rng, N, N)
+      @test gradtest(exp, A)
+    end
+  end
+
+  @testset "complex dense" begin
+    rng, N = MersenneTwister(6865931), 8
+    for i = 1:5
+      A = randn(rng, N, N)
+      B = randn(rng, N, N)
+      @test gradcheck(A, B) do a,b
+        c = complex.(a, b)
+        d = exp(c)
+        return sum(real.(d) + 2*imag.(d))
+      end
+    end
   end
 end
 
