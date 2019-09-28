@@ -408,12 +408,12 @@ end
 @adjoint exp(A::AbstractMatrix) = exp(A), function(F̄)
   n = size(A, 1)
   E = eigen(A)
-  w = E.values
+  w = conj.(E.values)
   ew = exp.(w)
   X = [i==j ? ew[i] : (ew[i]-ew[j])/(w[i]-w[j]) for i in 1:n,j=1:n]
-  V = E.vectors
-  VF = factorize(V)
-  Ā = (V * ((VF \ F̄' * V) .* X) / VF)'
+  V = E.vectors'
+  Vf = factorize(V)
+  Ā = Vf \ ((V * F̄ / Vf) .* X) * V
   return (Ā,)
 end
 
