@@ -467,6 +467,10 @@ end
   end
 end
 
+@adjoint function LinearAlgebra.eigvals(A::LinearAlgebra.RealHermSymComplexHerm)
+  d, U = eigen(A)
+  return d, d̄ -> (U * Diagonal(d̄) * U',)
+end
 
 Zygote.@adjoint function LinearAlgebra.tr(x::AbstractMatrix)
   # x is a squre matrix checked by tr,

@@ -527,6 +527,29 @@ end
   end
 end
 
+@testset "eigvals(::RealHermSymComplexHerm)" begin
+  @testset "eigvals(::Symmetric{<:Real})" begin
+    rng, N = MersenneTwister(123), 7
+    A = Symmetric(randn(rng, N, N))
+    @test gradtest(x->eigvals(Symmetric(x)), collect(A))
+  end
+
+  @testset "eigvals(::Hermitian{<:Real})" begin
+    rng, N = MersenneTwister(456), 7
+    A = Hermitian(randn(rng, N, N))
+    @test gradtest(x->eigvals(Hermitian(x)), collect(A))
+  end
+
+  @testset "eigvals(::Hermitian{<:Complex})" begin
+    rng, N = MersenneTwister(789), 7
+    A, B = randn(rng, N, N), randn(rng, N, N)
+    @test gradtest(A, B) do a,b
+      c = Hermitian(complex.(a, b))
+      return eigvals(c)
+    end
+  end
+end
+
 using Distances
 
 Zygote.refresh()
