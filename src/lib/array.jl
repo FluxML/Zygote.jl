@@ -447,6 +447,26 @@ end
   Ā = real.(VTF\(VT*F̄/VTF.*X)*VT)
   (Ā, )
 end
+@adjoint function LinearAlgebra.eigen(A::LinearAlgebra.RealHermSymComplexHerm)
+  dU = eigen(A)
+  return dU, function (Δ)
+    d, U = dU
+    d̄, Ū = Δ
+    if Ū === nothing
+      P = Diagonal(d̄)
+    else
+      F = inv.(d' .- d)
+      P = F .* (U' * Ū)
+      if d̄ === nothing
+        P[diagind(P)] .= 0
+      else
+        P[diagind(P)] = d̄
+      end
+    end
+    return (U * P * U',)
+  end
+end
+
 
 Zygote.@adjoint function LinearAlgebra.tr(x::AbstractMatrix)
   # x is a squre matrix checked by tr,

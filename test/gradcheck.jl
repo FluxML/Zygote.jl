@@ -497,6 +497,36 @@ end
   end
 end
 
+@testset "eigen(::RealHermSymComplexHerm)" begin
+  @testset "eigen(::Symmetric{<:Real})" begin
+    rng, N = MersenneTwister(123), 7
+    A = Symmetric(randn(rng, N, N))
+    @test gradtest(collect(A)) do (x)
+      d, Q = eigen(Symmetric(x))
+      return Q * Diagonal(exp.(d)) * transpose(Q)
+    end
+  end
+
+  @testset "eigen(::Hermitian{<:Real})" begin
+    rng, N = MersenneTwister(456), 7
+    A = Hermitian(randn(rng, N, N))
+    @test gradtest(collect(A)) do (x)
+      d, Q = eigen(Hermitian(x))
+      return Q * Diagonal(exp.(d)) * transpose(Q)
+    end
+  end
+
+  @testset "eigen(::Hermitian{<:Real})" begin
+    rng, N = MersenneTwister(789), 7
+    A = collect(Hermitian(complex.(randn(rng, N, N), randn(rng, N, N))))
+    @test gradtest(real.(A), imag.(A)) do a,b
+      d, U = eigen(Hermitian(complex.(a, b)))
+      X = U * Diagonal(exp.(d)) * U'
+      return real.(X) + imag.(X)
+    end
+  end
+end
+
 using Distances
 
 Zygote.refresh()
