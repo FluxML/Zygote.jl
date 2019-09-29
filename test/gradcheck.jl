@@ -505,6 +505,10 @@ end
       d, Q = eigen(Symmetric(x))
       return Q * Diagonal(exp.(d)) * transpose(Q)
     end
+    y = Zygote.pullback(eigen, A)[1]
+    y2 = eigen(A)
+    @test y.values ≈ y2.values
+    @test y.vectors ≈ y2.vectors
   end
 
   @testset "eigen(::Hermitian{<:Real})" begin
@@ -514,6 +518,10 @@ end
       d, Q = eigen(Hermitian(x))
       return Q * Diagonal(exp.(d)) * transpose(Q)
     end
+    y = Zygote.pullback(eigen, A)[1]
+    y2 = eigen(A)
+    @test y.values ≈ y2.values
+    @test y.vectors ≈ y2.vectors
   end
 
   @testset "eigen(::Hermitian{<:Real})" begin
@@ -524,6 +532,10 @@ end
       X = U * Diagonal(exp.(d)) * U'
       return real.(X) + imag.(X)
     end
+    y = Zygote.pullback(eigen, Hermitian(A))[1]
+    y2 = eigen(Hermitian(A))
+    @test y.values ≈ y2.values
+    @test y.vectors ≈ y2.vectors
   end
 end
 
@@ -532,12 +544,14 @@ end
     rng, N = MersenneTwister(123), 7
     A = Symmetric(randn(rng, N, N))
     @test gradtest(x->eigvals(Symmetric(x)), collect(A))
+    @test Zygote.pullback(eigvals, A)[1] ≈ eigvals(A)
   end
 
   @testset "eigvals(::Hermitian{<:Real})" begin
     rng, N = MersenneTwister(456), 7
     A = Hermitian(randn(rng, N, N))
     @test gradtest(x->eigvals(Hermitian(x)), collect(A))
+    @test Zygote.pullback(eigvals, A)[1] ≈ eigvals(A)
   end
 
   @testset "eigvals(::Hermitian{<:Complex})" begin
@@ -547,6 +561,7 @@ end
       c = Hermitian(complex.(a, b))
       return eigvals(c)
     end
+    @test Zygote.pullback(eigvals, Hermitian(A))[1] ≈ eigvals(Hermitian(A))
   end
 end
 
