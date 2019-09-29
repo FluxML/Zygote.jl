@@ -323,15 +323,106 @@ end
 end
 
 @testset "Symmetric" begin
-  rng, P = MersenneTwister(123456), 7
-  A = randn(rng, P, P)
-  @test gradtest(Symmetric, A)
-  y, back = Zygote.pullback(Symmetric, A)
+  @testset "real" begin
+    rng, P = MersenneTwister(123456), 7
+    A = randn(rng, P, P)
+    @testset "uplo=$uplo" for uplo in (:U, :L)
+      @test gradtest(x->Symmetric(x, uplo), A)
+      y, back = Zygote.pullback(Symmetric, A, uplo)
+      @test y isa Symmetric
 
-  @testset "back(::Diagonal)" begin
-    D̄ = Diagonal(randn(rng, P))
-    @test back(Diagonal(D̄))[1] isa Diagonal
-    @test back(Diagonal(D̄))[1] ≈ back(Matrix(D̄))[1]
+      @testset "back(::Diagonal)" begin
+        D̄ = Diagonal(randn(rng, P))
+        @test back(Diagonal(D̄))[1] isa Diagonal
+        @test back(Diagonal(D̄))[1] ≈ back(Matrix(D̄))[1]
+      end
+
+      @testset "back(::$TTri)" for TTri in (LowerTriangular,UpperTriangular)
+        D̄ = TTri(randn(rng, P, P))
+        @test back(D̄)[1] isa Matrix
+        @test back(D̄)[2] === nothing
+        @test back(D̄)[1] ≈ back(Matrix(D̄))[1]
+      end
+    end
+  end
+
+  @testset "complex" begin
+    rng, P = MersenneTwister(123456), 7
+    Re = randn(rng, P, P)
+    Im = randn(rng, P, P)
+    A = complex.(Re, Im)
+
+    @testset "gradcheck dense" begin
+      for uplo in (:U, :L)
+        @test gradcheck(Re,Im) do a, b
+          c = Symmetric(complex.(a, b), uplo)
+          d = exp.(c)
+          sum(real.(d) + imag.(d))
+        end
+      end
+    end
+
+    @testset "uplo=$uplo" for uplo in (:U, :L)
+      y, back = Zygote.pullback(Symmetric, A, uplo)
+      @test y isa Symmetric
+
+      @testset "back(::Diagonal)" begin
+        D̄ = Diagonal(complex.(randn(rng, P), randn(rng, P)))
+        @test back(Diagonal(D̄))[1] isa Diagonal
+        @test back(Diagonal(D̄))[1] ≈ back(Matrix(D̄))[1]
+      end
+
+      @testset "back(::$TTri)" for TTri in (LowerTriangular,UpperTriangular)
+        D̄ = TTri(complex.(randn(rng, P, P), randn(rng, P, P)))
+        @test back(D̄)[1] isa Matrix
+        @test back(D̄)[2] === nothing
+        @test back(D̄)[1] ≈ back(Matrix(D̄))[1]
+      end
+    end
+  end
+end
+
+@testset "Hermitian" begin
+  rng, P = MersenneTwister(123456), 7
+  Re = randn(rng, P, P)
+  Im = randn(rng, P, P)
+  A = complex.(Re, Im)
+
+  @testset "gradcheck dense" begin
+    for uplo in (:U, :L)
+      @test gradcheck(Re,Im) do a, b
+        c = Hermitian(complex.(a, b), uplo)
+        d = exp.(c)
+        sum(real.(d) + imag.(d))
+      end
+    end
+  end
+
+  @testset "uplo=$uplo" for uplo in (:U, :L)
+    y, back = Zygote.pullback(Hermitian, A, uplo)
+    _, back_sym = Zygote.pullback(Symmetric, A, uplo)
+    @test y isa Hermitian
+
+    @testset "back" begin
+      D̄ = randn(rng, P, P)
+      @test back(D̄)[1] ≈ back_sym(D̄)[1]
+    end
+
+    @testset "back(::Diagonal)" begin
+      D̄ = Diagonal(complex.(randn(rng, P), randn(rng, P)))
+      @test back(D̄)[1] isa Diagonal
+      @test back(D̄)[2] === nothing
+      @test back(D̄)[1] ≈ back(Matrix(D̄))[1]
+      @test back(real(D̄))[1] ≈ back_sym(real(D̄))[1]
+    end
+
+    @testset "back(::$TTri)" for TTri in (LowerTriangular,UpperTriangular)
+      D̄ = TTri(complex.(randn(rng, P, P), randn(rng, P, P)))
+      @test back(D̄)[1] isa Matrix
+      @test back(D̄)[2] === nothing
+      @test back(D̄)[1] ≈ back(Matrix(D̄))[1]
+      @test back(real(D̄))[1] ≈ back_sym(real(D̄))[1]
+    end
   end
 end
 
