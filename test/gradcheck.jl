@@ -701,6 +701,67 @@ end
   end
 end
 
+_randmatpow(rng, f, T, n) = rand(rng, T, n, n)
+function _randmatpow(rng, ::typeof(atanh), T, n)
+  return collect(tanh(Hermitian(_randmatpow(rng, tanh, T, n))))
+end
+
+@testset "Hermitian/matrix power series functions" begin
+  @testset "$func(::RealHermSymComplexHerm)" for func in (:exp, :sin, :tan, :cosh, :sinh, :tanh, :atan, :asinh, :atanh)
+    f = eval(func)
+    @testset "$func(::Symmetric{<:Real})" begin
+      rng, N = MersenneTwister(123), 7
+      A = Symmetric(_randmatpow(rng, f, Float64, N))
+      @test gradtest(x->f(Symmetric(x)), collect(A))
+      y = Zygote.pullback(f, A)[1]
+      y2 = f(A)
+      @test y ≈ y2
+      @testset "similar eigenvalues" begin
+        λ, U = eigen(A)
+        λ[1] = λ[3] + sqrt(eps(eltype(λ))) / 10
+        A2 = U * Diagonal(λ) * U'
+        @test gradtest(x->f(Symmetric(x)), A2)
+      end
+    end
+
+    @testset "$func(::Hermitian{<:Real})" begin
+      rng, N = MersenneTwister(456), 7
+      A = Hermitian(_randmatpow(rng, f, Float64, N))
+      @test gradtest(x->f(Hermitian(x)), collect(A))
+      y = Zygote.pullback(f, A)[1]
+      y2 = f(A)
+      @test y ≈ y2
+      @testset "similar eigenvalues" begin
+        λ, U = eigen(A)
+        λ[1] = λ[3] + sqrt(eps(eltype(λ))) / 10
+        A2 = U * Diagonal(λ) * U'
+        @test gradtest(x->f(Hermitian(x)), A2)
+      end
+    end
+
+    @testset "$func(::Hermitian{<:Complex})" begin
+      rng, N = MersenneTwister(789), 7
+      A = Hermitian(_randmatpow(rng, f, Complex{Float64}, N))
+      @test gradtest(collect(real.(A)), collect(imag.(A))) do a,b
+        B = f(Hermitian(complex.(a, b)))
+        return real.(B) + 2 * imag.(B)
+      end
+      y = Zygote.pullback(f, A)[1]
+      y2 = f(A)
+      @test y ≈ y2
+      @testset "similar eigenvalues" begin
+        λ, U = eigen(A)
+        λ[1] = λ[3] + sqrt(eps(eltype(λ))) / 10
+        A2 = U * Diagonal(λ) * U'
+        @test gradtest(real.(A2), imag.(A2)) do a,b
+          B = f(Hermitian(complex.(a, b)))
+          return real.(B) + 2 * imag.(B)
+        end
+      end
+    end
+  end
+end
+
 using Distances
 
 Zygote.refresh()
