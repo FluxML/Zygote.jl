@@ -442,10 +442,10 @@ end
   w = E.values
   ew = exp.(w)
   X = [i==j ? ew[i] : (ew[i]-ew[j])/(w[i]-w[j]) for i in 1:n,j=1:n]
-  VT = transpose(E.vectors)
-  VTF = factorize(collect(VT))
-  Ā = real.(VTF\(VT*F̄/VTF.*X)*VT)
-  (Ā, )
+  V = E.vectors
+  VF = factorize(V)
+  Ā = (V * ((VF \ F̄' * V) .* X) / VF)'
+  return (Ā,)
 end
 
 Zygote.@adjoint function LinearAlgebra.tr(x::AbstractMatrix)
