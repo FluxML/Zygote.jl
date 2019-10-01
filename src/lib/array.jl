@@ -453,7 +453,8 @@ end
   E = eigen(A)
   w = E.values
   ew = exp.(w)
-  X = [i==j ? ew[i] : (ew[i]-ew[j])/(w[i]-w[j]) for i in 1:n,j=1:n]
+  Δeij = (i, j)->_pairdiffquot(exp, i, j, w, ew, ew, ew)
+  X = Δeij.(Base.OneTo(n), Base.OneTo(n)')
   VT = transpose(E.vectors)
   VTF = factorize(collect(VT))
   Ā = real.(VTF\(VT*F̄/VTF.*X)*VT)
