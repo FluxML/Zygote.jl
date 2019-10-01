@@ -707,7 +707,7 @@ function _randmatpow(rng, ::typeof(atanh), T, n)
 end
 
 @testset "Hermitian/matrix power series functions" begin
-  @testset "$func(::RealHermSymComplexHerm)" for func in (:exp, :sin, :tan, :cosh, :sinh, :tanh, :atan, :asinh, :atanh)
+  @testset "$func(::RealHermSymComplexHerm)" for func in (:exp, :cos, :sin, :tan, :cosh, :sinh, :tanh, :atan, :asinh, :atanh)
     f = eval(func)
     @testset "$func(::Symmetric{<:Real})" begin
       rng, N = MersenneTwister(123), 7
