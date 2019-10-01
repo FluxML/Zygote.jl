@@ -496,6 +496,13 @@ end
       A = randn(rng, N, N)
       @test gradtest(exp, A)
     end
+
+    @testset "similar eigenvalues" begin
+      λ, V = eigen(A)
+      λ[1] = λ[3] + sqrt(eps(real(eltype(λ)))) / 10
+      A2 = real.(V * Diagonal(λ) / V)
+      @test gradtest(exp, A2)
+    end
   end
 
   @testset "complex dense" begin

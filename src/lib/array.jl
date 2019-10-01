@@ -453,8 +453,8 @@ end
   E = eigen(A)
   w = E.values
   ew = exp.(w)
-  X = [i==j ? ew[i] : (ew[i]-ew[j])/(w[i]-w[j]) for i in 1:n,j=1:n]
-  V = E.vectors
+  Δeij = (i, j)->_pairdiffquot(exp, i, j, w, ew, ew, ew)
+  X = Δeij.(Base.OneTo(n), Base.OneTo(n)')
   VF = factorize(V)
   Ā = (V * ((VF \ F̄' * V) .* X) / VF)'
   return (Ā,)
