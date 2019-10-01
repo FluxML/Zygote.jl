@@ -460,7 +460,7 @@ end
   return (Ā,)
 end
 
-for func in (:exp, :sin, :tan, :cosh, :sinh, :tanh, :atan, :asinh, :atanh)
+for func in (:exp, :cos, :sin, :tan, :cosh, :sinh, :tanh, :atan, :asinh, :atanh)
   @eval begin
     @adjoint function ($func)(A::LinearAlgebra.RealHermSymComplexHerm)
       λ,U = eigen(A)
