@@ -304,3 +304,7 @@ end
   @test gradient((x,y,z) -> sum((x,y,z)[1:2]), 7, 8.8, 9.9) == (1.0, 1.0, nothing)
   @test gradient((x,y,z) -> sum((x,y,z)[[1,2,1]]), 1,2,3) == (2, 1, nothing)
 end
+
+@testset "@timed" begin
+  @test gradient(x -> (@timed x)[1], 0) == (1,)
+end
