@@ -121,7 +121,7 @@ end
     bar = (x) -> x*y
     sum(map(bar, 1:5))
   end
-  Zygote.usetyped || @test gradtest(foo, 3) #TODO
+  @test gradtest(foo, 3)
   @test gradient(v -> sum([x for x in v]), [1.1,2.2,3.3]) == ([1, 1, 1],)
 end
 
@@ -711,9 +711,7 @@ end
 end
 
 @testset "broadcast" begin
-  if !Zygote.usetyped
-    @test gradient(x -> sum(sin.(x)), Diagonal(randn(3)))[1][2] == 1
-  end
+  @test gradient(x -> sum(sin.(x)), Diagonal(randn(3)))[1][2] == 1
 end
 
 using Zygote: Buffer

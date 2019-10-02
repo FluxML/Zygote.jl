@@ -19,8 +19,6 @@ end
 bad(x) = x
 @adjoint bad(x) = x, Δ -> error("bad")
 
-Zygote.usetyped && Zygote.refresh()
-
 function badly(x)
   x = x + 1
   x = bad(x)
@@ -33,7 +31,7 @@ y, back = pullback(badly, 2)
 bt = try back(1) catch e stacktrace(catch_backtrace()) end
 
 @test trace_contains(bt, nothing, "compiler.jl", 20)
-@test trace_contains(bt, :badly, "compiler.jl", 26)
+@test trace_contains(bt, :badly, "compiler.jl", 24)
 
 # Type inference checks
 
@@ -76,8 +74,3 @@ y, back = @test_inferred pullback(x->x[1], (5,:a))
 
 y, back = @test_inferred pullback(((a,b),) -> a, (5, 10))
 @test_inferred back(1)
-
-# Checks that use control flow
-if Zygote.usetyped
-  include("typed.jl")
-end

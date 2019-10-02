@@ -22,7 +22,7 @@ end
 
 # Emit
 
-xstack(T) = stmt(Expr(:call, Vector{T}), type = Vector{T})
+xstack(T) = Expr(:call, Vector{T})
 
 function alphauses(b)
   us = Set{Alpha}()
@@ -45,24 +45,17 @@ function forward_stacks!(adj, F)
     if runonce(b)
       push!(recs, Variable(α))
     else
-      T = exprtype(pr, Variable(α))
-      stk = pushfirst!(pr, xstack(T))
+      stk = pushfirst!(pr, xstack(Any))
       push!(recs, stk)
       push!(b, xcall(Zygote, :_push!, stk, Variable(α)))
     end
     push!(stks, (b.id, alpha(α)))
   end
   args = arguments(pr)[3:end]
-  T = Tuple{concrete.(exprtype.((pr,), recs))...}
-  isconcretetype(T) || (T = Any)
   rec = push!(pr, xtuple(recs...))
-  if usetyped && length(pr.blocks) > 1
-    rec = push!(pr, Expr(:call, Pullback{F,T}, rec))
-  else
-    P = length(pr.blocks) == 1 ? Pullback{F} : Pullback{F,Any}
-    # P = Pullback{F,Any} # reduce specialisation
-    rec = push!(pr, Expr(:call, P, rec))
-  end
+  P = length(pr.blocks) == 1 ? Pullback{F} : Pullback{F,Any}
+  # P = Pullback{F,Any} # reduce specialisation
+  rec = push!(pr, Expr(:call, P, rec))
   ret = xtuple(pr.blocks[end].branches[end].args[1], rec)
   ret = push!(pr, ret)
   pr.blocks[end].branches[end].args[1] = ret
@@ -102,18 +95,8 @@ end
 
 varargs(m::Method, n) = m.isva ? n - m.nargs + 1 : nothing
 
-meta(T) = (usetyped ? IRTools.typed_meta : IRTools.meta)(T)
-
-function getmeta(T)
-  m = meta(T)
-  (usetyped && m != nothing) || return m
-  any(x -> isexpr(x, :goto, :gotoifnot), m.code.code) || return IRTools.meta(T)
-  return m
-end
-
 function _lookup_grad(T)
-  (m = getmeta(T)) == nothing && return
-  m isa IRTools.TypedMeta && m.ret == Union{} && return
+  (m = meta(T)) == nothing && return
   va = varargs(m.method, length(T.parameters))
   forw, back = stacks!(Adjoint(IR(m), varargs = va, normalise = false), T)
   m, forw, back
