@@ -455,6 +455,7 @@ end
   ew = exp.(w)
   Δeij = (i, j)->_pairdiffquot(exp, i, j, w, ew, ew, ew)
   X = Δeij.(Base.OneTo(n), Base.OneTo(n)')
+  V = E.vectors
   VF = factorize(V)
   Ā = (V * ((VF \ F̄' * V) .* X) / VF)'
   return (Ā,)
