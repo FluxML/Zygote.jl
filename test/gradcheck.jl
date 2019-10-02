@@ -524,7 +524,7 @@ end
     @test y.vectors ≈ y2.vectors
   end
 
-  @testset "eigen(::Hermitian{<:Real})" begin
+  @testset "eigen(::Hermitian{<:Complex})" begin
     rng, N = MersenneTwister(789), 7
     A = collect(Hermitian(complex.(randn(rng, N, N), randn(rng, N, N))))
     @test gradtest(real.(A), imag.(A)) do a,b
