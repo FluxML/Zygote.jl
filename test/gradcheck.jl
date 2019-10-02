@@ -546,7 +546,7 @@ end
     @test gradtest(reim(collect(A))...) do a,b
       d, U = eigen(Hermitian(complex.(a, b)))
       X = U * Diagonal(exp.(d)) * U'
-      return sum(reim(X))
+      return real.(X) .+ imag.(X)
     end
     y = Zygote.pullback(eigen, A)[1]
     y2 = eigen(A)
@@ -558,7 +558,7 @@ end
       @test_broken gradtest(reim(collect(A2))...) do a,b
         d, U = eigen(Hermitian(complex.(a, b)))
         X = U * Diagonal(exp.(d)) * U'
-        return sum(reim(X))
+        return real.(X) .+ imag.(X)
       end
     end
   end
