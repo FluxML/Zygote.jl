@@ -5,15 +5,6 @@ using LinearAlgebra: copytri!, AbstractTriangular
 
 import ZygoteRules: @adjoint, @adjoint!, AContext, adjoint, _pullback, pullback
 
-# This flag enables Zygote to grab extra type inference information during
-# compiles. When control flow is present, this can give gradient code a
-# performance boost.
-
-# HOWEVER, this is not Jameson-approved, nor well supported by the compiler, and
-# has several caveats. Recursion will cause inference to stack overflow.
-# Gradient redefinitions may result in ugly type errors. And Jameson *will* know.
-const usetyped = get(ENV, "ZYGOTE_TYPED", false) == "true"
-
 using IRTools
 using MacroTools, Requires
 using MacroTools: @forward
@@ -49,7 +40,7 @@ include("profiler/Profile.jl")
   include("flux.jl")
 end
 
-precompile() = usetyped || include(joinpath(@__DIR__, "precompile.jl"))
+precompile() = include(joinpath(@__DIR__, "precompile.jl"))
 
 # precompile()
 @init Requires.isprecompiling() || precompile()

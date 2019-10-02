@@ -7,10 +7,8 @@ using Zygote, Test
 
 @test gradient(a -> real((a*conj(a))), 0.3im)[1] == 0.6im
 @test gradient(a -> real((a.*conj(a))), 0.3im)[1] == 0.6im
-if !Zygote.usetyped
-  @test gradient(a -> real(([a].*conj([a])))[], 0.3im)[1] == 0.6im #TODO
-  @test gradient(a -> real(([a].*conj.([a])))[], 0.3im)[1] == 0.6im #TODO
-end
+@test gradient(a -> real(([a].*conj([a])))[], 0.3im)[1] == 0.6im
+@test gradient(a -> real(([a].*conj.([a])))[], 0.3im)[1] == 0.6im
 @test gradient(a -> real.(([a].*conj.([a])))[], 0.3im)[1] == 0.6im
 
 fs_C_to_R = (real,

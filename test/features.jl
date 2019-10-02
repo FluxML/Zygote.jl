@@ -137,9 +137,7 @@ end == (4,)
 
 pow_rec(x, n) = n == 0 ? 1 : x*pow_rec(x, n-1)
 
-if !Zygote.usetyped
-  @test gradient(pow_rec, 2, 3) == (12, nothing)
-end
+@test gradient(pow_rec, 2, 3) == (12, nothing)
 
 # For nested AD, until we support errors
 function grad(f, args...)
@@ -187,17 +185,14 @@ y, back = pullback(() -> layer(x), Params([W]))
   sum(H)
 end[1] == 1
 
-# FIXME
-if !Zygote.usetyped
-  @test gradient(2) do x
-    if x < 0
-      throw("foo")
-    end
-    return x*5
-  end[1] == 5
+@test gradient(2) do x
+  if x < 0
+    throw("foo")
+  end
+  return x*5
+end[1] == 5
 
-  @test gradient(x -> one(eltype(x)), rand(10))[1] == nothing
-end
+@test gradient(x -> one(eltype(x)), rand(10))[1] == nothing
 
 # Thre-way control flow merge
 @test gradient(1) do x
@@ -214,15 +209,11 @@ grad_closure(x) = 2x
 
 Zygote.@adjoint (f::typeof(grad_closure))(x) = f(x), Δ -> (1, 2)
 
-Zygote.usetyped && Zygote.refresh()
-
 @test gradient((f, x) -> f(x), grad_closure, 5) == (1, 2)
 
-if !Zygote.usetyped
-  invokable(x) = 2x
-  invokable(x::Integer) = 3x
-  @test gradient(x -> invoke(invokable, Tuple{Any}, x), 5) == (2,)
-end
+invokable(x) = 2x
+invokable(x::Integer) = 3x
+@test gradient(x -> invoke(invokable, Tuple{Any}, x), 5) == (2,)
 
 y, back = Zygote.pullback(x->tuple(x...), [1, 2, 3])
 @test back((1, 1, 1)) == ((1,1,1),)
