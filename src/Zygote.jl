@@ -52,7 +52,7 @@ end
 precompile() = usetyped || include(joinpath(@__DIR__, "precompile.jl"))
 
 # precompile()
-@init precompile()
+@init Requires.isprecompiling() || precompile()
 
 # helps to work around 265-y issues
 function refresh()
