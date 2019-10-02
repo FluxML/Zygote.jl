@@ -643,6 +643,11 @@ end
         A2 = U * Diagonal(λ) * U'
         @test gradtest(x->f(Symmetric(x)), A2)
       end
+      @testset "low rank" begin
+        U = eigvecs(A)
+        A2 = U * Diagonal([rand(rng), zeros(N-1)...]) * U'
+        @test gradtest(x->f(Symmetric(x)), A2)
+      end
     end
 
     @testset "$func(::Hermitian{<:Real})" begin
@@ -656,6 +661,11 @@ end
         λ, U = eigen(A)
         λ[1] = λ[3] + sqrt(eps(eltype(λ))) / 10
         A2 = U * Diagonal(λ) * U'
+        @test gradtest(x->f(Hermitian(x)), A2)
+      end
+      @testset "low rank" begin
+        U = eigvecs(A)
+        A2 = U * Diagonal([rand(rng), zeros(N-1)...]) * U'
         @test gradtest(x->f(Hermitian(x)), A2)
       end
     end
@@ -674,6 +684,14 @@ end
         λ, U = eigen(A)
         λ[1] = λ[3] + sqrt(eps(eltype(λ))) / 10
         A2 = Hermitian(U * Diagonal(λ) * U')
+        @test gradtest(reim(collect(A2))...) do a,b
+          B = f(Hermitian(complex.(a, b)))
+          return real.(B) .+ 2 .* imag.(B)
+        end
+      end
+      @testset "low rank" begin
+        U = eigvecs(A)
+        A2 = U * Diagonal([rand(rng), zeros(N-1)...]) * U'
         @test gradtest(reim(collect(A2))...) do a,b
           B = f(Hermitian(complex.(a, b)))
           return real.(B) .+ 2 .* imag.(B)
