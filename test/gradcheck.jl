@@ -526,14 +526,14 @@ end
 
   @testset "eigen(::Hermitian{<:Complex})" begin
     rng, N = MersenneTwister(789), 7
-    A = collect(Hermitian(complex.(randn(rng, N, N), randn(rng, N, N))))
-    @test gradtest(real.(A), imag.(A)) do a,b
+    A = Hermitian(randn(rng, ComplexF64, N, N))
+    @test gradtest(reim(collect(A))...) do a,b
       d, U = eigen(Hermitian(complex.(a, b)))
       X = U * Diagonal(exp.(d)) * U'
-      return real.(X) + imag.(X)
+      return sum(reim(X))
     end
-    y = Zygote.pullback(eigen, Hermitian(A))[1]
-    y2 = eigen(Hermitian(A))
+    y = Zygote.pullback(eigen, A)[1]
+    y2 = eigen(A)
     @test y.values ≈ y2.values
     @test y.vectors ≈ y2.vectors
   end
