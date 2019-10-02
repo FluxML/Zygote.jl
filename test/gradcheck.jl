@@ -509,6 +509,14 @@ end
     y2 = eigen(A)
     @test y.values ≈ y2.values
     @test y.vectors ≈ y2.vectors
+    @testset "low rank" begin
+      U = eigvecs(A)
+      A2 = Symmetric(U * Diagonal([randn(rng), zeros(N-1)...]) * U')
+      @test_broken gradtest(collect(A2)) do (x)
+        d, Q = eigen(Symmetric(x))
+        return Q * Diagonal(exp.(d)) * transpose(Q)
+      end
+    end
   end
 
   @testset "eigen(::Hermitian{<:Real})" begin
@@ -522,6 +530,14 @@ end
     y2 = eigen(A)
     @test y.values ≈ y2.values
     @test y.vectors ≈ y2.vectors
+    @testset "low rank" begin
+      U = eigvecs(A)
+      A2 = Hermitian(U * Diagonal([randn(rng), zeros(N-1)...]) * U')
+      @test_broken gradtest(collect(A2)) do (x)
+        d, Q = eigen(Hermitian(x))
+        return Q * Diagonal(exp.(d)) * transpose(Q)
+      end
+    end
   end
 
   @testset "eigen(::Hermitian{<:Complex})" begin
@@ -536,6 +552,15 @@ end
     y2 = eigen(A)
     @test y.values ≈ y2.values
     @test y.vectors ≈ y2.vectors
+    @testset "low rank" begin
+      U = eigvecs(A)
+      A2 = Hermitian(U * Diagonal([randn(rng), zeros(N-1)...]) * U')
+      @test_broken gradtest(reim(collect(A2))...) do a,b
+        d, U = eigen(Hermitian(complex.(a, b)))
+        X = U * Diagonal(exp.(d)) * U'
+        return sum(reim(X))
+      end
+    end
   end
 end
 
