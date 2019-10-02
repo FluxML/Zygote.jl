@@ -489,34 +489,6 @@ for func in (:exp, :cos, :sin, :tan, :cosh, :sinh, :tanh, :atan, :asinh, :atanh)
   end
 end
 
-for func in (:exp, :cos, :sin, :tan, :cosh, :sinh, :tanh, :atan, :asinh, :atanh)
-  @eval begin
-    @adjoint function ($func)(A::LinearAlgebra.RealHermSymComplexHerm)
-      λ,U = eigen(A)
-      n = size(λ)[1]
-      fλ, fback = Zygote.pullback(x->($func).(x), λ)
-      B = U * Diagonal(fλ) * U'
-      issym = isreal(B)
-      if issym
-        Ω = Symmetric(B)
-      else
-        for i in 1:n
-            B[i,i] = real(B[i,i])
-        end
-        Ω = Hermitian(B)
-      end
-      return Ω, function (Ω̄)
-        B̄ = issym ? _symmetric_back(Ω̄, 'U') : _hermitian_back(Ω̄, 'U')
-        dfλ = fback(ones(n))[1]
-        Δfij = (i, j)->_pairdiffquot($func, i, j, λ, conj(fλ), dfλ) # TODO: add 2nd deriv
-        P = @inbounds Δfij.(Base.OneTo(n), Base.OneTo(n)')
-        J = U' * B̄ * U
-        return (U * (P .* J) * U',)
-      end
-    end
-  end
-end
-
 Zygote.@adjoint function LinearAlgebra.tr(x::AbstractMatrix)
   # x is a squre matrix checked by tr,
   # so we could just use Eye(size(x, 1))
