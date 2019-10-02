@@ -570,9 +570,9 @@ end
     @testset "$func(::Hermitian{<:Complex})" begin
       rng, N = MersenneTwister(789), 7
       A = Hermitian(_randmatpow(rng, f, Complex{Float64}, N))
-      @test gradtest(collect(real.(A)), collect(imag.(A))) do a,b
+      @test gradtest(reim(collect(A))...) do a,b
         B = f(Hermitian(complex.(a, b)))
-        return real.(B) + 2 * imag.(B)
+        return real.(B) .+ 2 .* imag.(B)
       end
       y = Zygote.pullback(f, A)[1]
       y2 = f(A)
@@ -580,10 +580,10 @@ end
       @testset "similar eigenvalues" begin
         λ, U = eigen(A)
         λ[1] = λ[3] + sqrt(eps(eltype(λ))) / 10
-        A2 = U * Diagonal(λ) * U'
-        @test gradtest(real.(A2), imag.(A2)) do a,b
+        A2 = Hermitian(U * Diagonal(λ) * U')
+        @test gradtest(reim(collect(A2))...) do a,b
           B = f(Hermitian(complex.(a, b)))
-          return real.(B) + 2 * imag.(B)
+          return real.(B) .+ 2 .* imag.(B)
         end
       end
     end
