@@ -438,6 +438,18 @@ end
   end
 end
 
+# Matrix of pairwise difference quotients
+Base.@propagate_inbounds function _pairdiffquot(f, i, j, x, fx, dfx, d²fx = nothing)
+  i == j && return dfx[i]
+  Δx = x[i] - x[j]
+  T = real(eltype(x))
+  if abs(Δx) ≤ sqrt(eps(T))
+    return d²fx === nothing ? dfx[i] : dfx[i] - Δx / 2 * d²fx[i]
+  end
+  Δfx = fx[i] - fx[j]
+  return Δfx / Δx
+end
+
 # Adjoint based on the Theano implementation, which uses the differential as described
 # in Brančík, "Matlab programs for matrix exponential function derivative evaluation"
 @adjoint exp(A::AbstractMatrix) = exp(A), function(F̄)
@@ -474,6 +486,34 @@ end
 @adjoint function LinearAlgebra.eigvals(A::LinearAlgebra.RealHermSymComplexHerm)
   d, U = eigen(A)
   return d, d̄ -> (U * Diagonal(d̄) * U',)
+end
+
+for func in (:exp, :cos, :sin, :tan, :cosh, :sinh, :tanh, :atan, :asinh, :atanh)
+  @eval begin
+    @adjoint function ($func)(A::LinearAlgebra.RealHermSymComplexHerm)
+      λ,U = eigen(A)
+      n = size(λ)[1]
+      fλ, fback = Zygote.pullback(x->($func).(x), λ)
+      B = U * Diagonal(fλ) * U'
+      issym = isreal(B)
+      if issym
+        Ω = Symmetric(B)
+      else
+        for i in 1:n
+            B[i,i] = real(B[i,i])
+        end
+        Ω = Hermitian(B)
+      end
+      return Ω, function (Ω̄)
+        B̄ = issym ? _symmetric_back(Ω̄, 'U') : _hermitian_back(Ω̄, 'U')
+        dfλ = fback(ones(n))[1]
+        Δfij = (i, j)->_pairdiffquot($func, i, j, λ, conj(fλ), dfλ) # TODO: add 2nd deriv
+        P = @inbounds Δfij.(Base.OneTo(n), Base.OneTo(n)')
+        J = U' * B̄ * U
+        return (U * (P .* J) * U',)
+      end
+    end
+  end
 end
 
 Zygote.@adjoint function LinearAlgebra.tr(x::AbstractMatrix)
