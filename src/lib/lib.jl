@@ -127,7 +127,7 @@ end
 
 unapply(t, xs) = _unapply(t, xs)[1]
 
-@adjoint function Core._apply(f, args...)
+@adjoint! function Core._apply(f, args...)
   y, back = Core._apply(_pullback, (__context__, f), args...)
   st = map(_empty, args)
   y, function (Δ)
