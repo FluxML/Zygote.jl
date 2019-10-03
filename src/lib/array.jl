@@ -457,12 +457,14 @@ end
   E = eigen(A)
   w = E.values
   ew = exp.(w)
-  X = [i==j ? ew[i] : (ew[i]-ew[j])/(w[i]-w[j]) for i in 1:n,j=1:n]
+  Δeij = (i, j)->_pairdiffquot(exp, i, j, w, ew, ew, ew)
+  X = Δeij.(Base.OneTo(n), Base.OneTo(n)')
   V = E.vectors
   VF = factorize(V)
   Ā = (V * ((VF \ F̄' * V) .* X) / VF)'
   return (Ā,)
 end
+
 @adjoint function LinearAlgebra.eigen(A::LinearAlgebra.RealHermSymComplexHerm)
   dU = eigen(A)
   return dU, function (Δ)

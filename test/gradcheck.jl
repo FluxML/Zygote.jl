@@ -510,18 +510,35 @@ end
     for i = 1:5
       A = randn(rng, N, N)
       @test gradtest(exp, A)
+
+      @testset "similar eigenvalues" begin
+        λ, V = eigen(A)
+        λ[1] = λ[3] + sqrt(eps(real(eltype(λ)))) / 10
+        A2 = real.(V * Diagonal(λ) / V)
+        @test gradtest(exp, A2)
+      end
     end
   end
 
   @testset "complex dense" begin
     rng, N = MersenneTwister(6865931), 8
     for i = 1:5
-      A = randn(rng, N, N)
-      B = randn(rng, N, N)
-      @test gradcheck(A, B) do a,b
+      A = randn(rng, ComplexF64, N, N)
+      @test gradcheck(reim(A)...) do a,b
         c = complex.(a, b)
         d = exp(c)
         return sum(real.(d) + 2 .* imag.(d))
+      end
+
+      @testset "similar eigenvalues" begin
+        λ, V = eigen(A)
+        λ[1] = λ[3] + sqrt(eps(real(eltype(λ)))) / 10
+        A2 = V * Diagonal(λ) / V
+        @test gradcheck(reim(A2)...) do a,b
+          c = complex.(a, b)
+          d = exp(c)
+          return sum(real.(d) + 2 .* imag.(d))
+        end
       end
     end
   end
