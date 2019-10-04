@@ -840,6 +840,12 @@ using Zygote: Buffer
   @test eachindex(buf) == 1:3
   @test stride(buf, 2) === 3
   @test strides(buf) === (1, )
+
+  @test gradient([1, 2, 3]) do xs
+    b = Zygote.Buffer(xs)
+    b .= xs .* 2
+    return sum(copy(b))
+  end == ([2,2,2],)
 end
 
 @testset "FillArrays" begin
