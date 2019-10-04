@@ -51,6 +51,11 @@ function Base.setindex!(b::Buffer, v, i...)
   b.data[i...] = v
 end
 
+function Base.copyto!(b::Buffer, data)
+  b.freeze && error("Buffer is frozen")
+  copyto!(b.data, data)
+end
+
 function Base.copy(b::Buffer)
   b.freeze = true
   return b.data
@@ -84,6 +89,18 @@ end
     (nothing, v̄, map(_->nothing, i)...)
   end
 end
+
+@adjoint! function copyto!(b::Buffer, xs)
+  copyto!(b, xs), function (_)
+    grad = grad_mut(__context__, b)
+    x̄s = copy(grad)
+    grad .= eltype(grad) <: Number ? 0 : nothing
+    return (nothing, x̄s)
+  end
+end
+
+_pullback(cx::AContext, ::typeof(Broadcast.materialize!), b::Buffer, x::AbstractArray) =
+  _pullback(cx, copyto!, b, x)
 
 @adjoint function copy(b::Buffer)
   copy(b), function (b̄)
