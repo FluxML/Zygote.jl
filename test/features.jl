@@ -314,5 +314,7 @@ function baz(args)
     m.value
 end
 
-value, grad = Zygote.pullback(baz, (1.0,))
-@test grad(1.) == ((1.0,),)
+let
+  value, back = Zygote.pullback(baz, (1.0,))
+  @test back(1.) == ((1.0,),)
+end
