@@ -1,6 +1,7 @@
-using Zygote, NNlib, Test, Random, LinearAlgebra, Statistics, FillArrays
+using Zygote, NNlib, Test, Random, LinearAlgebra, Statistics, FillArrays, FFTW
 using Zygote: gradient
 using NNlib: conv, ∇conv_data, depthwiseconv
+using Base.Broadcast: broadcast_shape
 
 function ngradient(f, xs::AbstractArray...)
   grads = zero.(xs)
@@ -53,6 +54,9 @@ Random.seed!(0)
 @test gradtest(logdet, map(x -> x*x', (rand(4, 4),))[1])
 @test gradtest(x -> logabsdet(x)[1], (4, 4))
 
+@test gradtest(x -> view(x,:,2,:), (3,4,5))
+@test gradtest(x -> view(x,1:2,3:4), (3,4))
+
 @testset "conv" begin
   for spatial_rank in (1, 2, 3)
     x = rand(repeat([10], spatial_rank)..., 3, 2)
@@ -75,13 +79,27 @@ end
   end
 end
 
+@test gradtest(x -> permutedims(x), rand(2))
+@test gradtest(x -> permutedims(x), rand(2,3))
 @test gradtest(x -> permutedims(x, [3,1,2]), rand(4,5,6))
+@test gradtest(x -> PermutedDimsArray(x, (3,1,2)), rand(4,5,6))
+let
+  y, back = Zygote.pullback(permutedims, randn(3))
+  @test first(back(randn(1, 3))) isa Vector
+end
 
 @test gradtest(x -> repeat(x; inner=2), rand(5))
 @test gradtest(x -> repeat(x; inner=2, outer=3), rand(5))
 @test gradtest(x -> repeat(x; inner=(2,2,1), outer=(1,1,3)), rand(5,4,3))
 
 @test gradtest(tr, rand(4, 4))
+
+@testset "fill" begin
+  rng, N, M, P = MersenneTwister(123456), 11, 6, 5
+  @test gradtest(x->fill(first(x), N), randn(rng, 1))
+  @test gradtest(x->fill(first(x), N, M), randn(rng, 1))
+  @test gradtest(x->fill(first(x), N, M, P), randn(rng, 1))
+end
 
 @testset "dot" begin
   rng = MersenneTwister(123456)
@@ -117,6 +135,60 @@ end
   @test gradtest(x -> mean(x, dims=[1, 2]), rand(2, 3, 4))
 end
 
+@testset "var" begin
+  @test gradtest(var, rand(2, 3))
+  @test gradtest(x -> var(x, dims=1), rand(2, 3))
+  @test gradtest(x -> var(x, dims=2), rand(2, 3))
+  @test gradtest(x -> var(x, dims=3), rand(2, 3, 4))
+  @test gradtest(x -> var(x, dims=[1, 2]), rand(2, 3, 4))
+
+
+  @test gradtest(x -> var(x, corrected=false), rand(2, 3))
+  @test gradtest(x -> var(x, dims=1, corrected=false), rand(2, 3))
+  @test gradtest(x -> var(x, dims=2, corrected=false), rand(2, 3))
+  @test gradtest(x -> var(x, dims=3, corrected=false), rand(2, 3, 4))
+  @test gradtest(x -> var(x, dims=[1, 2], corrected=false), rand(2, 3, 4))
+
+  @test gradtest(x -> var(x, mean=mean(x)), rand(2, 3))
+  @test gradtest(x -> var(x, dims=1, mean=mean(x, dims=1)), rand(2, 3))
+  @test gradtest(x -> var(x, dims=2, mean=mean(x, dims=2)), rand(2, 3))
+  @test gradtest(x -> var(x, dims=3, mean=mean(x, dims=3)), rand(2, 3, 4))
+  @test gradtest(x -> var(x, dims=[1, 2], mean=mean(x, dims=[1, 2])), rand(2, 3, 4))
+
+  @test gradtest(x -> var(x, corrected=false, mean=mean(x)), rand(2, 3))
+  @test gradtest(x -> var(x, dims=1, corrected=false, mean=mean(x, dims=1)), rand(2, 3))
+  @test gradtest(x -> var(x, dims=2, corrected=false, mean=mean(x, dims=2)), rand(2, 3))
+  @test gradtest(x -> var(x, dims=3, corrected=false, mean=mean(x, dims=3)), rand(2, 3, 4))
+  @test gradtest(x -> var(x, dims=[1, 2], corrected=false, mean=mean(x, dims=[1, 2])), rand(2, 3, 4))
+end
+
+@testset "std" begin
+  @test gradtest(std, rand(2, 3))
+  @test gradtest(x -> std(x, dims=1), rand(2, 3))
+  @test gradtest(x -> std(x, dims=2), rand(2, 3))
+  @test gradtest(x -> std(x, dims=3), rand(2, 3, 4))
+  @test gradtest(x -> std(x, dims=[1, 2]), rand(2, 3, 4))
+
+
+  @test gradtest(x -> std(x, corrected=false), rand(2, 3))
+  @test gradtest(x -> std(x, dims=1, corrected=false), rand(2, 3))
+  @test gradtest(x -> std(x, dims=2, corrected=false), rand(2, 3))
+  @test gradtest(x -> std(x, dims=3, corrected=false), rand(2, 3, 4))
+  @test gradtest(x -> std(x, dims=[1, 2], corrected=false), rand(2, 3, 4))
+
+  @test gradtest(x -> std(x, mean=mean(x)), rand(2, 3))
+  @test gradtest(x -> std(x, dims=1, mean=mean(x, dims=1)), rand(2, 3))
+  @test gradtest(x -> std(x, dims=2, mean=mean(x, dims=2)), rand(2, 3))
+  @test gradtest(x -> std(x, dims=3, mean=mean(x, dims=3)), rand(2, 3, 4))
+  @test gradtest(x -> std(x, dims=[1, 2], mean=mean(x, dims=[1, 2])), rand(2, 3, 4))
+
+  @test gradtest(x -> std(x, corrected=false, mean=mean(x)), rand(2, 3))
+  @test gradtest(x -> std(x, dims=1, corrected=false, mean=mean(x, dims=1)), rand(2, 3))
+  @test gradtest(x -> std(x, dims=2, corrected=false, mean=mean(x, dims=2)), rand(2, 3))
+  @test gradtest(x -> std(x, dims=3, corrected=false, mean=mean(x, dims=3)), rand(2, 3, 4))
+  @test gradtest(x -> std(x, dims=[1, 2], corrected=false, mean=mean(x, dims=[1, 2])), rand(2, 3, 4))
+end
+
 @testset "maximum" begin
   @test gradtest(maximum, rand(2, 3))
 
@@ -139,26 +211,110 @@ end
   @test gradtest(x -> minimum(x, dims=[1, 2]), rand(2, 3, 4))
 end
 
-@testset "backsolve" begin
-  rng, P, Q = MersenneTwister(123456), 10, 9
-  X, Y, y = randn(rng, P, P), randn(rng, P, Q), randn(rng, P)
+@testset "dropdims" begin
+  @test gradtest(x -> dropdims(x, dims = 3), rand(2, 2, 1, 2))
+  @test gradtest(x -> dropdims(x, dims = (2, 3)), rand(2, 1, 1, 3))
+  @test gradtest(x -> dropdims(x, dims = (1, 2, 3)), rand(1, 1, 1, 3))
+end
 
-  # \
-  @test gradtest(X -> X \ Y, X)
-  @test gradtest(Y -> X \ Y, Y)
-  @test gradtest(X -> X \ y, X)
-  @test gradtest(y -> X \ y, y)
+@testset "(p)inv" begin
+  rng, P, Q = MersenneTwister(123456), 13, 11
+  A, B, C = randn(rng, P, Q), randn(rng, P, P), randn(Q, P)
+  @test gradtest(pinv, A)
+  @test gradtest(inv, B)
+  @test gradtest(pinv, C)
+end
+
+@testset "multiplication" begin
+  @testset "matrix-matrix" begin
+    rng, M, P, Q = MersenneTwister(123456), 13, 7, 11
+    @test gradtest(*, randn(rng, M, P), randn(rng, P, Q))
+    @test gradtest(*, randn(rng, M, P), randn(rng, P))
+    @test gradtest(*, randn(rng, M, 1), randn(rng, 1, Q))
+    @test gradtest(*, randn(rng, M), randn(rng, 1, Q))
+    @test gradtest(*, randn(rng, 10)', randn(rng, 10))
+
+    let
+      y, back = Zygote.pullback(*, randn(rng, M, P), randn(rng, P))
+      @test last(back(randn(rng, M))) isa Vector
+    end
+    let
+      y, back = Zygote.pullback(*, randn(rng, M), randn(rng, 1, P))
+      @test first(back(randn(rng, M, P))) isa Vector
+    end
+  end
+end
+
+@testset "backsolve" begin
+  rng, M, P, Q = MersenneTwister(123456), 13, 10, 9
+  X, Y, y = randn(rng, P, P), randn(rng, P, Q), randn(rng, P)
+  A, B = randn(rng, P, M), randn(P, Q)
+  D = collect(Diagonal(randn(rng, P)))
+  L = collect(LowerTriangular(randn(rng, P, P)))
+  L[diagind(L)] .= 1 .+ 0.01 .* randn(rng, P)
+  U = collect(UpperTriangular(randn(rng, P, P)))
+  U[diagind(U)] .= 1 .+ 0.01 .* randn(rng, P)
+
+  # \ (Dense square)
+  @test gradtest(\, X, Y)
+  @test gradtest(\, X, y)
+
+  # \ (Dense rectangular)
+  @test gradtest(\, A, Y)
+  @test gradtest(\, A, y)
+  @test gradtest(\, B, Y)
+  @test gradtest(\, B, y)
+
+  # \ (Diagonal)
+  @test gradtest(\, D, Y)
+  @test gradtest(\, D, y)
+  @test gradtest((D, Y)-> Diagonal(D) \ Y, D, Y)
+  @test gradtest((D, Y)-> Diagonal(D) \ Y, D, y)
+
+  # \ (LowerTriangular)
+  @test gradtest(\, L, Y)
+  @test gradtest(\, L, y)
+  @test gradtest((L, Y) -> LowerTriangular(L) \ Y, L, Y)
+  @test gradtest((L, Y) -> LowerTriangular(L) \ Y, L, y)
+
+  # \ (UpperTriangular)
+  @test gradtest(\, U, Y)
+  @test gradtest(\, U, y)
+  @test gradtest((U, Y) -> UpperTriangular(U) \ Y, U, Y)
+  @test gradtest((U, Y) -> UpperTriangular(U) \ Y, U, y)
 
   # /
-  @test gradtest(X -> Y' / X, X)
-  @test gradtest(Y -> Y' / X, Y)
-  @test gradtest(X -> y' / X, X)
-  @test gradtest(y -> y' / X, y)
+  @test gradtest(/, Y', X)
+  @test gradtest((y, X)->y' / X, y, X)
+
+  # / (rectangular)
+  @test gradtest(/, Y', A')
+  @test gradtest((y, A)->y' / A', y, A)
+  @test gradtest(/, Y', B')
+  @test gradtest((y, A)->y' / A', y, B)
+
+  # / (Diagonal)
+  @test gradtest((D, Y) -> Y' / D, D, Y)
+  @test gradtest((D, Y) -> Y' / D, D, y)
+  @test gradtest((D, Y)-> Y' / Diagonal(D), D, Y)
+  @test gradtest((D, Y)-> Y' / Diagonal(D), D, y)
+
+  # / (LowerTriangular)
+  @test gradtest((L, Y) -> Y' / L, L, Y)
+  @test gradtest((L, Y) -> Y' / L, L, y)
+  @test gradtest((L, Y) -> Y' / LowerTriangular(L), L, Y)
+  @test gradtest((L, Y) -> Y' / LowerTriangular(L), L, y)
+
+  # / (UpperTriangular)
+  @test gradtest((U, Y) -> Y' / U, U, Y)
+  @test gradtest((U, Y) -> Y' / U, U, y)
+  @test gradtest((U, Y) -> Y' / UpperTriangular(U), U, Y)
+  @test gradtest((U, Y) -> Y' / UpperTriangular(U), U, y)
 
   @testset "Cholesky" begin
 
     # Check that the forwards pass computes the correct thing.
-    @test Zygote.forward(X->cholesky(X * X' + I) \ Y, X)[1] == cholesky(X * X' + I) \ Y
+    @test Zygote.pullback(X->cholesky(X * X' + I) \ Y, X)[1] == cholesky(X * X' + I) \ Y
     @test gradtest(X->cholesky(X * X' + I) \ Y, X)
     @test gradtest(Y->cholesky(X * X' + I) \ Y, Y)
     @test gradtest(X->cholesky(X * X' + I) \ y, X)
@@ -167,15 +323,106 @@ end
 end
 
 @testset "Symmetric" begin
-  rng, P = MersenneTwister(123456), 7
-  A = randn(rng, P, P)
-  @test gradtest(Symmetric, A)
-  y, back = Zygote.forward(Symmetric, A)
+  @testset "real" begin
+    rng, P = MersenneTwister(123456), 7
+    A = randn(rng, P, P)
+    @testset "uplo=$uplo" for uplo in (:U, :L)
+      @test gradtest(x->Symmetric(x, uplo), A)
+      y, back = Zygote.pullback(Symmetric, A, uplo)
+      @test y isa Symmetric
 
-  @testset "back(::Diagonal)" begin
-    D̄ = Diagonal(randn(rng, P))
-    @test back(Diagonal(D̄))[1] isa Diagonal
-    @test back(Diagonal(D̄))[1] ≈ back(Matrix(D̄))[1]
+      @testset "back(::Diagonal)" begin
+        D̄ = Diagonal(randn(rng, P))
+        @test back(Diagonal(D̄))[1] isa Diagonal
+        @test back(Diagonal(D̄))[1] ≈ back(Matrix(D̄))[1]
+      end
+
+      @testset "back(::$TTri)" for TTri in (LowerTriangular,UpperTriangular)
+        D̄ = TTri(randn(rng, P, P))
+        @test back(D̄)[1] isa Matrix
+        @test back(D̄)[2] === nothing
+        @test back(D̄)[1] ≈ back(Matrix(D̄))[1]
+      end
+    end
+  end
+
+  @testset "complex" begin
+    rng, P = MersenneTwister(123456), 7
+    Re = randn(rng, P, P)
+    Im = randn(rng, P, P)
+    A = complex.(Re, Im)
+
+    @testset "gradcheck dense" begin
+      for uplo in (:U, :L)
+        @test gradcheck(Re,Im) do a, b
+          c = Symmetric(complex.(a, b), uplo)
+          d = exp.(c)
+          sum(real.(d) + imag.(d))
+        end
+      end
+    end
+
+    @testset "uplo=$uplo" for uplo in (:U, :L)
+      y, back = Zygote.pullback(Symmetric, A, uplo)
+      @test y isa Symmetric
+
+      @testset "back(::Diagonal)" begin
+        D̄ = Diagonal(complex.(randn(rng, P), randn(rng, P)))
+        @test back(Diagonal(D̄))[1] isa Diagonal
+        @test back(Diagonal(D̄))[1] ≈ back(Matrix(D̄))[1]
+      end
+
+      @testset "back(::$TTri)" for TTri in (LowerTriangular,UpperTriangular)
+        D̄ = TTri(complex.(randn(rng, P, P), randn(rng, P, P)))
+        @test back(D̄)[1] isa Matrix
+        @test back(D̄)[2] === nothing
+        @test back(D̄)[1] ≈ back(Matrix(D̄))[1]
+      end
+    end
+  end
+end
+
+@testset "Hermitian" begin
+  rng, P = MersenneTwister(123456), 7
+  Re = randn(rng, P, P)
+  Im = randn(rng, P, P)
+  A = complex.(Re, Im)
+
+  @testset "gradcheck dense" begin
+    for uplo in (:U, :L)
+      @test gradcheck(Re,Im) do a, b
+        c = Hermitian(complex.(a, b), uplo)
+        d = exp.(c)
+        sum(real.(d) + imag.(d))
+      end
+    end
+  end
+
+  @testset "uplo=$uplo" for uplo in (:U, :L)
+    y, back = Zygote.pullback(Hermitian, A, uplo)
+    _, back_sym = Zygote.pullback(Symmetric, A, uplo)
+    @test y isa Hermitian
+
+    @testset "back" begin
+      D̄ = randn(rng, P, P)
+      @test back(D̄)[1] ≈ back_sym(D̄)[1]
+    end
+
+    @testset "back(::Diagonal)" begin
+      D̄ = Diagonal(complex.(randn(rng, P), randn(rng, P)))
+      @test back(D̄)[1] isa Diagonal
+      @test back(D̄)[2] === nothing
+      @test back(D̄)[1] ≈ back(Matrix(D̄))[1]
+      @test back(real(D̄))[1] ≈ back_sym(real(D̄))[1]
+    end
+
+    @testset "back(::$TTri)" for TTri in (LowerTriangular,UpperTriangular)
+      D̄ = TTri(complex.(randn(rng, P, P), randn(rng, P, P)))
+      @test back(D̄)[1] isa Matrix
+      @test back(D̄)[2] === nothing
+      @test back(D̄)[1] ≈ back(Matrix(D̄))[1]
+      @test back(real(D̄))[1] ≈ back_sym(real(D̄))[1]
+    end
   end
 end
 
@@ -189,7 +436,7 @@ end
   rng, P = MersenneTwister(123456), 10
   d = randn(rng, P)
   @test gradtest(Diagonal, d)
-  y, back = Zygote.forward(Diagonal, d)
+  y, back = Zygote.pullback(Diagonal, d)
   D̄ = randn(rng, P, P)
   @test back(D̄) == back(Diagonal(D̄))
   @test back(D̄) == back((diag=diag(D̄),))
@@ -203,22 +450,30 @@ end
 end
 
 @testset "cholesky" begin
-  rng, N = MersenneTwister(123456), 5
-  A = randn(rng, N, N)
-  @test gradtest(A->logdet(cholesky(A' * A + 1e-6I)), A)
+  @testset "cholesky - dense" begin
+    rng, N = MersenneTwister(123456), 5
+    A = randn(rng, N, N)
+    @test cholesky(A' * A + I) == first(Zygote.pullback(A->cholesky(A' * A + I), A))
+    @test gradtest(A->cholesky(A' * A + I).U, A)
+    @test gradtest(A->logdet(cholesky(A' * A + I)), A)
+    @test gradtest(B->cholesky(Symmetric(B)).U, A * A' + I)
+    @test gradtest(B->logdet(cholesky(Symmetric(B))), A * A' + I)
+  end
   @testset "cholesky - scalar" begin
-    y, back = Zygote.forward(cholesky, 5.0 * ones(1, 1))
-    y′, back′ = Zygote.forward(cholesky, 5.0)
+    rng = MersenneTwister(123456)
+    y, back = Zygote.pullback(cholesky, 5.0 * ones(1, 1))
+    y′, back′ = Zygote.pullback(cholesky, 5.0)
     C̄ = randn(rng, 1, 1)
     @test back′((factors=C̄,))[1] isa Real
     @test back′((factors=C̄,))[1] ≈ back((factors=C̄,))[1][1, 1]
   end
   @testset "cholesky - Diagonal" begin
-    D = Diagonal(exp.(randn(3)))
+    rng, N = MersenneTwister(123456), 3
+    D = Diagonal(exp.(randn(rng, N)))
     Dmat = Matrix(D)
-    y, back = Zygote.forward(cholesky, Dmat)
-    y′, back′ = Zygote.forward(cholesky, D)
-    C̄ = (factors=randn(rng, 3, 3),)
+    y, back = Zygote.pullback(cholesky, Dmat)
+    y′, back′ = Zygote.pullback(cholesky, D)
+    C̄ = (factors=randn(rng, N, N),)
     @test back′(C̄)[1] isa Diagonal
     @test diag(back′(C̄)[1]) ≈ diag(back(C̄)[1])
   end
@@ -235,10 +490,118 @@ end
 end
 
 @testset "matrix exponential" begin
-  rng, N = MersenneTwister(6865931), 8
-  for i = 1:5
-    A = randn(rng, N, N)
-    @test gradtest(exp, A)
+  @testset "real dense" begin
+    rng, N = MersenneTwister(6865931), 8
+    for i = 1:5
+      A = randn(rng, N, N)
+      @test gradtest(exp, A)
+    end
+  end
+
+  @testset "complex dense" begin
+    rng, N = MersenneTwister(6865931), 8
+    for i = 1:5
+      A = randn(rng, N, N)
+      B = randn(rng, N, N)
+      @test gradcheck(A, B) do a,b
+        c = complex.(a, b)
+        d = exp(c)
+        return sum(real.(d) + 2 .* imag.(d))
+      end
+    end
+  end
+end
+
+@testset "eigen(::RealHermSymComplexHerm)" begin
+  @testset "eigen(::Symmetric{<:Real})" begin
+    rng, N = MersenneTwister(123), 7
+    A = Symmetric(randn(rng, N, N))
+    @test gradtest(collect(A)) do (x)
+      d, Q = eigen(Symmetric(x))
+      return Q * Diagonal(exp.(d)) * transpose(Q)
+    end
+    y = Zygote.pullback(eigen, A)[1]
+    y2 = eigen(A)
+    @test y.values ≈ y2.values
+    @test y.vectors ≈ y2.vectors
+    @testset "low rank" begin
+      U = eigvecs(A)
+      A2 = Symmetric(U * Diagonal([randn(rng), zeros(N-1)...]) * U')
+      @test_broken gradtest(collect(A2)) do (x)
+        d, Q = eigen(Symmetric(x))
+        return Q * Diagonal(exp.(d)) * transpose(Q)
+      end
+    end
+  end
+
+  @testset "eigen(::Hermitian{<:Real})" begin
+    rng, N = MersenneTwister(456), 7
+    A = Hermitian(randn(rng, N, N))
+    @test gradtest(collect(A)) do (x)
+      d, Q = eigen(Hermitian(x))
+      return Q * Diagonal(exp.(d)) * transpose(Q)
+    end
+    y = Zygote.pullback(eigen, A)[1]
+    y2 = eigen(A)
+    @test y.values ≈ y2.values
+    @test y.vectors ≈ y2.vectors
+    @testset "low rank" begin
+      U = eigvecs(A)
+      A2 = Hermitian(U * Diagonal([randn(rng), zeros(N-1)...]) * U')
+      @test_broken gradtest(collect(A2)) do (x)
+        d, Q = eigen(Hermitian(x))
+        return Q * Diagonal(exp.(d)) * transpose(Q)
+      end
+    end
+  end
+
+  @testset "eigen(::Hermitian{<:Complex})" begin
+    rng, N = MersenneTwister(789), 7
+    A = Hermitian(randn(rng, ComplexF64, N, N))
+    @test gradtest(reim(collect(A))...) do a,b
+      d, U = eigen(Hermitian(complex.(a, b)))
+      X = U * Diagonal(exp.(d)) * U'
+      return real.(X) .+ imag.(X)
+    end
+    y = Zygote.pullback(eigen, A)[1]
+    y2 = eigen(A)
+    @test y.values ≈ y2.values
+    @test y.vectors ≈ y2.vectors
+    @testset "low rank" begin
+      U = eigvecs(A)
+      A2 = Hermitian(U * Diagonal([randn(rng), zeros(N-1)...]) * U')
+      @test_broken gradtest(reim(collect(A2))...) do a,b
+        d, U = eigen(Hermitian(complex.(a, b)))
+        X = U * Diagonal(exp.(d)) * U'
+        return real.(X) .+ imag.(X)
+      end
+    end
+  end
+end
+
+@testset "eigvals(::RealHermSymComplexHerm)" begin
+  @testset "eigvals(::Symmetric{<:Real})" begin
+    rng, N = MersenneTwister(123), 7
+    A = Symmetric(randn(rng, N, N))
+    @test gradtest(x->eigvals(Symmetric(x)), collect(A))
+    @test Zygote.pullback(eigvals, A)[1] ≈ eigvals(A)
+  end
+
+  @testset "eigvals(::Hermitian{<:Real})" begin
+    rng, N = MersenneTwister(456), 7
+    A = Hermitian(randn(rng, N, N))
+    @test gradtest(x->eigvals(Hermitian(x)), collect(A))
+    @test Zygote.pullback(eigvals, A)[1] ≈ eigvals(A)
+  end
+
+  @testset "eigvals(::Hermitian{<:Complex})" begin
+    rng, N = MersenneTwister(789), 7
+    A, B = randn(rng, N, N), randn(rng, N, N)
+    @test gradtest(A, B) do a,b
+      c = Hermitian(complex.(a, b))
+      return eigvals(c)
+    end
+    @test Zygote.pullback(eigvals, Hermitian(A))[1] ≈ eigvals(Hermitian(A))
   end
 end
 
@@ -278,11 +641,27 @@ Zygote.refresh()
    # Check unary pairwise.
   @test gradtest(X->pairwise(SqEuclidean(), X; dims=2), randn(rng, D, P))
   @test gradtest(Xt->pairwise(SqEuclidean(), Xt; dims=1), randn(rng, P, D))
+
+  @testset "colwise(::Euclidean, X, Y; dims=2)" begin
+    rng, D, P = MersenneTwister(123456), 2, 3
+    X, Y, D̄ = randn(rng, D, P), randn(rng, D, P), randn(rng, P)
+    gradtest((X, Y)->colwise(Euclidean(), X, Y), X, Y)
+  end
+  @testset "pairwise(::Euclidean, X, Y; dims=2)" begin
+    rng, D, P, Q = MersenneTwister(123456), 2, 3, 5
+    X, Y, D̄ = randn(rng, D, P), randn(rng, D, Q), randn(rng, P, Q)
+    gradtest((X, Y)->pairwise(Euclidean(), X, Y; dims=2), X, Y)
+  end
+  @testset "pairwise(::Euclidean, X; dims=2)" begin
+    rng, D, P = MersenneTwister(123456), 2, 3
+    X, D̄ = randn(rng, D, P), randn(rng, P, P)
+    gradtest(X->pairwise(Euclidean(), X; dims=2), X)
+  end
 end
 
 function cat_test(f, A::Union{AbstractVector, AbstractMatrix}...)
   @test gradtest(f, A...)
-  Z, back = Zygote.forward(f, A...)
+  Z, back = Zygote.pullback(f, A...)
   Ā = back(randn(size(Z)))
   @test all(map((a, ā)->ā isa typeof(a), A, Ā))
 end
@@ -334,10 +713,10 @@ end
 end
 
 @testset "hvcat" begin
-  @test grad(xs -> hvcat((2,2),xs...)[1,1], [1,2,3,4])[1] == (1,0,0,0)
-  @test grad(xs -> hvcat((2,2),xs...)[2,1], [1,2,3,4])[1] == (0,0,1,0)
-  @test grad(xs -> hvcat((2,2),xs...)[1,2], [1,2,3,4])[1] == (0,1,0,0)
-  @test grad(xs -> hvcat((2,2),xs...)[2,2], [1,2,3,4])[1] == (0,0,0,1)
+  @test gradient(xs -> hvcat((2,2),xs...)[1,1], [1,2,3,4])[1] == (1,0,0,0)
+  @test gradient(xs -> hvcat((2,2),xs...)[2,1], [1,2,3,4])[1] == (0,0,1,0)
+  @test gradient(xs -> hvcat((2,2),xs...)[1,2], [1,2,3,4])[1] == (0,1,0,0)
+  @test gradient(xs -> hvcat((2,2),xs...)[2,2], [1,2,3,4])[1] == (0,0,0,1)
 end
 
 @testset "one(s) and zero(s)" begin
@@ -345,6 +724,11 @@ end
   @test Zygote.gradient(x->sum(one(x)), randn(3, 3))[1] isa Nothing
   @test Zygote.gradient(x->sum(zeros(size(x))), randn(7))[1] isa Nothing
   @test Zygote.gradient(x->sum(zero(x)), randn(3))[1] isa Nothing
+end
+
+@testset "fma and muladd" begin
+    @test gradcheck(x -> fma(x[1], x[2], x[3]), [2.0, 3.0, 5.0])
+    @test gradcheck(x -> muladd(x[1], x[2], x[3]), [2.0, 3.0, 5.0])
 end
 
 import StatsFuns
@@ -420,9 +804,7 @@ end
 end
 
 @testset "broadcast" begin
-  if !Zygote.usetyped
-    @test gradient(x -> sum(sin.(x)), Diagonal(randn(3)))[1][2] == 1
-  end
+  @test gradient(x -> sum(sin.(x)), Diagonal(randn(3)))[1][2] == 1
 end
 
 using Zygote: Buffer
@@ -458,10 +840,16 @@ using Zygote: Buffer
   @test eachindex(buf) == 1:3
   @test stride(buf, 2) === 3
   @test strides(buf) === (1, )
+
+  @test gradient([1, 2, 3]) do xs
+    b = Zygote.Buffer(xs)
+    b .= xs .* 2
+    return sum(copy(b))
+  end == ([2,2,2],)
 end
 
 @testset "FillArrays" begin
-  gradcheck(x->sum(Fill(x[], (2, 2))), [0.1])
+  @test gradcheck(x->sum(Fill(x[], (2, 2))), [0.1])
   @test first(Zygote.gradient(sz->sum(Ones(sz)), 6)) === nothing
   @test first(Zygote.gradient(sz->sum(Zeros(sz)), 6)) === nothing
 end
@@ -469,7 +857,87 @@ end
 @testset "AbstractArray Addition / Subtraction / Negation" begin
   rng, M, N, P = MersenneTwister(123567), 3, 7, 11
   A, B = randn(rng, M, N, P), randn(rng, M, N, P)
-  gradtest(+, A, B)
-  gradtest(-, A, B)
-  gradtest(-, A)
+  @test gradtest(+, A, B)
+  @test gradtest(-, A, B)
+  @test gradtest(-, A)
+end
+
+@testset "FFTW" begin
+  x=[-0.353213 -0.789656 -0.270151; -0.95719 -1.27933 0.223982]
+  # gradient of ifft(rfft) must be 1
+  @test gradient((x)->real(ifft(fft(x))[1]),x)[1][1] == 1.0+0.0im
+  @test gradient((x)->real(fft(ifft(x))[1]),x)[1][1] == 1.0+0.0im
+
+  # check ffts for individual dimensions
+  @test gradient((x)->sum(abs.(FFTW.fft(x))),x)[1] ≈ gradient((x)->sum(abs.(FFTW.fft(FFTW.fft(x,1),2))),x)[1]
+  @test gradient((x)->abs(sum((FFTW.fft(x)))),x)[1] ≈ gradient((x)->abs(sum(FFTW.fft(FFTW.fft(x,1),2))),x)[1]
+  @test gradient((x, dims)->sum(abs.(FFTW.fft(x,dims))),x,(1,2))[1] ≈ gradient((x)->sum(abs.(FFTW.fft(x))),x)[1]
+  @test gradient((x)->sum(abs.(FFTW.fft(x,(1,2)))),x)[1] ≈ gradient((x)->sum(abs.(FFTW.fft(FFTW.fft(x,1),2))),x)[1]
+  @test gradient((x, dims)->sum(abs.(FFTW.ifft(x,dims))),x,(1,2))[1] ≈ gradient((x)->sum(abs.(FFTW.ifft(x))),x)[1]
+  @test gradient((x)->sum(abs.(FFTW.ifft(x,(1,2)))),x)[1] ≈ gradient((x)->sum(abs.(FFTW.ifft(FFTW.ifft(x,1),2))),x)[1]
+
+  @test gradcheck(x->sum(abs.(FFTW.fft(x))), x)
+  @test gradcheck(x->sum(abs.(FFTW.ifft(x))), x)
+  @test gradcheck(x->sum(abs.(FFTW.fft(x, 1))), x)
+  @test gradcheck(x->sum(abs.(FFTW.ifft(x, 1))), x)
+
+end
+
+@testset "FillArrays" begin
+  rng, M, N = MersenneTwister(123456), 7, 11
+  x, y = randn(rng), randn(rng)
+  @test Zygote.gradient(x->sum(Fill(x, N)), x)[1] == N
+  @test Zygote.gradient(x->sum(Fill(x, N, 3, 4)), x)[1] == N * 3 * 4
+  @test Zygote.gradient((x, y)->sum(Fill(x, N)), x, y) == (N, nothing)
+
+  let
+    out, back = Zygote.pullback(sum, Fill(x, N))
+    @test back(nothing) isa Nothing
+  end
+
+  z = randn(rng, N)
+  @test gradtest(x->Fill(first(x), N), [x])
+  let
+    out, back = Zygote.pullback(x->Fill(x, N), x)
+    @test out == Fill(x, N)
+    @test first(back(Fill(y, N))) ≈ y * N
+  end
+
+  # Test unary broadcasting gradients.
+  out, back = Zygote.pullback(x->exp.(x), Fill(x, N))
+  @test out isa Fill
+  @test out == Fill(exp(x), N)
+  @test back(Ones(N))[1] isa Fill
+  @test back(Ones(N))[1] == Ones(N) .* exp(x)
+  @test back(ones(N))[1] isa Vector
+  @test back(ones(N))[1] == ones(N) .* exp(x)
+  @test gradtest(x->exp.(Fill(3 * first(x), N)), [x])
+
+  @testset "broadcast + and *" begin
+    for sx in [(M, N), (M, 1), (1, N), (1, 1)]
+      for sy in [(M, N), (M, 1), (1, N), (1, 1)]
+        z = randn(rng, broadcast_shape(sx, sy))
+
+        # Addition
+        @test gradtest((x, y)->Fill(first(x), sx...) .+ Fill(first(y), sy...), [x], [y])
+        @test gradtest(x->Fill(first(x), sx...) .+ Ones(sy...), [x])
+        @test gradtest(x->Fill(first(x), sx...) .+ Zeros(sy...), [x])
+        @test gradtest(y->Ones(sx...) .+ Fill(first(y), sy...), [y])
+        @test gradtest(y->Zeros(sx...) .+ Fill(first(y), sy...), [y])
+
+        # Multiplication
+        @test gradtest((x, y)->Fill(first(x), sx...) .* Fill(first(y), sy...), [x], [y])
+        @test gradtest(x->Fill(first(x), sx...) .* Ones(sy...), [x])
+        @test gradtest(x->Fill(first(x), sx...) .* Zeros(sy...), [x])
+        @test gradtest(y->Ones(sx...) .* Fill(first(y), sy...), [y])
+        @test gradtest(y->Zeros(sx...) .* Fill(first(y), sy...), [y])
+      end
+    end
+  end
+end
+
+@testset "@nograd" begin
+  @test gradient(x -> findfirst(ismissing, x), [1, missing]) == (nothing,)
+  @test gradient(x -> findlast(ismissing, x), [1, missing]) == (nothing,)
+  @test gradient(x -> findall(ismissing, x)[1], [1, missing]) == (nothing,)
 end

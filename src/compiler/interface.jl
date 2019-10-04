@@ -1,4 +1,4 @@
-mutable struct Context
+mutable struct Context <: AContext
   cache::Union{IdDict{Any,Any},Nothing}
   globals::Union{Dict{GlobalRef,Any},Nothing}
 end
@@ -28,22 +28,22 @@ end
 
 # Wrappers
 
-_forward(f, args...) = _forward(Context(), f, args...)
+_pullback(f, args...) = _pullback(Context(), f, args...)
 
 tailmemaybe(::Nothing) = nothing
 tailmemaybe(x::Tuple) = Base.tail(x)
 
-function forward(f, args...)
-  y, back = _forward(f, args...)
+function pullback(f, args...)
+  y, back = _pullback(f, args...)
   y, Δ -> tailmemaybe(back(Δ))
 end
 
 sensitivity(y::Number) = one(y)
 sensitivity(y::Complex) = error("Output is complex, so the gradient is not defined.")
-sensitivity(y) = error("Output should be scalar; gradients are not defined for output $y")
+sensitivity(y) = error("Output should be scalar; gradients are not defined for output $(repr(y))")
 
 function gradient(f, args...)
-  y, back = forward(f, args...)
+  y, back = pullback(f, args...)
   return back(sensitivity(y))
 end
 
@@ -91,9 +91,9 @@ function Base.getindex(gs::Grads, x)
   return gs.grads[x]
 end
 
-function forward(f, ps::Params)
+function pullback(f, ps::Params)
   cx = Context()
-  y, back = _forward(cx, f)
+  y, back = _pullback(cx, f)
   y, function (Δ)
     for p in ps
       cache(cx)[p] = nothing

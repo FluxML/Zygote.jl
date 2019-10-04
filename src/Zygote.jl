@@ -1,22 +1,15 @@
 module Zygote
 
 using LinearAlgebra, Statistics
-using LinearAlgebra: copytri!
+using LinearAlgebra: copytri!, AbstractTriangular
 
-# This flag enables Zygote to grab extra type inference information during
-# compiles. When control flow is present, this can give gradient code a
-# performance boost.
-
-# HOWEVER, this is not Jameson-approved, nor well supported by the compiler, and
-# has several caveats. Recursion will cause inference to stack overflow.
-# Gradient redefinitions may result in ugly type errors. And Jameson *will* know.
-const usetyped = get(ENV, "ZYGOTE_TYPED", false) == "true"
+import ZygoteRules: @adjoint, @adjoint!, AContext, adjoint, _pullback, pullback, literal_getproperty
 
 using IRTools
 using MacroTools, Requires
 using MacroTools: @forward
 
-export Params, gradient, forward, @code_grad
+export Params, gradient, pullback, @code_grad
 
 include("tools/idset.jl")
 
@@ -40,7 +33,6 @@ include("lib/utils.jl")
 
 # we need to define this late, so that the genfuncs see lib.jl
 include("compiler/interface2.jl")
-usetyped || include("precompile.jl")
 
 include("profiler/Profile.jl")
 include("gradcheck.jl")
@@ -49,17 +41,22 @@ include("gradcheck.jl")
   include("flux.jl")
 end
 
+precompile() = include(joinpath(@__DIR__, "precompile.jl"))
+
+# precompile()
+@init Requires.isprecompiling() || precompile()
+
 # helps to work around 265-y issues
 function refresh()
   include(joinpath(@__DIR__, "compiler/interface2.jl"))
-  usetyped || include(joinpath(@__DIR__, "precompile.jl"))
+  precompile()
   return
 end
 
 macro profile(ex)
   @capture(ex, f_(x__)) || error("@profile f(args...)")
   quote
-    _, back = _forward($(esc(f)), $(esc.(x)...))
+    _, back = _pullback($(esc(f)), $(esc.(x)...))
     Profile.juno(Profile.profile(back))
   end
 end

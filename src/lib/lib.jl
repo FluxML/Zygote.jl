@@ -29,7 +29,7 @@ end
 
 @nograd Core.apply_type, Core.typeof, nfields, fieldtype,
   (==), (===), (>=), (<), (>), isempty, supertype, Base.typename,
-  Base.parameter_upper_bound, eps
+  Base.parameter_upper_bound, eps, Meta.parse, Base.eval, sleep
 
 @adjoint deepcopy(x) = deepcopy(x), ȳ -> (ȳ,)
 
@@ -84,15 +84,18 @@ literal_indexed_iterate(x, ::Val{i}, state) where i = Base.indexed_iterate(x, i,
 @adjoint getindex(xs::NTuple{N,Any}, i::Integer) where N =
   (xs[i], Δ -> (ntuple(j -> i == j ? Δ : nothing, Val(N)), nothing))
 
-function _forward(cx::Context, ::typeof(literal_indexed_iterate), xs::Tuple, ::Val{i}) where i
-  y, b = _forward(cx, literal_getindex, xs, Val(i))
+@adjoint getindex(xs::NTuple{N,Any}, r::AbstractUnitRange) where N =
+  (xs[r], Δ -> (ntuple(j -> j in r ? Δ[findfirst(isequal(j), r)] : nothing, Val(N)), nothing))
+
+function _pullback(cx::Context, ::typeof(literal_indexed_iterate), xs::Tuple, ::Val{i}) where i
+  y, b = _pullback(cx, literal_getindex, xs, Val(i))
   back(::Nothing) = nothing
   back(ȳ) = b(ȳ[1])
   (y, i+1), back
 end
 
-function _forward(cx::Context, ::typeof(literal_indexed_iterate), xs::Tuple, ::Val{i}, st) where i
-  y, b = _forward(cx, literal_getindex, xs, Val(i))
+function _pullback(cx::Context, ::typeof(literal_indexed_iterate), xs::Tuple, ::Val{i}, st) where i
+  y, b = _pullback(cx, literal_getindex, xs, Val(i))
   back(::Nothing) = nothing
   back(ȳ) = (b(ȳ[1])..., nothing)
   (y, i+1), back
@@ -106,6 +109,8 @@ end
   drest = map(_->nothing, tail(xs))
   first(xs), Δ -> ((Δ, drest...),)
 end
+
+@adjoint Base.tail(xs::Tuple) = tail(xs), x̄s -> ((nothing, x̄s...),)
 
 _empty(x) = length(x)
 _empty(x::Tuple) = map(_->nothing, x)
@@ -122,12 +127,13 @@ end
 
 unapply(t, xs) = _unapply(t, xs)[1]
 
-@adjoint function Core._apply(f, args...)
-  y, back = Core._apply(_forward, (__context__, f), args...)
+@adjoint! function Core._apply(f, args...)
+  y, back = Core._apply(_pullback, (__context__, f), args...)
   st = map(_empty, args)
   y, function (Δ)
     Δ = back(Δ)
-    (first(Δ), unapply(st, Base.tail(Δ))...)
+    Δ === nothing ? nothing :
+      (first(Δ), unapply(st, Base.tail(Δ))...)
   end
 end
 
@@ -145,8 +151,6 @@ end
 
 @generated pair(::Val{k}, v) where k = :($k = v,)
 
-literal_getproperty(x, ::Val{f}) where f = getproperty(x, f)
-
 @adjoint function literal_getproperty(x, ::Val{f}) where f
   val = getproperty(x, f)
   function back(Δ)
@@ -162,17 +166,17 @@ literal_getproperty(x, ::Val{f}) where f = getproperty(x, f)
   unwrap(val), back
 end
 
-_forward(cx::Context, ::typeof(getproperty), x, f::Symbol) =
-  _forward(cx, literal_getproperty, x, Val(f))
+_pullback(cx::Context, ::typeof(getproperty), x, f::Symbol) =
+  _pullback(cx, literal_getproperty, x, Val(f))
 
-_forward(cx::Context, ::typeof(getfield), x, f::Symbol) =
-  _forward(cx, literal_getproperty, x, Val(f))
+_pullback(cx::Context, ::typeof(getfield), x, f::Symbol) =
+  _pullback(cx, literal_getproperty, x, Val(f))
 
-_forward(cx::Context, ::typeof(literal_getindex), x::NamedTuple, ::Val{f}) where f =
-  _forward(cx, literal_getproperty, x, Val(f))
+_pullback(cx::Context, ::typeof(literal_getindex), x::NamedTuple, ::Val{f}) where f =
+  _pullback(cx, literal_getproperty, x, Val(f))
 
-_forward(cx::Context, ::typeof(literal_getproperty), x::Tuple, ::Val{f}) where f =
-  _forward(cx, literal_getindex, x, Val(f))
+_pullback(cx::Context, ::typeof(literal_getproperty), x::Tuple, ::Val{f}) where f =
+  _pullback(cx, literal_getindex, x, Val(f))
 
 grad_mut(x) = Ref{Any}(nt_nothing(x))
 
@@ -247,3 +251,5 @@ end
     (nothing, ($(map(f -> :(x̄.$f), fieldnames(T))...),))
   end
 end
+
+(back::Jnew{T})(Δ) where T = error("Need an adjoint for constructor $T. Gradient is of type $(typeof(Δ))")

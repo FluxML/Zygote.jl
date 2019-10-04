@@ -39,7 +39,7 @@ In cases like these, all bets are off. The gradient can only be described with m
 
 ```julia
 function jacobi(f, x)
-  y, back = Zygote.forward(f, x)
+  y, back = Zygote.pullback(f, x)
   back(1)[1], back(im)[1]
 end
 
