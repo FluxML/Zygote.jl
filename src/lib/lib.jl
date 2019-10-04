@@ -151,8 +151,6 @@ end
 
 @generated pair(::Val{k}, v) where k = :($k = v,)
 
-literal_getproperty(x, ::Val{f}) where f = getproperty(x, f)
-
 @adjoint function literal_getproperty(x, ::Val{f}) where f
   val = getproperty(x, f)
   function back(Δ)
