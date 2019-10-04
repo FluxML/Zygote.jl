@@ -17,6 +17,7 @@ include("compiler/reverse.jl")
 include("compiler/emit.jl")
 include("compiler/interface.jl")
 include("compiler/show.jl")
+include("compiler/prettyprint.jl")
 
 include("lib/grad.jl")
 include("lib/lib.jl")
