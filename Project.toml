@@ -6,6 +6,7 @@ version = "0.3.4"
 DiffRules = "b552c78f-8df3-52c6-915a-8e097449b14b"
 FFTW = "7a1cc6ca-52ef-59f5-83cd-3a7055c09341"
 FillArrays = "1a297f60-69ca-5386-bcde-b61e274b549b"
+FiniteDifferences = "26cc04aa-876d-5657-8c51-4c34ba976000"
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 IRTools = "7869d1d1-7146-5819-86e3-90919afe41df"
 InteractiveUtils = "b77e0a4c-d291-57a0-90e8-8db25a27a240"
@@ -20,10 +21,8 @@ Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 ZygoteRules = "700de1a5-db45-46bc-99cf-38207098b444"
 
 [compat]
-IRTools = "0.2.3"
 NNlib = "0.6"
 ZygoteRules = "0.2"
-julia = "1"
 
 [extras]
 Distances = "b4f34e82-e78d-54a5-968a-f98e89d6e8f7"

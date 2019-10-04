@@ -1,49 +1,13 @@
-export jacobian, njacobian, gradcheck
+using FiniteDifferences
+export jacobian, gradcheck
 
 # Base on torch.gradcheck
 make_jacobian(x::AbstractArray{T}, out_length::Int) where T = zeros(T, out_length, length(x))
 make_jacobian(x::Number, out_length::Int) = zeros(typeof(x), out_length, 1)
 
-function perturb(f, xs::Tuple, idx::Int, x::AbstractArray, x_idx, eps)
-    orig = x[x_idx]
-    x[x_idx] = orig + eps
-    out = copy(f(xs...))
-    x[x_idx] = orig
-    return out
-end
-
-function perturb(f, xs::Tuple, idx::Int, x::Number, x_idx, eps)
-    out = copy(f((k == idx ? x + eps : x for (k, x) in enumerate(xs))...))
-    return out
-end
-
 zero_like(x::T) where {T <: Number} = zero(T)
 zero_like(x) = fill!(similar(x), 0)
 zero_like(x::Broadcast.Broadcasted) = zero_like(Broadcast.materialize(x))
-
-_set_njacobian_elem!(d_tensor, d_idx, r::AbstractArray) = d_tensor[:, d_idx] = vec(r)
-_set_njacobian_elem!(d_tensor, d_idx, r::Number) = d_tensor[1, d_idx] = r
-
-"""
-    njacobian(f, xs...; eps=√eps(eltype(first(xs))))
-
-Return the numerical jacobian of `f` with input `xs...`. It use square root of
-the machine precision the first arguement element type `sqrt(eps(eltype(first(xs)))`. 
-"""
-function njacobian(f, xs...; eps=sqrt(eps(eltype(first(x)))))
-    output_size = length(f(xs...))
-    jacobians = map(x->make_jacobian(x, output_size), xs)
-
-    for (idx, (x, d_tensor)) in enumerate(zip(xs, jacobians))
-        for (d_idx, x_idx) in enumerate(eachindex(x))
-            outa = perturb(f, xs, idx, x, x_idx, -eps)
-            outb = perturb(f, xs, idx, x, x_idx, eps)
-            r = (outb - outa) / 2eps
-            _set_njacobian_elem!(d_tensor, d_idx, r)            
-        end
-    end
-    return jacobians
-end
 
 """
     jacobian(f, xs...)
@@ -51,7 +15,7 @@ end
 Return the analytical jacobian of `f` with input `xs...`.
 """
 function jacobian(f, xs...)
-    output, back = forward(f, xs...)
+    output, back = pullback(f, xs...)
     output_size = length(output)
     jacobians = map(x->make_jacobian(x, output_size), xs)
     grad_output = zero_like(output)
@@ -90,8 +54,11 @@ end
 Check the gradient of `f` at input `xs...` by comparing numerical jacobian and analytical jacobian.
 """
 function gradcheck(f, xs...;
-        eps=sqrt(eps(eltype(first(x)))),
+        eps=sqrt(eps(eltype(first(xs)))),
         atol::Real=0, rtol::Real= atol > 0 ? 0 : sqrt(eps))
     
-    all( isapprox.(njacobian(f, xs...; eps=eps), jacobian(f, xs...); atol=atol, rtol=rtol) )
+    fdm = central_fdm(5, 1, eps=eps)
+    njac = FiniteDifferences.jacobian(fdm, f, xs...)
+    jac = jacobian(f, xs...)
+    all( isapprox.(njac, jac, ; atol=atol, rtol=rtol) )
 end
