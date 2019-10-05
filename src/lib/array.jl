@@ -450,6 +450,11 @@ Base.@propagate_inbounds function _pairdiffquot(f, i, j, x, fx, dfx, d²fx = not
   return Δfx / Δx
 end
 
+Base.@propagate_inbounds function _pairdiffquotmat(f, n, x, fx, dfx, d²fx = nothing)
+  Δfij = (i, j)->_pairdiffquot(f, i, j, x, fx, dfx, d²fx)
+  return Δfij.(Base.OneTo(n), Base.OneTo(n)')
+end
+
 # Adjoint based on the Theano implementation, which uses the differential as described
 # in Brančík, "Matlab programs for matrix exponential function derivative evaluation"
 @adjoint exp(A::AbstractMatrix) = exp(A), function(F̄)
@@ -457,8 +462,7 @@ end
   E = eigen(A)
   w = E.values
   ew = exp.(w)
-  Δeij = (i, j)->_pairdiffquot(exp, i, j, w, ew, ew, ew)
-  X = Δeij.(Base.OneTo(n), Base.OneTo(n)')
+  X = _pairdiffquotmat(exp, n, w, ew, ew, ew)
   V = E.vectors
   VF = factorize(V)
   Ā = (V * ((VF \ F̄' * V) .* X) / VF)'
@@ -490,30 +494,67 @@ end
   return d, d̄ -> (U * Diagonal(d̄) * U',)
 end
 
-for func in (:exp, :cos, :sin, :tan, :cosh, :sinh, :tanh, :atan, :asinh, :atanh)
+
+## Matrix functions that can be written as power series
+
+function _realifydiag!(A)
+  for i in 1:size(A,1)
+      @inbounds A[i,i] = real(A[i,i])
+  end
+  return A
+end
+
+_hasrealdomain(f, x) = true
+_hasrealdomain(::Union{typeof.((acos,asin))...}, x) = all(x -> -1 ≤ x ≤ 1, x)
+_hasrealdomain(::typeof(acosh), x) = all(x -> x ≥ 1, x)
+_hasrealdomain(::Union{typeof.((log,sqrt))...}, x) = all(x -> x ≥ 0, x)
+
+_process_series_eigvals(f, λ) = _hasrealdomain(f, λ) ? λ : complex.(λ)
+
+_process_series_matrix(f, fA, A, λ) = fA
+_process_series_matrix(f, fA, A::LinearAlgebra.RealHermSym, λ) = Symmetric(fA)
+function _process_series_matrix(f,
+                                fA,
+                                A::LinearAlgebra.Hermitian{<:Complex},
+                                λ::AbstractVector{<:Real})
+  return Hermitian(_realifydiag!(fA))
+end
+@adjoint function _process_series_matrix(f,
+                                         fA,
+                                         A::LinearAlgebra.Hermitian{<:Complex},
+                                         λ::AbstractVector{<:Real})
+  return _process_series_matrix(f, fA, A, λ), function (Δ)
+    return (nothing, _hermitian_back(Δ, 'U'), nothing, nothing)
+  end
+end
+
+_apply_series_func(f, A, args...) = f(A, args...)
+
+@adjoint function _apply_series_func(func, A, args...)
+  hasargs = !isempty(args)
+  λ, U = eigen(A)
+  n = length(λ)
+  λ′ = _process_series_eigvals(func, λ)
+  fλ, fback = Zygote.pullback(x->(func).(x, args...), λ′)
+  fA = U * Diagonal(fλ) * U'
+  Ω, processback = Zygote.pullback(x->_process_series_matrix(func, x, A, λ′), fA)
+  return Ω, function (Ω̄)
+    f̄A = processback(Ω̄)[1]
+    ∂fλ = fback(ones(n))[1]
+    J = U' * f̄A * U
+    ārgs = hasargs ? tail(back(diag(J))) : ()
+    P = _pairdiffquotmat(func, n, λ, conj(fλ), ∂fλ)  # TODO: add 2nd deriv
+    Ā = U * (P .* J) * U'
+    return (nothing, Ā, ārgs...)
+  end
+end
+
+for func in (:exp, :log, :cos, :sin, :tan, :cosh, :sinh, :tanh, :acos, :asin, :atan, :acosh, :asinh, :atanh, :sqrt)
   @eval begin
-    @adjoint function ($func)(A::LinearAlgebra.RealHermSymComplexHerm)
-      λ,U = eigen(A)
-      n = size(λ)[1]
-      fλ, fback = Zygote.pullback(x->($func).(x), λ)
-      B = U * Diagonal(fλ) * U'
-      issym = isreal(B)
-      if issym
-        Ω = Symmetric(B)
-      else
-        for i in 1:n
-            B[i,i] = real(B[i,i])
-        end
-        Ω = Hermitian(B)
-      end
-      return Ω, function (Ω̄)
-        B̄ = issym ? _symmetric_back(Ω̄, 'U') : _hermitian_back(Ω̄, 'U')
-        dfλ = fback(ones(n))[1]
-        Δfij = (i, j)->_pairdiffquot($func, i, j, λ, conj(fλ), dfλ) # TODO: add 2nd deriv
-        P = @inbounds Δfij.(Base.OneTo(n), Base.OneTo(n)')
-        J = U' * B̄ * U
-        return (U * (P .* J) * U',)
-      end
+    function _pullback(cx::AContext,
+                       f::typeof($func),
+                       A::LinearAlgebra.RealHermSymComplexHerm)
+      return _pullback(cx, A -> _apply_series_func(f, A), A)
     end
   end
 end
