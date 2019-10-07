@@ -219,14 +219,13 @@ end
 
 @testset "$f(::AbstractArray)" for f in (real, conj, imag)
   rng, N = MersenneTwister(123456), 3
-  DTs = (Real, Complex)
   Ts = (Float64, ComplexF64)
-  @testset "$f(::Array{<:$IDT})" for (IT, IDT) in zip(Ts, DTs)
+  @testset "$f(::Array{$IT})" for IT in Ts
     A = randn(IT, N, N)
     y, back = Zygote.pullback(f, A)
     y2, back2 = Zygote.pullback(x->f.(x), A)
     @test y == y2
-    @testset "back(::Array{<:$BDT})" for (BT, BDT) in zip(Ts, DTs)
+    @testset "back(::Array{$BT})" for BT in Ts
       ȳ = randn(BT, N, N)
       @test back(ȳ)[1] == back2(ȳ)[1]
     end
