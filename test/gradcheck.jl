@@ -25,6 +25,15 @@ gradcheck(f, xs...) =
 gradtest(f, xs::AbstractArray...) = gradcheck((xs...) -> sum(sin.(f(xs...))), xs...)
 gradtest(f, dims...) = gradtest(f, rand.(Float64, dims)...)
 
+# utilities for using gradcheck with complex matrices
+_splitreim(A) = (real(A),)
+_splitreim(A::AbstractArray{<:Complex}) = reim(A)
+
+_joinreim(A, B) = complex.(A, B)
+_joinreim(A) = A
+
+_dropimaggrad(A) = Zygote.hook(real, A)
+
 Random.seed!(0)
 
 @test gradient(//, 2, 3) === (1//3, -2//9)
@@ -642,80 +651,43 @@ function _randmatseries(rng, ::typeof(atanh), T, n)
   return collect(tanh(Hermitian(_randmatseries(rng, tanh, T, n))))
 end
 
+_symhermtype(::Type{<:Symmetric}) = Symmetric
+_symhermtype(::Type{<:Hermitian}) = Hermitian
+
+function _gradtest_symherm(f, ST, A)
+  gradtest(_splitreim(collect(A))...) do (args...)
+    B = f(ST(_joinreim(_dropimaggrad.(args)...)))
+    return sum(_splitreim(B))
+  end
+end
+
 @testset "Hermitian/Symmetric power series functions" begin
+  MTs = (Symmetric{Float64}, Hermitian{Float64}, Hermitian{ComplexF64})
+  rng, N = MersenneTwister(123), 7
   @testset "$func(::RealHermSymComplexHerm)" for func in (:exp, :log, :cos, :sin, :tan, :cosh, :sinh, :tanh, :acos, :asin, :atan, :acosh, :asinh, :atanh, :sqrt)
     f = eval(func)
-    @testset "$func(::Symmetric{<:Real})" begin
-      rng, N = MersenneTwister(123), 7
-      A = Symmetric(_randmatseries(rng, f, Float64, N))
-      @test gradtest(x->sum(reim(f(Symmetric(Zygote.hook(real, x))))), collect(A))
+    @testset "$func(::$MT)" for MT in MTs
+      T = eltype(MT)
+      ST = _symhermtype(MT)
+      A = ST(_randmatseries(rng, f, T, N))
+      λ, U = eigen(A)
+
+      @test _gradtest_symherm(f, ST, A)
+
       y = Zygote.pullback(f, A)[1]
       y2 = f(A)
       @test y ≈ y2
+
       @testset "similar eigenvalues" begin
-        λ, U = eigen(A)
         λ[1] = λ[3] + sqrt(eps(eltype(λ))) / 10
         A2 = U * Diagonal(λ) * U'
-        @test gradtest(x->sum(reim(f(Symmetric(Zygote.hook(real, x))))), collect(A2))
+        @test _gradtest_symherm(f, ST, A2)
       end
-      if f ∉ (log, sqrt) # only defined for invertible matrices
-        @testset "low rank" begin
-          U = eigvecs(A)
-          A2 = U * Diagonal([rand(rng), zeros(N-1)...]) * U'
-          @test gradtest(x->sum(reim(f(Symmetric(Zygote.hook(real, x))))), collect(A2))
-        end
-      end
-    end
 
-    @testset "$func(::Hermitian{<:Real})" begin
-      rng, N = MersenneTwister(456), 7
-      A = Hermitian(_randmatseries(rng, f, Float64, N))
-      @test gradtest(x->sum(reim(f(Hermitian(Zygote.hook(real, x))))), collect(A))
-      y = Zygote.pullback(f, A)[1]
-      y2 = f(A)
-      @test y ≈ y2
-      @testset "similar eigenvalues" begin
-        λ, U = eigen(A)
-        λ[1] = λ[3] + sqrt(eps(eltype(λ))) / 10
-        A2 = U * Diagonal(λ) * U'
-        @test gradtest(x->sum(reim(f(Hermitian(Zygote.hook(real, x))))), collect(A2))
-      end
       if f ∉ (log, sqrt) # only defined for invertible matrices
         @testset "low rank" begin
-          U = eigvecs(A)
-          A2 = U * Diagonal([rand(rng), zeros(N-1)...]) * U'
-          @test gradtest(x->sum(reim(f(Hermitian(Zygote.hook(real, x))))), collect(A2))
-        end
-      end
-    end
-
-    @testset "$func(::Hermitian{<:Complex})" begin
-      rng, N = MersenneTwister(789), 7
-      A = Hermitian(_randmatseries(rng, f, Complex{Float64}, N))
-      @test gradtest(reim(collect(A))...) do a,b
-        B = f(Hermitian(complex.(a, b)))
-        return real.(B) .+ 2 .* imag.(B)
-      end
-      y = Zygote.pullback(f, A)[1]
-      y2 = f(A)
-      @test y ≈ y2
-      @testset "similar eigenvalues" begin
-        λ, U = eigen(A)
-        λ[1] = λ[3] + sqrt(eps(eltype(λ))) / 10
-        A2 = Hermitian(U * Diagonal(λ) * U')
-        @test gradtest(reim(collect(A2))...) do a,b
-          B = f(Hermitian(complex.(a, b)))
-          return real.(B) .+ 2 .* imag.(B)
-        end
-      end
-      if f ∉ (log, sqrt) # only defined for invertible matrices
-        @testset "low rank" begin
-          U = eigvecs(A)
-          A2 = U * Diagonal([rand(rng), zeros(N-1)...]) * U'
-          @test gradtest(reim(collect(A2))...) do a,b
-            B = f(Hermitian(complex.(a, b)))
-            return real.(B) .+ 2 .* imag.(B)
-          end
+          A3 = U * Diagonal([rand(rng), zeros(N-1)...]) * U'
+          @test _gradtest_symherm(f, ST, A3)
         end
       end
     end
