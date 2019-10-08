@@ -509,11 +509,14 @@ _hasrealdomain(f, x) = true
 _hasrealdomain(::Union{typeof.((acos,asin))...}, x) = all(x -> -1 ≤ x ≤ 1, x)
 _hasrealdomain(::typeof(acosh), x) = all(x -> x ≥ 1, x)
 _hasrealdomain(::Union{typeof.((log,sqrt))...}, x) = all(x -> x ≥ 0, x)
+_hasrealdomain(::typeof(^), x) = all(x -> x ≥ 0, x)
 
 _process_series_eigvals(f, λ) = _hasrealdomain(f, λ) ? λ : complex.(λ)
 
 _process_series_matrix(f, fA, A, λ) = fA
 _process_series_matrix(f, fA, ::LinearAlgebra.HermOrSym{<:Real}, λ) = Symmetric(fA)
+_process_series_matrix(::typeof(^), fA, ::Hermitian{<:Real}, λ::AbstractArray{<:Real}) =
+  Hermitian(fA)
 function _process_series_matrix(f,
                                 fA,
                                 ::Hermitian{<:Complex},
@@ -549,6 +552,13 @@ _apply_series_func(f, A, args...) = f(A, args...)
     Ā = U * (P .* f̄Λ) * U'
     return (nothing, Ā, ārgs...)
   end
+end
+
+function _pullback(cx::AContext,
+                   f::typeof(^),
+                   A::LinearAlgebra.RealHermSymComplexHerm,
+                   p::Real)
+  return _pullback(cx, (A, p) -> _apply_series_func(f, A, p), A, p)
 end
 
 for func in (:exp, :log, :cos, :sin, :tan, :cosh, :sinh, :tanh, :acos, :asin, :atan, :acosh, :asinh, :atanh, :sqrt)
