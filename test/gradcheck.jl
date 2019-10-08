@@ -644,6 +644,42 @@ end
       end
     end
   end
+
+  @testset "sincos(::RealHermSymComplexHerm)" begin
+    @testset "sincos(::$MT)" for MT in MTs
+      T = eltype(MT)
+      ST = _symhermtype(MT)
+      A = ST(_randmatseries(rng, sincos, T, N))
+      λ, U = eigen(A)
+
+      @test gradtest(_splitreim(collect(A))...) do (args...)
+        S,C = sincos(ST(_joinreim(_dropimaggrad.(args)...)))
+        return vcat(vec.(_splitreim(S))..., vec.(_splitreim(C))...)
+      end
+
+      y = Zygote.pullback(sincos, A)[1]
+      y2 = sincos(A)
+      @test y[1] ≈ y2[1]
+      @test y[2] ≈ y2[2]
+
+      @testset "similar eigenvalues" begin
+        λ[1] = λ[3] + sqrt(eps(eltype(λ))) / 10
+        A2 = U * Diagonal(λ) * U'
+        @test gradtest(_splitreim(collect(A2))...) do (args...)
+          S,C = sincos(ST(_joinreim(_dropimaggrad.(args)...)))
+          return vcat(vec.(_splitreim(S))..., vec.(_splitreim(C))...)
+        end
+      end
+
+      @testset "low rank" begin
+        A3 = U * Diagonal([rand(rng), zeros(N-1)...]) * U'
+        @test gradtest(_splitreim(collect(A3))...) do (args...)
+          S,C = sincos(ST(_joinreim(_dropimaggrad.(args)...)))
+          return vcat(vec.(_splitreim(S))..., vec.(_splitreim(C))...)
+        end
+      end
+    end
+  end
 end
 
 using Distances

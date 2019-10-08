@@ -555,6 +555,32 @@ for func in (:exp, :log, :cos, :sin, :tan, :cosh, :sinh, :tanh, :acos, :asin, :a
   end
 end
 
+@adjoint function sincos(A::LinearAlgebra.RealHermSymComplexHerm)
+  n = LinearAlgebra.checksquare(A)
+  λ, U = eigen(A)
+  sinλ, cosλ = Buffer(λ), Buffer(λ)
+  for i in Base.OneTo(n)
+    @inbounds sinλ[i], cosλ[i] = sincos(λ[i])
+  end
+  sinλ = copy(sinλ)
+  cosλ = copy(cosλ)
+  sinA = U * Diagonal(sinλ) * U'
+  cosA = U * Diagonal(cosλ) * U'
+  SC, processback = Zygote.pullback(sinA, cosA) do s,c
+    return (_process_series_matrix(sin, s, A, λ),
+            _process_series_matrix(cos, c, A, λ))
+  end
+  return SC, function (S̄C̄)
+    s̄inA, c̄osA = processback(S̄C̄)
+    JS = U' * s̄inA * U
+    JC = U' * c̄osA * U
+    PS = _pairdiffquotmat(sin, n, λ, sinλ, cosλ, -sinλ)
+    PC = _pairdiffquotmat(cos, n, λ, cosλ, -sinλ, -cosλ)
+    Ā = U * (PS .* JS .+ PC .* JC) * U'
+    return (Ā,)
+  end
+end
+
 Zygote.@adjoint function LinearAlgebra.tr(x::AbstractMatrix)
   # x is a squre matrix checked by tr,
   # so we could just use Eye(size(x, 1))
