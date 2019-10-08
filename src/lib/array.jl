@@ -531,21 +531,22 @@ end
 
 _apply_series_func(f, A, args...) = f(A, args...)
 
-@adjoint function _apply_series_func(func, A, args...)
+@adjoint function _apply_series_func(f, A, args...)
   hasargs = !isempty(args)
   n = LinearAlgebra.checksquare(A)
   λ, U = eigen(A)
-  λ′ = _process_series_eigvals(func, λ)
-  fλ, fback = Zygote.pullback(x->(func).(x, args...), λ′)
-  fA = U * Diagonal(fλ) * U'
-  Ω, processback = Zygote.pullback(x->_process_series_matrix(func, x, A, λ′), fA)
+  λ′ = _process_series_eigvals(f, λ)
+  fλ, fback = Zygote.pullback((x, args...)->f.(x, args...), λ′, args...)
+  fΛ = Diagonal(fλ)
+  fA = U * fΛ * U'
+  Ω, processback = Zygote.pullback(x->_process_series_matrix(f, x, A, λ′), fA)
   return Ω, function (Ω̄)
     f̄A = processback(Ω̄)[1]
-    ∂fλ = fback(ones(n))[1]
-    J = U' * f̄A * U
-    ārgs = hasargs ? tail(back(diag(J))) : ()
-    P = _pairdiffquotmat(func, n, λ, conj(fλ), ∂fλ)  # TODO: add 2nd deriv
-    Ā = U * (P .* J) * U'
+    f̄Λ = U' * f̄A * U
+    ārgs = hasargs ? tail(fback(diag(f̄Λ))) : ()
+    conjdfλ = fback(ones(n))[1]
+    P = _pairdiffquotmat(f, n, λ, conj(fλ), conjdfλ)  # TODO: add 2nd deriv
+    Ā = U * (P .* f̄Λ) * U'
     return (nothing, Ā, ārgs...)
   end
 end
@@ -571,17 +572,17 @@ end
   cosλ = copy(cosλ)
   sinA = U * Diagonal(sinλ) * U'
   cosA = U * Diagonal(cosλ) * U'
-  SC, processback = Zygote.pullback(sinA, cosA) do s,c
+  Ω, processback = Zygote.pullback(sinA, cosA) do s,c
     return (_process_series_matrix(sin, s, A, λ),
             _process_series_matrix(cos, c, A, λ))
   end
-  return SC, function (S̄C̄)
-    s̄inA, c̄osA = processback(S̄C̄)
-    JS = U' * s̄inA * U
-    JC = U' * c̄osA * U
+  return Ω, function (Ω̄)
+    s̄inA, c̄osA = processback(Ω̄)
+    s̄inΛ = U' * s̄inA * U
+    c̄osΛ = U' * c̄osA * U
     PS = _pairdiffquotmat(sin, n, λ, sinλ, cosλ, -sinλ)
     PC = _pairdiffquotmat(cos, n, λ, cosλ, -sinλ, -cosλ)
-    Ā = U * (PS .* JS .+ PC .* JC) * U'
+    Ā = U * (PS .* s̄inΛ .+ PC .* c̄osΛ) * U'
     return (Ā,)
   end
 end
