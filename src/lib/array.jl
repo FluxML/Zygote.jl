@@ -494,7 +494,8 @@ end
 ## Matrix functions that can be written as power series
 
 function _realifydiag!(A)
-  for i in 1:size(A,1)
+  n = LinearAlgebra.checksquare(A)
+  for i in 1:n
       @inbounds A[i,i] = real(A[i,i])
   end
   return A
@@ -528,8 +529,8 @@ _apply_series_func(f, A, args...) = f(A, args...)
 
 @adjoint function _apply_series_func(func, A, args...)
   hasargs = !isempty(args)
+  n = LinearAlgebra.checksquare(A)
   λ, U = eigen(A)
-  n = length(λ)
   λ′ = _process_series_eigvals(func, λ)
   fλ, fback = Zygote.pullback(x->(func).(x, args...), λ′)
   fA = U * Diagonal(fλ) * U'
