@@ -38,6 +38,8 @@ Random.seed!(0)
 
 @test gradient(//, 2, 3) === (1//3, -2//9)
 
+@test gradtest((a,b)->sum(reim(acosh(complex(a[1], b[1])))), [-2.0], [1.0])
+
 @test gradtest((x, W, b) -> σ.(W*x .+ b), 5, (2,5), 2)
 @test gradtest((x, W, b) -> σ.(W*x .+ b), (5,3), (2,5), 2)
 @test gradtest((x, W, b) -> logσ.(W*x .+ b), 5, (2,5), 2)
