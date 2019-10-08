@@ -217,6 +217,21 @@ end
   @test gradtest(x -> dropdims(x, dims = (1, 2, 3)), rand(1, 1, 1, 3))
 end
 
+@testset "$f(::AbstractArray)" for f in (real, conj, imag)
+  rng, N = MersenneTwister(123456), 3
+  Ts = (Float64, ComplexF64)
+  @testset "$f(::Array{$IT})" for IT in Ts
+    A = randn(IT, N, N)
+    y, back = Zygote.pullback(f, A)
+    y2, back2 = Zygote.pullback(x->f.(x), A)
+    @test y == y2
+    @testset "back(::Array{$BT})" for BT in Ts
+      ȳ = randn(BT, N, N)
+      @test back(ȳ)[1] == back2(ȳ)[1]
+    end
+  end
+end
+
 @testset "(p)inv" begin
   rng, P, Q = MersenneTwister(123456), 13, 11
   A, B, C = randn(rng, P, Q), randn(rng, P, P), randn(Q, P)
