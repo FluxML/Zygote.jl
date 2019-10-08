@@ -196,6 +196,10 @@ end
   dropdims(xs, dims = dims), Δ -> (reshape(Δ, size(xs)...),)
 end
 
+@adjoint real(x::AbstractArray) = real(x), r̄ -> (real(r̄),)
+@adjoint conj(x::AbstractArray) = conj(x), r̄ -> (conj(r̄),)
+@adjoint imag(x::AbstractArray) = imag(x), ī -> (complex.(0, real.(ī)),)
+
 @adjoint function mean(xs::AbstractArray; dims = :)
   return mean(xs, dims=dims), Δ -> (_backmean(xs,Δ,dims),)
 end
