@@ -513,16 +513,16 @@ _hasrealdomain(::Union{typeof.((log,sqrt))...}, x) = all(x -> x ≥ 0, x)
 _process_series_eigvals(f, λ) = _hasrealdomain(f, λ) ? λ : complex.(λ)
 
 _process_series_matrix(f, fA, A, λ) = fA
-_process_series_matrix(f, fA, A::LinearAlgebra.RealHermSym, λ) = Symmetric(fA)
+_process_series_matrix(f, fA, ::LinearAlgebra.HermOrSym{<:Real}, λ) = Symmetric(fA)
 function _process_series_matrix(f,
                                 fA,
-                                A::LinearAlgebra.Hermitian{<:Complex},
-                                λ::AbstractVector{<:Real})
+                                ::Hermitian{<:Complex},
+                                ::AbstractVector{<:Real})
   return Hermitian(_realifydiag!(fA))
 end
 @adjoint function _process_series_matrix(f,
                                          fA,
-                                         A::LinearAlgebra.Hermitian{<:Complex},
+                                         A::Hermitian{<:Complex},
                                          λ::AbstractVector{<:Real})
   return _process_series_matrix(f, fA, A, λ), function (Δ)
     return (nothing, _hermitian_back(Δ, 'U'), nothing, nothing)
