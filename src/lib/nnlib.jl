@@ -1,7 +1,7 @@
 using NNlib
 import NNlib: softmax, ∇softmax, logsoftmax, ∇logsoftmax, conv, depthwiseconv, ∇conv_data, ∇depthwiseconv_data, maxpool, meanpool, σ, relu
 
-@adjoint function Base.Broadcast.broadcasted(::typeof(relu), xs::AbstractArray{T}) where T<:Number
+@adjoint function Base.Broadcast.broadcasted(::typeof(relu), xs::Numeric{T}) where T<:Number
     ys = relu.(xs)
     ys, Δ -> (nothing, broadcast((y, d) -> y > 0 ? d : zero(T), ys, Δ))
 end
