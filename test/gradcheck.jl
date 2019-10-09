@@ -685,18 +685,18 @@ end
   end
 
   @testset "^(::RealHermSymComplexHerm, p::Real)" begin
-    @testset for p in (-1.0, 0.5, 1.5)
+    @testset for p in (-1.0, 0.5, 1.5, 2.0)
       @testset "^(::$MT, $p)" for MT in MTs
         T = eltype(MT)
         ST = _hermsymtype(MT)
         A = ST(_randmatseries(rng, ^, T, N))
         λ, U = eigen(A)
 
-        @test gradtest(_splitreim(collect(A))..., [p]) do (args...)
+        @test gradcheck(_splitreim(collect(A))..., [p]) do (args...)
           p = _dropimaggrad(args[end][1])
           A = ST(_joinreim(_dropimaggrad.(args[1:end-1])...))
           B = A^p
-          return vcat(vec.(_splitreim(B))...)
+          return abs2(sum(sin.(B)))
         end
 
         y = Zygote.pullback(^, A, p)[1]
@@ -707,11 +707,11 @@ end
         @testset "similar eigenvalues" begin
           λ[1] = λ[3] + sqrt(eps(eltype(λ))) / 10
           A2 = U * Diagonal(λ) * U'
-          @test gradtest(_splitreim(collect(A2))..., [p]) do (args...)
+          @test gradcheck(_splitreim(collect(A2))..., [p]) do (args...)
             p = _dropimaggrad(args[end][1])
             A = ST(_joinreim(_dropimaggrad.(args[1:end-1])...))
             B = A^p
-            return vcat(vec.(_splitreim(B))...)
+            return abs2(sum(sin.(B)))
           end
         end
       end
