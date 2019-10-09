@@ -715,6 +715,29 @@ end
   end
 end
 
+@testset "^(::Union{Symmetric,Hermitian}, p::Integer)" begin
+  MTs = (Symmetric{Float64}, Symmetric{ComplexF64},
+         Hermitian{Float64}, Hermitian{ComplexF64})
+  rng, N = MersenneTwister(123), 7
+  @testset for p in (-3, -2, -1, 1, 2, 3)
+    @testset "^(::$MT, $p)" for MT in MTs
+      T = eltype(MT)
+      ST = _symhermtype(MT)
+      A = ST(randn(rng, T, N, N))
+
+      @test gradtest(_splitreim(collect(A))...) do (args...)
+        A = ST(_joinreim(_dropimaggrad.(args)...))
+        B = A^p
+        return vcat(vec.(_splitreim(B))...)
+      end
+
+      y = Zygote.pullback(^, A, p)[1]
+      y2 = A^p
+      @test y ≈ y2
+    end
+  end
+end
+
 using Distances
 
 Zygote.refresh()

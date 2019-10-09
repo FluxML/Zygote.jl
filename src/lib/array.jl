@@ -497,6 +497,7 @@ end
 
 ## Matrix functions that can be written as power series
 
+_realifydiag!(A::AbstractArray{<:Real}) = A
 function _realifydiag!(A)
   n = LinearAlgebra.checksquare(A)
   for i in 1:n
@@ -553,6 +554,30 @@ _apply_series_func(f, A, args...) = f(A, args...)
     return (nothing, Ā, ārgs...)
   end
 end
+
+_hermsympow(A::Symmetric, p::Integer) = LinearAlgebra.sympow(A, p)
+_hermsympow(A::Hermitian, p::Integer) = A^p
+
+@adjoint function _hermsympow(A::Hermitian, p::Integer)
+  if p < 0
+    B, back = Zygote.pullback(A->Base.power_by_squaring(inv(A), -p), A)
+  else
+    B, back = Zygote.pullback(A->Base.power_by_squaring(A, p), A)
+  end
+  Ω = Hermitian(_realifydiag!(B))
+  return Ω, function (Ω̄)
+    B̄ = _hermitian_back(Ω̄, 'U')
+    Ā = back(B̄)[1]
+    return (Ā, nothing)
+  end
+end
+
+_pullback(cx::AContext, ::typeof(^), A::LinearAlgebra.HermOrSym{<:Real}, p::Integer) =
+  _pullback(cx, _hermsympow, A, p)
+_pullback(cx::AContext, ::typeof(^), A::Symmetric{<:Complex}, p::Integer) =
+  _pullback(cx, _hermsympow, A, p)
+_pullback(cx::AContext, ::typeof(^), A::Hermitian{<:Complex}, p::Integer) =
+  _pullback(cx, _hermsympow, A, p)
 
 function _pullback(cx::AContext,
                    f::typeof(^),
