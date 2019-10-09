@@ -495,7 +495,7 @@ end
 end
 
 
-## Matrix functions that can be written as power series
+# Hermitian/Symmetric matrix functions that can be written as power series
 
 _realifydiag!(A::AbstractArray{<:Real}) = A
 function _realifydiag!(A)
@@ -599,22 +599,19 @@ end
 @adjoint function sincos(A::LinearAlgebra.RealHermSymComplexHerm)
   n = LinearAlgebra.checksquare(A)
   λ, U = eigen(A)
-  sinλ, cosλ = Buffer(λ), Buffer(λ)
+  sλ, cλ = Buffer(λ), Buffer(λ)
   for i in Base.OneTo(n)
-    @inbounds sinλ[i], cosλ[i] = sincos(λ[i])
+    @inbounds sλ[i], cλ[i] = sincos(λ[i])
   end
-  sinλ = copy(sinλ)
-  cosλ = copy(cosλ)
-  sinA = U * Diagonal(sinλ) * U'
-  cosA = U * Diagonal(cosλ) * U'
+  sinλ, cosλ = copy(sλ), copy(cλ)
+  sinA, cosA = U * Diagonal(sinλ) * U', U * Diagonal(cosλ) * U'
   Ω, processback = Zygote.pullback(sinA, cosA) do s,c
     return (_process_series_matrix(sin, s, A, λ),
             _process_series_matrix(cos, c, A, λ))
   end
   return Ω, function (Ω̄)
     s̄inA, c̄osA = processback(Ω̄)
-    s̄inΛ = U' * s̄inA * U
-    c̄osΛ = U' * c̄osA * U
+    s̄inΛ, c̄osΛ = U' * s̄inA * U, U' * c̄osA * U
     PS = _pairdiffquotmat(sin, n, λ, sinλ, cosλ, -sinλ)
     PC = _pairdiffquotmat(cos, n, λ, cosλ, -sinλ, -cosλ)
     Ā = U * (PS .* s̄inΛ .+ PC .* c̄osΛ) * U'
