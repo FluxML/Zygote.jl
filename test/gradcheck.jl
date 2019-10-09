@@ -555,10 +555,10 @@ end
   end
 end
 
-_symhermtype(::Type{<:Symmetric}) = Symmetric
-_symhermtype(::Type{<:Hermitian}) = Hermitian
+_hermsymtype(::Type{<:Symmetric}) = Symmetric
+_hermsymtype(::Type{<:Hermitian}) = Hermitian
 
-function _gradtest_symherm(f, ST, A)
+function _gradtest_hermsym(f, ST, A)
   gradtest(_splitreim(collect(A))...) do (args...)
     B = f(ST(_joinreim(_dropimaggrad.(args)...)))
     return sum(_splitreim(B))
@@ -570,12 +570,12 @@ end
   rng, N = MersenneTwister(123), 7
   @testset "eigen(::$MT)" for MT in MTs
     T = eltype(MT)
-    ST = _symhermtype(MT)
+    ST = _hermsymtype(MT)
 
     A = ST(randn(rng, T, N, N))
     U = eigvecs(A)
 
-    @test _gradtest_symherm(ST, A) do (A)
+    @test _gradtest_hermsym(ST, A) do (A)
       d, U = eigen(A)
       return U * Diagonal(exp.(d)) * U'
     end
@@ -587,7 +587,7 @@ end
 
     @testset "low rank" begin
       A2 = Symmetric(U * Diagonal([randn(rng), zeros(N-1)...]) * U')
-      @test_broken _gradtest_symherm(ST, A2) do (A)
+      @test_broken _gradtest_hermsym(ST, A2) do (A)
         d, U = eigen(A)
         return U * Diagonal(exp.(d)) * U'
       end
@@ -600,10 +600,10 @@ end
   rng, N = MersenneTwister(123), 7
   @testset "eigvals(::$MT)" for MT in MTs
     T = eltype(MT)
-    ST = _symhermtype(MT)
+    ST = _hermsymtype(MT)
 
     A = ST(randn(rng, T, N, N))
-    @test _gradtest_symherm(A ->eigvals(A), ST, A)
+    @test _gradtest_hermsym(A ->eigvals(A), ST, A)
     @test Zygote.pullback(eigvals, A)[1] ≈ eigvals(A)
   end
 end
@@ -620,11 +620,11 @@ end
     f = eval(func)
     @testset "$func(::$MT)" for MT in MTs
       T = eltype(MT)
-      ST = _symhermtype(MT)
+      ST = _hermsymtype(MT)
       A = ST(_randmatseries(rng, f, T, N))
       λ, U = eigen(A)
 
-      @test _gradtest_symherm(f, ST, A)
+      @test _gradtest_hermsym(f, ST, A)
 
       y = Zygote.pullback(f, A)[1]
       y2 = f(A)
@@ -633,13 +633,13 @@ end
       @testset "similar eigenvalues" begin
         λ[1] = λ[3] + sqrt(eps(eltype(λ))) / 10
         A2 = U * Diagonal(λ) * U'
-        @test _gradtest_symherm(f, ST, A2)
+        @test _gradtest_hermsym(f, ST, A2)
       end
 
       if f ∉ (log, sqrt) # only defined for invertible matrices
         @testset "low rank" begin
           A3 = U * Diagonal([rand(rng), zeros(N-1)...]) * U'
-          @test _gradtest_symherm(f, ST, A3)
+          @test _gradtest_hermsym(f, ST, A3)
         end
       end
     end
@@ -648,7 +648,7 @@ end
   @testset "sincos(::RealHermSymComplexHerm)" begin
     @testset "sincos(::$MT)" for MT in MTs
       T = eltype(MT)
-      ST = _symhermtype(MT)
+      ST = _hermsymtype(MT)
       A = ST(_randmatseries(rng, sincos, T, N))
       λ, U = eigen(A)
 
@@ -685,7 +685,7 @@ end
     @testset for p in (-1.0, 0.5, 1.5)
       @testset "^(::$MT, $p)" for MT in MTs
         T = eltype(MT)
-        ST = _symhermtype(MT)
+        ST = _hermsymtype(MT)
         A = ST(_randmatseries(rng, ^, T, N))
         λ, U = eigen(A)
 
@@ -722,7 +722,7 @@ end
   @testset for p in (-3, -2, -1, 1, 2, 3)
     @testset "^(::$MT, $p)" for MT in MTs
       T = eltype(MT)
-      ST = _symhermtype(MT)
+      ST = _hermsymtype(MT)
       A = ST(randn(rng, T, N, N))
 
       @test gradtest(_splitreim(collect(A))...) do (args...)
