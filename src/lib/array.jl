@@ -86,6 +86,13 @@ pull_block_horz(sz, Δ, A::AbstractMatrix) = Δ[:, sz-size(A, 2)+1:sz]
   return hcat(A...), Δ->(map(n->pull_block_horz(sz[n], Δ, A[n]), eachindex(A))...,)
 end
 
+@adjoint function cat(A::AbstractArray...; dims::Int)
+  sz = [0, cumsum([size.(A, dims)...])...]
+    return cat(A...; dims=dims), function(Δ)
+        ax = axes(Δ)
+        return (map(n -> view(Δ,ax[1:(dims-1)]..., (1 + sz[n-1]):sz[n], ax[(dims+1):end]...), 2:length(sz))...,)
+    end
+end
 
 @adjoint function repeat(xs; inner=ntuple(_->1, ndims(xs)), outer=ntuple(_->1, ndims(xs)))
   repeat(xs, inner = inner, outer = outer), function (Δ)
@@ -473,14 +480,14 @@ end
 
 @adjoint function *(P::AbstractFFTs.Plan, xs)
   return P * xs, function(Δ)
-    N = prod(size(xs)[P.region])
+    N = prod(size(xs)[[P.region...]])
     return (nothing, N * (P \ Δ))
   end
 end
 
 @adjoint function \(P::AbstractFFTs.Plan, xs)
   return P \ xs, function(Δ)
-    N = prod(size(Δ)[P.region])
+    N = prod(size(Δ)[[P.region...]])
     return (nothing, 1/N * (P * Δ))
   end
 end
