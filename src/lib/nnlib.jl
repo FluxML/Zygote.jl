@@ -5,7 +5,7 @@ import NNlib: softmax, ∇softmax, logsoftmax, ∇logsoftmax, conv, depthwisecon
 
 @adjoint function Base.Broadcast.broadcasted(::typeof(relu), x::Numeric)
     y = relu.(x)
-    y, Δ -> (nothing, broadcast((z, d) -> z > 0 ? d : zero(z), y, Δ))
+    y, Δ -> (nothing, ifelse.(y .> 0, Δ, zero.(y)))
 end
 
 @adjoint function σ(x::Real)
