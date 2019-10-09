@@ -1,17 +1,9 @@
 using NNlib
 import NNlib: softmax, ∇softmax, logsoftmax, ∇logsoftmax, conv, depthwiseconv, ∇conv_data, ∇depthwiseconv_data, maxpool, meanpool, σ, relu
 
-Zygote.@adjoint function Base.broadcasted(::typeof(relu), x::Array{T}) where T<:Real
-    y = relu.(x)
-    return y, Δ -> begin
-        res = zero(Δ)
-        @inbounds for i in 1:length(res)
-            if y[i] > 0
-                res[i] = Δ[i]
-            end
-        end
-        (nothing, res)
-    end
+@adjoint function Base.Broadcast.broadcasted(::typeof(relu), xs::Array{T}) where T<:Real
+    ys = relu.(xs)
+    ys, Δ -> (nothing, broadcast((y, d) -> y > 0 ? d : zero(T), ys, Δ))
 end
 
 @adjoint function σ(x::Real)
