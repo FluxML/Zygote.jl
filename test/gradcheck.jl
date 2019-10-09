@@ -629,6 +629,7 @@ end
       y = Zygote.pullback(f, A)[1]
       y2 = f(A)
       @test y ≈ y2
+      @test typeof(y) == typeof(y2)
 
       @testset "similar eigenvalues" begin
         λ[1] = λ[3] + sqrt(eps(eltype(λ))) / 10
@@ -660,7 +661,9 @@ end
       y = Zygote.pullback(sincos, A)[1]
       y2 = sincos(A)
       @test y[1] ≈ y2[1]
+      @test typeof(y[1]) == typeof(y2[1])
       @test y[2] ≈ y2[2]
+      @test typeof(y[2]) == typeof(y2[2])
 
       @testset "similar eigenvalues" begin
         λ[1] = λ[3] + sqrt(eps(eltype(λ))) / 10
@@ -699,6 +702,7 @@ end
         y = Zygote.pullback(^, A, p)[1]
         y2 = A^p
         @test y ≈ y2
+        @test typeof(y) == typeof(y2)
 
         @testset "similar eigenvalues" begin
           λ[1] = λ[3] + sqrt(eps(eltype(λ))) / 10
