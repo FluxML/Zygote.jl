@@ -496,7 +496,6 @@ end
 
 
 # Hermitian/Symmetric matrix functions that can be written as power series
-
 _realifydiag!(A::AbstractArray{<:Real}) = A
 function _realifydiag!(A)
   n = LinearAlgebra.checksquare(A)
@@ -505,6 +504,7 @@ function _realifydiag!(A)
   end
   return A
 end
+@adjoint _realifydiag!(A) = _realifydiag!(A), Δ -> (_realifydiag!(Δ),)
 
 _hasrealdomain(f, x) = true
 _hasrealdomain(::Union{typeof.((acos,asin))...}, x) = all(x -> -1 ≤ x ≤ 1, x)
