@@ -514,23 +514,11 @@ _hasrealdomain(::typeof(^), x) = all(x -> x ≥ 0, x)
 
 _process_series_eigvals(f, λ) = _hasrealdomain(f, λ) ? λ : complex.(λ)
 
-_process_series_matrix(f, fA, A, λ) = fA
-_process_series_matrix(f, fA, ::LinearAlgebra.HermOrSym{<:Real}, λ) = Symmetric(fA)
-_process_series_matrix(::typeof(^), fA, ::Hermitian{<:Real}, λ::AbstractArray{<:Real}) =
-  Hermitian(fA)
-function _process_series_matrix(f,
-                                fA,
-                                ::Hermitian{<:Complex},
-                                ::AbstractVector{<:Real})
-  return Hermitian(_realifydiag!(fA))
-end
-@adjoint function _process_series_matrix(f,
-                                         fA,
-                                         A::Hermitian{<:Complex},
-                                         λ::AbstractVector{<:Real})
-  return _process_series_matrix(f, fA, A, λ), function (Δ)
-    return (nothing, _hermitian_back(Δ, 'U'), nothing, nothing)
-  end
+_process_series_matrix(f, fA, A, fλ) = fA
+_process_series_matrix(f, fA, ::LinearAlgebra.HermOrSym{<:Real}, fλ) = Symmetric(fA)
+_process_series_matrix(f, fA, ::Hermitian{<:Complex}, ::AbstractVector{<:Real}) =
+  Hermitian(_realifydiag!(fA))
+_process_series_matrix(::typeof(^), fA, ::Hermitian{<:Real}, fλ) = Hermitian(fA)
 end
 
 _apply_series_func(f, A, args...) = f(A, args...)
@@ -543,9 +531,8 @@ _apply_series_func(f, A, args...) = f(A, args...)
   fλ, fback = Zygote.pullback((x, args...)->f.(x, args...), λ′, args...)
   fΛ = Diagonal(fλ)
   fA = U * fΛ * U'
-  Ω, processback = Zygote.pullback(x->_process_series_matrix(f, x, A, λ′), fA)
-  return Ω, function (Ω̄)
-    f̄A = processback(Ω̄)[1]
+  Ω = _process_series_matrix(f, fA, A, fλ)
+  return Ω, function (f̄A)
     f̄Λ = U' * f̄A * U
     ārgs = hasargs ? tail(fback(diag(f̄Λ))) : ()
     conjdfλ = fback(ones(n))[1]::typeof(fλ)
