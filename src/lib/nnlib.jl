@@ -1,11 +1,11 @@
 using NNlib
 import NNlib: softmax, ∇softmax, logsoftmax, ∇logsoftmax, conv, depthwiseconv, ∇conv_data, ∇depthwiseconv_data, maxpool, meanpool, σ, relu
 
-@adjoint Base.Broadcast.broadcasted(::typeof(identity), x::Numeric{T}) where T<:Number = x, Δ -> (nothing, Δ)
+@adjoint Base.Broadcast.broadcasted(::typeof(identity), x::Numeric) = x, Δ -> (nothing, Δ)
 
-@adjoint function Base.Broadcast.broadcasted(::typeof(relu), x::Numeric{T}) where T<:Number
+@adjoint function Base.Broadcast.broadcasted(::typeof(relu), x::Numeric)
     y = relu.(x)
-    y, Δ -> (nothing, broadcast((z, d) -> z > 0 ? d : zero(T), y, Δ))
+    y, Δ -> (nothing, broadcast((z, d) -> z > 0 ? d : zero(eltype(y)), y, Δ))
 end
 
 @adjoint function σ(x::Real)
