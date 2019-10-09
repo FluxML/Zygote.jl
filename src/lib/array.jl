@@ -519,6 +519,27 @@ _process_series_matrix(f, fA, ::LinearAlgebra.HermOrSym{<:Real}, fλ) = Symmetri
 _process_series_matrix(f, fA, ::Hermitian{<:Complex}, ::AbstractVector{<:Real}) =
   Hermitian(_realifydiag!(fA))
 _process_series_matrix(::typeof(^), fA, ::Hermitian{<:Real}, fλ) = Hermitian(fA)
+
+# Compute function on eigvals, thunks for conjugates of 1st and 2nd derivatives,
+# and function to pull back adjoints to args
+function _pullback_series_func_scalar(f, λ, args...)
+  compλ = _process_series_eigvals(f, λ)
+  fλ, fback = Zygote.pullback((x,args...) -> f.(x, args...), compλ, args...)
+  n = length(λ)
+  return (fλ,
+          ()->fback(ones(n))[1],
+          ()->nothing, # TODO: add 2nd deriv
+          isempty(args) ? _ -> () : f̄λ -> tail(fback(f̄λ)))
+end
+
+function _pullback_series_func_scalar(f::typeof(^), λ, p)
+  compλ = _process_series_eigvals(f, λ)
+  r, powλ = isinteger(p) ? (Integer(p), λ) : (p, compλ)
+  fλ = powλ .^ r
+  return (fλ,
+          ()->conj.(r .* powλ .^ (r - 1)),
+          ()->conj.((r * (r - 1)) .* powλ .^ (r - 2)),
+          f̄λ -> (dot(fλ .* log.(compλ), f̄λ),))
 end
 
 _apply_series_func(f, A, args...) = f(A, args...)
@@ -527,16 +548,14 @@ _apply_series_func(f, A, args...) = f(A, args...)
   hasargs = !isempty(args)
   n = LinearAlgebra.checksquare(A)
   λ, U = eigen(A)
-  λ′ = _process_series_eigvals(f, λ)
-  fλ, fback = Zygote.pullback((x, args...)->f.(x, args...), λ′, args...)
+  fλ, dfthunk, d²fthunk, argsback = _pullback_series_func_scalar(f, λ, args...)
   fΛ = Diagonal(fλ)
   fA = U * fΛ * U'
   Ω = _process_series_matrix(f, fA, A, fλ)
   return Ω, function (f̄A)
     f̄Λ = U' * f̄A * U
-    ārgs = hasargs ? tail(fback(diag(f̄Λ))) : ()
-    conjdfλ = fback(ones(n))[1]::typeof(fλ)
-    P = _pairdiffquotmat(f, n, λ, conj(fλ), conjdfλ)  # TODO: add 2nd deriv
+    ārgs = hasargs ? argsback(diag(f̄Λ)) : ()
+    P = _pairdiffquotmat(f, n, λ, conj(fλ), dfthunk(), d²fthunk())
     Ā = U * (P .* f̄Λ) * U'
     return (nothing, Ā, ārgs...)
   end
