@@ -547,7 +547,7 @@ _apply_series_func(f, A, args...) = f(A, args...)
     f̄A = processback(Ω̄)[1]
     f̄Λ = U' * f̄A * U
     ārgs = hasargs ? tail(fback(diag(f̄Λ))) : ()
-    conjdfλ = fback(ones(n))[1]
+    conjdfλ = fback(ones(n))[1]::typeof(fλ)
     P = _pairdiffquotmat(f, n, λ, conj(fλ), conjdfλ)  # TODO: add 2nd deriv
     Ā = U * (P .* f̄Λ) * U'
     return (nothing, Ā, ārgs...)
