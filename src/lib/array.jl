@@ -283,8 +283,8 @@ end
 @adjoint logabsdet(xs) = logabsdet(xs), Δ -> (Δ[1] * transpose(inv(xs)),)
 
 @adjoint function inv(A)
-  return inv(A), function (Δ)
-    Ainv = inv(A)
+  Ainv = inv(A)
+  return Ainv, function (Δ)
     ∇A = - Ainv' * Δ * Ainv'
     return (∇A, )
   end
