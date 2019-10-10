@@ -509,8 +509,7 @@ end
 _hasrealdomain(f, x) = true
 _hasrealdomain(::Union{typeof.((acos,asin))...}, x) = all(x -> -1 ≤ x ≤ 1, x)
 _hasrealdomain(::typeof(acosh), x) = all(x -> x ≥ 1, x)
-_hasrealdomain(::Union{typeof.((log,sqrt))...}, x) = all(x -> x ≥ 0, x)
-_hasrealdomain(::typeof(^), x) = all(x -> x ≥ 0, x)
+_hasrealdomain(::Union{typeof.((log,sqrt,^))...}, x) = all(x -> x ≥ 0, x)
 
 _process_series_eigvals(f, λ) = _hasrealdomain(f, λ) ? λ : complex.(λ)
 
