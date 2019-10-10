@@ -685,7 +685,7 @@ end
   end
 
   @testset "^(::RealHermSymComplexHerm, p::Real)" begin
-    @testset for p in (-1.0, 0.5, 1.5, 2.0)
+    @testset for p in range(-2, 2; step=0.25)
       @testset "^(::$MT, $p)" for MT in MTs
         T = eltype(MT)
         ST = _hermsymtype(MT)
@@ -696,7 +696,7 @@ end
           p = _dropimaggrad(args[end][1])
           A = ST(_joinreim(_dropimaggrad.(args[1:end-1])...))
           B = A^p
-          return abs2(sum(sin.(B)))
+          return abs2(sum(tan.(B)))
         end
 
         y = Zygote.pullback(^, A, p)[1]
@@ -711,7 +711,7 @@ end
             p = _dropimaggrad(args[end][1])
             A = ST(_joinreim(_dropimaggrad.(args[1:end-1])...))
             B = A^p
-            return abs2(sum(sin.(B)))
+            return abs2(sum(tan.(B)))
           end
         end
       end
@@ -723,7 +723,7 @@ end
   MTs = (Symmetric{Float64}, Symmetric{ComplexF64},
          Hermitian{Float64}, Hermitian{ComplexF64})
   rng, N = MersenneTwister(123), 7
-  @testset for p in (-3, -2, -1, 1, 2, 3)
+  @testset for p in -3:3
     @testset "^(::$MT, $p)" for MT in MTs
       T = eltype(MT)
       ST = _hermsymtype(MT)
