@@ -46,7 +46,7 @@ Random.seed!(0)
 @test gradtest(x -> sum(x, dims = (2, 3)), (3,4,5))
 @test gradtest(x -> sum(abs2, x), randn(4, 3, 2))
 @test gradtest(x -> sum(abs2, x; dims=1), randn(4, 3, 2))
-@test gradtest(x -> prod(x, dims = (2, 3)), (3,4,5))
+@test_broken gradtest(x -> prod(x, dims = (2, 3)), (3,4,5))
 @test gradtest(x -> prod(x), (3,4,5))
 
 @test gradtest(x -> softmax(x).*(1:3), 3)
