@@ -543,6 +543,11 @@ function _pullback_series_func_scalar(f::typeof(^), λ, p)
           f̄λ -> (dot(fλ .* log.(compλ), f̄λ),))
 end
 
+function _pullback_series_func_scalar(f::typeof(exp), λ)
+  expλ = exp.(λ)
+  return expλ, ()->expλ, ()->expλ, _ -> ()
+end
+
 _apply_series_func(f, A, args...) = f(A, args...)
 
 @adjoint function _apply_series_func(f, A, args...)
