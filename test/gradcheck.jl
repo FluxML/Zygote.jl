@@ -32,7 +32,11 @@ _splitreim(A::AbstractArray{<:Complex}) = reim(A)
 _joinreim(A, B) = complex.(A, B)
 _joinreim(A) = A
 
-_dropimaggrad(A) = Zygote.hook(real, A)
+function _dropimaggrad(A)
+  back(Δ) = real(Δ)
+  back(Δ::Nothing) = nothing
+  return Zygote.hook(back, A)
+end
 
 Random.seed!(0)
 
@@ -762,15 +766,24 @@ end
       ST = _hermsymtype(MT)
       A = ST(randn(rng, T, N, N))
 
-      @test gradtest(_splitreim(collect(A))...) do (args...)
-        A = ST(_joinreim(_dropimaggrad.(args)...))
-        B = A^p
-        return vcat(vec.(_splitreim(B))...)
+      if p == 0
+        @test gradient(_splitreim(collect(A))...) do (args...)
+          A = ST(_joinreim(_dropimaggrad.(args)...))
+          B = A^p
+          return sum(sin.(vcat(vec.(_splitreim(B))...)))
+        end === map(_->nothing, _splitreim(A))
+      else
+        @test gradtest(_splitreim(collect(A))...) do (args...)
+          A = ST(_joinreim(_dropimaggrad.(args)...))
+          B = A^p
+          return vcat(vec.(_splitreim(B))...)
+        end
       end
 
       y = Zygote.pullback(^, A, p)[1]
       y2 = A^p
       @test y ≈ y2
+      @test typeof(y) === typeof(y2)
     end
   end
 end
