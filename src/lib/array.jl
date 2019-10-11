@@ -443,8 +443,10 @@ Base.@propagate_inbounds function _pairdiffquot(f, i, j, x, fx, dfx, d²fx = not
   i == j && return dfx[i]
   Δx = x[i] - x[j]
   T = real(eltype(x))
-  if abs(Δx) ≤ sqrt(eps(T))
-    return d²fx === nothing ? dfx[i] : dfx[i] - Δx / 2 * d²fx[i]
+  if d²fx === nothing
+    abs(Δx) ≤ sqrt(eps(T)) && return (dfx[i] + dfx[j]) / 2
+  else
+    abs(Δx) ≤ eps(T)^(1/3) && return dfx[i] - Δx / 2 * d²fx[i]
   end
   Δfx = fx[i] - fx[j]
   return Δfx / Δx
