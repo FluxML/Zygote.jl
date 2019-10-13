@@ -2,7 +2,9 @@
 
 Complex numbers add some difficulty to the idea of a "gradient". To talk about `gradient(f, x)` here we need to talk a bit more about `f`.
 
-If `f` returns a real number, things are fairly straightforward. For ``c = x + yi`` and  ``z = f(c)``, we can define the adjoint ``\bar c = \frac{\partial z}{\partial x} + \frac{\partial z}{\partial y}i = \bar x + \bar y i`` (note that ``\bar c`` means gradient, and ``c^*`` means conjugate). It's exactly as if the complex number were just a pair of reals `(re, im)`. This works out of the box.
+*A note on notation*: We are using ``\bar c`` to mean the gradient of ``c`` here, like we did before. For the complex conjugate of ``c``, we therefore use the notation ``c^*`` and not the ``c'`` Julia code uses, since that could be confused to mean derivative instead, and we also want to distinguish between the complex conjugate and the conjugate transpose. Note however, that whenever we talk about code snippets, `c'` of course still means conjugate (transpose).
+
+If `f` returns a real number, things are fairly straightforward. For ``c = x + yi`` and  ``z = f(c)``, we can define the adjoint ``\bar c = \frac{\partial z}{\partial x} + \frac{\partial z}{\partial y}i = \bar x + \bar y i``. It's exactly as if the complex number were just a pair of reals `(re, im)`. This works out of the box.
 
 ```julia
 julia> gradient(c -> abs2(c), 1+2im)
@@ -57,7 +59,7 @@ julia> wirtinger(x -> abs2(x), 1+2im)
 (1.0 - 2.0im, 1.0 + 2.0im)
 ```
 
-The gradient definition Zygote uses can also be expressed in terms of the [Wirtinger calculus](https://en.wikipedia.org/wiki/Wirtinger_derivatives) using the operators ``\frac{\partial}{\partial z}`` and ``\frac{\partial}{\partial z^*}``:
+The gradient definition Zygote uses can also be expressed in terms of the [Wirtinger calculus](https://en.wikipedia.org/wiki/Wirtinger_derivatives) using the operators ``\frac{\partial}{\partial z}`` and ``\frac{\partial}{\partial z^*}``. Since ``f(z)`` is always real, we can use that ``f = \mathrm{Re} f`` as a trick to rewrite the gradient of ``f`` in terms of the Wirtinger derivatives.
 
 ```math
 f: \mathbb{C} \rightarrow \mathbb{R}, \qquad
@@ -70,7 +72,8 @@ z \in \mathbb{C}, \ x, y \in \mathbb{R} \\[1.2em]
     = \frac{\partial f}{\partial z^*} + \left(\frac{\partial f}{\partial z}\right)^{\!*}
 ```
 
-For the composition of two function, one gets the following pullback map, if the inner function is holomorphic:
+Further, we want to study, how these gradients chain together, since the usual chain rule doesn't apply here. We are going to use the relationship we found above, together with the chain rule for Wirtinger derivatives.
+Therefore, for the composition of two functions ``f`` and ``w``, one gets the following pullback map, if the inner function ``w`` is holomorphic:
 
 ```math
 f: \mathbb{C} \rightarrow \mathbb{R}, \qquad
@@ -90,6 +93,7 @@ w: \mathbb{C} \rightarrow \mathbb{C} \\[1.2em]
 \end{align*}
 ```
 
+This nicely explains, why the complex conjugate appears in Zygote's pullback definitions, as pointed out in the [Pullbacks section](../adjoints/#Pullbacks).
 If `w` is not holomorphic, the pullback map ``\overline{f} \mapsto \overline{f \circ w}`` is not ``\mathbb{C}``-linear and can therefore not be expressed simply as a multiple of ``\overline{f}``, like in the holomorphic case.
 
 Attention has to be paid, when comparing Zygote to other AD-tools, since they might use different definitions for complex gradients.
