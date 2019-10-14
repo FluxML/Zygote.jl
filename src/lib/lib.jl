@@ -116,7 +116,7 @@ end
 @adjoint Base.tail(xs::Tuple) = tail(xs), x̄s -> ((nothing, x̄s...),)
 
 _empty(x) = length(x)
-_empty(x::Tuple) = map(_->nothing, x)
+_empty(x::Union{Tuple,NamedTuple}) = map(_->nothing, x)
 
 _unapply(t::Integer, xs) = xs[1:t], xs[t+1:end]
 _unapply(t, xs) = first(xs), tail(xs)
@@ -126,6 +126,11 @@ function _unapply(t::Tuple, xs)
   t1, xs1 = _unapply(first(t), xs)
   t2, xs2 = _unapply(tail(t), xs1)
   (t1, t2...), xs2
+end
+
+function _unapply(t::NamedTuple{K}, xs) where K
+  t, rst = _unapply(Tuple(t), xs)
+  NamedTuple{K}(t), rst
 end
 
 unapply(t, xs) = _unapply(t, xs)[1]
