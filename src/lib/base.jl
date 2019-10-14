@@ -47,6 +47,9 @@ end
   end
 end
 
+@adjoint Base.haskey(collection, x) =
+  Base.haskey(collection, x), _ -> nothing
+
 # Channels
 
 @nograd Channel, schedule
