@@ -169,7 +169,7 @@ end
 
 @init @require CuArrays="3a865a2d-5b23-5a0f-bc46-62713ec82fae" begin
   @adjoint function broadcasted(::Broadcast.ArrayStyle{CuArrays.CuArray}, f, args...)
-    y, back = broadcast_forward(f, args...)
+    y, back = broadcast_forward(CuArrays.cufunc(f), args...)
     y, ȳ -> (nothing, nothing, back(ȳ)...)
   end
 end
