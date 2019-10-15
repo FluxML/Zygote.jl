@@ -319,8 +319,8 @@ let
   @test back(1.) == ((1.0,),)
 end
 
-function foo()
+function type_test()
    Complex{<:Real}
 end
 
-@test pullback(foo)[1] == Complex{<:Real}
+@test pullback(type_test)[1] == Complex{<:Real}
