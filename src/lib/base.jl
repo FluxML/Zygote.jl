@@ -48,6 +48,7 @@ end
 end
 
 @nograd haskey
+@nograd Base.RefValue
 
 # Channels
 
