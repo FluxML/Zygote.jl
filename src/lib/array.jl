@@ -4,14 +4,7 @@ using Base.Broadcast: broadcasted, broadcast_shape
 
 @adjoint (::Type{T})(::UndefInitializer, args...) where T<:Array = T(undef, args...), Δ -> nothing
 
-@adjoint Array(xs::AbstractArray) = Array(xs), ȳ -> (ȳ,)
-@adjoint Array(xs::Array) = Array(xs), ȳ -> (ȳ,)
-
-@adjoint Vector(xs::AbstractVector) = Vector(xs), ȳ -> (ȳ,)
-@adjoint Vector(xs::Vector) = Vector(xs), ȳ -> (ȳ,)
-
-@adjoint Matrix(xs::AbstractMatrix) = Matrix(xs), ȳ -> (ȳ,)
-@adjoint Matrix(xs::Matrix) = Matrix(xs), ȳ -> (ȳ,)
+@adjoint (::Type{T})(x::AbstractArray) where {T<:AbstractArray} = T(x), Δ -> (T(Δ),)
 
 @nograd size, length, eachindex, Colon(), findfirst, findlast, findall, randn, ones, zeros, one, zero,
   print, println, any, all
@@ -353,9 +346,6 @@ end
 
 # LinAlg Matrix Types
 # ===================
-
-@adjoint LinearAlgebra.LowerTriangular(A) = LowerTriangular(A), Δ->(LowerTriangular(Δ),)
-@adjoint LinearAlgebra.UpperTriangular(A) = UpperTriangular(A), Δ->(UpperTriangular(Δ),)
 
 # This is basically a hack while we don't have a working `ldiv!`.
 @adjoint function \(A::Cholesky, B::AbstractVecOrMat)
