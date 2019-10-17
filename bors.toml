@@ -1,5 +1,5 @@
 status = [
-  "ci/gitlab/%"
+  "ci/gitlab%"
 ]
 
 timeout-sec = 14400
