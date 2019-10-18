@@ -180,7 +180,8 @@ end
     CuArrays.CuArray{N,T}(xs), Δ -> (CuArrays.CuArray{N,T}(Δ), )
 
   @adjoint function sum(xs::CuArrays.CuArray; dims = :)
-    sum(xs, dims = dims), Δ -> (similar(xs) .= Δ,)
+    placeholder = similar(xs)
+    sum(xs, dims = dims), Δ -> (placeholder .= Δ,)
   end
 
 end
