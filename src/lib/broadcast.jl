@@ -172,4 +172,15 @@ end
     y, back = broadcast_forward(f, args...)
     y, ȳ -> (nothing, nothing, back(ȳ)...)
   end
+
+  @adjoint CuArrays.cu(xs) =
+    CuArrays.cu(xs), Δ -> (CuArrays.cu(Δ), )
+
+  @adjoint CuArrays.CuArray{N,T}(xs) where {N,T} =
+    CuArrays.CuArray{N,T}(xs), Δ -> (CuArrays.CuArray{N,T}(Δ), )
+
+  @adjoint function sum(xs::CuArrays.CuArray; dims = :)
+    sum(xs, dims = dims), Δ -> (similar(xs) .= Δ,)
+  end
+
 end
