@@ -741,6 +741,13 @@ end
   @test gradient(xs -> hvcat((2,2),xs...)[2,2], [1,2,3,4])[1] == (0,0,0,1)
 end
 
+@testset "cat(..., dims = $dim)" for dim in 1:5
+  catdim = (x...) -> cat(x..., dims = dim)
+  @test gradtest(catdim, rand(5), rand(5))
+  @test gradtest(catdim, rand(2,5), rand(2,5), rand(2,5))
+  @test gradtest(catdim, rand(2,5,3), rand(2,5,3), rand(2,5,3))
+end
+
 @testset "one(s) and zero(s)" begin
   @test Zygote.gradient(x->sum(ones(size(x))), randn(5))[1] isa Nothing
   @test Zygote.gradient(x->sum(one(x)), randn(3, 3))[1] isa Nothing
