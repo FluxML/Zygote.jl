@@ -682,6 +682,9 @@ function cat_test(f, A::Union{AbstractVector, AbstractMatrix}...)
 end
 
 @testset "vcat" begin
+  # Scalar
+  @test gradient((x,y) -> sum(vcat(x,y)), 1,2) == (1,1)
+  @test gradient((x,y) -> sum([x;y]), 1,2) == (1,1)
 
   # Vector-only.
   cat_test(vcat, randn(1))
@@ -707,6 +710,10 @@ end
 end
 
 @testset "hcat" begin
+  # Scalar
+  @test gradient((x,y) -> sum(hcat(x,y)), 1,2) == (1,1)
+  @test gradient((x,y) -> sum([x y]), 1,2) == (1,1)
+  @test gradient((a,b,c,d) -> sum(sqrt, [a b;c d]), 1,1,1,4) == (0.5, 0.5, 0.5, 0.25)
 
   # Vector-only.
   for r in [1, 2]

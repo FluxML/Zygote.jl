@@ -79,6 +79,7 @@ pull_block_vert(sz, Δ, A::AbstractMatrix) = Δ[sz-size(A, 1)+1:sz, :]
   sz = cumsum([size.(A, 1)...])
   return vcat(A...), Δ->(map(n->pull_block_vert(sz[n], Δ, A[n]), eachindex(A))...,)
 end
+@adjoint vcat(xs::Number...) = vcat(xs...), Δ -> (Δ...,)
 
 pull_block_horz(sz, Δ, A::AbstractVector) = Δ[:, sz]
 pull_block_horz(sz, Δ, A::AbstractMatrix) = Δ[:, sz-size(A, 2)+1:sz]
@@ -86,7 +87,7 @@ pull_block_horz(sz, Δ, A::AbstractMatrix) = Δ[:, sz-size(A, 2)+1:sz]
   sz = cumsum([size.(A, 2)...])
   return hcat(A...), Δ->(map(n->pull_block_horz(sz[n], Δ, A[n]), eachindex(A))...,)
 end
-
+@adjoint hcat(xs::Number...) = hcat(xs...), Δ -> (Δ...,)
 
 @adjoint function repeat(xs; inner=ntuple(_->1, ndims(xs)), outer=ntuple(_->1, ndims(xs)))
   repeat(xs, inner = inner, outer = outer), function (Δ)
