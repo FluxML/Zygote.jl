@@ -39,7 +39,7 @@ if has_cuda()
     include("cuda.jl")
   end
 else
-  @info "CUDA not found - Skipping CUDA Tests"
+  @warn "CUDA not found - Skipping CUDA Tests"
 end
 
 end
