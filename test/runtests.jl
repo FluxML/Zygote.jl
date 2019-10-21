@@ -34,7 +34,7 @@ end
 
 using CUDAapi
 if has_cuda()
-  @info "Starting GPU intgeration tests..."
+  @info "Starting GPU integration tests..."
   @testset "CUDA tests" begin
     include("cuda.jl")
   end
