@@ -31,4 +31,8 @@ end
   include("compiler.jl")
 end
 
+@testset "CUDA tests" begin
+  include("cuda.jl")
+end
+
 end
