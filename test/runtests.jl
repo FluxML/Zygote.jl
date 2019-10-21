@@ -31,7 +31,6 @@ end
   include("compiler.jl")
 end
 
-
 using CUDAapi
 if has_cuda()
   @info "Starting GPU integration tests..."
