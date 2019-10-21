@@ -1,3 +1,6 @@
+before_script:
+  - export CI_GITLAB_CUDA=true
+
 variables:
   CI_IMAGE_TAG: 'cuda'
 

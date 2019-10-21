@@ -31,8 +31,13 @@ end
   include("compiler.jl")
 end
 
-@testset "CUDA tests" begin
-  include("cuda.jl")
+@info "Starting GPU intgeration tests..."
+if haskey(ENV, "CI_GITLAB_CUDA")
+  @testset "CUDA tests" begin
+    include("cuda.jl")
+  end
+else
+  @info "ENV variable CI_GITLAB_CUDA not set - Skipping CUDA Tests"
 end
 
 end
