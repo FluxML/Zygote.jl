@@ -299,3 +299,28 @@ end
 @testset "@timed" begin
   @test gradient(x -> (@timed x)[1], 0) == (1,)
 end
+
+mutable struct MyMutable
+    value::Float64
+end
+
+function foo!(m::MyMutable, x)
+    m.value = x
+end
+
+function baz(args)
+    m = MyMutable(0.)
+    foo!(m, args...)
+    m.value
+end
+
+let
+  value, back = Zygote.pullback(baz, (1.0,))
+  @test back(1.) == ((1.0,),)
+end
+
+function type_test()
+   Complex{<:Real}
+end
+
+@test pullback(type_test)[1] == Complex{<:Real}
