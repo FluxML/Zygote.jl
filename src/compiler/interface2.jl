@@ -3,16 +3,9 @@ using IRTools.Inner: argnames!, update!
 
 ignore_sig(T) = all(T -> T <: Type, T.parameters)
 
-
 function _pullback(ctx::AContext, f, args...)
-  if chainrules_blacklist(f, args...)
-    # then don't even consider using ChainRules
-    return _pullback_via_source2source(ctx, f, args...)
-  end
-
-  res = ChainRules.rrule(f, args...)
-  if res === nothing
-    # No ChainRule defined, time to do the source tranform
+  if chainrules_blacklist(f, args...)  || (res = ChainRules.rrule(f, args...)) === nothing
+    # Blacklisted or no ChainRule defined, time to do the source tranform
     return _pullback_via_source2source(ctx, f, args...)
   else
     # Can just use ChainRule answer
@@ -20,6 +13,39 @@ function _pullback(ctx::AContext, f, args...)
     return y, _pullback_via_chainrules(pb)
   end
 end
+
+@generated function _pullback_via_source2source(ctx::AContext, f, args...)
+  T = Tuple{f,args...}
+  ignore(T) && return :(f(args...), Pullback{$T}(()))
+  g = try _lookup_grad(T) catch e e end
+  !(g isa Tuple) && return :(f(args...), Pullback{$T}((f,)))
+  meta, forw, _ = g
+  argnames!(meta, Symbol("#self#"), :ctx, :f, :args)
+  forw = varargs!(meta, forw, 3)
+  # IRTools.verify(forw)
+  forw = slots!(pis!(inlineable!(forw)))
+  return update!(meta.code, forw)
+end
+
+@generated function (j::Pullback{T})(Δ) where T
+  ignore(T) && return :nothing
+  g = try _lookup_grad(T)
+  catch e
+    rethrow(CompileError(T,e))
+  end
+  if g == nothing
+    Δ == Nothing && return :nothing
+    return :(error("Non-differentiable function $(repr(j.t[1]))"))
+  end
+  meta, _, back = g
+  argnames!(meta, Symbol("#self#"), :Δ)
+  # IRTools.verify(back)
+  back = slots!(inlineable!(back))
+  return update!(meta.code, back)
+end
+
+
+
 
 #=="""
   chainrules_blacklist(f, args...,)
@@ -39,17 +65,6 @@ end
 chainrules_blacklist(::typeof(sum), f, x::AbstractArray{<:Real}) = true
 # Except for sum(abs2, xs), that is fine
 chainrules_blacklist(::typeof(sum), ::typeof(abs2), x::AbstractArray{<:Real}) = false
-
-# ChainRules current Wirtinger deriviative is not compatible
-# reconsider after https://github.com/JuliaDiff/ChainRulesCore.jl/pull/29
-for f in (abs, abs2, conj, adjoint, hypot, angle, imag, real)
-  @eval chainrules_blacklist(::typeof($f), ::Complex) = true
-end
-
-# Sum of nonarrays doesn't really work
-# Fixed in https://github.com/JuliaDiff/ChainRules.jl/pull/124
-chainrules_blacklist(::typeof(sum), x) = true
-chainrules_blacklist(::typeof(sum), x::AbstractArray{<:Real}) = false
 
 
 #=="""
@@ -73,34 +88,3 @@ end
 zextern(x) = ChainRules.extern(x)
 zextern(::ChainRules.Zero) = nothing  # Zygote loves calling things nothing
 zextern(::ChainRules.DNE) = nothing  # Zygote loves calling things nothing
-
-
-@generated function _pullback_via_source2source(ctx::AContext, f, args...)
-  T = Tuple{f,args...}
-  ignore_sig(T) && return :(f(args...), Pullback{$T}(()))
-  g = try _lookup_grad(T) catch e e end
-  !(g isa Tuple) && return :(f(args...), Pullback{$T}((f,)))
-  meta, forw, _ = g
-  argnames!(meta, Symbol("#self#"), :ctx, :f, :args)
-  forw = varargs!(meta, forw, 3)
-  # IRTools.verify(forw)
-  forw = slots!(pis!(inlineable!(forw)))
-  return update!(meta.code, forw)
-end
-
-@generated function (j::Pullback{T})(Δ) where T
-  ignore_sig(T) && return :nothing
-  g = try _lookup_grad(T)
-  catch e
-    rethrow(CompileError(T,e))
-  end
-  if g == nothing
-    Δ == Nothing && return :nothing
-    return :(error("Non-differentiable function $(repr(j.t[1]))"))
-  end
-  meta, _, back = g
-  argnames!(meta, Symbol("#self#"), :Δ)
-  # IRTools.verify(back)
-  back = slots!(inlineable!(back))
-  return update!(meta.code, back)
-end
