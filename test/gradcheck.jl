@@ -834,6 +834,13 @@ end
 
 @testset "broadcast" begin
   @test gradient(x -> sum(sin.(x)), Diagonal(randn(3)))[1][2] == 1
+
+  a = rand(3)
+  b = rand(2,2)
+
+  @test gradcheck(x -> sum(sum(diag.((x,) .* a))), b)
+  @test gradcheck(x -> sum(sum(diag.(Ref(x) .* a))), b)
+  @test gradcheck(x -> sum(sum(diag.([x] .* a))), b)
 end
 
 using Zygote: Buffer
