@@ -48,7 +48,6 @@ end
 end
 
 @nograd haskey
-@nograd Base.RefValue{Val{f}} where f
 
 # Channels
 
