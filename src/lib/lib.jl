@@ -242,7 +242,9 @@ end
 # TODO captured mutables + multiple calls to `back`
 @generated function (back::Jnew{T,G,false})(Δ::Union{NamedTuple,Nothing,RefValue}) where {T,G}
   !T.mutable && Δ == Nothing && return :nothing
-  Δ = G == Nothing ? :Δ : :(accum(Δ, back.g[]))
+  Δ = G == Nothing ? :Δ :
+      Δ <: RefValue ? :(back.g[]) :
+      :(accum(back.g[], Δ))
   quote
     x̄ = $Δ
     $(G == Nothing || :(back.g[] = nt_nothing($Δ)))
