@@ -173,11 +173,8 @@ end
     y, ȳ -> (nothing, nothing, back(ȳ)...)
   end
 
-  @adjoint CuArrays.cu(xs) =
-    CuArrays.cu(xs), Δ -> (CuArrays.cu(Δ), )
-
   @adjoint CuArrays.CuArray{N,T}(xs) where {N,T} =
-    CuArrays.CuArray{N,T}(xs), Δ -> (CuArrays.CuArray{N,T}(Δ), )
+    CuArrays.CuArray{N,T}(xs), Δ -> (convert(Array, Δ), )
 
   @adjoint function sum(xs::CuArrays.CuArray; dims = :)
     placeholder = similar(xs)
