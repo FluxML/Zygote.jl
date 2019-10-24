@@ -1,5 +1,9 @@
 using NNlib
-import NNlib: softmax, ∇softmax, logsoftmax, ∇logsoftmax, conv, depthwiseconv, ∇conv_data, ∇depthwiseconv_data, maxpool, meanpool, σ
+import NNlib: softmax, ∇softmax, logsoftmax, ∇logsoftmax, conv, depthwiseconv, ∇conv_data, ∇depthwiseconv_data, maxpool, meanpool, σ, relu
+
+@adjoint function Base.Broadcast.broadcasted(::typeof(relu), x::Numeric)
+  relu.(x), Δ -> (nothing, ifelse.(x .> 0, Δ, zero.(x)))
+end
 
 @adjoint function σ(x::Real)
     y = σ(x)

@@ -76,6 +76,8 @@ Numeric{T<:Number} = Union{T,AbstractArray{<:T}}
   res, Δ -> (nothing, unbroadcast(x, Δ ./ y), unbroadcast(y, -Δ .* res ./ y))
 end
 
+@adjoint broadcasted(::typeof(identity), x::Numeric) = x, Δ -> (nothing, Δ)
+
 @adjoint function broadcasted(::typeof(σ), x::Numeric)
   y = σ.(x)
   y, ȳ -> (nothing, ȳ .* conj.(y .* (1 .- y)))
