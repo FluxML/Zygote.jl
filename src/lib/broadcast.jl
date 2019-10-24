@@ -172,10 +172,4 @@ end
     y, back = broadcast_forward(f, args...)
     y, ȳ -> (nothing, nothing, back(ȳ)...)
   end
-
-  @adjoint CuArrays.cu(xs) = CuArrays.cu(xs), Δ -> (CuArrays.cu(Δ),)
-
-  @adjoint CuArrays.CuArray{T,N}(xs) where {T,N} =
-    CuArrays.CuArray{T, N}(xs), Δ -> (CuArrays.CuArray{T, N}(Δ),)
-
 end
