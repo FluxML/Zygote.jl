@@ -2,8 +2,7 @@ using NNlib
 import NNlib: softmax, ∇softmax, logsoftmax, ∇logsoftmax, conv, depthwiseconv, ∇conv_data, ∇depthwiseconv_data, maxpool, meanpool, σ, relu
 
 @adjoint function Base.Broadcast.broadcasted(::typeof(relu), x::Numeric)
-    y = relu.(x)
-    y, Δ -> (nothing, ifelse.(y .> 0, Δ, zero.(y)))
+  relu.(x), Δ -> (nothing, ifelse.(x .> 0, Δ, zero.(x)))
 end
 
 @adjoint function σ(x::Real)
