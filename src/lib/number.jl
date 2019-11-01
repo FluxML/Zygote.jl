@@ -15,7 +15,8 @@ for (M, f, arity) in DiffRules.diffrules()
     dx = :(conj($dx))
   end
   @eval begin
-    @adjoint $M.$f(x::Number) = $M.$f(x), Δ -> ($Δ * $dx,)
+    @adjoint $M.$f(x::Number) = $M.$f(x),
+      Δ -> ($Δ * $dx,)
   end
 end
 
@@ -23,17 +24,16 @@ for (M, f, arity) in DiffRules.diffrules()
   arity == 2 || continue
   da, db = DiffRules.diffrule(M, f, :a, :b)
   @eval begin
-    @adjoint $M.$f(a::Number, b::Number) =
-      $M.$f(a, b), Δ -> (Δ * conj($da), Δ * conj($db))
+    @adjoint $M.$f(a::Number, b::Number) = $M.$f(a, b),
+      Δ -> (Δ * conj($da), Δ * conj($db))
   end
 end
 
-@adjoint Base.convert(T::Type{<:Real}, x::Real) =
-  convert(T, x), ȳ -> (nothing, ȳ)
+@adjoint Base.convert(T::Type{<:Real}, x::Real) = convert(T, x), ȳ -> (nothing, ȳ)
 @adjoint (T::Type{<:Real})(x::Real) = T(x), ȳ -> (nothing, ȳ)
 
 for T in Base.uniontypes(Core.BuiltinInts)
-  @adjoint (::Type{T})(x::Core.BuiltinInts) = T(x), Δ -> (Δ,)
+    @adjoint (::Type{T})(x::Core.BuiltinInts) = T(x), Δ -> (Δ,)
 end
 
 @adjoint Base.:+(xs::Number...) = +(xs...), Δ -> map(_ -> Δ, xs)
@@ -46,57 +46,47 @@ end
 
 @adjoint function sincos(x)
   s, c = sincos(x)
-  (s, c), ((s̄, c̄),) -> (s̄ * c - c̄ * s,)
+  (s, c), ((s̄, c̄),) -> (s̄*c - c̄*s,)
 end
 
-@adjoint a // b = (a // b, c̄ -> (c̄ * 1 // b, -c̄ * a // b // b))
+@adjoint a // b = (a // b, c̄ -> (c̄ * 1//b, - c̄ * a // b // b))
 
 @nograd floor, ceil, trunc, round, hash
 
 # Complex Numbers
 
-@adjoint (T::Type{<:Complex})(re, im) =
-  T(re, im), c̄ -> (nothing, real(c̄), imag(c̄))
+@adjoint (T::Type{<:Complex})(re, im) = T(re, im), c̄ -> (nothing, real(c̄), imag(c̄))
 
 @adjoint real(x::Number) = real(x), r̄ -> (real(r̄),)
 @adjoint conj(x::Number) = conj(x), r̄ -> (conj(r̄),)
-@adjoint imag(x::Number) = imag(x), ī -> (real(ī) * im,)
+@adjoint imag(x::Number) = imag(x), ī -> (real(ī)*im,)
 
-DiffRules._abs_deriv(x::Complex) = x / abs(x)
+DiffRules._abs_deriv(x::Complex) = x/abs(x)
 
  # Function add adjoint for Fastmath operations
  # DiffRules is used to find derivatives for each operation
-function fastmath()
+for f in keys(fast_op)
 
-  for f in keys(fast_op)
-    unarydx, binarydx = DiffRules.hasdiffrule(:Base, f, 1) ?
-                        DiffRules.diffrule(:Base, f, :x) : nothing,
-      DiffRules.hasdiffrule(:Base, f, 2) ?
-      DiffRules.diffrule(:Base, f, :x, :y) : nothing
+  fastf = fast_op[f]
 
-    fastf = fast_op[f]
-
-    if unarydx != nothing
-      dx = unarydx
-      Δ = :Δ
-      if f in [:abs, :abs2]
-        Δ = :(real($Δ))
-      else
-        dx = :(conj($dx))
-      end
-      @eval begin
-        @adjoint Base.FastMath.$fastf(x::Number) =
-          Base.FastMath.$fastf(x), Δ -> ($Δ * make_fastmath($dx),)
-      end
-    elseif binarydx != nothing
-      dx, dy = binarydx
-      @eval begin
-        @adjoint Base.FastMath.$fastf(x::Number, y::Number) =
-          Base.FastMath.$fastf(x, y),
-          Δ -> (Δ * make_fastmath(conj($dx)), Δ * make_fastmath(conj($dy)))
-      end
+  if DiffRules.hasdiffrule(:Base, f, 1)
+    dx = DiffRules.diffrule(:Base, f, :x)
+    Δ = :Δ
+    if f in [:abs, :abs2]
+      Δ = :(real($Δ))
+    else
+      dx = :(conj($dx))
+    end
+    @eval begin
+      @adjoint Base.FastMath.$fastf(x::Number) =
+        Base.FastMath.$fastf(x), Δ -> ($Δ * make_fastmath($dx),)
+    end
+  elseif DiffRules.hasdiffrule(:Base, f, 2)
+    dx, dy = DiffRules.diffrule(:Base, f, :x, :y)
+    @eval begin
+      @adjoint Base.FastMath.$fastf(x::Number, y::Number) =
+        Base.FastMath.$fastf(x, y),
+        Δ -> (Δ * make_fastmath(conj($dx)), Δ * make_fastmath(conj($dy)))
     end
   end
 end
-
-fastmath()
