@@ -63,12 +63,8 @@ end
 
 DiffRules._abs_deriv(x::Complex) = x/abs(x)
 
- # Function add adjoint for Fastmath operations
- # DiffRules is used to find derivatives for each operation
-for f in keys(fast_op)
-
-  fastf = fast_op[f]
-
+ # adjoint for Fastmath operations
+for (f, fastf) in fast_op
   if DiffRules.hasdiffrule(:Base, f, 1)
     dx = DiffRules.diffrule(:Base, f, :x)
     Δ = :Δ
