@@ -47,6 +47,8 @@ end
   end
 end
 
+@nograd haskey
+
 # Channels
 
 @nograd Channel, schedule

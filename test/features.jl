@@ -318,3 +318,9 @@ let
   value, back = Zygote.pullback(baz, (1.0,))
   @test back(1.) == ((1.0,),)
 end
+
+function type_test()
+   Complex{<:Real}
+end
+
+@test pullback(type_test)[1] == Complex{<:Real}

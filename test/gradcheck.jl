@@ -44,6 +44,12 @@ Random.seed!(0)
 
 @test gradtest((a,b)->sum(reim(acosh(complex(a[1], b[1])))), [-2.0], [1.0])
 
+@test gradtest((x, W, b) -> identity.(W*x .+ b), 5, (2,5), 2)
+@test gradtest((x, W, b) -> identity.(W*x .+ b), (5,3), (2,5), 2)
+
+@test gradtest((x, W, b) -> relu.(W*x .+ b), 5, (2,5), 2)
+@test gradtest((x, W, b) -> relu.(W*x .+ b), (5,3), (2,5), 2)
+
 @test gradtest((x, W, b) -> σ.(W*x .+ b), 5, (2,5), 2)
 @test gradtest((x, W, b) -> σ.(W*x .+ b), (5,3), (2,5), 2)
 @test gradtest((x, W, b) -> logσ.(W*x .+ b), 5, (2,5), 2)
@@ -55,7 +61,10 @@ Random.seed!(0)
 @test gradtest(x -> sum(x, dims = (2, 3)), (3,4,5))
 @test gradtest(x -> sum(abs2, x), randn(4, 3, 2))
 @test gradtest(x -> sum(abs2, x; dims=1), randn(4, 3, 2))
-@test gradtest(x -> prod(x, dims = (2, 3)), (3,4,5))
+@test gradtest(x -> sum(x[i] for i in 1:length(x)), randn(10))
+@test_broken gradtest(x -> sum(i->x[i], 1:length(x)), randn(10)) # https://github.com/FluxML/Zygote.jl/issues/231
+
+@test_broken gradtest(x -> prod(x, dims = (2, 3)), (3,4,5))
 @test gradtest(x -> prod(x), (3,4,5))
 
 @test gradtest(x -> softmax(x).*(1:3), 3)
@@ -850,6 +859,9 @@ function cat_test(f, A::Union{AbstractVector, AbstractMatrix}...)
 end
 
 @testset "vcat" begin
+  # Scalar
+  @test gradient((x,y) -> sum(vcat(x,y)), 1,2) == (1,1)
+  @test gradient((x,y) -> sum([x;y]), 1,2) == (1,1)
 
   # Vector-only.
   cat_test(vcat, randn(1))
@@ -875,6 +887,10 @@ end
 end
 
 @testset "hcat" begin
+  # Scalar
+  @test gradient((x,y) -> sum(hcat(x,y)), 1,2) == (1,1)
+  @test gradient((x,y) -> sum([x y]), 1,2) == (1,1)
+  @test gradient((a,b,c,d) -> sum(sqrt, [a b;c d]), 1,1,1,4) == (0.5, 0.5, 0.5, 0.25)
 
   # Vector-only.
   for r in [1, 2]
@@ -900,6 +916,13 @@ end
   @test gradient(xs -> hvcat((2,2),xs...)[2,1], [1,2,3,4])[1] == (0,0,1,0)
   @test gradient(xs -> hvcat((2,2),xs...)[1,2], [1,2,3,4])[1] == (0,1,0,0)
   @test gradient(xs -> hvcat((2,2),xs...)[2,2], [1,2,3,4])[1] == (0,0,0,1)
+end
+
+@testset "cat(..., dims = $dim)" for dim in 1:5
+  catdim = (x...) -> cat(x..., dims = dim)
+  @test gradtest(catdim, rand(5), rand(5))
+  @test gradtest(catdim, rand(2,5), rand(2,5), rand(2,5))
+  @test gradtest(catdim, rand(2,5,3), rand(2,5,3), rand(2,5,3))
 end
 
 @testset "one(s) and zero(s)" begin
@@ -988,6 +1011,13 @@ end
 
 @testset "broadcast" begin
   @test gradient(x -> sum(sin.(x)), Diagonal(randn(3)))[1][2] == 1
+
+  a = rand(3)
+  b = rand(2,2)
+
+  @test gradcheck(x -> sum(sum(diag.((x,) .* a))), b)
+  @test gradcheck(x -> sum(sum(diag.(Ref(x) .* a))), b)
+  @test gradcheck(x -> sum(sum(diag.([x] .* a))), b)
 end
 
 using Zygote: Buffer
@@ -1123,4 +1153,11 @@ end
   @test gradient(x -> findfirst(ismissing, x), [1, missing]) == (nothing,)
   @test gradient(x -> findlast(ismissing, x), [1, missing]) == (nothing,)
   @test gradient(x -> findall(ismissing, x)[1], [1, missing]) == (nothing,)
+end
+
+@testset "fastmath" begin
+  @test gradient(x -> begin @fastmath sin(x) end, 1) == gradient(x -> sin(x), 1)
+  @test gradient(x -> begin @fastmath tanh(x) end, 1) == gradient(x -> tanh(x), 1)
+  @test gradient((x, y) -> begin @fastmath x*y end, 3, 2) == gradient((x, y) -> x*y, 3, 2)
+  @test gradient(x -> begin @fastmath real(log(x)) end, 1 + 2im) == gradient(x -> real(log(x)), 1 + 2im)
 end

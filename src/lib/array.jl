@@ -79,6 +79,7 @@ pull_block_vert(sz, Δ, A::AbstractMatrix) = Δ[sz-size(A, 1)+1:sz, :]
   sz = cumsum([size.(A, 1)...])
   return vcat(A...), Δ->(map(n->pull_block_vert(sz[n], Δ, A[n]), eachindex(A))...,)
 end
+@adjoint vcat(xs::Number...) = vcat(xs...), Δ -> (Δ...,)
 
 pull_block_horz(sz, Δ, A::AbstractVector) = Δ[:, sz]
 pull_block_horz(sz, Δ, A::AbstractMatrix) = Δ[:, sz-size(A, 2)+1:sz]
@@ -86,7 +87,19 @@ pull_block_horz(sz, Δ, A::AbstractMatrix) = Δ[:, sz-size(A, 2)+1:sz]
   sz = cumsum([size.(A, 2)...])
   return hcat(A...), Δ->(map(n->pull_block_horz(sz[n], Δ, A[n]), eachindex(A))...,)
 end
+@adjoint hcat(xs::Number...) = hcat(xs...), Δ -> (Δ...,)
 
+@adjoint function cat(Xs...; dims)
+  cat(Xs...; dims = dims), Δ -> begin
+    start = ntuple(_ -> 0, ndims(Δ))
+    dXs = map(Xs) do x
+      move = ntuple(d -> d in dims ? size(x,d) : 0, ndims(Δ))
+      x_in_Δ = ntuple(d -> move[d] > 0 ? (start[d]+1:start[d]+move[d]) : Colon(), ndims(Δ))
+      start = start .+ move
+      dx = reshape(Δ[x_in_Δ...], size(x))
+    end
+  end
+end
 
 @adjoint function repeat(xs; inner=ntuple(_->1, ndims(xs)), outer=ntuple(_->1, ndims(xs)))
   repeat(xs, inner = inner, outer = outer), function (Δ)
@@ -283,8 +296,8 @@ end
 @adjoint logabsdet(xs) = logabsdet(xs), Δ -> (Δ[1] * transpose(inv(xs)),)
 
 @adjoint function inv(A)
-  return inv(A), function (Δ)
-    Ainv = inv(A)
+  Ainv = inv(A)
+  return Ainv, function (Δ)
     ∇A = - Ainv' * Δ * Ainv'
     return (∇A, )
   end

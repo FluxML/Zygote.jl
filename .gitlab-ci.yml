@@ -1,0 +1,15 @@
+before_script:
+  - export CI_GITLAB_CUDA=true
+
+variables:
+  CI_IMAGE_TAG: 'cuda'
+
+include:
+  - 'https://raw.githubusercontent.com/JuliaGPU/gitlab-ci/master/templates/v5/test.yml'
+
+test:v1.0:
+  extends: .test:v1.0
+
+test:dev:
+  extends: .test:dev
+  allow_failure: true
