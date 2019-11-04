@@ -22,7 +22,7 @@ ZygoteRules = "700de1a5-db45-46bc-99cf-38207098b444"
 [compat]
 DiffRules = "0.0"
 FFTW = "1"
-FillArrays = "0.8"
+FillArrays = "0"
 ForwardDiff = "0.10"
 IRTools = "0.3"
 MacroTools = "0.5"
