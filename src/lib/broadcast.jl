@@ -36,9 +36,11 @@ using NNlib
 accum_sum(xs; dims = :) = reduce(accum, xs, dims = dims)
 
 # Work around reducedim_init issue
+# https://github.com/JuliaLang/julia/issues/31427
 accum_sum(xs::Nothing; dims = :) = nothing
 accum_sum(xs::AbstractArray{Nothing}; dims = :) = nothing
 accum_sum(xs::AbstractArray{<:Number}; dims = :) = sum(xs, dims = dims)
+accum_sum(xs::AbstractArray{<:AbstractArray{<:Number}}; dims = :) = sum(xs, dims = dims)
 accum_sum(xs::Number; dims = :) = xs
 
 trim(x, Δ) = reshape(Δ, ntuple(i -> size(Δ, i), Val(ndims(x))))
@@ -48,7 +50,9 @@ unbroadcast(x::AbstractArray, x̄) =
   length(x) == length(x̄) ? trim(x, x̄) :
     trim(x, accum_sum(x̄, dims = ntuple(i -> size(x, i) == 1 ? i : ndims(x̄)+1, Val(ndims(x̄)))))
 
-unbroadcast(x::Union{Number,Ref}, x̄) = accum_sum(x̄)
+unbroadcast(x::Number, x̄) = accum_sum(x̄)
+unbroadcast(x::Tuple{<:Any}, x̄) = (accum_sum(x̄),)
+unbroadcast(x::Base.RefValue, x̄) = (x=accum_sum(x̄),)
 
 unbroadcast(x::AbstractArray, x̄::Nothing) = nothing
 
@@ -71,6 +75,8 @@ Numeric{T<:Number} = Union{T,AbstractArray{<:T}}
   res = x ./ y
   res, Δ -> (nothing, unbroadcast(x, Δ ./ y), unbroadcast(y, -Δ .* res ./ y))
 end
+
+@adjoint broadcasted(::typeof(identity), x::Numeric) = x, Δ -> (nothing, Δ)
 
 @adjoint function broadcasted(::typeof(σ), x::Numeric)
   y = σ.(x)
@@ -169,7 +175,16 @@ end
 
 @init @require CuArrays="3a865a2d-5b23-5a0f-bc46-62713ec82fae" begin
   @adjoint function broadcasted(::Broadcast.ArrayStyle{CuArrays.CuArray}, f, args...)
-    y, back = broadcast_forward(f, args...)
+    y, back = broadcast_forward(CuArrays.cufunc(f), args...)
     y, ȳ -> (nothing, nothing, back(ȳ)...)
   end
+
+  @adjoint CuArrays.CuArray{N,T}(xs::Array) where {N,T} =
+    CuArrays.CuArray{N,T}(xs), Δ -> (convert(Array, Δ), )
+
+  @adjoint function sum(xs::CuArrays.CuArray; dims = :)
+    placeholder = similar(xs)
+    sum(xs, dims = dims), Δ -> (placeholder .= Δ,)
+  end
+
 end

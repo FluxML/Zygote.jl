@@ -27,7 +27,7 @@ end
 
 # Core functions
 
-@nograd Core.apply_type, Core.typeof, nfields, fieldtype,
+@nograd Core.apply_type, Core.typeof, nfields, fieldtype, Core.TypeVar, Core.UnionAll,
   (==), (===), (>=), (<), (>), isempty, supertype, Base.typename,
   Base.parameter_upper_bound, eps, Meta.parse, Base.eval, sleep
 
@@ -105,6 +105,9 @@ end
 @adjoint Core.getfield(xs::NTuple{N,Any}, i::Integer) where N =
   (xs[i], Δ -> (ntuple(j -> i == j ? Δ : nothing, Val(N)), nothing))
 
+@adjoint Core.getfield(xs::NamedTuple{K,<:NTuple{N,Any}}, i::Integer) where {K,N} =
+  (xs[i], Δ -> (NamedTuple{K}(ntuple(j -> i == j ? Δ : nothing, Val(N))), nothing))
+
 @adjoint function Base.first(xs::Tuple)
   drest = map(_->nothing, tail(xs))
   first(xs), Δ -> ((Δ, drest...),)
@@ -113,7 +116,7 @@ end
 @adjoint Base.tail(xs::Tuple) = tail(xs), x̄s -> ((nothing, x̄s...),)
 
 _empty(x) = length(x)
-_empty(x::Tuple) = map(_->nothing, x)
+_empty(x::Union{Tuple,NamedTuple}) = map(_->nothing, x)
 
 _unapply(t::Integer, xs) = xs[1:t], xs[t+1:end]
 _unapply(t, xs) = first(xs), tail(xs)
@@ -123,6 +126,11 @@ function _unapply(t::Tuple, xs)
   t1, xs1 = _unapply(first(t), xs)
   t2, xs2 = _unapply(tail(t), xs1)
   (t1, t2...), xs2
+end
+
+function _unapply(t::NamedTuple{K}, xs) where K
+  t, rst = _unapply(Tuple(t), xs)
+  NamedTuple{K}(t), rst
 end
 
 unapply(t, xs) = _unapply(t, xs)[1]
@@ -234,10 +242,12 @@ end
 # TODO captured mutables + multiple calls to `back`
 @generated function (back::Jnew{T,G,false})(Δ::Union{NamedTuple,Nothing,RefValue}) where {T,G}
   !T.mutable && Δ == Nothing && return :nothing
-  Δ = G == Nothing ? :Δ : :(back.g[])
+  Δ = G == Nothing ? :Δ :
+      Δ <: RefValue ? :(back.g[]) :
+      :(accum(back.g[], Δ))
   quote
     x̄ = $Δ
-    $(G == Nothing || :($Δ = nt_nothing($Δ)))
+    $(G == Nothing || :(back.g[] = nt_nothing($Δ)))
     (nothing, $(map(f -> :(x̄.$f), fieldnames(T))...))
   end
 end
