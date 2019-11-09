@@ -416,6 +416,11 @@ end
   return H, back
 end
 
+@adjoint convert(::Type{R}, A::LinearAlgebra.HermOrSym{T,S}) where {T,S,R<:Array} = convert(R, A),
+  Δ -> (nothing, convert(S, Δ),)
+@adjoint Matrix(A::LinearAlgebra.HermOrSym{T,S}) where {T,S} = Matrix(A),
+  Δ -> (convert(S, Δ),)
+
 @adjoint function cholesky(Σ::Real)
   C = cholesky(Σ)
   return C, Δ::NamedTuple->(Δ.factors[1, 1] / (2 * C.U[1, 1]),)
