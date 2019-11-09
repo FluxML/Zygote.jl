@@ -49,6 +49,9 @@ end
   (s, c), ((s̄, c̄),) -> (s̄*c - c̄*s,)
 end
 
+@adjoint acosh(x::Complex) =
+  acosh(x), Δ -> (Δ * conj(inv(sqrt(x - 1) * sqrt(x + 1))),)
+
 @adjoint a // b = (a // b, c̄ -> (c̄ * 1//b, - c̄ * a // b // b))
 
 @nograd floor, ceil, trunc, round, hash

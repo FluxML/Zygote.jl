@@ -25,9 +25,24 @@ gradcheck(f, xs...) =
 gradtest(f, xs::AbstractArray...) = gradcheck((xs...) -> sum(sin.(f(xs...))), xs...)
 gradtest(f, dims...) = gradtest(f, rand.(Float64, dims)...)
 
+# utilities for using gradcheck with complex matrices
+_splitreim(A) = (real(A),)
+_splitreim(A::AbstractArray{<:Complex}) = reim(A)
+
+_joinreim(A, B) = complex.(A, B)
+_joinreim(A) = A
+
+function _dropimaggrad(A)
+  back(Δ) = real(Δ)
+  back(Δ::Nothing) = nothing
+  return Zygote.hook(back, A)
+end
+
 Random.seed!(0)
 
 @test gradient(//, 2, 3) === (1//3, -2//9)
+
+@test gradtest((a,b)->sum(reim(acosh(complex(a[1], b[1])))), [-2.0], [1.0])
 
 @test gradtest((x, W, b) -> identity.(W*x .+ b), 5, (2,5), 2)
 @test gradtest((x, W, b) -> identity.(W*x .+ b), (5,3), (2,5), 2)
@@ -519,113 +534,266 @@ end
     for i = 1:5
       A = randn(rng, N, N)
       @test gradtest(exp, A)
+
+      @testset "similar eigenvalues" begin
+        λ, V = eigen(A)
+        λ[1] = λ[3] + sqrt(eps(real(eltype(λ)))) / 10
+        A2 = real.(V * Diagonal(λ) / V)
+        @test gradtest(exp, A2)
+      end
     end
   end
 
   @testset "complex dense" begin
     rng, N = MersenneTwister(6865931), 8
     for i = 1:5
-      A = randn(rng, N, N)
-      B = randn(rng, N, N)
-      @test gradcheck(A, B) do a,b
+      A = randn(rng, ComplexF64, N, N)
+      @test gradcheck(reim(A)...) do a,b
         c = complex.(a, b)
         d = exp(c)
         return sum(real.(d) + 2 .* imag.(d))
+      end
+
+      @testset "similar eigenvalues" begin
+        λ, V = eigen(A)
+        λ[1] = λ[3] + sqrt(eps(real(eltype(λ)))) / 10
+        A2 = V * Diagonal(λ) / V
+        @test gradcheck(reim(A2)...) do a,b
+          c = complex.(a, b)
+          d = exp(c)
+          return sum(real.(d) + 2 .* imag.(d))
+        end
       end
     end
   end
 end
 
+_hermsymtype(::Type{<:Symmetric}) = Symmetric
+_hermsymtype(::Type{<:Hermitian}) = Hermitian
+
+function _gradtest_hermsym(f, ST, A)
+  gradtest(_splitreim(collect(A))...) do (args...)
+    B = f(ST(_joinreim(_dropimaggrad.(args)...)))
+    return sum(_splitreim(B))
+  end
+end
+
 @testset "eigen(::RealHermSymComplexHerm)" begin
-  @testset "eigen(::Symmetric{<:Real})" begin
-    rng, N = MersenneTwister(123), 7
-    A = Symmetric(randn(rng, N, N))
-    @test gradtest(collect(A)) do (x)
-      d, Q = eigen(Symmetric(x))
-      return Q * Diagonal(exp.(d)) * transpose(Q)
+  MTs = (Symmetric{Float64}, Hermitian{Float64}, Hermitian{ComplexF64})
+  rng, N = MersenneTwister(123), 7
+  @testset "eigen(::$MT)" for MT in MTs
+    T = eltype(MT)
+    ST = _hermsymtype(MT)
+
+    A = ST(randn(rng, T, N, N))
+    U = eigvecs(A)
+
+    @test _gradtest_hermsym(ST, A) do (A)
+      d, U = eigen(A)
+      return U * Diagonal(exp.(d)) * U'
     end
+
     y = Zygote.pullback(eigen, A)[1]
     y2 = eigen(A)
     @test y.values ≈ y2.values
     @test y.vectors ≈ y2.vectors
+
     @testset "low rank" begin
-      U = eigvecs(A)
       A2 = Symmetric(U * Diagonal([randn(rng), zeros(N-1)...]) * U')
-      @test_broken gradtest(collect(A2)) do (x)
-        d, Q = eigen(Symmetric(x))
-        return Q * Diagonal(exp.(d)) * transpose(Q)
-      end
-    end
-  end
-
-  @testset "eigen(::Hermitian{<:Real})" begin
-    rng, N = MersenneTwister(456), 7
-    A = Hermitian(randn(rng, N, N))
-    @test gradtest(collect(A)) do (x)
-      d, Q = eigen(Hermitian(x))
-      return Q * Diagonal(exp.(d)) * transpose(Q)
-    end
-    y = Zygote.pullback(eigen, A)[1]
-    y2 = eigen(A)
-    @test y.values ≈ y2.values
-    @test y.vectors ≈ y2.vectors
-    @testset "low rank" begin
-      U = eigvecs(A)
-      A2 = Hermitian(U * Diagonal([randn(rng), zeros(N-1)...]) * U')
-      @test_broken gradtest(collect(A2)) do (x)
-        d, Q = eigen(Hermitian(x))
-        return Q * Diagonal(exp.(d)) * transpose(Q)
-      end
-    end
-  end
-
-  @testset "eigen(::Hermitian{<:Complex})" begin
-    rng, N = MersenneTwister(789), 7
-    A = Hermitian(randn(rng, ComplexF64, N, N))
-    @test gradtest(reim(collect(A))...) do a,b
-      d, U = eigen(Hermitian(complex.(a, b)))
-      X = U * Diagonal(exp.(d)) * U'
-      return real.(X) .+ imag.(X)
-    end
-    y = Zygote.pullback(eigen, A)[1]
-    y2 = eigen(A)
-    @test y.values ≈ y2.values
-    @test y.vectors ≈ y2.vectors
-    @testset "low rank" begin
-      U = eigvecs(A)
-      A2 = Hermitian(U * Diagonal([randn(rng), zeros(N-1)...]) * U')
-      @test_broken gradtest(reim(collect(A2))...) do a,b
-        d, U = eigen(Hermitian(complex.(a, b)))
-        X = U * Diagonal(exp.(d)) * U'
-        return real.(X) .+ imag.(X)
+      @test_broken _gradtest_hermsym(ST, A2) do (A)
+        d, U = eigen(A)
+        return U * Diagonal(exp.(d)) * U'
       end
     end
   end
 end
 
 @testset "eigvals(::RealHermSymComplexHerm)" begin
-  @testset "eigvals(::Symmetric{<:Real})" begin
-    rng, N = MersenneTwister(123), 7
-    A = Symmetric(randn(rng, N, N))
-    @test gradtest(x->eigvals(Symmetric(x)), collect(A))
+  MTs = (Symmetric{Float64}, Hermitian{Float64}, Hermitian{ComplexF64})
+  rng, N = MersenneTwister(123), 7
+  @testset "eigvals(::$MT)" for MT in MTs
+    T = eltype(MT)
+    ST = _hermsymtype(MT)
+
+    A = ST(randn(rng, T, N, N))
+    @test _gradtest_hermsym(A ->eigvals(A), ST, A)
     @test Zygote.pullback(eigvals, A)[1] ≈ eigvals(A)
   end
+end
 
-  @testset "eigvals(::Hermitian{<:Real})" begin
-    rng, N = MersenneTwister(456), 7
-    A = Hermitian(randn(rng, N, N))
-    @test gradtest(x->eigvals(Hermitian(x)), collect(A))
-    @test Zygote.pullback(eigvals, A)[1] ≈ eigvals(A)
-  end
+_randmatunitary(rng, T, n) = qr(randn(rng, T, n, n)).Q
+function _randvectorin(rng, n, r)
+  l, u = r
+  isinf(l) && isinf(u) && return randn(rng, n)
+  isinf(l) && return rand(rng, n) .+ (u - 1)
+  isinf(u) && return rand(rng, n) .+ l
+  return rand(rng, n) .* (u - l) .+ l
+end
 
-  @testset "eigvals(::Hermitian{<:Complex})" begin
-    rng, N = MersenneTwister(789), 7
-    A, B = randn(rng, N, N), randn(rng, N, N)
-    @test gradtest(A, B) do a,b
-      c = Hermitian(complex.(a, b))
-      return eigvals(c)
+realdomainrange(::Any) = (Inf, Inf)
+realdomainrange(::Union{typeof.((acos,asin,atanh))...}) = (-1, 1)
+realdomainrange(::typeof(acosh)) = (1, Inf)
+realdomainrange(::Union{typeof.((log,sqrt,^))...}) = (0, Inf)
+
+function _randmatseries(rng, f, T, n, domain::Type{Real})
+  U = _randmatunitary(rng, T, n)
+  λ = _randvectorin(rng, n, realdomainrange(f))
+  return U * Diagonal(λ) * U'
+end
+
+function _randmatseries(rng, f, T, n, domain::Type{Complex})
+  U = _randmatunitary(rng, T, n)
+  r = realdomainrange(f)
+  r == (Inf, Inf) && return nothing
+  λ = _randvectorin(rng, n, r)
+  λ[end] -= 2
+  return U * Diagonal(λ) * U'
+end
+
+_randmatseries(rng, ::typeof(atanh), T, n, domain::Type{Complex}) = nothing
+
+@testset "Hermitian/Symmetric power series functions" begin
+  MTs = (Symmetric{Float64}, Hermitian{Float64}, Hermitian{ComplexF64})
+  rng, N = MersenneTwister(123), 7
+  domains = (Real, Complex)
+  @testset "$func(::RealHermSymComplexHerm)" for func in (:exp, :log, :cos, :sin, :tan, :cosh, :sinh, :tanh, :acos, :asin, :atan, :acosh, :asinh, :atanh, :sqrt)
+    f = eval(func)
+    @testset "$func(::$MT)" for MT in MTs
+      T = eltype(MT)
+      ST = _hermsymtype(MT)
+      @testset "domain $domain" for domain in domains
+        preA = _randmatseries(rng, f, T, N, domain)
+        preA === nothing && continue
+        A = ST(preA)
+        λ, U = eigen(A)
+
+        @test _gradtest_hermsym(f, ST, A)
+
+        y = Zygote.pullback(f, A)[1]
+        y2 = f(A)
+        @test y ≈ y2
+        @test typeof(y) == typeof(y2)
+
+        @testset "similar eigenvalues" begin
+          λ[1] = λ[3] + sqrt(eps(eltype(λ))) / 10
+          A2 = U * Diagonal(λ) * U'
+          @test _gradtest_hermsym(f, ST, A2)
+        end
+
+        if f ∉ (log, sqrt) # only defined for invertible matrices
+          @testset "low rank" begin
+            A3 = U * Diagonal([rand(rng), zeros(N-1)...]) * U'
+            @test _gradtest_hermsym(f, ST, A3)
+          end
+        end
+      end
     end
-    @test Zygote.pullback(eigvals, Hermitian(A))[1] ≈ eigvals(Hermitian(A))
+  end
+
+  @testset "sincos(::RealHermSymComplexHerm)" begin
+    @testset "sincos(::$MT)" for MT in MTs
+      T = eltype(MT)
+      ST = _hermsymtype(MT)
+      A = ST(_randmatseries(rng, sincos, T, N, Real))
+      λ, U = eigen(A)
+
+      @test gradtest(_splitreim(collect(A))...) do (args...)
+        S,C = sincos(ST(_joinreim(_dropimaggrad.(args)...)))
+        return vcat(vec.(_splitreim(S))..., vec.(_splitreim(C))...)
+      end
+
+      y = Zygote.pullback(sincos, A)[1]
+      y2 = sincos(A)
+      @test y[1] ≈ y2[1]
+      @test typeof(y[1]) == typeof(y2[1])
+      @test y[2] ≈ y2[2]
+      @test typeof(y[2]) == typeof(y2[2])
+
+      @testset "similar eigenvalues" begin
+        λ[1] = λ[3] + sqrt(eps(eltype(λ))) / 10
+        A2 = U * Diagonal(λ) * U'
+        @test gradtest(_splitreim(collect(A2))...) do (args...)
+          S,C = sincos(ST(_joinreim(_dropimaggrad.(args)...)))
+          return vcat(vec.(_splitreim(S))..., vec.(_splitreim(C))...)
+        end
+      end
+
+      @testset "low rank" begin
+        A3 = U * Diagonal([rand(rng), zeros(N-1)...]) * U'
+        @test gradtest(_splitreim(collect(A3))...) do (args...)
+          S,C = sincos(ST(_joinreim(_dropimaggrad.(args)...)))
+          return vcat(vec.(_splitreim(S))..., vec.(_splitreim(C))...)
+        end
+      end
+    end
+  end
+
+  @testset "^(::RealHermSymComplexHerm, p::Real)" begin
+    @testset for p in (-1.0, -0.5, 0.5, 1.0, 1.5)
+      @testset "^(::$MT, $p)" for MT in MTs
+        T = eltype(MT)
+        ST = _hermsymtype(MT)
+        @testset "domain $domain" for domain in domains
+          A = ST(_randmatseries(rng, ^, T, N, domain))
+          λ, U = eigen(A)
+
+          @test gradcheck(_splitreim(collect(A))..., [p]) do (args...)
+            p = _dropimaggrad(args[end][1])
+            A = ST(_joinreim(_dropimaggrad.(args[1:end-1])...))
+            B = A^p
+            return abs(sum(sin.(B)))
+          end
+
+          y = Zygote.pullback(^, A, p)[1]
+          y2 = A^p
+          @test y ≈ y2
+          @test typeof(y) == typeof(y2)
+
+          @testset "similar eigenvalues" begin
+            λ[1] = λ[3] + sqrt(eps(eltype(λ))) / 10
+            A2 = U * Diagonal(λ) * U'
+            @test gradcheck(_splitreim(collect(A2))..., [p]) do (args...)
+              p = _dropimaggrad(args[end][1])
+              A = ST(_joinreim(_dropimaggrad.(args[1:end-1])...))
+              B = A^p
+              return abs(sum(sin.(B)))
+            end
+          end
+        end
+      end
+    end
+  end
+end
+
+@testset "^(::Union{Symmetric,Hermitian}, p::Integer)" begin
+  MTs = (Symmetric{Float64}, Symmetric{ComplexF64},
+         Hermitian{Float64}, Hermitian{ComplexF64})
+  rng, N = MersenneTwister(123), 7
+  @testset for p in -3:3
+    @testset "^(::$MT, $p)" for MT in MTs
+      T = eltype(MT)
+      ST = _hermsymtype(MT)
+      A = ST(randn(rng, T, N, N))
+
+      if p == 0
+        @test gradient(_splitreim(collect(A))...) do (args...)
+          A = ST(_joinreim(_dropimaggrad.(args)...))
+          B = A^p
+          return sum(sin.(vcat(vec.(_splitreim(B))...)))
+        end === map(_->nothing, _splitreim(A))
+      else
+        @test gradtest(_splitreim(collect(A))...) do (args...)
+          A = ST(_joinreim(_dropimaggrad.(args)...))
+          B = A^p
+          return vcat(vec.(_splitreim(B))...)
+        end
+      end
+
+      y = Zygote.pullback(^, A, p)[1]
+      y2 = A^p
+      @test y ≈ y2
+      @test typeof(y) === typeof(y2)
+    end
   end
 end
 
