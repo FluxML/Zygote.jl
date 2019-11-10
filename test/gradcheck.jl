@@ -3,29 +3,24 @@ using Zygote: gradient
 using NNlib: conv, ∇conv_data, depthwiseconv
 using Base.Broadcast: broadcast_shape
 
-function ngradient(f, xs::AbstractArray...)
-  grads = zero.(xs)
-  for (x, Δ) in zip(xs, grads), i in 1:length(x)
-    δ = sqrt(eps())
-    tmp = x[i]
-    x[i] = tmp - δ/2
-    y1 = f(xs...)
-    x[i] = tmp + δ/2
-    y2 = f(xs...)
-    x[i] = tmp
-    Δ[i] = (y2-y1)/δ
+Random.seed!(0)
+
+function grad(fdm, f, x::AbstractArray{T}) where T <: Number
+  dx = similar(x)
+  tmp = similar(x)
+  for k in eachindex(x)
+      dx[k] = fdm(zero(T)) do ϵ
+          tmp .= x
+          tmp[k] += ϵ
+          return f(tmp)
+      end
   end
-  return grads
+  return (dx, )
 end
 
-gradcheck(f, xs...) =
-  all(isapprox.(ngradient(f, xs...),
-                gradient(f, xs...), rtol = 1e-5, atol = 1e-5))
 
-gradtest(f, xs::AbstractArray...) = gradcheck((xs...) -> sum(sin.(f(xs...))), xs...)
-gradtest(f, dims...) = gradtest(f, rand.(Float64, dims)...)
-
-Random.seed!(0)
+gradtest(f, xs...) = gradcheck(f, xs...)
+gradtest(f, dims::Union{Int, Dims}...) = gradtest(f, rand.(Float64, dims)...)
 
 @test gradient(//, 2, 3) === (1//3, -2//9)
 
@@ -60,7 +55,10 @@ Random.seed!(0)
 @test gradtest(x -> x', rand(5))
 
 @test gradtest(det, (4, 4))
-@test gradtest(logdet, map(x -> x*x', (rand(4, 4),))[1])
+# NOTE: this is a workaround, fdm fails occasionally
+# when using gradcheck(logdet, positive_semidefinite_matrix)
+# See also: https://github.com/JuliaDiff/FiniteDifferences.jl/issues/52
+@test gradtest(x -> logdet(x*x'), rand(4, 4))
 @test gradtest(x -> logabsdet(x)[1], (4, 4))
 
 @test gradtest(x -> view(x,:,2,:), (3,4,5))
