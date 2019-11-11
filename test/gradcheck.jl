@@ -20,7 +20,7 @@ function _dropimaggrad(A)
 end
 
 Random.seed!(0)
-
+@info "Checking Basic Gradients"
 @test gradient(//, 2, 3) === (1//3, -2//9)
 
 @test gradtest((a,b)->sum(reim(acosh(complex(a[1], b[1])))), [-2.0], [1.0])
@@ -65,6 +65,7 @@ Random.seed!(0)
 @test gradtest(x -> view(x,:,2,:), (3,4,5))
 @test gradtest(x -> view(x,1:2,3:4), (3,4))
 
+@info "Checking Conv & Pooling"
 @testset "conv" begin
   for spatial_rank in (1, 2, 3)
     x = rand(repeat([4], spatial_rank)..., 3, 2)
@@ -95,6 +96,8 @@ let
   y, back = Zygote.pullback(permutedims, randn(3))
   @test first(back(randn(1, 3))) isa Vector
 end
+
+@info "Checking LinearAlgebra"
 
 @test gradtest(x -> repeat(x; inner=2), rand(5))
 @test gradtest(x -> repeat(x; inner=2, outer=3), rand(5))
@@ -783,6 +786,7 @@ end
   end
 end
 
+@info "Check Distances"
 using Distances
 
 Zygote.refresh()
@@ -923,6 +927,7 @@ end
     @test gradcheck(x -> muladd(x[1], x[2], x[3]), [2.0, 3.0, 5.0])
 end
 
+@info "Check StatsFuns"
 import StatsFuns
 
 Zygote.refresh()
@@ -1006,6 +1011,7 @@ end
   @test gradcheck(x -> sum(sum(diag.([x] .* a))), b)
 end
 
+@info "Check Zygote Buffer"
 using Zygote: Buffer
 
 @testset "Buffer" begin
