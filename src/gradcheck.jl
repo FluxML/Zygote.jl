@@ -6,7 +6,7 @@ make_jacobian(x::AbstractArray{T}, out_length::Int) where T = zeros(T, out_lengt
 make_jacobian(x::Number, out_length::Int) = zeros(typeof(x), out_length, 1)
 
 zero_like(x::T) where {T <: Number} = zero(T)
-zero_like(x) = fill!(similar(x), 0)
+zero_like(x::AbstractArray) = zeros(eltype(x), size(x))
 zero_like(x::Broadcast.Broadcasted) = zero_like(Broadcast.materialize(x))
 
 """
@@ -36,12 +36,12 @@ function jacobian!(f_back, jacobians, grad_output::T) where T <: Number
 end
 
 function jacobian!(f_back, jacobians, grad_output::AbstractArray)
-    for idx in eachindex(grad_output)
+    for (k, idx) in enumerate(eachindex(grad_output))
         grad_output = fill!(grad_output, 0)
         grad_output[idx] = 1
         grads_input = f_back(grad_output)
         for (jacobian_x, d_x) in zip(jacobians, grads_input)
-            jacobian_x[idx, :] .= _vec(d_x)
+            jacobian_x[k, :] .= _vec(d_x)
         end
     end
     return jacobians

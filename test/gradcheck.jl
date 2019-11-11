@@ -1,3 +1,4 @@
+using Revise
 using Zygote, NNlib, Test, Random, LinearAlgebra, Statistics, FillArrays, FFTW
 using Zygote: gradient
 using NNlib: conv, ∇conv_data, depthwiseconv
@@ -67,7 +68,7 @@ Random.seed!(0)
 
 @testset "conv" begin
   for spatial_rank in (1, 2, 3)
-    x = rand(repeat([10], spatial_rank)..., 3, 2)
+    x = rand(repeat([4], spatial_rank)..., 3, 2)
     w = rand(repeat([3], spatial_rank)..., 3, 3)
     cdims = DenseConvDims(x, w)
     @test gradtest((x, w) -> conv(x, w, cdims), x, w)
@@ -80,9 +81,9 @@ end
 
 @testset "pooling" begin
   for spatial_rank in (1, 2)
-    x = rand(repeat([10], spatial_rank)..., 3, 2)
+    x = rand(repeat([4], spatial_rank)..., 3, 2)
     pdims = PoolDims(x, 2)
-    @test gradtest(x -> maxpool(x, pdims), x)
+    @test_broken gradtest(x -> maxpool(x, pdims), x)
     @test gradtest(x -> meanpool(x, pdims), x)
   end
 end
@@ -197,26 +198,28 @@ end
   @test gradtest(x -> std(x, dims=[1, 2], corrected=false, mean=mean(x, dims=[1, 2])), rand(2, 3, 4))
 end
 
+# https://github.com/JuliaDiff/FiniteDifferences.jl/issues/53
 @testset "maximum" begin
-  @test gradtest(maximum, rand(2, 3))
+  @test_broken gradtest(maximum, rand(2, 3))
 
-  @test gradtest(x -> maximum(x, dims=1), rand(2, 3))
-  @test gradtest(x -> maximum(x, dims=2), rand(2, 3))
-  @test gradtest(x -> maximum(x, dims=3), rand(2, 3, 4))
+  @test_broken gradtest(x -> maximum(x, dims=1), rand(2, 3))
+  @test_broken gradtest(x -> maximum(x, dims=2), rand(2, 3))
+  @test_broken gradtest(x -> maximum(x, dims=3), rand(2, 3, 4))
 
-  @test gradtest(x -> maximum(x, dims=[1, 2]), rand(2, 3, 4))
+  @test_broken gradtest(x -> maximum(x, dims=[1, 2]), rand(2, 3, 4))
 
   @test gradient(x -> 1 / maximum(x), [1., 2, 3])[1] == [0, 0, -1/9]
 end
 
+# same issue with maximum
 @testset "minimum" begin
-  @test gradtest(minimum, rand(2, 3))
+  @test_broken gradtest(minimum, rand(2, 3))
 
-  @test gradtest(x -> minimum(x, dims=1), rand(2, 3))
-  @test gradtest(x -> minimum(x, dims=2), rand(2, 3))
-  @test gradtest(x -> minimum(x, dims=3), rand(2, 3, 4))
+  @test_broken gradtest(x -> minimum(x, dims=1), rand(2, 3))
+  @test_broken gradtest(x -> minimum(x, dims=2), rand(2, 3))
+  @test_broken gradtest(x -> minimum(x, dims=3), rand(2, 3, 4))
 
-  @test gradtest(x -> minimum(x, dims=[1, 2]), rand(2, 3, 4))
+  @test_broken gradtest(x -> minimum(x, dims=[1, 2]), rand(2, 3, 4))
 end
 
 @testset "dropdims" begin
@@ -241,7 +244,7 @@ end
 end
 
 @testset "(p)inv" begin
-  rng, P, Q = MersenneTwister(123456), 13, 11
+  rng, P, Q = MersenneTwister(123456), 5, 3
   A, B, C = randn(rng, P, Q), randn(rng, P, P), randn(Q, P)
   @test gradtest(pinv, A)
   @test gradtest(inv, B)
@@ -250,7 +253,7 @@ end
 
 @testset "multiplication" begin
   @testset "matrix-matrix" begin
-    rng, M, P, Q = MersenneTwister(123456), 13, 7, 11
+    rng, M, P, Q = MersenneTwister(123456), 9, 5, 7
     @test gradtest(*, randn(rng, M, P), randn(rng, P, Q))
     @test gradtest(*, randn(rng, M, P), randn(rng, P))
     @test gradtest(*, randn(rng, M, 1), randn(rng, 1, Q))
@@ -269,7 +272,7 @@ end
 end
 
 @testset "backsolve" begin
-  rng, M, P, Q = MersenneTwister(123456), 13, 10, 9
+  rng, M, P, Q = MersenneTwister(123456), 9, 7, 5
   X, Y, y = randn(rng, P, P), randn(rng, P, Q), randn(rng, P)
   A, B = randn(rng, P, M), randn(P, Q)
   D = collect(Diagonal(randn(rng, P)))
@@ -347,7 +350,7 @@ end
 
 @testset "Symmetric" begin
   @testset "real" begin
-    rng, P = MersenneTwister(123456), 7
+    rng, P = MersenneTwister(123456), 5
     A = randn(rng, P, P)
     @testset "uplo=$uplo" for uplo in (:U, :L)
       @test gradtest(x->Symmetric(x, uplo), A)
@@ -370,7 +373,7 @@ end
   end
 
   @testset "complex" begin
-    rng, P = MersenneTwister(123456), 7
+    rng, P = MersenneTwister(123456), 5
     Re = randn(rng, P, P)
     Im = randn(rng, P, P)
     A = complex.(Re, Im)
@@ -406,7 +409,7 @@ end
 end
 
 @testset "Hermitian" begin
-  rng, P = MersenneTwister(123456), 7
+  rng, P = MersenneTwister(123456), 5
   Re = randn(rng, P, P)
   Im = randn(rng, P, P)
   A = complex.(Re, Im)
@@ -515,10 +518,10 @@ end
 @testset "matrix exponential" begin
   @testset "real dense" begin
     rng, N = MersenneTwister(6865931), 8
-    for i = 1:5
-      A = randn(rng, N, N)
-      @test gradtest(exp, A)
+    A = randn(rng, N, N)
+    @test gradtest(exp, A)
 
+    for i = 1:5
       @testset "similar eigenvalues" begin
         λ, V = eigen(A)
         λ[1] = λ[3] + sqrt(eps(real(eltype(λ)))) / 10
@@ -564,7 +567,7 @@ end
 
 @testset "eigen(::RealHermSymComplexHerm)" begin
   MTs = (Symmetric{Float64}, Hermitian{Float64}, Hermitian{ComplexF64})
-  rng, N = MersenneTwister(123), 7
+  rng, N = MersenneTwister(123), 5
   @testset "eigen(::$MT)" for MT in MTs
     T = eltype(MT)
     ST = _hermsymtype(MT)
@@ -594,7 +597,7 @@ end
 
 @testset "eigvals(::RealHermSymComplexHerm)" begin
   MTs = (Symmetric{Float64}, Hermitian{Float64}, Hermitian{ComplexF64})
-  rng, N = MersenneTwister(123), 7
+  rng, N = MersenneTwister(123), 5
   @testset "eigvals(::$MT)" for MT in MTs
     T = eltype(MT)
     ST = _hermsymtype(MT)

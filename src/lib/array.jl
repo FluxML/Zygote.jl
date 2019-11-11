@@ -477,7 +477,7 @@ end
 
 # Adjoint based on the Theano implementation, which uses the differential as described
 # in Brančík, "Matlab programs for matrix exponential function derivative evaluation"
-@adjoint exp(A::AbstractMatrix) = exp(A), function(F̄)
+function ∇exp(F̄, A::AbstractMatrix)
   n = size(A, 1)
   E = eigen(A)
   w = E.values
@@ -485,8 +485,15 @@ end
   X = _pairdiffquotmat(exp, n, w, ew, ew, ew)
   V = E.vectors
   VF = factorize(V)
-  Ā = (V * ((VF \ F̄' * V) .* X) / VF)'
-  return (Ā,)
+  return (V * ((VF \ F̄' * V) .* X) / VF)'
+end
+
+@adjoint exp(A::AbstractMatrix) = exp(A), function(F̄)
+  return (∇exp(F̄, A), )
+end
+
+@adjoint exp(A::AbstractMatrix{<:Real}) = exp(A), function(F̄)
+  return (real(∇exp(F̄, A)), )
 end
 
 @adjoint function LinearAlgebra.eigen(A::LinearAlgebra.RealHermSymComplexHerm)
