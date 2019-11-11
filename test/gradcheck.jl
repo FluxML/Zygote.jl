@@ -641,7 +641,7 @@ _randmatseries(rng, ::typeof(atanh), T, n, domain::Type{Complex}) = nothing
 
 @testset "Hermitian/Symmetric power series functions" begin
   MTs = (Symmetric{Float64}, Hermitian{Float64}, Hermitian{ComplexF64})
-  rng, N = MersenneTwister(123), 7
+  rng, N = MersenneTwister(123), 3
   domains = (Real, Complex)
   @testset "$func(::RealHermSymComplexHerm)" for func in (:exp, :log, :cos, :sin, :tan, :cosh, :sinh, :tanh, :acos, :asin, :atan, :acosh, :asinh, :atanh, :sqrt)
     f = eval(func)
@@ -976,7 +976,7 @@ end
   rng = MersenneTwister(123456)
   @testset "Float64" begin
     for x in [-10.0, -5.0, -1.0, -eps(), 0.0, eps(), 1.0, 5.0, 10.0]
-      @test gradcheck(x->5.1 * StatsFuns.log1psq(x[1]), [x])
+      @test gradcheck(x->5.1 * StatsFuns.log1psq(x[1]), [x]; atol=1e-11)
     end
   end
 end
