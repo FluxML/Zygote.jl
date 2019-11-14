@@ -79,3 +79,63 @@ a real.
      1  0
 """
 hessian(f, x::AbstractArray) = forward_jacobian(x -> gradient(f, x)[1], x)[2]
+
+"""
+    jacobian(f, args...)
+
+If `y = f(args...)` is a vector, then for each vector `a ∈ args`
+this returns a matrix with `J_a[o,i] = ∂yₒ/∂aᵢ`.
+
+For scalar `x ∈ args` it returns a vector with `J_x[o] = ∂yₒ/∂x`,
+and for other shapes `size(J_arg) = (size(y)..., size(arg)...)`.
+
+Keyword `matrix=true` reshapes to treat both output `y` and
+every `arg` as a vector, hence every `J_arg` a matrix.
+This will give an error on scalar `y`.
+"""
+function jacobian(f, args...; matrix::Bool = false)
+    res, back = Zygote.forward(f, args...)
+    if !(res isa AbstractArray)
+        matrix && error("jacobian(f, args...; matrix=true) cannot " *
+            "handle scalar output, try gradient(f, args...)")
+        return gradient(f, args...)
+    end
+    out = map(args) do p
+        T = Base.promote_type(eltype(p), eltype(res))
+        similar(res, T, size(res)..., size(p)...)
+    end
+    delta = fill!(similar(res), 0)
+    for k in CartesianIndices(res)
+        delta[k] = 1
+        grads = back(delta)
+        for (g,o) in zip(grads, out)
+            c = map(_->(:), size(g))
+            o[k,c...] .= g
+        end
+        delta[k] = 0
+    end
+    matrix ? reshape.(out, length(res), :) : out
+end
+
+function jacobian(f, ps::Params) # Union{Tracker.Params, Zygote.Params}
+    res, back = forward(f, ps)
+    out = IdDict()
+    for p in ps
+        T = Base.promote_type(eltype(p), eltype(res))
+        J = similar(res, T, size(res)..., size(p)...)
+        out[p] = J
+    end
+    delta = fill!(similar(res), 0)
+    for k in CartesianIndices(res)
+        delta[k] = 1
+        grads = back(delta)
+        for p in ps
+            g = grads[p]
+            c = map(_->(:), size(g))
+            o = out[p]
+            o[k,c...] .= g
+        end
+        delta[k] = 0
+    end
+    out
+end
