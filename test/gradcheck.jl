@@ -78,8 +78,36 @@ Random.seed!(0)
 @test gradtest(logdet, map(x -> x*x', (rand(4, 4),))[1])
 @test gradtest(x -> logabsdet(x)[1], (4, 4))
 
-@test gradtest(x -> view(x,:,2,:), (3,4,5))
-@test gradtest(x -> view(x,1:2,3:4), (3,4))
+@testset "getindex" begin
+  @test gradtest(x -> x[:,2,:], (3,4,5))
+  @test gradtest(x -> x[1:2,3:4], (3,4))
+
+  imat = [1 2; 3 4]
+  @test gradtest(x -> x[:,imat], (3,4))
+  @test gradtest(x -> x[:,[1,2,2]], (3,4))
+  irep = [1 2; 2 2]
+  @test gradtest(x -> x[1,irep], (3,4))
+
+  # https://github.com/invenia/Nabla.jl/issues/139
+  x = rand(3)
+  z = [1,2,3,3]
+  y(x,z) = dot(ones(4), x[z])
+  @test gradient(y, x,z) == ([1,1,2], nothing)
+
+  # https://github.com/FluxML/Zygote.jl/issues/376
+  _, back = Zygote._pullback(x->x[1]*im, randn(2))
+  @test back(1.0)[2] == [-im, 0]
+end
+
+@testset "view" begin
+  @test gradtest(x -> view(x,:,2,:), (3,4,5))
+  @test gradtest(x -> view(x,1:2,3:4), (3,4))
+  @test gradtest(x -> view(x,:,[1,2,2]), (3,4))
+
+  # https://github.com/FluxML/Zygote.jl/issues/272
+  g(x) = view(x,1:2)[1]
+  @test gradient(g, ones(3)) == ([1,0,0],)
+end
 
 @testset "conv" begin
   for spatial_rank in (1, 2, 3)
