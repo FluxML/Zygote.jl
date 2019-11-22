@@ -22,8 +22,10 @@ using Base.Broadcast: broadcasted, broadcast_shape
 @adjoint (::Type{T})(sz) where {T<:Zeros} = Zeros(sz), Δ->(nothing,)
 @adjoint (::Type{T})(sz) where {T<:Ones} = Ones(sz), Δ->(nothing,)
 
-_zero(xs::AbstractArray{<:Number}, T=float(eltype(xs))) = fill!(similar(xs, T), false)
+_zero(xs::AbstractArray{<:Number}, T=float(eltype(xs))) =
+    fill!(similar(xs, T, size(xs)), false)
 _zero(xs::AbstractArray, T=Any) = Union{Nothing, T}[nothing for x in xs]
+_makelike(dx, x) = dx
 
 @adjoint getindex(x::AbstractArray, inds...) = x[inds...], ∇getindex(x, inds)
 
@@ -37,7 +39,7 @@ _zero(xs::AbstractArray, T=Any) = Union{Nothing, T}[nothing for x in xs]
     dx = _zero(x, eltype(dy))
     @views dx[inds...] .+= dy
   end
-  (dx, map(_->nothing, inds)...)
+  (_makelike(dx, x), map(_->nothing, inds)...)
 end
 
 @adjoint! setindex!(xs::AbstractArray, x...) = setindex!(xs, x...),
@@ -363,6 +365,10 @@ end
 # LinAlg Matrix Types
 # ===================
 
+for AT in [:Diagonal, :LowerTriangular, :UpperTriangular]
+    @eval _makelike(dx, x::$AT) = $AT(dx) # for getindex
+end
+
 @adjoint LinearAlgebra.LowerTriangular(A) = LowerTriangular(A), Δ->(LowerTriangular(Δ),)
 @adjoint LinearAlgebra.UpperTriangular(A) = UpperTriangular(A), Δ->(UpperTriangular(Δ),)
 
@@ -390,6 +396,8 @@ _symmetric_back(Δ::LowerTriangular, uplo) = collect(uplo == 'U' ? transpose(Δ)
   return S, back
 end
 
+_makelike(dx, x::Symmetric) = Symmetric(_symmetric_back(dx, x.uplo), Symbol(x.uplo))
+
 _extract_imag(x) = (x->complex(0, imag(x))).(x)
 function _hermitian_back(Δ, uplo)
   isreal(Δ) && return _symmetric_back(Δ, uplo)
@@ -413,6 +421,8 @@ end
   back(Δ::NamedTuple) = (_hermitian_back(Δ.data, H.uplo), nothing)
   return H, back
 end
+
+_makelike(dx, x::Hermitian) = Hermitian(_hermitian_back(dx, x.uplo), Symbol(x.uplo))
 
 @adjoint convert(::Type{R}, A::LinearAlgebra.HermOrSym{T,S}) where {T,S,R<:Array} = convert(R, A),
   Δ -> (nothing, convert(S, Δ),)
