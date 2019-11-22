@@ -47,6 +47,21 @@ function jacobian!(f_back, jacobians, grad_output::AbstractArray)
     return jacobians
 end
 
+# create a valid delta for backward pass test
+test_delta(x::Number) = one(x)
+test_delta(x::AbstractArray) = fill_storage_ones(x)
+# NOTE: this might be in Adapt, but I'll PR this there later.
+#       in general we don't need to use the same type of output
+#       for delta, but since users are allowed to define their
+#       closure in pullback with type annotations, it's better
+#       to take care of it
+fill_storage_ones(x::AbstractArray) = fill!(similar(x), 1)
+fill_storage_ones(x::LinearAlgebra.Adjoint) = LinearAlgebra.Adjoint(fill_storage_ones(parent(x)))
+fill_storage_ones(x::Transpose) = Transpose(fill_storage_ones(parent(x)))
+fill_storage_ones(x::Diagonal) = Diagonal(fill_storage_ones(parent(x)))
+fill_storage_ones(x::UpperTriangular) = UpperTriangular(fill_storage_ones(parent(x)))
+fill_storage_ones(x::LowerTriangular) = LowerTriangular(fill_storage_ones(parent(x)))
+fill_storage_ones(x::Symmetric) = Symmetric(fill_storage_ones(parent(x)))
 
 """
     gradcheck(f, xs...; eps=sqrt(eps), atol::Real=0, rtol::Real=atol>0 ? 0 : √eps)
@@ -58,7 +73,10 @@ function gradcheck(f, xs...;
         atol::Real=0, rtol::Real= atol > 0 ? 0 : sqrt(eps))
     
     fdm = central_fdm(5, 1, eps=eps)
-    njac = FiniteDifferences.jacobian(fdm, f, xs...)
-    jac = jacobian(f, xs...)
-    all( isapprox.(njac, jac, ; atol=atol, rtol=rtol) )
+    output, back = pullback(f, xs...)
+
+    Δ = test_delta(output)
+    nj′vp = j′vp(fdm, f, Δ, xs...)
+    sj′vp = back(Δ)
+    all( isapprox.(nj′vp, sj′vp, ; atol=atol, rtol=rtol) )
 end
