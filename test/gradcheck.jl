@@ -103,8 +103,14 @@ Random.seed!(0)
   @test gradient(x -> x[1,1], Diagonal(ones(2)))[1] isa Diagonal
 
   @test gradient(x -> x[1,1] + 10x[1,2] + 100x[2,1], Symmetric(ones(2,2)))[1] == Symmetric([1 110; 0 0])
+  @test gradient(x -> x[1,1], Symmetric(ones(2,2)))[1] isa Symmetric
   @test gradient(x -> x[1,1] + 10x[1,2] + 100x[2,1], UpperTriangular(ones(2,2)))[1] == [1 10; 0 0]
   @test gradient(x -> x[1,1] + 10x[1,2] + 100x[2,1], LowerTriangular(ones(2,2)))[1] == [1 0; 100 0]
+
+  @test gradient(x -> Symmetric([x 3x; 5x 7x])[1,1], 13) == (1,)
+  @test gradient(x -> Symmetric([x 3x; 5x 7x])[1,2], 13) == (3,)
+  @test gradient(x -> Symmetric([x 3x; 5x 7x])[2,1], 13) == (3,)
+  @test gradient(x -> Symmetric([x 3x; 5x 7x], :L)[1,2], 13) == (5,)
 end
 
 @testset "view" begin

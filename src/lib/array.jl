@@ -22,10 +22,9 @@ using Base.Broadcast: broadcasted, broadcast_shape
 @adjoint (::Type{T})(sz) where {T<:Zeros} = Zeros(sz), Δ->(nothing,)
 @adjoint (::Type{T})(sz) where {T<:Ones} = Ones(sz), Δ->(nothing,)
 
-_zero(xs::AbstractArray{<:Number}, T=float(eltype(xs))) =
-    fill!(similar(xs, T, size(xs)), false)
+_zero(xs::AbstractArray{<:Number}, T=float(eltype(xs))) = fill!(similar(xs, T), false)
 _zero(xs::AbstractArray, T=Any) = Union{Nothing, T}[nothing for x in xs]
-_makelike(dx, x) = dx
+_wrap(dx, x) = dx
 
 @adjoint getindex(x::AbstractArray, inds...) = x[inds...], ∇getindex(x, inds)
 
@@ -39,7 +38,7 @@ _makelike(dx, x) = dx
     dx = _zero(x, eltype(dy))
     @views dx[inds...] .+= dy
   end
-  (_makelike(dx, x), map(_->nothing, inds)...)
+  (_wrap(dx, x), map(_->nothing, inds)...)
 end
 
 @adjoint! setindex!(xs::AbstractArray, x...) = setindex!(xs, x...),
@@ -366,7 +365,8 @@ end
 # ===================
 
 for AT in [:Diagonal, :LowerTriangular, :UpperTriangular]
-    @eval _makelike(dx, x::$AT) = $AT(dx) # for getindex
+    @eval _zero(xs::$AT{<:Number}, T=float(eltype(xs))) = fill!(similar(xs, T, size(xs)), false)
+    @eval _wrap(dx, x::$AT) = $AT(dx) # for getindex
 end
 
 @adjoint LinearAlgebra.LowerTriangular(A) = LowerTriangular(A), Δ->(LowerTriangular(Δ),)
@@ -386,6 +386,7 @@ function _symmetric_back(Δ, uplo)
   return uplo == 'U' ? U .+ transpose(L) - D : L .+ transpose(U) - D
 end
 _symmetric_back(Δ::Diagonal, uplo) = Δ
+_symmetric_back(Δ::Symmetric, uplo) = collect(uplo == 'U' ? UpperTriangular(Δ) : LowerTriangular(Δ))
 _symmetric_back(Δ::UpperTriangular, uplo) = collect(uplo == 'U' ? Δ : transpose(Δ))
 _symmetric_back(Δ::LowerTriangular, uplo) = collect(uplo == 'U' ? transpose(Δ) : Δ)
 
@@ -396,7 +397,8 @@ _symmetric_back(Δ::LowerTriangular, uplo) = collect(uplo == 'U' ? transpose(Δ)
   return S, back
 end
 
-_makelike(dx, x::Symmetric) = Symmetric(_symmetric_back(dx, x.uplo), Symbol(x.uplo))
+_zero(x::Symmetric{<:Number}, T=float(eltype(x))) = _zero(parent(x), T)
+_wrap(dx, x::Symmetric) = Symmetric(_symmetric_back(dx, x.uplo), Symbol(x.uplo))
 
 _extract_imag(x) = (x->complex(0, imag(x))).(x)
 function _hermitian_back(Δ, uplo)
@@ -405,6 +407,7 @@ function _hermitian_back(Δ, uplo)
   return uplo == 'U' ? U .+ L' - rD : L .+ U' - rD
 end
 _hermitian_back(Δ::Diagonal, uplo) = real.(Δ)
+_hermitian_back(Δ::Hermitian, uplo) = collect(uplo == 'U' ? UpperTriangular(Δ) : LowerTriangular(Δ))
 function _hermitian_back(Δ::LinearAlgebra.AbstractTriangular, uplo)
   isreal(Δ) && return _symmetric_back(Δ, uplo)
   ŪL̄ = Δ .- Diagonal(_extract_imag(diag(Δ)))
@@ -422,7 +425,8 @@ end
   return H, back
 end
 
-_makelike(dx, x::Hermitian) = Hermitian(_hermitian_back(dx, x.uplo), Symbol(x.uplo))
+_zero(x::Hermitian{<:Number}, T=float(eltype(x))) = _zero(parent(x), T)
+_wrap(dx, x::Hermitian) = Hermitian(_hermitian_back(dx, x.uplo), Symbol(x.uplo))
 
 @adjoint convert(::Type{R}, A::LinearAlgebra.HermOrSym{T,S}) where {T,S,R<:Array} = convert(R, A),
   Δ -> (nothing, convert(S, Δ),)
