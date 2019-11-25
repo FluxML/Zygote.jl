@@ -12,7 +12,7 @@ accum(x, y) =
 
 accum(x, y, zs...) = accum(accum(x, y), zs...)
 
-accum(x::Tuple, y::Tuple) = accum.(x, y)
+accum(x::Union{Tuple,AbstractVector}, y::Union{Tuple,AbstractVector}) = accum.(x, y)
 accum(x::AbstractArray, y::AbstractArray) = accum.(x, y)
 
 @generated function accum(x::NamedTuple, y::NamedTuple)
