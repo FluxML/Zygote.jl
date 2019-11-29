@@ -1001,6 +1001,7 @@ end
     @test gradtest(StatsFuns.logsumexp, randn(rng, 1, 1))
     @test gradtest(StatsFuns.logsumexp, randn(rng, 3))
     @test gradtest(StatsFuns.logsumexp, randn(rng, 3, 4, 5))
+    @test gradtest(x -> sum(StatsFuns.logsumexp(x; dims=1)), randn(rng, 4, 4))
   end
 end
 
