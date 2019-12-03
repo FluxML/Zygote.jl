@@ -485,7 +485,8 @@ end
   X = _pairdiffquotmat(exp, n, w, ew, ew, ew)
   V = E.vectors
   VF = factorize(V)
-  Ā = (V * ((VF \ F̄' * V) .* X) / VF)'
+  Āc = (V * ((VF \ F̄' * V) .* X) / VF)'
+  Ā = eltype(A) <: Real ? real(Āc) : Āc
   return (Ā,)
 end
 
