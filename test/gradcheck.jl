@@ -565,19 +565,12 @@ end
         end
       end
     end
-  end
-
-  @testset "real-valued"
     A = [ 0.0    1.0    0.0
           0.0    0.0    1.0
-         -4.34 -18.31  -0.43]
-    _,B = Zygote.pullback(exp,A)
-    Ȳ = rand(MersenneTwister(347392),3,3)
-    @test isreal(B(Ȳ)[1])
-    # Works when `exp` adjoint returns a real-valued array
-    x = [1.0]
-    f(A,x) = exp(A*x[1])
-    @test gradtest(f,A,x)
+          -4.34 -18.31  -0.43]
+    _,back = Zygote.pullback(exp,A)
+    Ȳ = rand(3,3)
+    @test isreal(back(Ȳ)[1])
   end
 end
 
