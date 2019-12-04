@@ -34,3 +34,36 @@ tasks4(x) = fetch(@async x^2)
 VERSION > v"1.3-" && include("threads.jl")
 
 @test Zygote.pullback(Array, [1f0])[1] == [1f0]
+
+@testset "Dicts" begin
+
+  d = Dict()
+  x = [5.0]
+  f = () -> get!(() -> sum(x .* x), d, x)
+
+  grads = gradient(f, Params((x,)))
+  @test d == Dict(x => 25)
+  @test grads[d] == Dict()
+  @test grads[x] == [10]
+
+  # This time it is already in the dict
+  grads = gradient(f, Params((x,)))
+  @test d == Dict(x => 25)
+  @test grads[d] == Dict(x => 1) # Not sure why tbh...
+  @test grads[x] == nothing
+
+  # Test (non-mutating) get. Same result as get! when x is in d
+  f = () -> get(() -> sum(x .* x), d, x)
+
+  grads = gradient(f, Params((x,)))
+  @test d == Dict(x => 25)
+  @test grads[d] == Dict(x => 1) # Not sure why tbh...
+  @test grads[x] == nothing
+
+  delete!(d, x)
+
+  grads = gradient(f, Params((x,)))
+  @test d == Dict() # Nothing added with get
+  @test d ∉ keys(grads.grads)
+  @test grads[x] == [10]
+end
