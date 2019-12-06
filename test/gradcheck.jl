@@ -125,6 +125,16 @@ end
   @test gradtest(x->fill(first(x), N, M, P), randn(rng, 1))
 end
 
+@testset "circshift" begin
+  L = 5
+  for D ∈ 1:5, reps ∈ 1:5 
+    x0 = zeros(ntuple(d->L, D))
+    g = gradient(x -> x[1], x0)[1] #Zero shift gradient
+    shift = ntuple(_ -> rand(-L:L), D) #Random shift
+    @test gradient(x -> circshift(x, shift)[1], x0)[1] == circshift(g, map(-, shift))
+  end
+end
+
 @testset "dot" begin
   rng = MersenneTwister(123456)
   @test gradtest((x, y)->dot(x[1], y[1]), [randn(rng)], [randn(rng)])
