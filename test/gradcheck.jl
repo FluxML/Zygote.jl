@@ -97,14 +97,6 @@ Random.seed!(0)
   # https://github.com/FluxML/Zygote.jl/issues/376
   _, back = Zygote._pullback(x->x[1]*im, randn(2))
   @test back(1.0)[2] == [-im, 0]
-
-  # https://github.com/FluxML/Zygote.jl/issues/402
-  @test gradient(x -> x[1,1] + 10x[1,2], Diagonal(ones(2)))[1] == Diagonal([1.0, 0.0])
-  @test gradient(x -> x[1,1], Diagonal(ones(2)))[1] isa Diagonal
-
-  @test gradient(x -> x[1,1] + 10x[1,2] + 100x[2,1], Symmetric(ones(2,2)))[1] == Symmetric([1 110; 0 0])
-  @test gradient(x -> x[1,1] + 10x[1,2] + 100x[2,1], UpperTriangular(ones(2,2)))[1] == [1 10; 0 0]
-  @test gradient(x -> x[1,1] + 10x[1,2] + 100x[2,1], LowerTriangular(ones(2,2)))[1] == [1 0; 100 0]
 end
 
 @testset "view" begin
