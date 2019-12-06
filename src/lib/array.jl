@@ -56,6 +56,10 @@ end
 
 @adjoint fill(x::Real, dims...) = fill(x, dims...), Δ->(sum(Δ), map(_->nothing, dims)...)
 
+@adjoint function circshift(A, shifts)
+  circshift(A, shifts), Δ -> (circshift(Δ, map(-, shifts)), nothing)
+end
+
 @adjoint permutedims(xs) = permutedims(xs), Δ -> (permutedims(Δ),)
 
 @adjoint permutedims(xs::AbstractVector) = permutedims(xs), Δ -> (vec(permutedims(Δ)),)
