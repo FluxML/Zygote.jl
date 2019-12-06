@@ -30,7 +30,7 @@ _zero(xs::AbstractArray, T=Any) = Union{Nothing, T}[nothing for x in xs]
 @adjoint view(x::AbstractArray, inds...) = view(x, inds...), ∇getindex(x, inds)
 
 ∇getindex(x::AbstractArray, inds) = dy -> begin
-  if inds isa  NTuple{<:Any, Integer}
+  if inds isa  NTuple{<:Any,Integer}
     dx = _zero(x, typeof(dy))
     dx[inds...] = dy
   else
