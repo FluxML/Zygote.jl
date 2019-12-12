@@ -47,10 +47,9 @@ reshape_scalar(x, y) = reshape(y, size(x))
 reshape_scalar(x::Real, y) = y[]
 
 """
-    forwarddiff(f, x) -> f(x)
     forwarddiff(f, xs...) -> f(xs...)
 
-Runs `f(x)` as usual, but instructs Zygote to differentiate `f` using pullback
+Runs `f(xs...)` as usual, but instructs Zygote to differentiate `f` using forward
 mode, rather than the usual reverse mode.
 
 Forward mode takes time linear in `length(x)` but only has constant memory
@@ -68,35 +67,26 @@ julia> function pow(x, n)
 pow (generic function with 1 method)
 
 julia> gradient(5) do x
-         forwarddiff(x) do x
-           pow(x, 2)
-         end
+         forwarddiff(x -> pow(x, 2), x)
        end
 (10,)
 ```
 
-Note that the function `f` will *drop gradients* for any closed-over values.
+Note that the function `f` will *drop gradients* for any closed-over values,
+such as `b` in the first example here:
 
 ```julia
 julia> gradient(2, 3) do a, b
-         forwarddiff(a) do a
-           a*b
-         end
+         forwarddiff(a -> a*b, a)
        end
 (3, nothing)
-```
 
-This can be rewritten by explicitly passing through `b`, i.e.
-
-```julia
-gradient(2, 3) do a, b
-  forwarddiff([a, b]) do (a, b)
-    a*b
-  end
-end
+julia> gradient(2, 3) do a, b
+         forwarddiff((a, b) -> a*b, a, b)
+       end
+(3, 2)
 ```
 """
-forwarddiff(f, x) = f(x)
 forwarddiff(f, xs...) = f(xs...)
 
 @adjoint function forwarddiff(f, x)
