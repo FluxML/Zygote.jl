@@ -22,16 +22,22 @@ using Base.Broadcast: broadcasted, broadcast_shape
 @adjoint (::Type{T})(sz) where {T<:Zeros} = Zeros(sz), Δ->(nothing,)
 @adjoint (::Type{T})(sz) where {T<:Ones} = Ones(sz), Δ->(nothing,)
 
-_zero(xs::AbstractArray{<:Integer}) = fill!(similar(xs, float(eltype(xs))), false)
-_zero(xs::AbstractArray{<:Number}) = zero(xs)
-_zero(xs::AbstractArray) = Any[nothing for x in xs]
+_zero(xs::AbstractArray{<:Number}, T=float(eltype(xs))) = fill!(similar(xs, T), false)
+_zero(xs::AbstractArray, T=Any) = Union{Nothing, T}[nothing for x in xs]
 
-@adjoint function getindex(xs::AbstractArray, i...)
-  xs[i...], function (Δ)
-    Δ′ = _zero(xs)
-    Δ′[i...] = Δ
-    (Δ′, map(_ -> nothing, i)...)
+@adjoint getindex(x::AbstractArray, inds...) = x[inds...], ∇getindex(x, inds)
+
+@adjoint view(x::AbstractArray, inds...) = view(x, inds...), ∇getindex(x, inds)
+
+∇getindex(x::AbstractArray, inds) = dy -> begin
+  if inds isa  NTuple{<:Any,Integer}
+    dx = _zero(x, typeof(dy))
+    dx[inds...] = dy
+  else
+    dx = _zero(x, eltype(dy))
+    @views dx[inds...] .+= dy
   end
+  (dx, map(_->nothing, inds)...)
 end
 
 @adjoint! setindex!(xs::AbstractArray, x...) = setindex!(xs, x...),
@@ -42,19 +48,15 @@ for f in [push!, pop!, pushfirst!, popfirst!]
     push!(xs, x...), _ -> error("Mutating arrays is not supported")
 end
 
-@adjoint function view(x::AbstractArray, inds...; kw...)
-  view(x, inds...; kw...), dy -> begin
-    dx = _zero(x)
-    copyto!(view(dx, inds...; kw...), dy)
-    (dx, map(_->nothing, inds)...)
-  end
-end
-
 # General
 
 @adjoint collect(x::Array) = collect(x), Δ -> (Δ,)
 
 @adjoint fill(x::Real, dims...) = fill(x, dims...), Δ->(sum(Δ), map(_->nothing, dims)...)
+
+@adjoint function circshift(A, shifts)
+  circshift(A, shifts), Δ -> (circshift(Δ, map(-, shifts)), nothing)
+end
 
 @adjoint permutedims(xs) = permutedims(xs), Δ -> (permutedims(Δ),)
 
