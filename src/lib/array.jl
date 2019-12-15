@@ -486,7 +486,7 @@ end
   V = E.vectors
   VF = factorize(V)
   Āc = (V * ((VF \ F̄' * V) .* X) / VF)'
-  Ā = eltype(A) <: Real && eltype(F̄) <: Real ? real(Āc) : Āc
+  Ā = isreal(A) && isreal(F̄) ? real(Āc) : Āc
   return (Ā,)
 end
 
