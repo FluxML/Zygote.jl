@@ -10,7 +10,7 @@ end
     return y, Δ -> (Δ * y * (1 - y),)
 end
 
-@adjoint softmax(xs) = softmax(xs), Δ -> (∇softmax(Δ, xs),)
+@adjoint softmax(xs; dims=1) = softmax(xs, dims=dims), Δ -> (∇softmax(Δ, xs, dims=dims),)
 
 @adjoint logsoftmax(xs) = logsoftmax(xs), Δ -> (∇logsoftmax(Δ, xs),)
 
