@@ -19,4 +19,8 @@ end
 gradient(pow, 2, 3)
 gradient((x, y) -> sum(x.*y), [1, 2, 3], [4, 5, 6])
 
-gradient(x -> sum(Float32.(x)), [1.0])
+try
+    gradient(x -> sum(Float32.(x)), [1.0])
+catch ex
+    @error("Caught exception", exception=(ex, catch_backtrace()))
+end
