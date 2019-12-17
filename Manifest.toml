@@ -138,9 +138,9 @@ uuid = "a63ad114-7e13-5084-954f-fe012c677804"
 
 [[NNlib]]
 deps = ["BinaryProvider", "Libdl", "LinearAlgebra", "Requires", "Statistics"]
-git-tree-sha1 = "fe5de1375620c3b5e04bdfc3dee5199cbefb2c0c"
-repo-rev = "master"
-repo-url = "https://github.com/FluxML/NNlib.jl.git"
+git-tree-sha1 = "268b0f3ac84fed014d15fb23a882c50b53c584ac"
+repo-rev = "tanhevg/logsoftmax-grad-dims"
+repo-url = "https://github.com/tanhevg/NNlib.jl.git"
 uuid = "872c559c-99b0-510c-b3b7-b6c96a88d5cd"
 version = "0.6.0"
 
