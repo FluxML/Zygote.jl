@@ -521,6 +521,8 @@ end
 @testset "lyap" begin
   n = 5
   @test gradtest(lyap, (n,n), (n,n))
+  C = rand(n,n)
+  @test gradtest(A->Diagonal(lyap(A,C))[1,1],(n,n)) # pull request 407
   @test gradcheck(x->lyap(x[1],x[2]),[3.1,4.6])
 end
 

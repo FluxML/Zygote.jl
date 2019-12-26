@@ -447,10 +447,10 @@ end
   end
 end
 
-Zygote.@adjoint function lyap(A::T, C::T) where {T<:AbstractMatrix}
+Zygote.@adjoint function lyap(A::StridedArray, C::StridedArray)
   X = lyap(A, C)
-  return X, function (X̄)
-    C̄ = lyap(collect(A'), convert(T,X̄))
+  return X, function (X̄::AbstractArray{T}) where {T}
+    C̄ = lyap(Matrix{T}(A'), Matrix{T}(X̄))
     Ā = C̄*X' + C̄'*X
     return (Ā, C̄)
   end
