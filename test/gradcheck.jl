@@ -388,6 +388,18 @@ end
   @test gradtest((U, Y) -> Y' / UpperTriangular(U), U, Y)
   @test gradtest((U, Y) -> Y' / UpperTriangular(U), U, y)
 
+  # / (UnitLowerTriangular)
+  @test gradtest((L, Y) -> Y' / L, L, Y)
+  @test gradtest((L, Y) -> Y' / L, L, y)
+  @test gradtest((L, Y) -> Y' / UnitLowerTriangular(L), L, Y)
+  @test gradtest((L, Y) -> Y' / UnitLowerTriangular(L), L, y)
+
+  # / (UnitUpperTriangular)
+  @test gradtest((U, Y) -> Y' / U, U, Y)
+  @test gradtest((U, Y) -> Y' / U, U, y)
+  @test gradtest((U, Y) -> Y' / UnitUpperTriangular(U), U, Y)
+  @test gradtest((U, Y) -> Y' / UnitUpperTriangular(U), U, y)
+
   @testset "Cholesky" begin
 
     # Check that the forwards pass computes the correct thing.
