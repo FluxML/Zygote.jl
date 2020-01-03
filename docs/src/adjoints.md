@@ -99,7 +99,7 @@ dist(p::Point) = sqrt(width(p)^2 + height(p)^2)
 
 ```julia
 julia> gradient(a -> dist(a), Point(1, 2))[1]
-(x = 0.5547001962252291, y = 0.8320502943378437)
+(x = 0.4472135954999579, y = 0.8944271909999159)
 ```
 
 Fundamentally, this happens because of Zygote's default adjoint for `getfield`.
