@@ -1116,6 +1116,8 @@ end
   @test gradcheck(x->sum(Fill(x[], (2, 2))), [0.1])
   @test first(Zygote.gradient(sz->sum(Ones(sz)), 6)) === nothing
   @test first(Zygote.gradient(sz->sum(Zeros(sz)), 6)) === nothing
+  @test gradcheck(x->Fill(x[], 5).value, [0.1])
+  @test gradcheck(x->FillArrays.getindex_value(Fill(x[], 5)), [0.1])
 end
 
 @testset "AbstractArray Addition / Subtraction / Negation" begin
