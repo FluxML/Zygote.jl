@@ -1110,6 +1110,13 @@ using Zygote: Buffer
     b .= xs .* 2
     return sum(copy(b))
   end == ([2,2,2],)
+
+  @test gradient(2) do x
+    b = Zygote.Buffer([])
+    push!(b, x)
+    push!(b, 3)
+    prod(copy(b))
+  end == (3,)
 end
 
 @testset "FillArrays" begin
