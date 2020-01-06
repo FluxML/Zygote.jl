@@ -56,6 +56,11 @@ function Base.copyto!(b::Buffer, data)
   copyto!(b.data, data)
 end
 
+function Base.push!(b::Buffer, data)
+  b.freeze && error("Buffer is frozen")
+  push!(b.data, data)
+end
+
 function Base.copy(b::Buffer)
   b.freeze = true
   return b.data
@@ -96,6 +101,13 @@ end
     x̄s = copy(grad)
     grad .= eltype(grad) <: Number ? 0 : nothing
     return (nothing, x̄s)
+  end
+end
+
+@adjoint! function push!(b::Buffer, x)
+  push!(b, x), function (y)
+    grad = grad_mut(__context__, b)
+    return (nothing, pop!(grad))
   end
 end
 
