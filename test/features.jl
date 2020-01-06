@@ -65,6 +65,18 @@ end
 
 @test gradient(pow_mut, 2, 3) == (12,nothing)
 
+r = 1
+function pow_global(x, n)
+  global r
+  while n > 0
+    r *= x
+    n -= 1
+  end
+  return r
+end
+
+@test gradient(pow_global, 2, 3) == (12,nothing)
+
 @test gradient(x -> 1, 2) == (nothing,)
 
 @test gradient(t -> t[1]*t[2], (2, 3)) == ((3, 2),)
