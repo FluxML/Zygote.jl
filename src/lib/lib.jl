@@ -68,6 +68,20 @@ unwrap(ref, x) = x
   accum_param(__context__, x, x̄)
 end
 
+function global_set(ref, val)
+  ccall(:jl_set_global, Cvoid, (Any, Any, Any),
+        ref.mod, ref.name, val)
+end
+
+@adjoint! function global_set(ref, x)
+  global_set(ref, x), function (x̄)
+    gs = globals(__context__)
+    x̄ = accum(get(gs, ref, nothing), x̄)
+    gs[ref] = nothing
+    return (nothing, x̄)
+  end
+end
+
 # Tuples
 
 using Base: tail
