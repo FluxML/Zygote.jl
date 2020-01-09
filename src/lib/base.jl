@@ -104,3 +104,6 @@ end
 # Make @sync work
 # Safe as long as other kinds of mutation are disallowed
 @adjoint push!(refs::Vector{Any}, t::Task) = push!(refs, t), _ -> nothing
+
+# named tuple
+@adjoint pairs(t::NamedTuple) = pairs(t), _ -> nothing
