@@ -107,11 +107,11 @@ end
 
 # named tuple
 @adjoint function pairs(t::NamedTuple{N}) where N
-    fun = function pairs_namedtuple(Δ)
+    function pairs_namedtuple(Δ)
         t0 = map(zero, t)
         idx, Δ = first(Δ)
         t0 = NamedTuple{N}(Base.setindex((t0...,), Δ, idx))
         return (t0,)
     end
-    return pairs(t), fun
+    return pairs(t), pairs_namedtuple
 end
