@@ -159,6 +159,16 @@ unapply(t, xs) = _unapply(t, xs)[1]
   end
 end
 
+@adjoint! function Core._apply_iterate(::typeof(iterate), f, args...)
+  y, back = Core._apply(_pullback, (__context__, f), args...)
+  st = map(_empty, args)
+  y, function (Δ)
+    Δ = back(Δ)
+    Δ === nothing ? nothing :
+      (nothing, first(Δ), unapply(st, Base.tail(Δ))...)
+  end
+end
+
 # Structs
 
 deref!(x) = x
