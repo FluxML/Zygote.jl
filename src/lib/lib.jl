@@ -5,10 +5,10 @@ using Base: RefValue
 accum() = nothing
 accum(x) = x
 
-accum(x, y) = x + y
-accum(::Nothing, y) = y
-accum(x, ::Nothing) = y
-accum(::Nothing, ::Nothing) = nothing
+accum(x, y) = 
+  x === nothing ? y :
+  y === nothing ? x :
+  x + y
 
 accum(x, y, zs...) = accum(accum(x, y), zs...)
 
