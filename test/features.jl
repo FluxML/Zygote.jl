@@ -336,3 +336,8 @@ function type_test()
 end
 
 @test pullback(type_test)[1] == Complex{<:Real}
+
+@testset "pairs of named tuple" begin
+    @test (x->10*pairs((a=x, b=2))[1])'(100) === 10
+    @test (x->10*pairs((a=x, b=2))[2])'(100) === 0
+end

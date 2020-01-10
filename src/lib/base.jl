@@ -106,4 +106,12 @@ end
 @adjoint push!(refs::Vector{Any}, t::Task) = push!(refs, t), _ -> nothing
 
 # named tuple
-@adjoint pairs(t::NamedTuple) = pairs(t), _ -> nothing
+@adjoint function pairs(t::NamedTuple{N}) where N
+    fun = function pairs_namedtuple(Δ)
+        t0 = map(zero, t)
+        idx, Δ = first(Δ)
+        t0 = NamedTuple{N}(Base.setindex((t0...,), Δ, idx))
+        return (t0,)
+    end
+    return pairs(t), fun
+end
