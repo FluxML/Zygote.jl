@@ -5,7 +5,7 @@ using Base: RefValue
 accum() = nothing
 accum(x) = x
 
-accum(x, y) = 
+accum(x, y) =
   x === nothing ? y :
   y === nothing ? x :
   x + y
