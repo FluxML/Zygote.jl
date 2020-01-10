@@ -115,3 +115,11 @@ end
     end
     return pairs(t), pairs_namedtuple
 end
+
+@adjoint function Base.getfield(p::Pair, i::Int)
+    function pair_getfield(Δ)
+        f, s = i == 1 ? (Δ, zero(p[2])) : (zero(p[1]), Δ)
+        return (first=f, second=s), nothing
+    end
+    return getfield(p, i), pair_getfield
+end

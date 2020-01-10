@@ -337,9 +337,12 @@ end
 
 @test pullback(type_test)[1] == Complex{<:Real}
 
-@testset "pairs of named tuple" begin
+@testset "Pairs" begin
     @test (x->10*pairs((a=x, b=2))[1])'(100) === 10
     @test (x->10*pairs((a=x, b=2))[2])'(100) === 0
     foo(;kw...) = 1
     @test gradient(() -> foo(a=1,b=2.0)) === ()
+
+    @test (x->10*(x => 2)[1])'(100) === 10
+    @test (x->10*(x => 2)[2])'(100) === 0
 end
