@@ -18,7 +18,12 @@ using Base.Broadcast: broadcasted, broadcast_shape
 
 # Array Constructors
 @adjoint (::Type{T})(x::T) where T<:Array = T(x), ȳ -> (ȳ,)
-@adjoint (::Type{T})(x::Number, sz) where {T <: Fill} = Fill(x, sz), Δ -> (sum(Δ), nothing)
+@adjoint function (::Type{T})(x::Number, sz) where {T <: Fill}
+    back(Δ::AbstractArray) = (sum(Δ), nothing)
+    back(Δ::NamedTuple) = (Δ.value, nothing)
+    return Fill(x, sz), back
+end
+
 @adjoint (::Type{T})(sz) where {T<:Zeros} = Zeros(sz), Δ->(nothing,)
 @adjoint (::Type{T})(sz) where {T<:Ones} = Ones(sz), Δ->(nothing,)
 
