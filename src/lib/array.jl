@@ -188,7 +188,7 @@ function _pullback(cx::AContext, ::typeof(prod), f, xs::AbstractArray)
   y, ȳ -> (nothing, nothing, back(ȳ)...)
 end
 
-@adjoint function maximum(xs; dims = :)
+@adjoint function maximum(xs::AbstractArray; dims = :)
   max, i = findmax(xs, dims = dims)
   max, function (Δ)
     Δ isa Real && abs(Δ) <= sqrt(eps(float(Δ))) && return nothing
@@ -198,7 +198,7 @@ end
   end
 end
 
-@adjoint function minimum(xs; dims = :)
+@adjoint function minimum(xs::AbstractArray; dims = :)
   min, i = findmin(xs, dims = dims)
   min, function (Δ)
     Δ′ = zero(xs)
