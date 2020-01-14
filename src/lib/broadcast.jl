@@ -187,4 +187,8 @@ end
     sum(xs, dims = dims), Δ -> (placeholder .= Δ,)
   end
 
+  @adjoint function Base.convert(::Type{T}, xs::Array)  where {T<:CuArrays.CuArray}
+    Base.convert(T, xs), Δ -> (nothing, Base.convert(Array, Δ),)
+  end
+
 end

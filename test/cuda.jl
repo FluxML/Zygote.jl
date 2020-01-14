@@ -1,4 +1,11 @@
 using CuArrays
+
+# Test GPU movement inside the call to `gradient`
+@testset "GPU movement" begin
+  r = rand(Float32, 3,3)
+  @test gradient(x -> sum(cu(x)), r)[1] isa AbstractArray
+end
+
 @testset "basic bcasting" begin
   a = cu(collect(1:9))
   v(x, n) = x .^ n
