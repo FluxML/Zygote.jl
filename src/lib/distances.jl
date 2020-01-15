@@ -1,11 +1,12 @@
 using .Distances
 
-@adjoint function sqeuclidean(x::AbstractVector, y::AbstractVector)
+@adjoint function (::SqEuclidean)(x::AbstractVector, y::AbstractVector)
   δ = x .- y
-  return sum(abs2, δ), function(Δ::Real)
+  function sqeuclidean(Δ::Real)
     x̄ = (2 * Δ) .* δ
     return x̄, -x̄
   end
+  return sum(abs2, δ), sqeuclidean
 end
 
 @adjoint function colwise(s::SqEuclidean, x::AbstractMatrix, y::AbstractMatrix)
