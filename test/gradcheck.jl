@@ -6,7 +6,7 @@ using FiniteDifferences: FiniteDifferences
 
 function ngradient(f, xs::AbstractArray...)
     fdm = FiniteDifferences.central_fdm(5,1)
-    return FiniteDifferences.grad(fdm, xs...)
+    return FiniteDifferences.grad(fdm, f, xs...)
 end
 
 gradcheck(f, xs...) =
@@ -14,7 +14,10 @@ gradcheck(f, xs...) =
                 gradient(f, xs...), rtol = 1e-5, atol = 1e-5))
 
 gradtest(f, xs::AbstractArray...) = gradcheck((xs...) -> sum(sin.(f(xs...))), xs...)
-gradtest(f, dims...) = gradtest(f, rand.(Float64, dims)...)
+# We generate random matrix with elements between 0.2 and -.7 so we are not close to any
+# nondefined areas for common functions
+rand27(args...) = 0.2 .+ 0.5.*rand(args...)
+gradtest(f, dims...) = gradtest(f, rand27.(Float64, dims)...)
 
 # utilities for using gradcheck with complex matrices
 _splitreim(A) = (real(A),)
@@ -68,7 +71,7 @@ Random.seed!(0)
 @test gradtest(x -> x', rand(5))
 
 @test gradtest(det, (4, 4))
-@test gradtest(logdet, map(x -> x*x', (rand(4, 4),))[1])
+@test gradtest(logdet, map(x -> x*x', (rand27(4, 4),))[1])
 @test gradtest(x -> logabsdet(x)[1], (4, 4))
 
 @testset "getindex" begin
