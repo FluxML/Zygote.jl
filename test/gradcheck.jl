@@ -111,26 +111,22 @@ end
   @test gradient(g, ones(3)) == ([1,0,0],)
 end
 
-@testset "conv" begin
-  for spatial_rank in (1, 2, 3)
-    x = rand(repeat([10], spatial_rank)..., 3, 2)
-    w = rand(repeat([3], spatial_rank)..., 3, 3)
-    cdims = DenseConvDims(x, w)
-    @test gradtest((x, w) -> conv(x, w, cdims), x, w)
-    y = conv(x, w, cdims)
-    @test gradtest((y, w) -> ∇conv_data(y, w, cdims), y, w)
-    dcdims = DepthwiseConvDims(x, w)
-    @test gradtest((x, w) -> depthwiseconv(x, w, dcdims), x, w)
-  end
+@testset "conv: spatial_rank=$spatial_rank" for spatial_rank in (1, 2, 3)
+  x = rand(repeat([10], spatial_rank)..., 3, 2)
+  w = rand(repeat([3], spatial_rank)..., 3, 3)
+  cdims = DenseConvDims(x, w)
+  @test gradtest((x, w) -> conv(x, w, cdims), x, w)
+  y = conv(x, w, cdims)
+  @test gradtest((y, w) -> ∇conv_data(y, w, cdims), y, w)
+  dcdims = DepthwiseConvDims(x, w)
+  @test gradtest((x, w) -> depthwiseconv(x, w, dcdims), x, w)
 end
 
-@testset "pooling" begin
-  for spatial_rank in (1, 2)
-    x = rand(repeat([10], spatial_rank)..., 3, 2)
-    pdims = PoolDims(x, 2)
-    @test gradtest(x -> maxpool(x, pdims), x)
-    @test gradtest(x -> meanpool(x, pdims), x)
-  end
+@testset "pooling: spatial_rank=$spatial_rank" for spatial_rank in (1, 2)
+  x = rand(repeat([10], spatial_rank)..., 3, 2)
+  pdims = PoolDims(x, 2)
+  @test gradtest(x -> maxpool(x, pdims), x)
+  @test gradtest(x -> meanpool(x, pdims), x)
 end
 
 @test gradtest(x -> permutedims(x), rand(2))
