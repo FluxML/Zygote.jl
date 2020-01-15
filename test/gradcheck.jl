@@ -613,6 +613,12 @@ end
         end
       end
     end
+    A = [ 0.0    1.0    0.0
+          0.0    0.0    1.0
+          -4.34 -18.31  -0.43]
+    _,back = Zygote.pullback(exp,A)
+    Ȳ = rand(3,3)
+    @test isreal(back(Ȳ)[1])
   end
 end
 
