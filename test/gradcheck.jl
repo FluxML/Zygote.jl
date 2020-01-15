@@ -2,20 +2,11 @@ using Zygote, NNlib, Test, Random, LinearAlgebra, Statistics, FillArrays, FFTW
 using Zygote: gradient
 using NNlib: conv, ∇conv_data, depthwiseconv
 using Base.Broadcast: broadcast_shape
+using FiniteDifferences: FiniteDifferences
 
 function ngradient(f, xs::AbstractArray...)
-  grads = zero.(xs)
-  for (x, Δ) in zip(xs, grads), i in 1:length(x)
-    δ = sqrt(eps())
-    tmp = x[i]
-    x[i] = tmp - δ/2
-    y1 = f(xs...)
-    x[i] = tmp + δ/2
-    y2 = f(xs...)
-    x[i] = tmp
-    Δ[i] = (y2-y1)/δ
-  end
-  return grads
+    fdm = FiniteDifferences.central_fdm(5,1)
+    return FiniteDifferences.grad(fdm, xs...)
 end
 
 gradcheck(f, xs...) =
