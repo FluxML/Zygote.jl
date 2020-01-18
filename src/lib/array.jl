@@ -700,6 +700,9 @@ end
   end
 end
 
+@adjoint function Matrix(::UniformScaling, i::Integer, j::Integer)
+  return Matrix(I, i, j), Δ -> (nothing, nothing, nothing)
+end
 @adjoint function Matrix{T}(::UniformScaling, i::Integer, j::Integer) where {T}
   return Matrix{T}(I, i, j), Δ -> (nothing, nothing, nothing)
 end
