@@ -703,8 +703,14 @@ end
 @adjoint function Matrix(::UniformScaling, i::Integer, j::Integer)
   return Matrix(I, i, j), Δ -> (nothing, nothing, nothing)
 end
+@adjoint function Matrix(::UniformScaling, ij::NTuple{2, Integer})
+  return Matrix(I, ij), Δ -> (nothing, nothing)
+end
 @adjoint function Matrix{T}(::UniformScaling, i::Integer, j::Integer) where {T}
   return Matrix{T}(I, i, j), Δ -> (nothing, nothing, nothing)
+end
+@adjoint function Matrix{T}(::UniformScaling, ij::NTuple{2, Integer}) where {T}
+  return Matrix{T}(I, ij), Δ -> (nothing, nothing)
 end
 @adjoint function +(A::AbstractMatrix, S::UniformScaling)
   return A + S, Δ->(Δ, (λ=sum(view(Δ, diagind(Δ))),))

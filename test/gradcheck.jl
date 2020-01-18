@@ -1228,5 +1228,7 @@ end
 
 @testset "UniformScaling to Matrix" begin
   @test gradient(x -> (Matrix(I, 2, 2); 1.0), [1.0]) == (nothing,)
+  @test gradient(x -> (Matrix(I, (2, 2)); 1.0), [1.0]) == (nothing,)
   @test gradient(x -> (Matrix{Float64}(I, 2, 2); 1.0), [1.0]) == (nothing,)
+  @test gradient(x -> (Matrix{Float64}(I, (2, 2)); 1.0), [1.0]) == (nothing,)
 end
