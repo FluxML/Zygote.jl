@@ -55,8 +55,20 @@ Base.adjoint(f::Function) = x -> gradient(f, x)[1]
 struct Params
   order::Vector{Any}
   params::IdSet{Any}
-  Params() = new([], IdSet())
+  function Params(xs)
+    order = Buffer([])
+    params = IdSet()
+    for x in xs
+      if !(x in params)
+        push!(order, x)
+        push!(params, x)
+      end
+    end
+    return new(copy(order), params)
+  end
 end
+
+Params() = Params(())
 
 @forward Params.order Base.iterate, Base.length
 
@@ -69,8 +81,6 @@ function Base.push!(ps::Params, x)
 end
 
 Base.push!(ps::Params, x...) = (foreach(x -> push!(ps, x), x); ps)
-
-Params(xs) = push!(Params(), xs...)
 
 function Base.show(io::IO, ps::Params)
   print(io, "Params([")
