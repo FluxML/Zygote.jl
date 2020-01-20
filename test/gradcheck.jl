@@ -157,7 +157,7 @@ end
 
 @testset "circshift" begin
   L = 5
-  for D ∈ 1:5, reps ∈ 1:5 
+  for D ∈ 1:5, reps ∈ 1:5
     x0 = zeros(ntuple(d->L, D))
     g = gradient(x -> x[1], x0)[1] #Zero shift gradient
     shift = ntuple(_ -> rand(-L:L), D) #Random shift
@@ -187,6 +187,10 @@ end
   end
   @test gradtest(foo, 3)
   @test gradient(v -> sum([x for x in v]), [1.1,2.2,3.3]) == ([1, 1, 1],)
+end
+
+@testset "sort" begin
+  @test gradtest(sort, 5)
 end
 
 @testset "mean" begin
