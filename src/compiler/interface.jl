@@ -53,9 +53,9 @@ Base.adjoint(f::Function) = x -> gradient(f, x)[1]
 
 # TODO store ids only
 struct Params
-  order::Vector{Any}
+  order::Buffer{Any, Vector{Any}}
   params::IdSet{Any}
-  Params() = new([], IdSet())
+  Params() = new(Buffer([], false), IdSet())
 end
 
 @forward Params.order Base.iterate, Base.length
