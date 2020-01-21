@@ -68,6 +68,15 @@ end
 
 @forward Buffer.data Base.eltype, Base.length, Base.ndims, Base.size, Base.axes, Base.eachindex, Base.stride, Base.strides
 
+Base.IteratorSize(::Type{<:Buffer{<:Any, A}}) where {A} = Base.IteratorSize(A)
+
+# Buffer iteration mirrors iteration for AbstractArray
+function Base.iterate(b::Buffer, state=(eachindex(b),))
+  y = iterate(state...)
+  y === nothing && return nothing
+  b[y[1]], (state[1], tail(y)...)
+end
+
 grad_mut(b::Buffer) = fill!(similar(b.data, Any), nothing)
 grad_mut(b::Buffer{T}) where T<:Number = fill!(similar(b.data, float(T)), 0)
 
