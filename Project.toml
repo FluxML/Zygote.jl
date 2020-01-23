@@ -6,7 +6,6 @@ version = "0.4.6"
 DiffRules = "b552c78f-8df3-52c6-915a-8e097449b14b"
 FFTW = "7a1cc6ca-52ef-59f5-83cd-3a7055c09341"
 FillArrays = "1a297f60-69ca-5386-bcde-b61e274b549b"
-FiniteDifferences = "26cc04aa-876d-5657-8c51-4c34ba976000"
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 IRTools = "7869d1d1-7146-5819-86e3-90919afe41df"
 InteractiveUtils = "b77e0a4c-d291-57a0-90e8-8db25a27a240"
@@ -39,8 +38,9 @@ julia = "1"
 CUDAapi = "3895d2a7-ec45-59b8-82bb-cfc6a382f9b3"
 CuArrays = "3a865a2d-5b23-5a0f-bc46-62713ec82fae"
 Distances = "b4f34e82-e78d-54a5-968a-f98e89d6e8f7"
+FiniteDifferences = "26cc04aa-876d-5657-8c51-4c34ba976000"
 StatsFuns = "4c63d2b9-4356-54db-8cca-17b64c39e42c"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["Test", "Distances", "StatsFuns", "CUDAapi", "CuArrays"]
+test = ["CUDAapi", "CuArrays", "Distances", "FiniteDifferences", "StatsFuns", "Test"]
