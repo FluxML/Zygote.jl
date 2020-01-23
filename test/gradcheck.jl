@@ -35,11 +35,13 @@ function gradcheck(f, xs...; kwargs...)
     correct = isapprox(fin_grad, ad_grad, rtol = 1e-5, atol = 1e-5)
     if !correct
       all_correct = false
-      @debug "gradcheck failed" f nth_partial=ii fin_grad ad_grad
+      # need to stringify arrays so they show content, rather than just type and size
+      @debug "gradcheck failed" f nth_partial=ii fin_grad="$fin_grad" ad_grad="$ad_grad"
     end
   end
   return all_correct
 end
+
 
 gradtest(f, xs::AbstractArray...; kwargs...) = gradcheck((xs...) -> sum(sin.(f(xs...))), xs...; kwargs...)
 # We generate random matrix with elements between 0.2 and -.7 so we are not close to any
