@@ -202,7 +202,6 @@ end
   @test gradtest(x -> var(x, dims=3), rand(2, 3, 4))
   @test gradtest(x -> var(x, dims=[1, 2]), rand(2, 3, 4))
 
-
   @test gradtest(x -> var(x, corrected=false), rand(2, 3))
   @test gradtest(x -> var(x, dims=1, corrected=false), rand(2, 3))
   @test gradtest(x -> var(x, dims=2, corrected=false), rand(2, 3))
@@ -220,6 +219,18 @@ end
   @test gradtest(x -> var(x, dims=2, corrected=false, mean=mean(x, dims=2)), rand(2, 3))
   @test gradtest(x -> var(x, dims=3, corrected=false, mean=mean(x, dims=3)), rand(2, 3, 4))
   @test gradtest(x -> var(x, dims=[1, 2], corrected=false, mean=mean(x, dims=[1, 2])), rand(2, 3, 4))
+
+  @test gradtest((x, m) -> var(x, mean=m[1]), rand(2, 3), rand(1))
+  @test gradtest((x, m) -> var(x, dims=1, mean=m), rand(2, 3), rand(1, 3))
+  @test gradtest((x, m) -> var(x, dims=2, mean=m), rand(2, 3), rand(2, 1))
+  @test gradtest((x, m) -> var(x, dims=3, mean=m), rand(2, 3, 4), rand(2, 3, 1))
+  @test gradtest((x, m) -> var(x, dims=[1, 2], mean=m), rand(2, 3, 4), rand(1, 1, 4))
+
+  @test gradtest((x, m) -> var(x, corrected=false, mean=m[1]), rand(2, 3), rand(1))
+  @test gradtest((x, m) -> var(x, dims=1, corrected=false, mean=m), rand(2, 3), rand(1, 3))
+  @test gradtest((x, m) -> var(x, dims=2, corrected=false, mean=m), rand(2, 3), rand(2, 1))
+  @test gradtest((x, m) -> var(x, dims=3, corrected=false, mean=m), rand(2, 3, 4), rand(2, 3, 1))
+  @test gradtest((x, m) -> var(x, dims=[1, 2], corrected=false, mean=m), rand(2, 3, 4), rand(1, 1, 4))
 end
 
 @testset "std" begin
@@ -228,7 +239,6 @@ end
   @test gradtest(x -> std(x, dims=2), rand(2, 3))
   @test gradtest(x -> std(x, dims=3), rand(2, 3, 4))
   @test gradtest(x -> std(x, dims=[1, 2]), rand(2, 3, 4))
-
 
   @test gradtest(x -> std(x, corrected=false), rand(2, 3))
   @test gradtest(x -> std(x, dims=1, corrected=false), rand(2, 3))
@@ -247,6 +257,18 @@ end
   @test gradtest(x -> std(x, dims=2, corrected=false, mean=mean(x, dims=2)), rand(2, 3))
   @test gradtest(x -> std(x, dims=3, corrected=false, mean=mean(x, dims=3)), rand(2, 3, 4))
   @test gradtest(x -> std(x, dims=[1, 2], corrected=false, mean=mean(x, dims=[1, 2])), rand(2, 3, 4))
+
+  @test gradtest((x, m) -> std(x, mean=m[1]), rand(2, 3), rand(1))
+  @test gradtest((x, m) -> std(x, dims=1, mean=m), rand(2, 3), rand(1, 3))
+  @test gradtest((x, m) -> std(x, dims=2, mean=m), rand(2, 3), rand(2, 1))
+  @test gradtest((x, m) -> std(x, dims=3, mean=m), rand(2, 3, 4), rand(2, 3, 1))
+  @test gradtest((x, m) -> std(x, dims=[1, 2], mean=m), rand(2, 3, 4), rand(1, 1, 4))
+
+  @test gradtest((x, m) -> std(x, corrected=false, mean=m[1]), rand(2, 3), rand(1))
+  @test gradtest((x, m) -> std(x, dims=1, corrected=false, mean=m), rand(2, 3), rand(1, 3))
+  @test gradtest((x, m) -> std(x, dims=2, corrected=false, mean=m), rand(2, 3), rand(2, 1))
+  @test gradtest((x, m) -> std(x, dims=3, corrected=false, mean=m), rand(2, 3, 4), rand(2, 3, 1))
+  @test gradtest((x, m) -> std(x, dims=[1, 2], corrected=false, mean=m), rand(2, 3, 4), rand(1, 1, 4))
 end
 
 @testset "maximum" begin

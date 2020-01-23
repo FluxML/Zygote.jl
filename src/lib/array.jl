@@ -238,6 +238,27 @@ _backvar(xs, Δ, N::Int, mean) = (convert(eltype(xs), 2/N) .* Δ .* (xs .- mean)
     return s, Δ -> _backvar(xs, Δ ./ (2 .* s), corrected, mean, dims)
 end
 
+function _pullback(ctx::AContext, ::Core.kwftype(Core.Typeof(Statistics.var)), kw, ::typeof(Statistics.var), xs::AbstractArray)
+  y, _back = adjoint(ctx, Statistics.var, xs; kw...)
+  y, Δ -> begin
+    backvar = _back(Δ)[1]
+    if haskey(kw, :mean)
+      dims = get(kw, :dims, :)
+      backmean = -sum(backvar; dims=dims)
+      kwb = NamedTuple{keys(kw)}(nothing for i = 1:length(kw))
+      kwb = merge(kwb, (; :mean=>backmean))
+      (nothing, kwb, nothing, backvar)
+    else
+      (nothing, nothing, nothing, backvar)
+    end
+  end
+end
+
+function _pullback(ctx::AContext, ::Core.kwftype(Core.Typeof(Statistics.std)), kw, ::typeof(Statistics.std), xs::AbstractArray)
+  v, vback = _pullback(ctx, Core.kwfunc(Statistics.var), kw, Statistics.var, xs)
+  s = sqrt.(v)
+  return s, Δ -> vback(Δ ./ (2 .* s))
+end
 
 # LinAlg
 # ======
