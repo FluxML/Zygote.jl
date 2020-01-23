@@ -24,6 +24,7 @@ function default_fdm(f::F) where F
 end
 
 function ngradient(f, xs::AbstractArray...; fdm=default_fdm(f))
+    println(" ")  # make sure TravisCI doesn't time out
     return FiniteDifferences.grad(fdm, f, xs...)
 end
 
