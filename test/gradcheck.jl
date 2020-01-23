@@ -18,7 +18,7 @@ function default_fdm(f::F) where F
     forward_fdm(5, 1)
   elseif lower == -Inf
     backward_fdm(5,1)
-  else  # fallback, hopefully not near bounds
+  else  # fallback, hopefully input is not near bounds
     central_fdm(5, 1)
   end
 end
@@ -28,13 +28,17 @@ function ngradient(f, xs::AbstractArray...; fdm=default_fdm(f))
 end
 
 function gradcheck(f, xs...; kwargs...)
-  fin_grad = ngradient(f, xs...; kwargs...)
-  ad_grad = gradient(f, xs...)
-  correct = all(isapprox.(fin_grad, ad_grad, rtol = 1e-5, atol = 1e-5))
-  if !correct
-    @warn "gradcheck failed" f fin_grad ad_grad)
+  fin_grads = ngradient(f, xs...; kwargs...)
+  ad_grads = gradient(f, xs...)
+  all_correct = true
+  for (ii, (fin_grad, ad_grad)) in enumerate(zip(fin_grads, ad_grads))
+    correct = isapprox(fin_grad, ad_grad, rtol = 1e-5, atol = 1e-5)
+    if !correct
+      all_correct = false
+      @debug "gradcheck failed" f nth_partial=ii fin_grad ad_grad
+    end
   end
-  return correct
+  return all_correct
 end
 
 gradtest(f, xs::AbstractArray...; kwargs...) = gradcheck((xs...) -> sum(sin.(f(xs...))), xs...; kwargs...)
