@@ -2,22 +2,45 @@ using Zygote, NNlib, Test, Random, LinearAlgebra, Statistics, FillArrays, FFTW
 using Zygote: gradient
 using NNlib: conv, ∇conv_data, depthwiseconv
 using Base.Broadcast: broadcast_shape
-using FiniteDifferences: FiniteDifferences
+using FiniteDifferences: FiniteDifferences, central_fdm, forward_fdm, backward_fdm
 
-function ngradient(f, xs::AbstractArray...)
-    fdm = FiniteDifferences.central_fdm(5,1)
+realdomainrange(::Any) = (-Inf, Inf)
+realdomainrange(::Union{typeof.((acos,asin,atanh))...}) = (-1, 1)
+realdomainrange(::typeof(acosh)) = (1, Inf)
+realdomainrange(::Union{typeof.((log,sqrt,^))...}) = (0, Inf)
+
+function default_fdm(f::F) where F
+  # Attempt to choose a way of finite differencing that will avoid escaping the domain
+  lower, upper = realdomainrange(F)
+  if lower == -Inf && upper==Inf  # Ideal case
+    central_fdm(5, 1)
+  elseif upper == Inf
+    forward_fdm(5, 1)
+  elseif lower == -Inf
+    backward_fdm(5,1)
+  else  # fallback, hopefully not near bounds
+    central_fdm(5, 1)
+  end
+end
+
+function ngradient(f, xs::AbstractArray...; fdm=default_fdm(f))
     return FiniteDifferences.grad(fdm, f, xs...)
 end
 
-gradcheck(f, xs...) =
-  all(isapprox.(ngradient(f, xs...),
-                gradient(f, xs...), rtol = 1e-5, atol = 1e-5))
+function gradcheck(f, xs...; kwargs...)
+  fin_grad = ngradient(f, xs...; kwargs...)
+  ad_grad = gradient(f, xs...)
+  correct = all(isapprox.(fin_grad, ad_grad, rtol = 1e-5, atol = 1e-5))
+  if !correct
+    @warn "gradcheck failed" f fin_grad ad_grad)
+  end
+  return correct
+end
 
-gradtest(f, xs::AbstractArray...) = gradcheck((xs...) -> sum(sin.(f(xs...))), xs...)
+gradtest(f, xs::AbstractArray...; kwargs...) = gradcheck((xs...) -> sum(sin.(f(xs...))), xs...; kwargs...)
 # We generate random matrix with elements between 0.2 and -.7 so we are not close to any
 # nondefined areas for common functions
-rand27(args...) = 0.2 .+ 0.5.*rand(args...)
-gradtest(f, dims...) = gradtest(f, rand27.(Float64, dims)...)
+gradtest(f, dims...; kwargs...) = gradtest(f, rand.(Float64, dims)...; kwargs...)
 
 # utilities for using gradcheck with complex matrices
 _splitreim(A) = (real(A),)
@@ -71,7 +94,7 @@ Random.seed!(0)
 @test gradtest(x -> x', rand(5))
 
 @test gradtest(det, (4, 4))
-@test gradtest(logdet, map(x -> x*x', (rand27(4, 4),))[1])
+@test gradtest(logdet, map(x -> x*x' + I, (rand(4, 4),))[1])
 @test gradtest(x -> logabsdet(x)[1], (4, 4))
 
 @testset "getindex" begin
@@ -147,7 +170,7 @@ end
 
 @testset "circshift" begin
   L = 5
-  for D ∈ 1:5, reps ∈ 1:5 
+  for D ∈ 1:5, reps ∈ 1:5
     x0 = zeros(ntuple(d->L, D))
     g = gradient(x -> x[1], x0)[1] #Zero shift gradient
     shift = ntuple(_ -> rand(-L:L), D) #Random shift
@@ -244,7 +267,7 @@ end
 end
 
 @testset "maximum" begin
-  @test gradtest(maximum, rand(2, 3))
+  @test gradtest(maximum, rand(2, 4))
 
   @test gradtest(x -> maximum(x, dims=1), rand(2, 3))
   @test gradtest(x -> maximum(x, dims=2), rand(2, 3))
@@ -619,8 +642,8 @@ end
 _hermsymtype(::Type{<:Symmetric}) = Symmetric
 _hermsymtype(::Type{<:Hermitian}) = Hermitian
 
-function _gradtest_hermsym(f, ST, A)
-  gradtest(_splitreim(collect(A))...) do (args...)
+function _gradtest_hermsym(f, ST, A; kwargs...)
+  gradtest(_splitreim(collect(A))...; kwargs...) do (args...)
     B = f(ST(_joinreim(_dropimaggrad.(args)...)))
     return sum(_splitreim(B))
   end
@@ -677,11 +700,6 @@ function _randvectorin(rng, n, r)
   isinf(u) && return rand(rng, n) .+ l
   return rand(rng, n) .* (u - l) .+ l
 end
-
-realdomainrange(::Any) = (Inf, Inf)
-realdomainrange(::Union{typeof.((acos,asin,atanh))...}) = (-1, 1)
-realdomainrange(::typeof(acosh)) = (1, Inf)
-realdomainrange(::Union{typeof.((log,sqrt,^))...}) = (0, Inf)
 
 function _randmatseries(rng, f, T, n, domain::Type{Real})
   U = _randmatunitary(rng, T, n)
