@@ -160,6 +160,11 @@ end
 
 @adjoint iterate(r::UnitRange, i...) = iterate(r, i...), _ -> nothing
 
+@adjoint function sort(x::AbstractArray)
+  p = sortperm(x)
+  return x[p], x̄ -> (x̄[invperm(p)],)
+end
+
 # Reductions
 
 @adjoint function sum(xs::AbstractArray; dims = :)
