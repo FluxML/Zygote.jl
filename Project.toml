@@ -1,6 +1,6 @@
 name = "Zygote"
 uuid = "e88e6eb3-aa80-5325-afca-941959d7151f"
-version = "0.4.6"
+version = "0.5.0"
 
 [deps]
 DiffRules = "b552c78f-8df3-52c6-915a-8e097449b14b"

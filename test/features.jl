@@ -164,7 +164,7 @@ D(f, x) = grad(f, x)[1]
 @test D(x -> x*D(y -> x*y, 1), 4) == 8
 
 if VERSION >= v"1.1"
-  @test sin'''(1.0) ==  -cos(1.0)
+  @test Zygote.gradient(y -> Zygote.gradient(x -> Zygote.gradient(sin, x)[1], y)[1], 1.0)[1] ==  -cos(1.0)
 end
 
 f(x) = throw(DimensionMismatch("fubar"))

@@ -47,8 +47,6 @@ function gradient(f, args...)
   return back(sensitivity(y))
 end
 
-Base.adjoint(f::Function) = x -> gradient(f, x)[1]
-
 # Param-style wrappers
 
 # TODO store ids only
