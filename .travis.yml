@@ -25,6 +25,10 @@ jobs:
         - julia --color=yes --project=docs/ docs/make.jl
       after_success: skip
 
+script:
+  - if [[ -a .git/shallow ]]; then git fetch --unshallow; fi
+  - travis_wait 30 julia -e 'using Pkg; Pkg.build(); Pkg.test(coverage=true)'
+  
 ## uncomment and modify the following lines to manually install system packages
 #addons:
 #  apt: # apt-get for linux
