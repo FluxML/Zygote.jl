@@ -159,7 +159,7 @@ unapply(t, xs) = _unapply(t, xs)[1]
   end
 end
 
-if VERSION > v"1.4-"
+if VERSION >= v"1.4.0-DEV.304"
   @adjoint! function Core._apply_iterate(::typeof(iterate), f, args...)
     y, back = Core._apply(_pullback, (__context__, f), args...)
     st = map(_empty, args)
