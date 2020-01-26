@@ -27,6 +27,11 @@ end
 @adjoint (::Type{T})(sz) where {T<:Zeros} = Zeros(sz), Δ->(nothing,)
 @adjoint (::Type{T})(sz) where {T<:Ones} = Ones(sz), Δ->(nothing,)
 
+@adjoint reinterpret(::Type{T}, x::T) where T = x, Δ->(nothing, Δ)
+@adjoint reinterpret(::Type{NTuple{N,T}}, xs::AbstractArray{T}) where {N,T} = reinterpret(NTuple{N,T}, xs), Δ->(nothing, reinterpret(T, Δ))
+@adjoint reinterpret(::Type{T}, xs::AbstractArray{NTuple{N,T}}) where {N,T} = reinterpret(T, xs), Δ->(nothing, reinterpret(NTuple{N,T}, Δ))
+@adjoint reinterpret(::Type{T}, x) where T = reinterpret(T, x), _ -> error("Non-trivial reinterpreting is not supported")
+
 _zero(xs::AbstractArray{<:Number}, T=float(eltype(xs))) = fill!(similar(xs, T), false)
 _zero(xs::AbstractArray{<:AbstractArray}, T=eltype(xs)) = eltype(xs)[_zero(x,eltype(T)) for x in xs]
 _zero(xs::AbstractArray, T=Any) = Union{Nothing, T}[nothing for x in xs]

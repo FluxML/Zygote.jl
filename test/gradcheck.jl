@@ -104,6 +104,15 @@ Random.seed!(0)
   @test back(1.0)[2] == [-im, 0]
 end
 
+@testset "reinterpret" begin
+  let T = Float64, T2 = Float32
+    @test_throws ErrorException gradient(x->reinterpret(T2, x), T[1.])
+    @test gradient(x -> reinterpret(T, x), rand(T)) == (1.,)
+    @test gradient(x -> sum(sum(reinterpret(NTuple{2,T}, x))), rand(T, 2)) == ([1., 1.],)
+    @test gradient(x -> sum(sum(reinterpret(T, x))), [(rand(T), rand(T))]) == ([(1., 1.)],)
+  end
+end
+
 @testset "view" begin
   @test gradtest(x -> view(x,:,2,:), (3,4,5))
   @test gradtest(x -> view(x,1:2,3:4), (3,4))
