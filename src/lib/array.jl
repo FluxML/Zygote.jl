@@ -28,6 +28,7 @@ end
 @adjoint (::Type{T})(sz) where {T<:Ones} = Ones(sz), Δ->(nothing,)
 
 _zero(xs::AbstractArray{<:Number}, T=float(eltype(xs))) = fill!(similar(xs, T), false)
+_zero(xs::AbstractArray{<:AbstractArray}, T=eltype(xs)) = eltype(xs)[_zero(x,eltype(T)) for x in xs]
 _zero(xs::AbstractArray, T=Any) = Union{Nothing, T}[nothing for x in xs]
 
 @adjoint getindex(x::AbstractArray, inds...) = x[inds...], ∇getindex(x, inds)

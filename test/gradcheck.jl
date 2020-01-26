@@ -90,6 +90,9 @@ Random.seed!(0)
   irep = [1 2; 2 2]
   @test gradtest(x -> x[1,irep], (3,4))
 
+  # nested arrays
+  @test gradient(x -> x[1][1], [[1]]) == ([[1]],)
+
   # https://github.com/invenia/Nabla.jl/issues/139
   x = rand(3)
   z = [1,2,3,3]
