@@ -6,9 +6,7 @@
 
 `] add Zygote`
 
-Zygote is a working prototype for source-to-source automatic differentiation (AD) in Julia, and the next-gen AD system for the [Flux](https://github.com/FluxML/Flux.jl) differentiable programming framework. For more details and benchmarks of Zygote's technique, see [our paper](https://arxiv.org/abs/1810.07951).
-
-You probably don't want to use Zygote yet (except as a preview of the future). Instead use Flux's built-in AD, which is API-compatible, and at some point in the near future you'll get a free speed boost.
+Zygote provides source-to-source automatic differentiation (AD) in Julia, and is the next-gen AD system for the [Flux](https://github.com/FluxML/Flux.jl) differentiable programming framework. For more details and benchmarks of Zygote's technique, see [our paper](https://arxiv.org/abs/1810.07951). You may want to check out Flux for more interesting examples of Zygote usage; the documentation here focuses on internals and advanced AD usage.
 
 ```julia
 julia> using Zygote
