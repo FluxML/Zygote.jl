@@ -537,6 +537,7 @@ end
   rng = MersenneTwister(123456)
   A, λ = randn(rng, 10, 10), randn(rng)
   @test gradtest(A->A + 5I, A)
+  @test gradtest(A->5I - A, A)
   @test gradtest(λ->A + λ[1] * I, [λ])
 end
 

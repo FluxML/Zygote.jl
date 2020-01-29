@@ -718,7 +718,10 @@ end
   return Matrix{T}(I, ij), Δ -> ((λ=tr(Δ),), nothing)
 end
 @adjoint function +(A::AbstractMatrix, S::UniformScaling)
-  return A + S, Δ->(Δ, (λ=sum(view(Δ, diagind(Δ))),))
+  return A + S, Δ->(Δ, (λ=tr(Δ),))
+end
+@adjoint function -(S::UniformScaling, A::AbstractMatrix)
+  return S - A, Δ->((λ=tr(Δ),), -Δ)
 end
 
 @adjoint +(A::AbstractArray, B::AbstractArray) = A + B, Δ->(Δ, Δ)
