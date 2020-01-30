@@ -153,9 +153,10 @@ unapply(t, xs) = _unapply(t, xs)[1]
   y, back = Core._apply(_pullback, (__context__, f), args...)
   st = map(_empty, args)
   y, function (Δ)
+    maybetoarray(arg, Δ) = arg isa Array ? reshape(collect(Δ), size(arg)) : Δ
     Δ = back(Δ)
     Δ === nothing ? nothing :
-      (first(Δ), unapply(st, Base.tail(Δ))...)
+      (first(Δ), maybetoarray.(args, unapply(st, Base.tail(Δ)))...)
   end
 end
 
