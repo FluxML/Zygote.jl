@@ -136,6 +136,7 @@ end
 
 @info "Still GradChecking (next is conv)"
 @testset "conv: spatial_rank=$spatial_rank" for spatial_rank in (1, 2, 3)
+  @info "Still GradChecking (conv: spatial_rank=$spatial_rank)"
   x = rand(repeat([10], spatial_rank)..., 3, 2)
   w = rand(repeat([3], spatial_rank)..., 3, 3)
   cdims = DenseConvDims(x, w)
