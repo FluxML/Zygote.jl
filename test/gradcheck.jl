@@ -146,6 +146,8 @@ end
   @test gradtest((x, w) -> depthwiseconv(x, w, dcdims), x, w)
 end
 
+
+@info "Still GradChecking (next is pooling)"
 @testset "pooling: spatial_rank=$spatial_rank" for spatial_rank in (1, 2)
   x = rand(repeat([10], spatial_rank)..., 3, 2)
   pdims = PoolDims(x, 2)
@@ -162,9 +164,13 @@ let
   @test first(back(randn(1, 3))) isa Vector
 end
 
-@test gradtest(x -> repeat(x; inner=2), rand(5))
-@test gradtest(x -> repeat(x; inner=2, outer=3), rand(5))
-@test gradtest(x -> repeat(x; inner=(2,2,1), outer=(1,1,3)), rand(5,4,3))
+
+@info "Still GradChecking (next is repeat)"
+@testset "repeat" begin
+    @test gradtest(x -> repeat(x; inner=2), rand(5))
+    @test gradtest(x -> repeat(x; inner=2, outer=3), rand(5))
+    @test gradtest(x -> repeat(x; inner=(2,2,1), outer=(1,1,3)), rand(5,4,3))
+end
 
 @test gradtest(tr, rand(4, 4))
 
