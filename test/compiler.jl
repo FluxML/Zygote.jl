@@ -16,7 +16,8 @@ trace_contains(st, func, file, line) = any(st) do fr
     fr.line == line
 end
 
-@test gradient(x -> vcat(x...)'x, [1,1]) == ([2,2],)
+@test gradient(x -> vcat(x...)'x, [1, 1]) == ([2, 2],)
+@test gradient(x -> sum(hcat(x...) * sum(x)), [[1, 2], [3, 4]]) == ([[7, 11], [9, 13]],)
 
 bad(x) = x
 @adjoint bad(x) = x, Δ -> error("bad")
