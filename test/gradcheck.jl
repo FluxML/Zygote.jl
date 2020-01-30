@@ -134,6 +134,7 @@ end
   @test gradient(g, ones(3)) == ([1,0,0],)
 end
 
+@info "Still GradChecking (next is conv)"
 @testset "conv: spatial_rank=$spatial_rank" for spatial_rank in (1, 2, 3)
   x = rand(repeat([10], spatial_rank)..., 3, 2)
   w = rand(repeat([3], spatial_rank)..., 3, 3)
@@ -218,6 +219,7 @@ end
   @test gradtest(x -> mean(x, dims=[1, 2]), rand(2, 3, 4))
 end
 
+@info "Still GradChecking (next is var)"
 @testset "var" begin
   @test gradtest(var, rand(2, 3))
   @test gradtest(x -> var(x, dims=1), rand(2, 3))
@@ -323,6 +325,7 @@ end
   @test gradtest(pinv, C)
 end
 
+@info "Still GradChecking (next is multiplication)"
 @testset "multiplication" begin
   @testset "matrix-matrix" begin
     rng, M, P, Q = MersenneTwister(123456), 13, 7, 11
@@ -343,6 +346,7 @@ end
   end
 end
 
+@info "Still GradChecking (next is backsolve)"
 @testset "backsolve" begin
   rng, M, P, Q = MersenneTwister(123456), 13, 10, 9
   X, Y, y = randn(rng, P, P), randn(rng, P, Q), randn(rng, P)
@@ -492,6 +496,8 @@ end
   end
 end
 
+
+@info "Still GradChecking (next is Hermitian)"
 @testset "Hermitian" begin
   rng, P = MersenneTwister(123456), 7
   Re = randn(rng, P, P)
@@ -599,6 +605,7 @@ end
   @test gradcheck(x->lyap(x[1],x[2]),[3.1,4.6])
 end
 
+@info "Still GradChecking (next is matrix exponential)"
 @testset "matrix exponential" begin
   @testset "real dense" begin
     rng, N = MersenneTwister(6865931), 8
@@ -724,6 +731,7 @@ end
 
 _randmatseries(rng, ::typeof(atanh), T, n, domain::Type{Complex}) = nothing
 
+@info "Still GradChecking (next is power series)"
 @testset "Hermitian/Symmetric power series functions" begin
   MTs = (Symmetric{Float64}, Hermitian{Float64}, Hermitian{ComplexF64})
   rng, N = MersenneTwister(123), 7
@@ -837,6 +845,7 @@ _randmatseries(rng, ::typeof(atanh), T, n, domain::Type{Complex}) = nothing
   end
 end
 
+@info "Still GradChecking (next is ^ on Symetric)"
 @testset "^(::Union{Symmetric,Hermitian}, p::Integer)" begin
   MTs = (Symmetric{Float64}, Symmetric{ComplexF64},
          Hermitian{Float64}, Hermitian{ComplexF64})
@@ -869,6 +878,7 @@ end
   end
 end
 
+@info "Still GradChecking (next is Distances)"
 using Distances
 
 Zygote.refresh()
@@ -1009,6 +1019,7 @@ end
     @test gradcheck(x -> muladd(x[1], x[2], x[3]), [2.0, 3.0, 5.0])
 end
 
+@info "Still GradChecking (next is StatsFuns)"
 import StatsFuns
 
 Zygote.refresh()
@@ -1093,6 +1104,7 @@ end
   @test gradcheck(x -> sum(sum(diag.([x] .* a))), b)
 end
 
+@info "Still GradChecking (next is Buffer)"
 using Zygote: Buffer
 
 @testset "Buffer" begin
@@ -1179,6 +1191,7 @@ end
 
 end
 
+@info "Still GradChecking (next is FillArrays)"
 @testset "FillArrays" begin
   rng, M, N = MersenneTwister(123456), 7, 11
   x, y = randn(rng), randn(rng)

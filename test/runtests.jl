@@ -1,12 +1,6 @@
 using Zygote, Test
 using Zygote: gradient
 
-# Shadow Test.@testset to always print something so that TravisCI doesn't shut-down for inactivity.
-macro testset(expr...)
-  :(print(" "); @time Test.@testset $(expr...);)
-end
-
-
 @testset "Zygote" begin
 
 @info "Testing compiler features"
