@@ -49,7 +49,7 @@ reshape_scalar(x::Real, y) = y[]
 """
     forwarddiff(f, x) -> f(x)
 
-Runs `f(x)` as usual, but instructs Zygote to differentiate `f` using pullback
+Runs `f(x)` as usual, but instructs Zygote to differentiate `f` using forward
 mode, rather than the usual reverse mode.
 
 Forward mode takes time linear in `length(x)` but only has constant memory
