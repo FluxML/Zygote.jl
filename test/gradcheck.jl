@@ -43,7 +43,7 @@ function gradcheck(f, xs...; kwargs...)
 end
 
 
-gradtest(f, xs::AbstractArray...; kwargs...) = gradcheck((xs...) -> sum(sin.(f(xs...))), xs...; kwargs...)
+gradtest(f, xs::AbstractArray...; kwargs...) = gradcheck((xs...) -> sum(sin, f(xs...)), xs...; kwargs...)
 # We generate random matrix with elements between 0.2 and -.7 so we are not close to any
 # nondefined areas for common functions
 gradtest(f, dims...; kwargs...) = gradtest(f, rand.(Float64, dims)...; kwargs...)
