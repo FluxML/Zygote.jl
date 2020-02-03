@@ -33,6 +33,10 @@ using NNlib
 # Utilities
 # =========
 
+Base.:+(::Nothing, x) = x
+Base.:+(x, ::Nothing) = x
+Base.:+(::Nothing, ::Nothing) = nothing
+
 accum_sum(xs; dims = :) = reduce(accum, xs, dims = dims)
 
 # Work around reducedim_init issue
