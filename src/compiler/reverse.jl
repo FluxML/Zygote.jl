@@ -86,8 +86,6 @@ function instrument(ir::IR)
     ex = st.expr
     if isexpr(ex, :foreigncall, :isdefined)
       continue
-    elseif isexpr(ex, :enter, :leave)
-      error("try/catch is not supported.")
     elseif isexpr(ex, :(=))
       @assert ex.args[1] isa GlobalRef
       pr[v] = xcall(Zygote, :global_set, QuoteNode(ex.args[1]), ex.args[2])
@@ -201,7 +199,7 @@ function adjointcfg(pr::Primal)
         push!(rb, xcall(Base, :(!==), alpha(pr.branches[b.id]), BranchNumber(i)))
       branch!(rb, preds[i].id, unless = cond)
     end
-    if !isempty(branches(b)) && branches(b)[end] == IRTools.unreachable
+    if isempty(preds) || (!isempty(branches(b)) && branches(b)[end] == IRTools.unreachable)
       branch!(rb, 0)
     end
   end
@@ -244,10 +242,11 @@ function adjoint(pr::Primal)
         end
       elseif ex isa Core.PiNode
         grads[ex.val] = grads[v]
-      elseif isexpr(ex, GlobalRef, :call, :isdefined, :inbounds, :meta)
+      elseif isexpr(ex, GlobalRef, :call, :isdefined, :inbounds, :meta, :enter, :leave, :catch)
       elseif isexpr(ex)
         push!(rb, stmt(xcall(Base, :error, "Can't differentiate $(ex.head) expression"),
                        line = b[v].line))
+        # break
       else # A literal value
         continue
       end
