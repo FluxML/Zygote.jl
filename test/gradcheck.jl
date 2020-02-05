@@ -189,6 +189,16 @@ end
   @test gradtest(sort, 5)
 end
 
+@testset "filter" begin
+  @test gradtest(xs -> filter(x -> x > 0.5, xs), 20)
+
+  @test gradient(x -> sum(log, filter(iseven, x)), 1:10) ==
+    (map(x -> iseven(x) ? 1/x : 0, 1:10),)
+  @test gradient(x -> sum(abs2, im .+ filter(iseven, x)), 1:10) ==
+    (map(x -> iseven(x) ? 2x+2im : 0, 1:10),)
+end
+
+
 @testset "mean" begin
   @test gradtest(mean, rand(2, 3))
 

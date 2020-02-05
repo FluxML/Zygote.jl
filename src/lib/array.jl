@@ -165,6 +165,15 @@ end
   return x[p], x̄ -> (x̄[invperm(p)],)
 end
 
+@adjoint function filter(f, x::AbstractVector)
+    t = map(f, x)
+    x[t], Δ -> begin
+        dx = _zero(x, eltype(Δ))
+        dx[t] .= Δ
+        (nothing, dx)
+    end
+end
+
 # Reductions
 
 @adjoint function sum(xs::AbstractArray; dims = :)
