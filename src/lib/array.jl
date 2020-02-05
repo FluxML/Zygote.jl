@@ -16,6 +16,9 @@ using Base.Broadcast: broadcasted, broadcast_shape
 
 @adjoint copy(x::AbstractArray) = copy(x), ȳ -> (ȳ,)
 
+@adjoint collect(x::Tuple) = collect(x), dy -> (Tuple(dy),)
+@adjoint collect(x::AbstractArray) = collect(x), dy -> (dy,)
+
 # Array Constructors
 @adjoint (::Type{T})(x::T) where T<:Array = T(x), ȳ -> (ȳ,)
 @adjoint function (::Type{T})(x::Number, sz) where {T <: Fill}

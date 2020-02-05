@@ -111,6 +111,15 @@ end
   @test gradient(g, ones(3)) == ([1,0,0],)
 end
 
+@testset "collect" begin
+  @test gradient(x -> sum(inv, collect(x)), (1,2)) === ((-1.0, -1/4),)
+
+  @test gradient(x -> sum(collect(view(x, 1:1))), rand(2)) == ([1,0],)
+  @test gradient(x -> sum(inv, collect(view(x', 1,:))), ones(2,2)) == ([-1 0; -1 0],)
+
+  @test gradient(xs -> sum(inv, [x^2 for x in xs]), ones(2)) == ([-2, -2],)
+end
+
 @testset "conv: spatial_rank=$spatial_rank" for spatial_rank in (1, 2, 3)
   x = rand(repeat([10], spatial_rank)..., 3, 2)
   w = rand(repeat([3], spatial_rank)..., 3, 3)
