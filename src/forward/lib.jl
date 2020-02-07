@@ -2,7 +2,8 @@ zerolike(x::Number) = zero(x)
 zerolike(x::Tuple) = zerolike.(x)
 zerolike(x::T) where T =
   NamedTuple{fieldnames(T)}(map(f -> zerolike(getfield(x, f)), fieldnames(T)))
-zerolike(x::Union{Module,Type}) = nothing
+# TODO figure out why this made a test fail
+zerolike(x::Union{Module,Type}) = false
 
 # TODO: `@nograd` and `@linear`
 

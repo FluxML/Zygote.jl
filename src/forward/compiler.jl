@@ -48,7 +48,12 @@ function dual(ir)
   end
   for (v, st) in pr
     st = instrument!(pr, v, st)
-    if isexpr(st.expr, :call)
+    if isexpr(st.expr, :meta, :inbounds, :loopinfo)
+      Δs[v] = nothing
+    elseif isexpr(st.expr, :boundscheck) ||
+           (isexpr(st.expr, :call) && st.expr.args[1] == GlobalRef(Base, :not_int))
+      Δs[v] = false
+    elseif isexpr(st.expr, :call)
       dargs = insert!(pr, v, xcall(:tuple, partial.((v,), st.expr.args)...))
       result = insert!(pr, v, stmt(st, expr = xcall(Forward, :_tangent, dargs, st.expr.args...)))
       pr[v] = xcall(:getindex, result, 1)
