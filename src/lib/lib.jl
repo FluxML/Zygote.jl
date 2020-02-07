@@ -88,10 +88,6 @@ using Base: tail
 
 @adjoint tuple(xs...) = xs, identity
 
-literal_getindex(x, ::Val{i}) where i = getindex(x, i)
-literal_indexed_iterate(x, ::Val{i}) where i = Base.indexed_iterate(x, i)
-literal_indexed_iterate(x, ::Val{i}, state) where i = Base.indexed_iterate(x, i, state)
-
 @adjoint literal_getindex(xs::NTuple{N,Any}, ::Val{i}) where {N,i} =
   (xs[i], Δ -> (ntuple(j -> i == j ? Δ : nothing, Val(N)), nothing))
 
@@ -230,20 +226,6 @@ end
     Δ = getfield(g[], f)
     g[] = (;g[]...,pair(Val(f),nothing)...)
     (nothing, nothing, Δ)
-  end
-end
-
-@generated function __new__(T, args...)
-  quote
-    Base.@_inline_meta
-    $(Expr(:new, :T, [:(args[$i]) for i = 1:length(args)]...))
-  end
-end
-
-@generated function __splatnew__(T, args)
-  quote
-    Base.@_inline_meta
-    $(Expr(:splatnew, :T, :args))
   end
 end
 
