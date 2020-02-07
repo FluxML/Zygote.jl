@@ -9,6 +9,10 @@ using Zygote: gradient
   include("features.jl")
 end
 
+@testset "Forward" begin
+  include("forward/forward.jl")
+end
+
 @info "Testing data structures"
 
 @testset "Data Structures" begin
