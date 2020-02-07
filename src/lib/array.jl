@@ -83,7 +83,7 @@ end
 pull_block_vert(sz, Δ, A::AbstractVector) = Δ[sz-length(A)+1:sz]
 pull_block_vert(sz, Δ, A::AbstractMatrix) = Δ[sz-size(A, 1)+1:sz, :]
 @adjoint function vcat(A::Union{AbstractVector, AbstractMatrix}...)
-  sz = cumsum([size.(A, 1)...])
+  sz = cumsum(collect(size.(A, 1)))
   return vcat(A...), Δ->(map(n->pull_block_vert(sz[n], Δ, A[n]), eachindex(A))...,)
 end
 @adjoint vcat(xs::Number...) = vcat(xs...), Δ -> (Δ...,)
@@ -91,7 +91,7 @@ end
 pull_block_horz(sz, Δ, A::AbstractVector) = Δ[:, sz]
 pull_block_horz(sz, Δ, A::AbstractMatrix) = Δ[:, sz-size(A, 2)+1:sz]
 @adjoint function hcat(A::Union{AbstractVector, AbstractMatrix}...)
-  sz = cumsum([size.(A, 2)...])
+  sz = cumsum(collect(size.(A, 2)))
   return hcat(A...), Δ->(map(n->pull_block_horz(sz[n], Δ, A[n]), eachindex(A))...,)
 end
 @adjoint hcat(xs::Number...) = hcat(xs...), Δ -> (Δ...,)
