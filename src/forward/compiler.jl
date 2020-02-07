@@ -9,6 +9,9 @@ function instrument!(pr, v, st)
   if isexpr(ex, :new)
     st = stmt(st, expr = xcall(Zygote, :__new__, ex.args...))
     pr[v] = st
+  elseif isexpr(ex, :splatnew)
+    st = stmt(st, expr = xcall(Zygote, :__splatnew__, ex.args...))
+    pr[v] = st
   end
   return st
 end

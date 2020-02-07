@@ -19,3 +19,20 @@ function pow(x, n)
 end
 
 @test D(x -> pow(x, 3), 2) == 12
+
+@test D(1) do x
+  f(y) = x = x*y
+  D(f, 1)
+  D(f, 1)
+end == 1
+
+@test D(x -> D(y -> x = y, x)*x, 1) == 1
+
+@test D(1) do x
+  D(2) do y
+    D(3) do z
+      x = z * y
+    end
+  end
+  x
+end == 0

@@ -1,7 +1,7 @@
 module Forward
 
 import ..Zygote
-import ..Zygote: __new__
+import ..Zygote: __new__, __splatnew__
 
 export pushforward
 
