@@ -1,17 +1,21 @@
 using Zygote, Test
-using Zygote.Forward: _tangent, zerolike
+using NNlib: relu
 
-D(f, x) = _tangent((zerolike(f), one(x)), f, x)[2]
+D(f, x) = pushforward(f, x)(1)
 
 @test D(x -> sin(cos(x)), 0.5) == -cos(cos(0.5))*sin(0.5)
 
-@test_broken D(x -> D(cos, x), 0.5) == -cos(0.5)
+@test D(x -> D(cos, x), 0.5) == -cos(0.5)
 
-@test_broken D(x -> x*D(y -> x*y, 1), 4) == 8
+@test D(x -> x*D(y -> x*y, 1), 4) == 8
 
-relu(x) = x > 0 ? x : 0
+function pow(x, n)
+  r = 1
+  while n > 0
+    n -= 1
+    r *= x
+  end
+  return r
+end
 
-D(relu, 5)
-
-@test D(relu, 5) == 1
-@test D(relu, -5) == 0
+@test D(x -> pow(x, 3), 2) == 12

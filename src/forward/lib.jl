@@ -14,10 +14,17 @@ zerolike(x::Union{Module,Type}) = nothing
 @tangent tuple(t...) = t, (ṫ...) -> ṫ
 @tangent tail(t) = tail(t), ṫ -> tail(ṫ)
 @tangent getfield(t, i) = getfield(t, i), (ṫ, _) -> getfield(ṫ, i)
-@tangent getproperty(t, i) = getproperty(t, i), ṫ -> getproperty(ṫ, i)
+@tangent getindex(t, i) = getindex(t, i), (ṫ, _) -> getindex(ṫ, i)
 
 @tangent __new__(T, s...) =
   __new__(T, s...), (_, ṡ...) -> NamedTuple{fieldnames(T)}(ṡ)
+
+function _tangent(dargs, ::typeof(Core._apply), f, args...)
+  dargs = tail(dargs) # drop self gradient
+  df, dargs = first(dargs), tail(dargs)
+  dargs = Core._apply(tuple, dargs...)
+  Core._apply(_tangent, ((df, dargs...), f), args...)
+end
 
 # Mathematical definitions
 
