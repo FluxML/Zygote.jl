@@ -8,5 +8,6 @@ export pushforward
 include("compiler.jl")
 include("interface.jl")
 include("lib.jl")
+include("number.jl")
 
 end

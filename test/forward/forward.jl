@@ -36,3 +36,5 @@ end == 1
   end
   x
 end == 0
+
+@test D(x -> abs(x+2im), 1) == gradient(x -> abs(x+2im), 1)[1]
