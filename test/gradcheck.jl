@@ -13,13 +13,13 @@ function default_fdm(f::F) where F
   # Attempt to choose a way of finite differencing that will avoid escaping the domain
   lower, upper = realdomainrange(F)
   if lower == -Inf && upper==Inf  # Ideal case
-    central_fdm(3, 1)
+    central_fdm(3, 1; adapt=false)
   elseif upper == Inf
-    forward_fdm(3, 1)
+    forward_fdm(3, 1; adapt=false)
   elseif lower == -Inf
-    backward_fdm(3,1)
+    backward_fdm(3,1; adapt=false)
   else  # fallback, hopefully input is not near bounds
-    central_fdm(3, 1)
+    central_fdm(3, 1; adapt=false)
   end
 end
 
