@@ -70,6 +70,15 @@ end
 
 Base.push!(ps::Params, x...) = (foreach(x -> push!(ps, x), x); ps)
 
+function Base.delete!(ps::Params, x)
+  if x in ps.params
+    delete!(ps.params, x)
+    i = findfirst(y -> y === x, ps.order)
+    deleteat!(ps.order, i)
+  end
+  return ps
+end
+
 Params(xs) = push!(Params(), xs...)
 
 function Base.show(io::IO, ps::Params)
