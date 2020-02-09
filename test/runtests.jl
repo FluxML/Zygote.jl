@@ -9,6 +9,12 @@ using Zygote: gradient
   include("interface.jl")
 end
 
+@info "Testing tools" 
+
+@testset "Tools" begin  
+  include("tools.jl")
+end
+
 @info "Testing compiler features"
 
 @testset "Features" begin
