@@ -124,10 +124,12 @@ end
   end
 end
 
-@adjoint repeat(x::AbstractVector, m::Integer, n::Integer=1) =
-   repeat(x, m, n), ȳ -> (dropdims(sum(reshape(ȳ, length(x), :); dims=2); dims=2), nothing, nothing)
-@adjoint repeat(x::AbstractMatrix, m::Integer, n::Integer=1) =
-   repeat(x, m, n), ȳ -> (dropdims(sum(reshape(ȳ, size(x,1), m, size(x,2), n); dims=(2,4)); dims=(2,4)), nothing, nothing)
+@adjoint function repeat(x::AbstractVecOrMat, m::Integer, n::Integer=1)
+    return repeat(x, m, n), function (ȳ)
+      ȳ′ = reshape(ȳ, size(x,1), m, size(x,2), n)
+      return reshape(sum(ȳ′; dims=(2,4)), size(x)), nothing, nothing
+   end
+end
 
 @adjoint getindex(i::Int, j::Int) = i[j], _ -> nothing
 
