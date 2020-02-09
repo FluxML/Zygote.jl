@@ -124,12 +124,10 @@ end
   end
 end
 
-@adjoint function repeat(x::AbstractVecOrMat, m::Integer, n::Integer=1)
-   size₁, size₂ = size(x, 1), size(x, 2)
-   begin₁, begin₂ = firstindex(x, 1), firstindex(x, 2)
-   end₁,   end₂   =  lastindex(x, 1),  lastindex(x, 2)
-   return repeat(x, m, n), ȳ -> (sum(@view ȳ[(begin₁ + i*size₁):(end₁ + i*size₁), (begin₂ + j*size₂):(end₂ + j*size₂)] for i ∈ 0:(m-1), j ∈ 0:(n-1)), nothing, nothing)
-end
+@adjoint repeat(x::AbstractVector, m::Integer, n::Integer=1) =
+   repeat(x, m, n), ȳ -> (dropdims(sum(reshape(ȳ, length(x), :); dims=2); dims=2), nothing, nothing)
+@adjoint repeat(x::AbstractMatrix, m::Integer, n::Integer=1) =
+   repeat(x, m, n), ȳ -> (dropdims(sum(reshape(ȳ, size(x,1), m, size(x,2), n); dims=(2,4)); dims=(2,4)), nothing, nothing)
 
 @adjoint getindex(i::Int, j::Int) = i[j], _ -> nothing
 
