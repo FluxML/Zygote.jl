@@ -124,6 +124,13 @@ end
   end
 end
 
+@adjoint function repeat(x::AbstractVecOrMat, m::Integer, n::Integer=1)
+   size₁, size₂ = size(x, 1), size(x, 2)
+   begin₁, begin₂ = firstindex(x, 1), firstindex(x, 2)
+   end₁,   end₂   =  lastindex(x, 1),  lastindex(x, 2)
+   return repeat(x, m, n), ȳ -> (sum(@view ȳ[(begin₁ + i*size₁):(end₁ + i*size₁), (begin₂ + j*size₂):(end₂ + j*size₂)] for i ∈ 0:(m-1), j ∈ 0:(n-1)), nothing, nothing)
+end
+
 @adjoint getindex(i::Int, j::Int) = i[j], _ -> nothing
 
 function unzip(tuples)
