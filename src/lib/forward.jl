@@ -1,6 +1,15 @@
 using ForwardDiff
 using ForwardDiff: Dual
 
+# ForwardDiff integration
+
+@adjoint Dual{T}(x, ẋ::Tuple) where T = Dual{T}(x, ẋ), ḋ -> (ForwardDiff.value(ḋ), (ForwardDiff.partials(ḋ)...,))
+
+@adjoint literal_getproperty(d::Dual{T}, ::Val{:partials}) where T =
+  d.partials, ṗ -> (Dual{T}(0, ṗ...),)
+
+# Mixed mode
+
 seed(x::Real, ::Val) = Dual(x, true)
 
 function seed(x, ::Val{N}, offset = 0) where N
