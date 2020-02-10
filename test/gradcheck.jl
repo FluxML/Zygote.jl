@@ -142,6 +142,11 @@ end
 @test gradtest(x -> repeat(x; inner=2, outer=3), rand(5))
 @test gradtest(x -> repeat(x; inner=(2,2,1), outer=(1,1,3)), rand(5,4,3))
 
+@test gradtest(x -> repeat(x, 3), rand(5))
+@test gradtest(x -> repeat(x, 2, 3), rand(5))
+@test gradtest(x -> repeat(x, 5), rand(5,7))
+@test gradtest(x -> repeat(x, 3, 2), rand(5,3))
+
 @test gradtest(tr, rand(4, 4))
 
 @testset "fill" begin
