@@ -8,6 +8,9 @@ using ForwardDiff: Dual
 @adjoint literal_getproperty(d::Dual{T}, ::Val{:partials}) where T =
   d.partials, ṗ -> (Dual{T}(0, ṗ...),)
 
+@adjoint literal_getproperty(d::Dual{T}, ::Val{:value}) where T =
+  d.value, ẋ -> (Dual{T}(ẋ, zeros(d.partials.values)...),)
+
 # Mixed mode
 
 seed(x::Real, ::Val) = Dual(x, true)
