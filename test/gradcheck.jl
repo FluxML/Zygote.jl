@@ -54,7 +54,8 @@ Random.seed!(0)
   @test gradient(xs ->sum(xs .^ pow), [4, -1]) == ([pow*4^9, -10],)
 
   @test gradient(x -> real((1+3im) * x^2), 5+7im) == (-32 - 44im,)
-  @test gradient(p -> real((1+3im) * (5+7im)^p), 2)[1] ≈ (-234 + 2im)*log(5 - 7im) # D[(1+3I)x^p, p] /. {x->5+7I, p->2} // Conjugate
+  @test gradient(p -> real((1+3im) * (5+7im)^p), 2)[1] ≈ (-234 + 2im)*log(5 - 7im)
+  # D[(1+3I)x^p, p] /. {x->5+7I, p->2} // Conjugate
 end
 
 @test gradtest((a,b)->sum(reim(acosh(complex(a[1], b[1])))), [-2.0], [1.0])
@@ -78,7 +79,7 @@ end
 @test gradtest(x -> sum(abs2, x; dims=1), randn(4, 3, 2))
 @test gradtest(x -> sum(x[i] for i in 1:length(x)), randn(10))
 @test_broken gradtest(x -> sum(i->x[i], 1:length(x)), randn(10)) # https://github.com/FluxML/Zygote.jl/issues/231
-@test_broken gradtest(x -> sum((i->x[i]).(1:length(x))), randn(10))
+@test gradtest(x -> sum((i->x[i]).(1:length(x))), randn(10))
 
 @test_broken gradtest(x -> prod(x, dims = (2, 3)), (3,4,5))
 @test gradtest(x -> prod(x), (3,4,5))
