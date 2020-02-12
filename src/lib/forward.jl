@@ -3,13 +3,16 @@ using ForwardDiff: Dual
 
 # ForwardDiff integration
 
-@adjoint Dual{T}(x, ẋ::Tuple) where T = Dual{T}(x, ẋ), ḋ -> (ForwardDiff.value(ḋ), (ForwardDiff.partials(ḋ)...,))
+@adjoint function Dual{T}(x, ẋ::Tuple) where T
+  @assert length(ẋ) == 1
+  Dual{T}(x, ẋ), ḋ -> (ḋ.partials[1], (ḋ.value,))
+end
 
 @adjoint literal_getproperty(d::Dual{T}, ::Val{:partials}) where T =
-  d.partials, ṗ -> (Dual{T}(0, ṗ...),)
+  d.partials, ṗ -> (Dual{T}(ṗ[1], 0),)
 
 @adjoint literal_getproperty(d::Dual{T}, ::Val{:value}) where T =
-  d.value, ẋ -> (Dual{T}(ẋ, zeros(d.partials.values)...),)
+  d.value, ẋ -> (Dual{T}(0, ẋ),)
 
 # Mixed mode
 
