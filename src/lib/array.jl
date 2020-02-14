@@ -76,7 +76,7 @@ end
 @adjoint reshape(xs, dims...) = reshape(xs, dims...),
   Δ -> (reshape(Δ, size(xs)),map(_->nothing,dims)...)
 
-@adjoint function hvcat(rows::Tuple{Vararg{Int}}, xs::T...) where T<:Number
+@adjoint function hvcat(rows::Tuple{Vararg{Int}}, xs::Number...)
   hvcat(rows, xs...), ȳ -> (nothing, permutedims(ȳ)...)
 end
 
