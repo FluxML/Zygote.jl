@@ -184,13 +184,9 @@ end
   return sum(abs2, X; dims=dims), Δ::Union{Number, AbstractArray}->(nothing, ((2Δ) .* X))
 end
 
-@adjoint function prod(xs::AbstractArray{<:Number}; dims = :)
-  if dims === (:)
-    prod(xs), Δ -> (prod(xs) ./ xs .* Δ,)
-  else
-    prod(xs, dims = dims),
-      Δ -> (reshape(.*(circshift.([reshape(xs, length(xs))], 1:length(xs)-1)...), size(xs)) .* Δ,)
-  end
+@adjoint function prod(xs; dims = :)
+  p = prod(xs; dims = dims)
+  p, Δ -> (p ./ xs .* Δ,)
 end
 
 function _pullback(cx::AContext, ::typeof(prod), f, xs::AbstractArray)
