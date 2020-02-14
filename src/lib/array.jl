@@ -63,6 +63,12 @@ end
   circshift(A, shifts), Δ -> (circshift(Δ, map(-, shifts)), nothing)
 end
 
+@adjoint function reverse(x::AbstractArray, args...; kwargs...)
+  _reverse(t) = reverse(t, args...; kwargs...)
+  _nothings(t) = map(_->nothing, keys(t))
+  _reverse(x), Δ->(_reverse(Δ), _nothings(args)..., _nothings(kwargs)...)
+end
+
 @adjoint permutedims(xs) = permutedims(xs), Δ -> (permutedims(Δ),)
 
 @adjoint permutedims(xs::AbstractVector) = permutedims(xs), Δ -> (vec(permutedims(Δ)),)

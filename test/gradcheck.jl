@@ -129,6 +129,11 @@ end
   @test gradtest(x -> meanpool(x, pdims), x)
 end
 
+@test gradtest(x -> reverse(x), rand(17))
+@test gradtest(x -> reverse(x, 8), rand(17))
+@test gradtest(x -> reverse(x, 8, 13), rand(17))
+@test gradtest(x -> reverse(x, dims=2), rand(17, 42))
+
 @test gradtest(x -> permutedims(x), rand(2))
 @test gradtest(x -> permutedims(x), rand(2,3))
 @test gradtest(x -> permutedims(x, [3,1,2]), rand(4,5,6))
