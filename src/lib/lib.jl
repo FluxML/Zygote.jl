@@ -41,23 +41,10 @@ end
 
 @adjoint Base.typeassert(x, T) = Base.typeassert(x, T), Δ -> (Δ, nothing)
 
-accum_param(cx::Context, x, Δ::Nothing) = nothing
-accum_param(cx::Context, xs::Tuple, Δ::Nothing) = nothing
-
 @generated function accum_param(cx::Context, x, Δ)
   isbitstype(x) && return
   quote
     haskey(cache(cx), x) && (cache(cx)[x] = accum(cache(cx)[x],Δ))
-    return
-  end
-end
-
-@generated function accum_param(cx::Context, xs::Tuple, Δ)
-  return quote
-    haskey(cache(cx), xs) && (cache(cx)[xs] = accum(cache(cx)[xs],Δ))
-    for (x, d) in zip(xs, Δ)
-      accum_param(cx, x, d)
-    end
     return
   end
 end
@@ -91,11 +78,23 @@ literal_getindex(x, ::Val{i}) where i = getindex(x, i)
 literal_indexed_iterate(x, ::Val{i}) where i = Base.indexed_iterate(x, i)
 literal_indexed_iterate(x, ::Val{i}, state) where i = Base.indexed_iterate(x, i, state)
 
-@adjoint literal_getindex(xs::NTuple{N,Any}, ::Val{i}) where {N,i} =
-  (xs[i], Δ -> (ntuple(j -> i == j ? Δ : nothing, Val(N)), nothing))
+@adjoint function literal_getindex(xs::NTuple{N,Any}, ::Val{i}) where {N,i}
+  val = xs[i]
+  function back(Δ)
+    accum_param(__context__, val, Δ)
+    return ntuple(j -> i == j ? Δ : nothing, Val(N)), nothing
+  end
+  val, back
+end
 
-@adjoint getindex(xs::NTuple{N,Any}, i::Integer) where N =
-  (xs[i], Δ -> (ntuple(j -> i == j ? Δ : nothing, Val(N)), nothing))
+@adjoint function getindex(xs::NTuple{N,Any}, i::Integer) where N
+  val = xs[i]
+  function back(Δ)
+    accum_param(__context__, val, Δ)
+    return ntuple(j -> i == j ? Δ : nothing, Val(N)), nothing
+  end
+  return val, back
+end
 
 @adjoint getindex(xs::NTuple{N,Any}, r::AbstractUnitRange) where N =
   (xs[r], Δ -> (ntuple(j -> j in r ? Δ[findfirst(isequal(j), r)] : nothing, Val(N)), nothing))
