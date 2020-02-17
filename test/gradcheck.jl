@@ -69,8 +69,10 @@ Random.seed!(0)
 
 @test gradtest(x -> softmax(x).*(1:3), 3)
 @test gradtest(x -> softmax(x).*(1:3), (3,5))
+@test gradtest(x -> softmax(x, dims=2).*(1:3), (3,5))
 @test gradtest(x -> logsoftmax(x).*(1:3), 3)
 @test gradtest(x -> logsoftmax(x).*(1:3), (3,5))
+@test gradtest(x -> logsoftmax(x, dims=2).*(1:3), (3,5))
 
 @test gradtest(x -> x', rand(5))
 
@@ -109,26 +111,22 @@ end
   @test gradient(g, ones(3)) == ([1,0,0],)
 end
 
-@testset "conv" begin
-  for spatial_rank in (1, 2, 3)
-    x = rand(repeat([10], spatial_rank)..., 3, 2)
-    w = rand(repeat([3], spatial_rank)..., 3, 3)
-    cdims = DenseConvDims(x, w)
-    @test gradtest((x, w) -> conv(x, w, cdims), x, w)
-    y = conv(x, w, cdims)
-    @test gradtest((y, w) -> ∇conv_data(y, w, cdims), y, w)
-    dcdims = DepthwiseConvDims(x, w)
-    @test gradtest((x, w) -> depthwiseconv(x, w, dcdims), x, w)
-  end
+@testset "conv: spatial_rank=$spatial_rank" for spatial_rank in (1, 2, 3)
+  x = rand(repeat([10], spatial_rank)..., 3, 2)
+  w = rand(repeat([3], spatial_rank)..., 3, 3)
+  cdims = DenseConvDims(x, w)
+  @test gradtest((x, w) -> conv(x, w, cdims), x, w)
+  y = conv(x, w, cdims)
+  @test gradtest((y, w) -> ∇conv_data(y, w, cdims), y, w)
+  dcdims = DepthwiseConvDims(x, w)
+  @test gradtest((x, w) -> depthwiseconv(x, w, dcdims), x, w)
 end
 
-@testset "pooling" begin
-  for spatial_rank in (1, 2)
-    x = rand(repeat([10], spatial_rank)..., 3, 2)
-    pdims = PoolDims(x, 2)
-    @test gradtest(x -> maxpool(x, pdims), x)
-    @test gradtest(x -> meanpool(x, pdims), x)
-  end
+@testset "pooling: spatial_rank=$spatial_rank" for spatial_rank in (1, 2)
+  x = rand(repeat([10], spatial_rank)..., 3, 2)
+  pdims = PoolDims(x, 2)
+  @test gradtest(x -> maxpool(x, pdims), x)
+  @test gradtest(x -> meanpool(x, pdims), x)
 end
 
 @test gradtest(x -> permutedims(x), rand(2))
@@ -155,7 +153,7 @@ end
 
 @testset "circshift" begin
   L = 5
-  for D ∈ 1:5, reps ∈ 1:5 
+  for D ∈ 1:5, reps ∈ 1:5
     x0 = zeros(ntuple(d->L, D))
     g = gradient(x -> x[1], x0)[1] #Zero shift gradient
     shift = ntuple(_ -> rand(-L:L), D) #Random shift
@@ -185,6 +183,10 @@ end
   end
   @test gradtest(foo, 3)
   @test gradient(v -> sum([x for x in v]), [1.1,2.2,3.3]) == ([1, 1, 1],)
+end
+
+@testset "sort" begin
+  @test gradtest(sort, 5)
 end
 
 @testset "mean" begin
@@ -388,6 +390,18 @@ end
   @test gradtest((U, Y) -> Y' / UpperTriangular(U), U, Y)
   @test gradtest((U, Y) -> Y' / UpperTriangular(U), U, y)
 
+  # / (UnitLowerTriangular)
+  @test gradtest((L, Y) -> Y' / L, L, Y)
+  @test gradtest((L, Y) -> Y' / L, L, y)
+  @test gradtest((L, Y) -> Y' / UnitLowerTriangular(L), L, Y)
+  @test gradtest((L, Y) -> Y' / UnitLowerTriangular(L), L, y)
+
+  # / (UnitUpperTriangular)
+  @test gradtest((U, Y) -> Y' / U, U, Y)
+  @test gradtest((U, Y) -> Y' / U, U, y)
+  @test gradtest((U, Y) -> Y' / UnitUpperTriangular(U), U, Y)
+  @test gradtest((U, Y) -> Y' / UnitUpperTriangular(U), U, y)
+
   @testset "Cholesky" begin
 
     # Check that the forwards pass computes the correct thing.
@@ -523,6 +537,7 @@ end
   rng = MersenneTwister(123456)
   A, λ = randn(rng, 10, 10), randn(rng)
   @test gradtest(A->A + 5I, A)
+  @test gradtest(A->5I - A, A)
   @test gradtest(λ->A + λ[1] * I, [λ])
 end
 
@@ -603,6 +618,12 @@ end
         end
       end
     end
+    A = [ 0.0    1.0    0.0
+          0.0    0.0    1.0
+          -4.34 -18.31  -0.43]
+    _,back = Zygote.pullback(exp,A)
+    Ȳ = rand(3,3)
+    @test isreal(back(Ȳ)[1])
   end
 end
 
@@ -1092,18 +1113,28 @@ using Zygote: Buffer
   @test eachindex(buf) == 1:3
   @test stride(buf, 2) === 3
   @test strides(buf) === (1, )
+  @test collect(buf) == collect(copy(buf))
 
   @test gradient([1, 2, 3]) do xs
     b = Zygote.Buffer(xs)
     b .= xs .* 2
     return sum(copy(b))
   end == ([2,2,2],)
+
+  @test gradient(2) do x
+    b = Zygote.Buffer([])
+    push!(b, x)
+    push!(b, 3)
+    prod(copy(b))
+  end == (3,)
 end
 
 @testset "FillArrays" begin
   @test gradcheck(x->sum(Fill(x[], (2, 2))), [0.1])
   @test first(Zygote.gradient(sz->sum(Ones(sz)), 6)) === nothing
   @test first(Zygote.gradient(sz->sum(Zeros(sz)), 6)) === nothing
+  @test gradcheck(x->Fill(x[], 5).value, [0.1])
+  @test gradcheck(x->FillArrays.getindex_value(Fill(x[], 5)), [0.1])
 end
 
 @testset "AbstractArray Addition / Subtraction / Negation" begin
@@ -1201,3 +1232,14 @@ end
   @test gradient(x -> begin @fastmath real(log(x)) end, 1 + 2im) == gradient(x -> real(log(x)), 1 + 2im)
 end
 
+@testset "UniformScaling to Matrix" begin
+  @test gradient(x -> (Matrix(I, 2, 2); 1.0), [1.0]) == (nothing,)
+  @test gradient(x -> (Matrix(I, (2, 2)); 1.0), [1.0]) == (nothing,)
+  @test gradient(x -> (Matrix{Float64}(I, 2, 2); 1.0), [1.0]) == (nothing,)
+  @test gradient(x -> (Matrix{Float64}(I, (2, 2)); 1.0), [1.0]) == (nothing,)
+
+  @test gradient(x -> sum(Matrix(x[1]*I, 2, 2)), [1.0]) == ([2.0],)
+  @test gradient(x -> sum(Matrix(x[1]*I, (2, 2))), [1.0]) == ([2.0],)
+  @test gradient(x -> sum(Matrix{Float64}(x[1]*I, 2, 2)), [1.0]) == ([2.0],)
+  @test gradient(x -> sum(Matrix{Float64}(x[1]*I, (2, 2))), [1.0]) == ([2.0],)
+end

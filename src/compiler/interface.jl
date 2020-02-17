@@ -53,9 +53,9 @@ Base.adjoint(f::Function) = x -> gradient(f, x)[1]
 
 # TODO store ids only
 struct Params
-  order::Vector{Any}
+  order::Buffer{Any, Vector{Any}}
   params::IdSet{Any}
-  Params() = new([], IdSet())
+  Params() = new(Buffer([], false), IdSet())
 end
 
 @forward Params.order Base.iterate, Base.length
@@ -69,6 +69,15 @@ function Base.push!(ps::Params, x)
 end
 
 Base.push!(ps::Params, x...) = (foreach(x -> push!(ps, x), x); ps)
+
+function Base.delete!(ps::Params, x)
+  if x in ps.params
+    delete!(ps.params, x)
+    i = findfirst(y -> y === x, ps.order)
+    deleteat!(ps.order, i)
+  end
+  return ps
+end
 
 Params(xs) = push!(Params(), xs...)
 

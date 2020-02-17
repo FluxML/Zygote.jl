@@ -6,8 +6,8 @@ accum() = nothing
 accum(x) = x
 
 accum(x, y) =
-  x == nothing ? y :
-  y == nothing ? x :
+  x === nothing ? y :
+  y === nothing ? x :
   x + y
 
 accum(x, y, zs...) = accum(accum(x, y), zs...)
@@ -28,7 +28,7 @@ end
 # Core functions
 
 @nograd Core.apply_type, Core.typeof, nfields, fieldtype, Core.TypeVar, Core.UnionAll,
-  (==), (===), (>=), (<), (>), isempty, supertype, Base.typename,
+  (==), (===), (<=), (>=), (<), (>), isempty, supertype, Base.typename,
   Base.parameter_upper_bound, eps, Meta.parse, Base.eval, sleep
 
 @adjoint deepcopy(x) = deepcopy(x), ȳ -> (ȳ,)
@@ -66,6 +66,20 @@ unwrap(ref, x) = x
 @adjoint unwrap(ref, x) = unwrap(x), function (x̄)
   accum_global(__context__, ref, x̄)
   accum_param(__context__, x, x̄)
+end
+
+function global_set(ref, val)
+  ccall(:jl_set_global, Cvoid, (Any, Any, Any),
+        ref.mod, ref.name, val)
+end
+
+@adjoint! function global_set(ref, x)
+  global_set(ref, x), function (x̄)
+    gs = globals(__context__)
+    x̄ = accum(get(gs, ref, nothing), x̄)
+    gs[ref] = nothing
+    return (nothing, x̄)
+  end
 end
 
 # Tuples
@@ -154,6 +168,18 @@ unapply(t, xs) = _unapply(t, xs)[1]
     Δ = back(Δ)
     Δ === nothing ? nothing :
       (first(Δ), unapply(st, Base.tail(Δ))...)
+  end
+end
+
+if VERSION >= v"1.4.0-DEV.304"
+  @adjoint! function Core._apply_iterate(::typeof(iterate), f, args...)
+    y, back = Core._apply(_pullback, (__context__, f), args...)
+    st = map(_empty, args)
+    y, function (Δ)
+      Δ = back(Δ)
+      Δ === nothing ? nothing :
+        (nothing, first(Δ), unapply(st, Base.tail(Δ))...)
+    end
   end
 end
 

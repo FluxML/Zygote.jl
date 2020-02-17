@@ -7,7 +7,7 @@ using Base.Broadcast: broadcasted, broadcast_shape
 @adjoint Array(xs::AbstractArray) = Array(xs), ȳ -> (ȳ,)
 @adjoint Array(xs::Array) = Array(xs), ȳ -> (ȳ,)
 
-@nograd size, length, eachindex, Colon(), findfirst, findlast, findall, randn, ones, zeros, one, zero,
+@nograd size, length, eachindex, axes, Colon(), findfirst, findlast, findall, randn, ones, zeros, one, zero,
   print, println, any, all
 
 @adjoint rand(dims::Integer...) = rand(dims...), _ -> nothing
@@ -18,7 +18,12 @@ using Base.Broadcast: broadcasted, broadcast_shape
 
 # Array Constructors
 @adjoint (::Type{T})(x::T) where T<:Array = T(x), ȳ -> (ȳ,)
-@adjoint (::Type{T})(x::Number, sz) where {T <: Fill} = Fill(x, sz), Δ -> (sum(Δ), nothing)
+@adjoint function (::Type{T})(x::Number, sz) where {T <: Fill}
+    back(Δ::AbstractArray) = (sum(Δ), nothing)
+    back(Δ::NamedTuple) = (Δ.value, nothing)
+    return Fill(x, sz), back
+end
+
 @adjoint (::Type{T})(sz) where {T<:Zeros} = Zeros(sz), Δ->(nothing,)
 @adjoint (::Type{T})(sz) where {T<:Ones} = Ones(sz), Δ->(nothing,)
 
@@ -155,6 +160,11 @@ end
 
 @adjoint iterate(r::UnitRange, i...) = iterate(r, i...), _ -> nothing
 
+@adjoint function sort(x::AbstractArray)
+  p = sortperm(x)
+  return x[p], x̄ -> (x̄[invperm(p)],)
+end
+
 # Reductions
 
 @adjoint function sum(xs::AbstractArray; dims = :)
@@ -188,7 +198,7 @@ function _pullback(cx::AContext, ::typeof(prod), f, xs::AbstractArray)
   y, ȳ -> (nothing, nothing, back(ȳ)...)
 end
 
-@adjoint function maximum(xs; dims = :)
+@adjoint function maximum(xs::AbstractArray; dims = :)
   max, i = findmax(xs, dims = dims)
   max, function (Δ)
     Δ isa Real && abs(Δ) <= sqrt(eps(float(Δ))) && return nothing
@@ -198,7 +208,7 @@ end
   end
 end
 
-@adjoint function minimum(xs; dims = :)
+@adjoint function minimum(xs::AbstractArray; dims = :)
   min, i = findmin(xs, dims = dims)
   min, function (Δ)
     Δ′ = zero(xs)
@@ -369,6 +379,8 @@ end
 
 @adjoint LinearAlgebra.LowerTriangular(A) = LowerTriangular(A), Δ->(LowerTriangular(Δ),)
 @adjoint LinearAlgebra.UpperTriangular(A) = UpperTriangular(A), Δ->(UpperTriangular(Δ),)
+@adjoint LinearAlgebra.UnitLowerTriangular(A) = UnitLowerTriangular(A), Δ->(UnitLowerTriangular(Δ)-I,)
+@adjoint LinearAlgebra.UnitUpperTriangular(A) = UnitUpperTriangular(A), Δ->(UnitUpperTriangular(Δ)-I,)
 
 # This is basically a hack while we don't have a working `ldiv!`.
 @adjoint function \(A::Cholesky, B::AbstractVecOrMat)
@@ -487,7 +499,8 @@ end
   X = _pairdiffquotmat(exp, n, w, ew, ew, ew)
   V = E.vectors
   VF = factorize(V)
-  Ā = (V * ((VF \ F̄' * V) .* X) / VF)'
+  Āc = (V * ((VF \ F̄' * V) .* X) / VF)'
+  Ā = isreal(A) && isreal(F̄) ? real(Āc) : Āc
   return (Ā,)
 end
 
@@ -692,8 +705,23 @@ end
   end
 end
 
+@adjoint function Matrix(::UniformScaling, i::Integer, j::Integer)
+  return Matrix(I, i, j), Δ -> ((λ=tr(Δ),), nothing, nothing)
+end
+@adjoint function Matrix(::UniformScaling, ij::NTuple{2, Integer})
+  return Matrix(I, ij), Δ -> ((λ=tr(Δ),), nothing)
+end
+@adjoint function Matrix{T}(::UniformScaling, i::Integer, j::Integer) where {T}
+  return Matrix{T}(I, i, j), Δ -> ((λ=tr(Δ),), nothing, nothing)
+end
+@adjoint function Matrix{T}(::UniformScaling, ij::NTuple{2, Integer}) where {T}
+  return Matrix{T}(I, ij), Δ -> ((λ=tr(Δ),), nothing)
+end
 @adjoint function +(A::AbstractMatrix, S::UniformScaling)
-  return A + S, Δ->(Δ, (λ=sum(view(Δ, diagind(Δ))),))
+  return A + S, Δ->(Δ, (λ=tr(Δ),))
+end
+@adjoint function -(S::UniformScaling, A::AbstractMatrix)
+  return S - A, Δ->((λ=tr(Δ),), -Δ)
 end
 
 @adjoint +(A::AbstractArray, B::AbstractArray) = A + B, Δ->(Δ, Δ)
