@@ -25,10 +25,7 @@ end
     return log1pexp(x), Δ->(Δ * (x < 9f0 ? logistic(x) : x < 16f0 ? 1 - exp(-x) : 1),)
 end
 
-@adjoint function logsumexp(X::AbstractArray{<:Real})
-    return logsumexp(X), function(Δ)
-        y = StatsFuns.softmax(X)
-        y .*= Δ
-        return (y,)
-    end
+@adjoint function logsumexp(X::AbstractArray{<:Real}; dims=:)
+    lse = logsumexp(X; dims=dims)
+    return lse, Δ -> (Δ .* exp.(X .- lse),)
 end

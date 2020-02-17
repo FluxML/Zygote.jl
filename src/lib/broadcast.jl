@@ -16,6 +16,8 @@ using Base.Broadcast
 using Base.Broadcast: Broadcasted, AbstractArrayStyle, broadcasted, materialize
 using NNlib
 
+@nograd Broadcast.combine_styles, Broadcast.result_style
+
 # There's a saying that debugging code is about twice as hard as writing it in
 # the first place. So if you're as clever as you can be when writing code, how
 # will you ever debug it?
@@ -34,8 +36,11 @@ using NNlib
 accum_sum(xs; dims = :) = reduce(accum, xs, dims = dims)
 
 # Work around reducedim_init issue
+# https://github.com/JuliaLang/julia/issues/31427
+accum_sum(xs::Nothing; dims = :) = nothing
 accum_sum(xs::AbstractArray{Nothing}; dims = :) = nothing
 accum_sum(xs::AbstractArray{<:Number}; dims = :) = sum(xs, dims = dims)
+accum_sum(xs::AbstractArray{<:AbstractArray{<:Number}}; dims = :) = sum(xs, dims = dims)
 accum_sum(xs::Number; dims = :) = xs
 
 trim(x, Δ) = reshape(Δ, ntuple(i -> size(Δ, i), Val(ndims(x))))
@@ -45,7 +50,11 @@ unbroadcast(x::AbstractArray, x̄) =
   length(x) == length(x̄) ? trim(x, x̄) :
     trim(x, accum_sum(x̄, dims = ntuple(i -> size(x, i) == 1 ? i : ndims(x̄)+1, Val(ndims(x̄)))))
 
-unbroadcast(x::Union{Number,Ref}, x̄) = accum_sum(x̄)
+unbroadcast(x::Number, x̄) = accum_sum(x̄)
+unbroadcast(x::Tuple{<:Any}, x̄) = (accum_sum(x̄),)
+unbroadcast(x::Base.RefValue, x̄) = (x=accum_sum(x̄),)
+
+unbroadcast(x::AbstractArray, x̄::Nothing) = nothing
 
 # Split Reverse Mode
 # ==================
@@ -66,6 +75,8 @@ Numeric{T<:Number} = Union{T,AbstractArray{<:T}}
   res = x ./ y
   res, Δ -> (nothing, unbroadcast(x, Δ ./ y), unbroadcast(y, -Δ .* res ./ y))
 end
+
+@adjoint broadcasted(::typeof(identity), x::Numeric) = x, Δ -> (nothing, Δ)
 
 @adjoint function broadcasted(::typeof(σ), x::Numeric)
   y = σ.(x)
@@ -91,10 +102,10 @@ end
 
 # The fused reverse mode implementation is the most general but currently has
 # poor performance. It works by flattening the broadcast and mapping the call to
-# `_forward` over the input.
+# `_pullback` over the input.
 
 # However, the core call
-# broadcast(_forward, (cx,), f, args...)
+# broadcast(_pullback, (cx,), f, args...)
 # is already 10x slower than a simple broadcast (presumably due to inlining
 # issues, or something similar) and the other operations needed take it to about
 # 100x overhead.
@@ -104,28 +115,33 @@ end
 # Avoid hitting special cases for `Adjoint` etc.
 _broadcast(f::F, x...) where F = materialize(broadcasted(f, x...))
 
+_get(x::Tuple, i) = x[i]
+_get(::Nothing, i) = nothing
+collapse_nothings(xs::Vector{Nothing}) = nothing
+collapse_nothings(xs) = xs
+
 @adjoint function broadcasted(::AbstractArrayStyle, f, args...)
   len = inclen(args)
-  y∂b = _broadcast((x...) -> _forward(__context__, f, x...), args...)
+  y∂b = _broadcast((x...) -> _pullback(__context__, f, x...), args...)
   y = map(x -> x[1], y∂b)
   ∂b = map(x -> x[2], y∂b)
   y, function (ȳ)
     dxs_zip = map((∂b, ȳ) -> ∂b(ȳ), ∂b, ȳ)
-    dxs = ntuple(i -> map(x -> x[i], dxs_zip), len)
+    dxs = collapse_nothings.(ntuple(i -> map(x -> _get(x, i), dxs_zip), len))
     (nothing, accum_sum(dxs[1]), map(unbroadcast, args, Base.tail(dxs))...)
   end
 end
 
 @adjoint function broadcasted(::AbstractArrayStyle{0}, f, args...)
   len = inclen(args)
-  y, ∂b = _broadcast((x...) -> _forward(__context__, f, x...), args...)
+  y, ∂b = _broadcast((x...) -> _pullback(__context__, f, x...), args...)
   y, function (ȳ)
     dxs = ∂b(ȳ)
     (nothing, dxs...)
   end
 end
 
-@adjoint! (b::typeof(broadcast))(f, args...) = _forward(__context__, broadcasted, f, args...)
+@adjoint! (b::typeof(broadcast))(f, args...) = _pullback(__context__, broadcasted, f, args...)
 
 # Forward Mode (mainly necessary for CUDA)
 
@@ -159,7 +175,16 @@ end
 
 @init @require CuArrays="3a865a2d-5b23-5a0f-bc46-62713ec82fae" begin
   @adjoint function broadcasted(::Broadcast.ArrayStyle{CuArrays.CuArray}, f, args...)
-    y, back = broadcast_forward(f, args...)
+    y, back = broadcast_forward(CuArrays.cufunc(f), args...)
     y, ȳ -> (nothing, nothing, back(ȳ)...)
   end
+
+  @adjoint CuArrays.CuArray{N,T}(xs::Array) where {N,T} =
+    CuArrays.CuArray{N,T}(xs), Δ -> (convert(Array, Δ), )
+
+  @adjoint function sum(xs::CuArrays.CuArray; dims = :)
+    placeholder = similar(xs)
+    sum(xs, dims = dims), Δ -> (placeholder .= Δ,)
+  end
+
 end

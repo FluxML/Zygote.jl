@@ -39,16 +39,16 @@ Note that this currently only works inside Juno.
 
 Julia's code and type inference reflection tools can also be useful, though
 Zygote's use of closures can make the output noisy. To see the code Julia runs
-you should use the low-level `_forward` method and the pullback it returns.
+you should use the low-level `_pullback` method and the pullback it returns.
 This will directly show either the derived adjoint code or the code for a custom
 adjoint, if there is one.
 
 ```julia
-julia> using Zygote: Context, _forward
+julia> using Zygote: Context, _pullback
 
 julia> add(a, b) = a+b
 
-julia> @code_typed _forward(Context(), add, 1, 2)
+julia> @code_typed _pullback(Context(), add, 1, 2)
 CodeInfo(
 1 ─ %1 = (Base.getfield)(args, 1)::Int64
 │   %2 = (Base.getfield)(args, 2)::Int64
@@ -57,7 +57,7 @@ CodeInfo(
 └──      return %4
 ) => Tuple{Int64,typeof(∂(add))}
 
-julia> y, back = _forward(Context(), add, 1, 2)
+julia> y, back = _pullback(Context(), add, 1, 2)
 (3, ∂(add))
 
 julia> @code_typed back(1)

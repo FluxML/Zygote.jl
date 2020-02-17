@@ -6,15 +6,15 @@ At least, that's the idea. We're still in beta so expect some adventures.
 
 ## Setup
 
-Zygote is still moving quickly and it's best to work from the development branches. Run this in a Julia session:
+Zygote can be installed from the package manager in Julia's REPL:
 
 ```julia
-using Pkg; pkg"add Zygote#master"
+] add Zygote
 ```
 
 ## Taking Gradients
 
-Zygote is easy to understand since, at its core, it has a one-function API (`forward`), along with a few simple conveniences. Before explaining `forward`, we'll look at the higher-level function `gradient`.
+Zygote is easy to understand since, at its core, it has a one-function API (`pullback`), along with a few simple conveniences. Before explaining `pullback`, we'll look at the higher-level function `gradient`.
 
 `gradient` calculates derivatives. For example, the derivative of ``3x^2 + 2x + 1`` is ``6x + 2``, so when `x = 5`, `dx = 32`.
 
@@ -153,7 +153,7 @@ Dict{Any,Any} with 2 entries:
   :W => [0.628998 … 0.433006]
 ```
 
-An extension of this is the Flux-style model in which we use call overloading to combine the weight object with the forward pass (equivalent to a closure).
+An extension of this is the Flux-style model in which we use call overloading to combine the weight object with the pullback pass (equivalent to a closure).
 
 ```julia
 julia> struct Linear

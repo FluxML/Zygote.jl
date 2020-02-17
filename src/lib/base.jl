@@ -1,6 +1,6 @@
 using Base: @get!
 
-@nograd readline
+@nograd readline, Base.gc_num, Base.time_ns
 
 # Gradient of AD stacks
 
@@ -25,7 +25,7 @@ end
 
 grad_mut(d::AbstractDict) = Dict()
 
-# TODO perhaps look up mutable gradients in `forward`
+# TODO perhaps look up mutable gradients in `pullback`
 function accum(a::AbstractDict, b::AbstractDict)
   @assert a === b
   return a
@@ -46,6 +46,8 @@ end
     (nothing, Δ, nothing)
   end
 end
+
+@nograd haskey
 
 # Channels
 
@@ -70,7 +72,7 @@ end
 @adjoint! function Task(f)
   t = Task(f)
   t.code = function ()
-    y, back = _forward(__context__, f)
+    y, back = _pullback(__context__, f)
     cache(__context__)[t] = Task(back)
     return y
   end
