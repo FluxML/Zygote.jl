@@ -2,28 +2,51 @@ using Zygote, NNlib, Test, Random, LinearAlgebra, Statistics, FillArrays, FFTW
 using Zygote: gradient
 using NNlib: conv, ∇conv_data, depthwiseconv
 using Base.Broadcast: broadcast_shape
+using FiniteDifferences: FiniteDifferences, central_fdm, forward_fdm, backward_fdm
 
-function ngradient(f, xs::AbstractArray...)
-  grads = zero.(xs)
-  for (x, Δ) in zip(xs, grads), i in 1:length(x)
-    δ = sqrt(eps())
-    tmp = x[i]
-    x[i] = tmp - δ/2
-    y1 = f(xs...)
-    x[i] = tmp + δ/2
-    y2 = f(xs...)
-    x[i] = tmp
-    Δ[i] = (y2-y1)/δ
+realdomainrange(::Any) = (-Inf, Inf)
+realdomainrange(::Union{typeof.((acos,asin,atanh))...}) = (-1, 1)
+realdomainrange(::typeof(acosh)) = (1, Inf)
+realdomainrange(::Union{typeof.((log,sqrt,^))...}) = (0, Inf)
+
+function default_fdm(f::F) where F
+  # Attempt to choose a way of finite differencing that will avoid escaping the domain
+  lower, upper = realdomainrange(F)
+  if lower == -Inf && upper==Inf  # Ideal case
+    central_fdm(3, 1; adapt=0)
+  elseif upper == Inf
+    forward_fdm(3, 1; adapt=0)
+  elseif lower == -Inf
+    backward_fdm(3,1; adapt=0)
+  else  # fallback, hopefully input is not near bounds
+    central_fdm(3, 1; adapt=0)
   end
-  return grads
 end
 
-gradcheck(f, xs...) =
-  all(isapprox.(ngradient(f, xs...),
-                gradient(f, xs...), rtol = 1e-5, atol = 1e-5))
+function ngradient(f, xs::AbstractArray...; fdm=default_fdm(f))
+    return FiniteDifferences.grad(fdm, f, xs...)
+end
 
-gradtest(f, xs::AbstractArray...) = gradcheck((xs...) -> sum(sin.(f(xs...))), xs...)
-gradtest(f, dims...) = gradtest(f, rand.(Float64, dims)...)
+function gradcheck(f, xs...; kwargs...)
+  fin_grads = ngradient(f, xs...; kwargs...)
+  ad_grads = gradient(f, xs...)
+  all_correct = true
+  for (ii, (fin_grad, ad_grad)) in enumerate(zip(fin_grads, ad_grads))
+    correct = isapprox(fin_grad, ad_grad, rtol = 1e-5, atol = 1e-5)
+    if !correct
+      all_correct = false
+      # need to stringify arrays so they show content, rather than just type and size
+      @debug "gradcheck failed" f nth_partial=ii fin_grad="$fin_grad" ad_grad="$ad_grad"
+    end
+  end
+  return all_correct
+end
+
+
+gradtest(f, xs::AbstractArray...; kwargs...) = gradcheck((xs...) -> sum(sin, f(xs...)), xs...; kwargs...)
+# We generate random matrix with elements between 0.2 and -.7 so we are not close to any
+# nondefined areas for common functions
+gradtest(f, dims...; kwargs...) = gradtest(f, rand.(Float64, dims)...; kwargs...)
 
 # utilities for using gradcheck with complex matrices
 _splitreim(A) = (real(A),)
@@ -77,7 +100,7 @@ Random.seed!(0)
 @test gradtest(x -> x', rand(5))
 
 @test gradtest(det, (4, 4))
-@test gradtest(logdet, map(x -> x*x', (rand(4, 4),))[1])
+@test gradtest(logdet, map(x -> x*x' + I, (rand(4, 4),))[1])
 @test gradtest(x -> logabsdet(x)[1], (4, 4))
 
 @testset "getindex" begin
@@ -111,7 +134,9 @@ end
   @test gradient(g, ones(3)) == ([1,0,0],)
 end
 
+@info "Still GradChecking (next is conv)"
 @testset "conv: spatial_rank=$spatial_rank" for spatial_rank in (1, 2, 3)
+  @info "Still GradChecking (conv: spatial_rank=$spatial_rank)"
   x = rand(repeat([10], spatial_rank)..., 3, 2)
   w = rand(repeat([3], spatial_rank)..., 3, 3)
   cdims = DenseConvDims(x, w)
@@ -122,6 +147,8 @@ end
   @test gradtest((x, w) -> depthwiseconv(x, w, dcdims), x, w)
 end
 
+
+@info "Still GradChecking (next is pooling)"
 @testset "pooling: spatial_rank=$spatial_rank" for spatial_rank in (1, 2)
   x = rand(repeat([10], spatial_rank)..., 3, 2)
   pdims = PoolDims(x, 2)
@@ -138,9 +165,13 @@ let
   @test first(back(randn(1, 3))) isa Vector
 end
 
-@test gradtest(x -> repeat(x; inner=2), rand(5))
-@test gradtest(x -> repeat(x; inner=2, outer=3), rand(5))
-@test gradtest(x -> repeat(x; inner=(2,2,1), outer=(1,1,3)), rand(5,4,3))
+
+@info "Still GradChecking (next is repeat)"
+@testset "repeat" begin
+    @test gradtest(x -> repeat(x; inner=2), rand(5))
+    @test gradtest(x -> repeat(x; inner=2, outer=3), rand(5))
+    @test gradtest(x -> repeat(x; inner=(2,2,1), outer=(1,1,3)), rand(5,4,3))
+end
 
 @test gradtest(tr, rand(4, 4))
 
@@ -199,6 +230,7 @@ end
   @test gradtest(x -> mean(x, dims=[1, 2]), rand(2, 3, 4))
 end
 
+@info "Still GradChecking (next is var)"
 @testset "var" begin
   @test gradtest(var, rand(2, 3))
   @test gradtest(x -> var(x, dims=1), rand(2, 3))
@@ -254,7 +286,7 @@ end
 end
 
 @testset "maximum" begin
-  @test gradtest(maximum, rand(2, 3))
+  @test gradtest(maximum, rand(2, 4))
 
   @test gradtest(x -> maximum(x, dims=1), rand(2, 3))
   @test gradtest(x -> maximum(x, dims=2), rand(2, 3))
@@ -304,6 +336,7 @@ end
   @test gradtest(pinv, C)
 end
 
+@info "Still GradChecking (next is multiplication)"
 @testset "multiplication" begin
   @testset "matrix-matrix" begin
     rng, M, P, Q = MersenneTwister(123456), 13, 7, 11
@@ -324,6 +357,7 @@ end
   end
 end
 
+@info "Still GradChecking (next is backsolve)"
 @testset "backsolve" begin
   rng, M, P, Q = MersenneTwister(123456), 13, 10, 9
   X, Y, y = randn(rng, P, P), randn(rng, P, Q), randn(rng, P)
@@ -473,6 +507,8 @@ end
   end
 end
 
+
+@info "Still GradChecking (next is Hermitian)"
 @testset "Hermitian" begin
   rng, P = MersenneTwister(123456), 7
   Re = randn(rng, P, P)
@@ -581,6 +617,7 @@ end
   @test gradcheck(x->lyap(x[1],x[2]),[3.1,4.6])
 end
 
+@info "Still GradChecking (next is matrix exponential)"
 @testset "matrix exponential" begin
   @testset "real dense" begin
     rng, N = MersenneTwister(6865931), 8
@@ -630,8 +667,8 @@ end
 _hermsymtype(::Type{<:Symmetric}) = Symmetric
 _hermsymtype(::Type{<:Hermitian}) = Hermitian
 
-function _gradtest_hermsym(f, ST, A)
-  gradtest(_splitreim(collect(A))...) do (args...)
+function _gradtest_hermsym(f, ST, A; kwargs...)
+  gradtest(_splitreim(collect(A))...; kwargs...) do (args...)
     B = f(ST(_joinreim(_dropimaggrad.(args)...)))
     return sum(_splitreim(B))
   end
@@ -689,11 +726,6 @@ function _randvectorin(rng, n, r)
   return rand(rng, n) .* (u - l) .+ l
 end
 
-realdomainrange(::Any) = (Inf, Inf)
-realdomainrange(::Union{typeof.((acos,asin,atanh))...}) = (-1, 1)
-realdomainrange(::typeof(acosh)) = (1, Inf)
-realdomainrange(::Union{typeof.((log,sqrt,^))...}) = (0, Inf)
-
 function _randmatseries(rng, f, T, n, domain::Type{Real})
   U = _randmatunitary(rng, T, n)
   λ = _randvectorin(rng, n, realdomainrange(f))
@@ -711,6 +743,7 @@ end
 
 _randmatseries(rng, ::typeof(atanh), T, n, domain::Type{Complex}) = nothing
 
+@info "Still GradChecking (next is power series)"
 @testset "Hermitian/Symmetric power series functions" begin
   MTs = (Symmetric{Float64}, Hermitian{Float64}, Hermitian{ComplexF64})
   rng, N = MersenneTwister(123), 7
@@ -824,6 +857,7 @@ _randmatseries(rng, ::typeof(atanh), T, n, domain::Type{Complex}) = nothing
   end
 end
 
+@info "Still GradChecking (next is ^ on Symetric)"
 @testset "^(::Union{Symmetric,Hermitian}, p::Integer)" begin
   MTs = (Symmetric{Float64}, Symmetric{ComplexF64},
          Hermitian{Float64}, Hermitian{ComplexF64})
@@ -856,6 +890,7 @@ end
   end
 end
 
+@info "Still GradChecking (next is Distances)"
 using Distances
 
 Zygote.refresh()
@@ -996,6 +1031,7 @@ end
     @test gradcheck(x -> muladd(x[1], x[2], x[3]), [2.0, 3.0, 5.0])
 end
 
+@info "Still GradChecking (next is StatsFuns)"
 import StatsFuns
 
 Zygote.refresh()
@@ -1080,6 +1116,7 @@ end
   @test gradcheck(x -> sum(sum(diag.([x] .* a))), b)
 end
 
+@info "Still GradChecking (next is Buffer)"
 using Zygote: Buffer
 
 @testset "Buffer" begin
@@ -1166,6 +1203,7 @@ end
 
 end
 
+@info "Still GradChecking (next is FillArrays)"
 @testset "FillArrays" begin
   rng, M, N = MersenneTwister(123456), 7, 11
   x, y = randn(rng), randn(rng)
