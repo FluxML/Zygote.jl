@@ -57,7 +57,7 @@ Now, clearly this is a mechanical transformation, so the only remaining thing is
 
 ## Closures
 
-The `J` function here corresponds to `pullback` in Zygote. However, `pullback` actually a wrapper around the lower level `_pullback` function.
+The `J` function here corresponds to `pullback` in Zygote. However, `pullback` is actually a wrapper around the lower level `_pullback` function.
 
 ```julia
 julia> y, back = Zygote._pullback(sin, 0.5);
@@ -137,7 +137,7 @@ julia> Zygote.@code_adjoint foo(1)
 , [1])
 ```
 
-This code is quite verbose, mainly due to all the tuple unpacking (`gradindex` is just like `getindex`, but handles `nothing` gracefully). The are two pieces of IR here, one for the modified pullback pass and one for the pullback closure. The `@` nodes allow the closure to refer to values from the pullback pass, and the `Δ()` represents the incoming gradient `ȳ`. In essence, this is just what we wrote above by hand for `J(::typeof(foo), x)`.
+This code is quite verbose, mainly due to all the tuple unpacking (`gradindex` is just like `getindex`, but handles `nothing` gracefully). There are two pieces of IR here, one for the modified pullback pass and one for the pullback closure. The `@` nodes allow the closure to refer to values from the pullback pass, and the `Δ()` represents the incoming gradient `ȳ`. In essence, this is just what we wrote above by hand for `J(::typeof(foo), x)`.
 
 `compiler/emit.jl` lowers this code into runnable IR (e.g. by turning `@` references into `getfield`s and stacks), and it's then turned back into lowered code for Julia to run.
 
