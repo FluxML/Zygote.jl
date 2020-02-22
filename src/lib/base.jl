@@ -1,5 +1,3 @@
-using Base: @get!
-
 @nograd readline, Base.gc_num, Base.time_ns
 
 # Gradient of AD stacks
