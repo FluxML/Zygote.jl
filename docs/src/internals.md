@@ -32,7 +32,7 @@ function foo(x)
 end
 ```
 
-We can easily differentiate `foo` if we can differentiate `bar` and `baz`. If we can get pullbacks for those functions via `J`, the pullback for `foo` looks as follows. Where the forward pass calculates `x -> a -> b`, the backwards takes `b̄ -> ā -> x̄` via the pullbacks.
+We can easily differentiate `foo` if we can differentiate the functions it calls. If we can get pullbacks via `J`, the pullback for `foo` looks as follows. Where the forward pass calculates `x -> a -> b`, the backwards takes `b̄ -> ā -> x̄` via the pullbacks.
 
 ```julia
 function J(::typeof(foo), x)
