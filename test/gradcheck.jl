@@ -64,8 +64,8 @@ Random.seed!(0)
 @test gradtest(x -> sum(x[i] for i in 1:length(x)), randn(10))
 @test_broken gradtest(x -> sum(i->x[i], 1:length(x)), randn(10)) # https://github.com/FluxML/Zygote.jl/issues/231
 
-@test_broken gradtest(x -> prod(x, dims = (2, 3)), (3,4,5))
-@test gradtest(x -> prod(x), (3,4,5))
+@test gradtest(x -> prod(x, dims = (2, 3)), (3,4,5))
+@test gradtest(x -> prod(x), (3,4))
 
 @test gradtest(x -> softmax(x).*(1:3), 3)
 @test gradtest(x -> softmax(x).*(1:3), (3,5))
@@ -112,7 +112,7 @@ end
 end
 
 @testset "conv: spatial_rank=$spatial_rank" for spatial_rank in (1, 2, 3)
-  x = rand(repeat([10], spatial_rank)..., 3, 2)
+  x = rand(repeat([5], spatial_rank)..., 3, 2)
   w = rand(repeat([3], spatial_rank)..., 3, 3)
   cdims = DenseConvDims(x, w)
   @test gradtest((x, w) -> conv(x, w, cdims), x, w)
