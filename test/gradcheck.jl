@@ -1,4 +1,4 @@
-using Zygote, NNlib, Test, Random, LinearAlgebra, Statistics, FillArrays, FFTW
+using Zygote, NNlib, Test, Random, LinearAlgebra, Statistics, FillArrays, FFTW, Distances
 using Zygote: gradient
 using NNlib: conv, ∇conv_data, depthwiseconv
 using Base.Broadcast: broadcast_shape
@@ -907,57 +907,49 @@ end
   end
 end
 
-using Distances
-
-Zygote.refresh()
-
 @testset "distances" begin
   rng, P, Q, D = MersenneTwister(123456), 10, 9, 8
 
-   # Check sqeuclidean.
-  let
-    x, y = randn(rng, D), randn(rng, D)
-    @test gradtest(x->sqeuclidean(x, y), x)
-    @test gradtest(y->sqeuclidean(x, y), y)
-  end
+  for (f, metric) in ((euclidean, Euclidean()), (sqeuclidean, SqEuclidean()))
+    let
+      x, y = randn(rng), randn(rng)
+      @test gradtest(x -> f(x[1], y), [x])
+      @test gradtest(x -> evaluate(metric, x[1], y), [x])
+      @test gradtest(y -> f(x, y[1]), [y])
+      @test gradtest(y -> evaluate(metric, x, y[1]), [y])
+    end
 
-   # Check binary colwise.
-  let
-    X, Y = randn(rng, D, P), randn(rng, D, P)
-    @test gradtest(X->colwise(SqEuclidean(), X, Y), X)
-    @test gradtest(Y->colwise(SqEuclidean(), X, Y), Y)
-  end
+    let
+      x, y = randn(rng, D), randn(rng, D)
+      @test gradtest(x -> f(x, y), x)
+      @test gradtest(x -> evaluate(metric, x, y), x)
+      @test gradtest(y -> f(x, y), y)
+      @test gradtest(y -> evaluate(metric, x, y), y)
+    end
 
-   # Check binary pairwise.
-  let
-    X, Y = randn(rng, D, P), randn(rng, D, Q)
-    @test gradtest(X->pairwise(SqEuclidean(), X, Y; dims=2), X)
-    @test gradtest(Y->pairwise(SqEuclidean(), X, Y; dims=2), Y)
-  end
-  let
-    Xt, Yt = randn(rng, P, D), randn(rng, Q, D)
-    @test gradtest(Xt->pairwise(SqEuclidean(), Xt, Yt; dims=1), Xt)
-    @test gradtest(Yt->pairwise(SqEuclidean(), Xt, Yt; dims=1), Yt)
-  end
+    # Check binary colwise.
+    let
+      X, Y = randn(rng, D, P), randn(rng, D, P)
+      @test gradtest(X->colwise(metric, X, Y), X)
+      @test gradtest(Y->colwise(metric, X, Y), Y)
+    end
 
-   # Check unary pairwise.
-  @test gradtest(X->pairwise(SqEuclidean(), X; dims=2), randn(rng, D, P))
-  @test gradtest(Xt->pairwise(SqEuclidean(), Xt; dims=1), randn(rng, P, D))
+    # Check binary pairwise.
+    let
+      X, Y = randn(rng, D, P), randn(rng, D, Q)
+      @test gradtest(X->pairwise(metric, X, Y; dims=2), X)
+      @test gradtest(Y->pairwise(metric, X, Y; dims=2), Y)
+    end
 
-  @testset "colwise(::Euclidean, X, Y; dims=2)" begin
-    rng, D, P = MersenneTwister(123456), 2, 3
-    X, Y, D̄ = randn(rng, D, P), randn(rng, D, P), randn(rng, P)
-    gradtest((X, Y)->colwise(Euclidean(), X, Y), X, Y)
-  end
-  @testset "pairwise(::Euclidean, X, Y; dims=2)" begin
-    rng, D, P, Q = MersenneTwister(123456), 2, 3, 5
-    X, Y, D̄ = randn(rng, D, P), randn(rng, D, Q), randn(rng, P, Q)
-    gradtest((X, Y)->pairwise(Euclidean(), X, Y; dims=2), X, Y)
-  end
-  @testset "pairwise(::Euclidean, X; dims=2)" begin
-    rng, D, P = MersenneTwister(123456), 2, 3
-    X, D̄ = randn(rng, D, P), randn(rng, P, P)
-    gradtest(X->pairwise(Euclidean(), X; dims=2), X)
+    let
+      Xt, Yt = randn(rng, P, D), randn(rng, Q, D)
+      @test gradtest(Xt->pairwise(metric, Xt, Yt; dims=1), Xt)
+      @test gradtest(Yt->pairwise(metric, Xt, Yt; dims=1), Yt)
+    end
+
+    # Check unary pairwise.
+    @test gradtest(X->pairwise(metric, X; dims=2), randn(rng, D, P))
+    @test gradtest(Xt->pairwise(metric, Xt; dims=1), randn(rng, P, D))
   end
 end
 
