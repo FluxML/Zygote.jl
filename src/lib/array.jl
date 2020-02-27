@@ -216,7 +216,7 @@ end
   return sum(abs2, X; dims=dims), Δ::Union{Number, AbstractArray}->(nothing, ((2Δ) .* X))
 end
 
-@adjoint function prod(xs; dims = :)
+@adjoint function prod(xs::AbstractArray; dims = :)
   p = prod(xs; dims = dims)
   p, Δ -> (p ./ xs .* Δ,)
 end
