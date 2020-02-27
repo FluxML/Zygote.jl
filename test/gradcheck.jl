@@ -83,7 +83,7 @@ end
 
 @test gradtest(x -> prod(x, dims = (2, 3)), (3,4,5))
 @test gradtest(x -> prod(x), (3,4))
-@test gradient(x -> prod((1,2,3)), 1)[1] === nothing 
+@test gradient(x -> prod(x), (1,2,3))[1] == (6,3,2)
 
 @test gradtest(x -> softmax(x).*(1:3), 3)
 @test gradtest(x -> softmax(x).*(1:3), (3,5))
