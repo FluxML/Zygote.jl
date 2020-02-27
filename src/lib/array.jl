@@ -129,6 +129,16 @@ end
   end
 end
 
+@adjoint repeat(x::AbstractVector, m::Integer) =
+   repeat(x, m), ȳ -> (dropdims(sum(reshape(ȳ, length(x), :); dims=2); dims=2), nothing)
+
+@adjoint function repeat(x::AbstractVecOrMat, m::Integer, n::Integer=1)
+   return repeat(x, m, n), function (ȳ)
+      ȳ′ = reshape(ȳ, size(x,1), m, size(x,2), n)
+      return reshape(sum(ȳ′; dims=(2,4)), size(x)), nothing, nothing
+   end
+end
+
 @adjoint getindex(i::Int, j::Int) = i[j], _ -> nothing
 
 function unzip(tuples)
@@ -168,6 +178,15 @@ end
 @adjoint function sort(x::AbstractArray)
   p = sortperm(x)
   return x[p], x̄ -> (x̄[invperm(p)],)
+end
+
+@adjoint function filter(f, x::AbstractVector)
+    t = map(f, x)
+    x[t], Δ -> begin
+        dx = _zero(x, eltype(Δ))
+        dx[t] .= Δ
+        (nothing, dx)
+    end
 end
 
 # Reductions

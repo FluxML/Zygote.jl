@@ -164,6 +164,11 @@ end
 @test gradtest(x -> repeat(x; inner=2, outer=3), rand(5))
 @test gradtest(x -> repeat(x; inner=(2,2,1), outer=(1,1,3)), rand(5,4,3))
 
+@test gradtest(x -> repeat(x, 3), rand(5))
+@test gradtest(x -> repeat(x, 2, 3), rand(5))
+@test gradtest(x -> repeat(x, 5), rand(5,7))
+@test gradtest(x -> repeat(x, 3, 2), rand(5,3))
+
 @test gradtest(tr, rand(4, 4))
 
 @testset "fill" begin
@@ -210,6 +215,16 @@ end
 @testset "sort" begin
   @test gradtest(sort, 5)
 end
+
+@testset "filter" begin
+  @test gradtest(xs -> filter(x -> x > 0.5, xs), 20)
+
+  @test gradient(x -> sum(log, filter(iseven, x)), 1:10) ==
+    (map(x -> iseven(x) ? 1/x : 0, 1:10),)
+  @test gradient(x -> sum(abs2, im .+ filter(iseven, x)), 1:10) ==
+    (map(x -> iseven(x) ? 2x+2im : 0, 1:10),)
+end
+
 
 @testset "mean" begin
   @test gradtest(mean, rand(2, 3))
