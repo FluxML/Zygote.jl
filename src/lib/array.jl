@@ -272,11 +272,11 @@ _backvar(xs, Δ, N::Int, mean) = (convert(eltype(xs), 2/N) .* Δ .* (xs .- mean)
 end
 
 @adjoint function cumsum(xs::AbstractVector; dims::Integer = 1)
-  dims==1 || return xs, Δ -> (Δ,)
+  dims == 1 || return copy(xs), Δ -> (Δ,)
   cumsum(xs), Δ -> (reverse(cumsum(reverse(Δ))),)
 end
 @adjoint function cumsum(xs::AbstractArray; dims::Integer)
-  dims<=ndims(xs) || return xs, Δ -> (Δ,)
+  dims <= ndims(xs) || return copy(xs), Δ -> (Δ,)
   cumsum(xs; dims=dims), Δ -> begin
     (reverse(cumsum(reverse(Δ, dims=dims), dims=dims), dims=dims),)
   end
