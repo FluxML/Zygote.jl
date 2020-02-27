@@ -53,6 +53,8 @@ _droplike(dy, dxv) = dy
 _droplike(dy::Union{LinearAlgebra.Adjoint, LinearAlgebra.Transpose}, dxv::AbstractVector) =
   dropdims(dy; dims=2)
 
+@adjoint getindex(::Type{T}, xs...) where {T} = T[xs...], dy -> (nothing, dy...)
+
 @adjoint! setindex!(xs::AbstractArray, x...) = setindex!(xs, x...),
   _ -> error("Mutating arrays is not supported")
 
