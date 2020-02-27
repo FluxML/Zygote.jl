@@ -125,6 +125,7 @@ end
 
   # https://github.com/FluxML/Zygote.jl/issues/513
   @test gradient(p -> sum(Float32[1,0] - p), [2,3]) == ([-1,-1],)
+  @test gradient(x -> sum(Float32[1,x] .+ x), 4) == (3.0f0,)
 end
 
 @testset "view" begin
