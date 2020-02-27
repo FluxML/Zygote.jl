@@ -4,7 +4,7 @@ using Base.Broadcast: broadcasted, broadcast_shape
 
 @adjoint (::Type{T})(::UndefInitializer, args...) where T<:Array = T(undef, args...), Δ -> nothing
 
-@nograd size, length, eachindex, Colon(), findfirst, rand, randn, randexp, randperm, randcycle, ones, zeros, one, zero,
+@nograd size, length, eachindex, Colon(), findfirst, randexp, randperm, randcycle, ones, zeros, one, zero,
   print, println
 
 
