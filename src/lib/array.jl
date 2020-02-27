@@ -16,6 +16,9 @@ using Base.Broadcast: broadcasted, broadcast_shape
 
 @adjoint copy(x::AbstractArray) = copy(x), ȳ -> (ȳ,)
 
+@adjoint collect(x::Tuple) = collect(x), dy -> (Tuple(dy),)
+@adjoint collect(x::AbstractArray) = collect(x), dy -> (dy,)
+
 # Array Constructors
 @adjoint (::Type{T})(x::T) where T<:Array = T(x), ȳ -> (ȳ,)
 @adjoint function (::Type{T})(x::Number, sz) where {T <: Fill}
@@ -40,10 +43,15 @@ _zero(xs::AbstractArray, T=Any) = Union{Nothing, T}[nothing for x in xs]
     dx[inds...] = dy
   else
     dx = _zero(x, eltype(dy))
-    @views dx[inds...] .+= dy
+    dxv = view(dx, inds...)
+    dxv .+= _droplike(dy, dxv)
   end
   (dx, map(_->nothing, inds)...)
 end
+
+_droplike(dy, dxv) = dy
+_droplike(dy::Union{LinearAlgebra.Adjoint, LinearAlgebra.Transpose}, dxv::AbstractVector) =
+  dropdims(dy; dims=2)
 
 @adjoint! setindex!(xs::AbstractArray, x...) = setindex!(xs, x...),
   _ -> error("Mutating arrays is not supported")
