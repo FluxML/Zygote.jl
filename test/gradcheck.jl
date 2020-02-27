@@ -88,7 +88,8 @@ end
 @test gradtest(x -> cumsum(x, dims=2), (3,4,5))
 @test gradtest(x -> cumsum(x, dims=1), (3,))
 @test gradtest(x -> cumsum(x), (4,))
-@test gradtest(x -> cumsum(x, dims=2), (5,))
+@test gradtest(x -> cumsum(x, dims=3), (5,))  # trivial
+@test gradtest(x -> cumsum(x, dims=3), (3,4)) # trivial
 
 @test gradtest(x -> softmax(x).*(1:3), 3)
 @test gradtest(x -> softmax(x).*(1:3), (3,5))
