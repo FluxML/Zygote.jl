@@ -273,7 +273,6 @@ end
 
 @adjoint function cumsum(xs::AbstractArray; dims = 1)
   cumsum(xs; dims=dims), Δ -> begin
-    xs isa AbstractVector && return dims==1 ? (reverse(cumsum(reverse(Δ))),) : (Δ,)
     (reverse(cumsum(reverse(Δ, dims=dims), dims=dims), dims=dims),)
   end
 end
