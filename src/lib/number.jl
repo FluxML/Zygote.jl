@@ -22,12 +22,19 @@ end
 
 for (M, f, arity) in DiffRules.diffrules()
   arity == 2 || continue
+  f == :^ && continue
   da, db = DiffRules.diffrule(M, f, :a, :b)
   @eval begin
     @adjoint $M.$f(a::Number, b::Number) = $M.$f(a, b),
       Δ -> (Δ * conj($da), Δ * conj($db))
   end
 end
+
+@adjoint Base.:^(x::Number, p::Number) = x^p,
+  Δ -> (Δ * conj(p * x^(p-1)), Δ * conj(x^p * log(complex(x))))
+@adjoint Base.literal_pow(::typeof(^), x::Number, ::Val{p}) where {p} =
+  Base.literal_pow(^,x,Val(p)),
+  Δ -> (nothing, Δ * conj(p * Base.literal_pow(^,x,Val(p-1))), nothing)
 
 @adjoint Base.convert(T::Type{<:Real}, x::Real) = convert(T, x), ȳ -> (nothing, ȳ)
 @adjoint (T::Type{<:Real})(x::Real) = T(x), ȳ -> (nothing, ȳ)
