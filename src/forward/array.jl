@@ -11,6 +11,8 @@ end
 @tangent size(A::AbstractArray, i::Integer) = size(A, i), (_, _) -> 0
 @tangent size(A::AbstractArray) = size(A), _ -> zerolike(size(A))
 
+@tangent Base.vect(xs...) = Base.vect(xs...), Base.vect
+
 @tangent first(x) = first(x), ẋ -> first(ẋ)
 
 @tangent setindex!(x::AbstractArray, v, inds...) =
