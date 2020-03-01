@@ -5,7 +5,8 @@ using Base: tail
 drop(x, n) = n == 0 ? x : :(tail($(drop(x, n-1))))
 drop(n) = x -> drop(x, n)
 
-function rule end
+# TODO: move to ZygoteRules
+function tangent end
 
 function gradm(ex)
   @capture(shortdef(ex), (name_(args__) = body_) |
@@ -26,15 +27,15 @@ function gradm(ex)
   fargs = kw == nothing ? [:($f::$T), args...] : [kw, :($f::$T), args...]
   dropg  = isclosure ? identity : drop(1)
   dropkw = isclosure ?  drop(2) : drop(3)
-  adj = @q @inline Zygote.Forward.rule($(fargs...)) where $(Ts...) = $(esc(body))
+  adj = @q @inline Zygote.Forward.tangent($(fargs...)) where $(Ts...) = $(esc(body))
   quote
     $adj
-    @inline function Zygote.Forward._tangent(partials, $f::$T, $(args...)) where $(Ts...)
-      y, forw = rule($f, $(argnames...))
+    @inline function Zygote.Forward._pushforward(partials, $f::$T, $(args...)) where $(Ts...)
+      y, forw = tangent($f, $(argnames...))
       return y, forw($(dropg(:partials))...)
     end
-    @inline function Zygote.Forward._tangent(dargs, ::$kT, kw, $f::$T, $(args...)) where $(Ts...)
-      y, forw = rule($f, $(argnames...))
+    @inline function Zygote.Forward._pushforward(dargs, ::$kT, kw, $f::$T, $(args...)) where $(Ts...)
+      y, forw = tangent($f, $(argnames...))
       return y, forw($(dropkw(:partials))...)
     end
     nothing
@@ -45,4 +46,4 @@ macro tangent(ex)
   gradm(ex)
 end
 
-pushforward(f, x...) = (ẋ...) -> _tangent((zerolike(f), ẋ...), f, x...)[2]
+pushforward(f, x...) = (ẋ...) -> _pushforward((zerolike(f), ẋ...), f, x...)[2]

@@ -55,7 +55,7 @@ function dual(ir)
       Δs[v] = false
     elseif isexpr(st.expr, :call)
       dargs = insert!(pr, v, xcall(:tuple, partial.((v,), st.expr.args)...))
-      result = insert!(pr, v, stmt(st, expr = xcall(Forward, :_tangent, dargs, st.expr.args...)))
+      result = insert!(pr, v, stmt(st, expr = xcall(Forward, :_pushforward, dargs, st.expr.args...)))
       pr[v] = xcall(:getindex, result, 1)
       Δs[v] = push!(pr, xcall(:getindex, result, 2))
     elseif !isexpr(st.expr)
@@ -68,7 +68,7 @@ function dual(ir)
   return ir
 end
 
-@dynamo function _tangent(_, x...)
+@dynamo function _pushforward(_, x...)
   ir = IR(x...)
   ir == nothing && return :(error("non-differentiable function $(args[2])"))
   return dual(ir)

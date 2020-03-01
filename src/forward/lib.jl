@@ -38,9 +38,9 @@ zerolike(x::Core.Box) = isdefined(x, :contents) ? Core.Box(zerolike(x.contents))
 @tangent __splatnew__(T, s) =
   __splatnew__(T, s), (_, ṡ) -> NamedTuple{fieldnames(T)}(ṡ)
 
-function _tangent(dargs, ::typeof(Core._apply), f, args...)
+function _pushforward(dargs, ::typeof(Core._apply), f, args...)
   dargs = tail(dargs) # drop self gradient
   df, dargs = first(dargs), tail(dargs)
   dargs = Core._apply(tuple, dargs...)
-  Core._apply(_tangent, ((df, dargs...), f), args...)
+  Core._apply(_pushforward, ((df, dargs...), f), args...)
 end
