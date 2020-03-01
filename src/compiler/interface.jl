@@ -1,12 +1,10 @@
 mutable struct Context <: AContext
   cache::Union{IdDict{Any,Any},Nothing}
-  globals::Union{Dict{GlobalRef,Any},Nothing}
 end
 
-Context() = Context(nothing, nothing)
+Context() = Context(nothing)
 
 cache(cx::Context) = cx.cache === nothing ? (cx.cache = IdDict()) : cx.cache
-globals(cx::Context) = cx.globals === nothing ? (cx.globals = Dict{GlobalRef,Any}()) : cx.globals
 
 struct Pullback{S,T}
   t::T
