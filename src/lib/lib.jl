@@ -41,6 +41,10 @@ end
 
 @adjoint Base.typeassert(x, T) = Base.typeassert(x, T), Δ -> (Δ, nothing)
 
+# TODO: check correctness. Gradients should be linear types. Right now it's
+# likely possible for gradients to be accumulated as params or globals and
+# backpropagated as values; these should be mutually exclusive options.
+
 @generated function accum_param(cx::Context, x, Δ)
   isbitstype(x) && return
   quote
@@ -50,7 +54,8 @@ end
 end
 
 function accum_global(cx::Context, ref, x̄)
-  gs = globals(cx)
+  (x̄ == nothing || isconst(ref.mod, ref.name)) && return
+  gs = cache(cx)
   gs[ref] = accum(get(gs, ref, nothing), x̄)
   return
 end
@@ -61,8 +66,6 @@ unwrap(x) = x
 
 unwrap(ref, x) = x
 
-# Right now we accumulate twice, for both implicit params and the `globals`
-# API. Eventually we'll deprecate implicit params.
 @adjoint unwrap(ref, x) = unwrap(x), function (x̄)
   accum_global(__context__, ref, x̄)
   accum_param(__context__, x, x̄)
@@ -75,7 +78,7 @@ end
 
 @adjoint! function global_set(ref, x)
   global_set(ref, x), function (x̄)
-    gs = globals(__context__)
+    gs = cache(__context__)
     x̄ = accum(get(gs, ref, nothing), x̄)
     gs[ref] = nothing
     return (nothing, x̄)
