@@ -1,5 +1,5 @@
 using NNlib
-import NNlib: softmax, ∇softmax, logsoftmax, ∇logsoftmax, conv, depthwiseconv, ∇conv_data, ∇depthwiseconv_data, maxpool, meanpool, σ, relu
+import NNlib: softmax, ∇softmax, logsoftmax, ∇logsoftmax, conv, depthwiseconv, ∇conv_data, ∇depthwiseconv_data, maxpool, meanpool, σ, relu, batched_mul, batched_adjoint
 
 @adjoint function Base.Broadcast.broadcasted(::typeof(relu), x::Numeric)
   relu.(x), Δ -> (nothing, ifelse.(x .> 0, Δ, zero.(x)))
@@ -66,4 +66,9 @@ end
 @adjoint function meanpool(x, pdims; kw...)
   y = meanpool(x, pdims; kw...)
   y, Δ -> (NNlib.∇meanpool(Δ, y, x, pdims; kw...), nothing)
+end
+
+@adjoint function batched_mul(A, B)
+    C = batched_mul(A, B)
+    C, Δ -> (batched_mul(Δ, batched_adjoint(B)), batched_mul(batched_adjoint(A), Δ))
 end
