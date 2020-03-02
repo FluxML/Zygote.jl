@@ -1,6 +1,6 @@
 using Zygote, NNlib, Test, Random, LinearAlgebra, Statistics, FillArrays, FFTW, Distances
 using Zygote: gradient
-using NNlib: conv, ∇conv_data, depthwiseconv
+using NNlib: conv, ∇conv_data, depthwiseconv, batched_mul
 using Base.Broadcast: broadcast_shape
 
 function ngradient(f, xs::AbstractArray...)
@@ -367,8 +367,9 @@ end
 end
 
 @testset "multiplication" begin
+  rng, M, P, Q = MersenneTwister(123456), 13, 7, 11
   @testset "matrix-matrix" begin
-    rng, M, P, Q = MersenneTwister(123456), 13, 7, 11
+
     @test gradtest(*, randn(rng, M, P), randn(rng, P, Q))
     @test gradtest(*, randn(rng, M, P), randn(rng, P))
     @test gradtest(*, randn(rng, M, 1), randn(rng, 1, Q))
@@ -383,6 +384,11 @@ end
       y, back = Zygote.pullback(*, randn(rng, M), randn(rng, 1, P))
       @test first(back(randn(rng, M, P))) isa Vector
     end
+  end
+
+  @testset "batched matrix multiplication" begin
+    B = 3
+    @test gradtest(batched_mul, randn(rng, M, P, B), randn(rng, P, Q, B))
   end
 end
 
