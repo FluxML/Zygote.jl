@@ -13,6 +13,9 @@ using Zygote, Test, LinearAlgebra
 
 @test gradient(x -> norm((im*x) ./ (im)), 2)[1] == 1
 @test gradient(x -> norm((im) ./ (im*x)), 2)[1] == -1/4
+@test gradient(x -> real(det(x)), [1 2im; 3im 4])[1] ≈ [4 3im; 2im 1]
+@test gradient(x -> real(logdet(x)), [1 2im; 3im 4])[1] ≈ [4 3im; 2im 1]/10
+@test gradient(x -> real(logabsdet(x)[1]), [1 2im; 3im 4])[1] ≈ [4 3im; 2im 1]/10
 
 fs_C_to_R = (real,
              imag,
