@@ -341,11 +341,11 @@ end
 
 @adjoint diag(A::AbstractMatrix) = diag(A), Δ->(Diagonal(Δ),)
 
-@adjoint det(xs) = det(xs), Δ -> (Δ * det(xs) * transpose(inv(xs)),)
+@adjoint det(xs) = det(xs), Δ -> (Δ * det(xs) * inv(xs)',)
 
-@adjoint logdet(xs) = logdet(xs), Δ -> (Δ * transpose(inv(xs)),)
+@adjoint logdet(xs) = logdet(xs), Δ -> (Δ * inv(xs)',)
 
-@adjoint logabsdet(xs) = logabsdet(xs), Δ -> (Δ[1] * transpose(inv(xs)),)
+@adjoint logabsdet(xs) = logabsdet(xs), Δ -> (Δ[1] * inv(xs)',)
 
 @adjoint function inv(A)
   Ainv = inv(A)

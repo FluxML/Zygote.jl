@@ -1,4 +1,4 @@
-using Zygote, Test
+using Zygote, Test, LinearAlgebra
 
 @test gradient(x -> real(abs(x)*exp(im*angle(x))), 10+20im)[1] ≈ 1
 @test gradient(x -> imag(real(x)+0.3im), 0.3)[1] ≈ 0
@@ -10,6 +10,12 @@ using Zygote, Test
 @test gradient(a -> real(([a].*conj([a])))[], 0.3im)[1] == 0.6im
 @test gradient(a -> real(([a].*conj.([a])))[], 0.3im)[1] == 0.6im
 @test gradient(a -> real.(([a].*conj.([a])))[], 0.3im)[1] == 0.6im
+
+@test gradient(x -> norm((im*x) ./ (im)), 2)[1] == 1
+@test gradient(x -> norm((im) ./ (im*x)), 2)[1] == -1/4
+@test gradient(x -> real(det(x)), [1 2im; 3im 4])[1] ≈ [4 3im; 2im 1]
+@test gradient(x -> real(logdet(x)), [1 2im; 3im 4])[1] ≈ [4 3im; 2im 1]/10
+@test gradient(x -> real(logabsdet(x)[1]), [1 2im; 3im 4])[1] ≈ [4 3im; 2im 1]/10
 
 fs_C_to_R = (real,
              imag,
