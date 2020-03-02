@@ -18,9 +18,15 @@ end
 @adjoint NNlib.DepthwiseConvDims(args...; kwargs...) = NNlib.DepthwiseConvDims(args...; kwargs...), _ -> nothing
 @adjoint NNlib.PoolDims(args...; kwargs...) = NNlib.PoolDims(args...; kwargs...), _ -> nothing
 
+colmajor(x) = colmajor(MemoryLayout(typeof(x)), x)
+colmajor(_, x) = convert(Array, x)
+colmajor(::AbstractColumnMajor, x) = x
+
+
 @adjoint conv(x, w, cdims; kw...) =
   conv(x, w, cdims; kw...),
     Δ -> begin
+       Δ = colmajor(Δ)
        return (
            NNlib.∇conv_data(Δ, w, cdims; kw...),
            NNlib.∇conv_filter(x, Δ, cdims; kw...),
@@ -31,6 +37,7 @@ end
 @adjoint ∇conv_data(x, w, cdims; kw...) =
   ∇conv_data(x, w, cdims; kw...),
     Δ -> begin
+       Δ = colmajor(Δ)
        return (
            NNlib.conv(Δ, w, cdims; kw...),
            NNlib.∇conv_filter(Δ, x, cdims; kw...),
@@ -41,6 +48,7 @@ end
 @adjoint depthwiseconv(x, w, cdims; kw...) =
   depthwiseconv(x, w, cdims; kw...),
     Δ -> begin
+       Δ = colmajor(Δ)
        return (
            NNlib.∇depthwiseconv_data(Δ, w, cdims; kw...),
            NNlib.∇depthwiseconv_filter(x, Δ, cdims; kw...),
@@ -51,6 +59,7 @@ end
 @adjoint ∇depthwiseconv_data(x, w, cdims; kw...) =
   ∇depthwiseconv_data(x, w, cdims; kw...),
     Δ -> begin
+       Δ = colmajor(Δ)
        return (
            NNlib.depthwiseconv(Δ, w, cdims; kw...),
            NNlib.∇depthwiseconv_filter(Δ, x, cdims; kw...),

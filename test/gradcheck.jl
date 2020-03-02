@@ -158,10 +158,19 @@ end
   w = rand(repeat([3], spatial_rank)..., 3, 3)
   cdims = DenseConvDims(x, w)
   @test gradtest((x, w) -> conv(x, w, cdims), x, w)
+  @test gradtest((x, w) -> sum(conv(x, w, cdims)), x, w)  # https://github.com/FluxML/Flux.jl/issues/1055
+  
   y = conv(x, w, cdims)
   @test gradtest((y, w) -> ∇conv_data(y, w, cdims), y, w)
+  @test gradtest((y, w) -> sum(∇conv_data(y, w, cdims)), y, w)
+  
   dcdims = DepthwiseConvDims(x, w)
   @test gradtest((x, w) -> depthwiseconv(x, w, dcdims), x, w)
+  @test gradtest((x, w) -> sum(depthwiseconv(x, w, dcdims)), x, w)
+
+  y = depthwiseconv(x, w, dcdims)
+  @test gradtest((y, w) -> ∇depthwiseconv_data(y, w, dcdims), y, w)
+  @test gradtest((y, w) -> sum(∇depthwiseconv_data(y, w, dcdims)), y, w)
 end
 
 @testset "pooling: spatial_rank=$spatial_rank" for spatial_rank in (1, 2)
@@ -169,6 +178,8 @@ end
   pdims = PoolDims(x, 2)
   @test gradtest(x -> maxpool(x, pdims), x)
   @test gradtest(x -> meanpool(x, pdims), x)
+  @test gradtest(x -> sum(maxpool(x, pdims)), x)
+  @test gradtest(x -> sum(meanpool(x, pdims)), x)
 end
 
 @test gradtest(x -> reverse(x), rand(17))
