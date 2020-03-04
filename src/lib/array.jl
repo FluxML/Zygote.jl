@@ -210,8 +210,8 @@ end
 end
 
 function _pullback(cx::AContext, ::typeof(sum), f, xs::AbstractArray)
-  y, back = pullback(cx, (xs -> sum(f.(xs))), xs)
-  y, ȳ -> (nothing, nothing, back(ȳ)...)
+  y, back = pullback(cx, ((f, xs) -> sum(f.(xs))), f, xs)
+  y, ȳ -> (nothing, back(ȳ)...)
 end
 
 @adjoint function sum(::typeof(abs2), X::AbstractArray; dims = :)
@@ -224,8 +224,8 @@ end
 end
 
 function _pullback(cx::AContext, ::typeof(prod), f, xs::AbstractArray)
-  y, back = pullback(cx, (xs -> prod(f.(xs))), xs)
-  y, ȳ -> (nothing, nothing, back(ȳ)...)
+  y, back = pullback(cx, ((f, xs) -> prod(f.(xs))), f, xs)
+  y, ȳ -> (nothing, back(ȳ)...)
 end
 
 @adjoint function maximum(xs::AbstractArray; dims = :)
