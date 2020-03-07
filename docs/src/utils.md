@@ -11,4 +11,5 @@ Zygote.dropgrad
 Zygote.hessian
 Zygote.Buffer
 Zygote.forwarddiff
+Zygote.nograd
 ```
