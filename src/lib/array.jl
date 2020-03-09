@@ -482,13 +482,17 @@ end
 
 @adjoint function cholesky(Σ::Diagonal; check = true)
   C = cholesky(Σ, check = check)
-  return C, Δ::NamedTuple->(Diagonal(diag(Δ.factors) .* inv.(2 .* C.factors.diag)),)
+  return C, Δ::NamedTuple -> begin
+    issuccess(C) || return (zero(Δ.factors), nothing)
+    return Diagonal(diag(Δ.factors) .* inv.(2 .* C.factors.diag)), nothing
+  end
 end
 
 # Implementation due to Seeger, Matthias, et al. "Auto-differentiating linear algebra."
 @adjoint function cholesky(Σ::Union{StridedMatrix, Symmetric{<:Real, <:StridedMatrix}}; check = true)
   C = cholesky(Σ, check = check)
   return C, function(Δ::NamedTuple)
+    issuccess(C) || return (zero(Δ.factors), nothing)
     U, Ū = C.U, Δ.factors
     Σ̄ = Ū * U'
     Σ̄ = copytri!(Σ̄, 'U')
