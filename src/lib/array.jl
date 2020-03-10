@@ -95,9 +95,10 @@ end
   hvcat(rows, xs...), ȳ -> (nothing, permutedims(ȳ)...)
 end
 
+pull_block_vert(sz, Δ, A::Number) = Δ[sz]
 pull_block_vert(sz, Δ, A::AbstractVector) = Δ[sz-length(A)+1:sz]
 pull_block_vert(sz, Δ, A::AbstractMatrix) = Δ[sz-size(A, 1)+1:sz, :]
-@adjoint function vcat(A::Union{AbstractVector, AbstractMatrix}...)
+@adjoint function vcat(A::Union{AbstractVector, AbstractMatrix, Number}...)
   sz = cumsum([size.(A, 1)...])
   return vcat(A...), Δ->(map(n->pull_block_vert(sz[n], Δ, A[n]), eachindex(A))...,)
 end
