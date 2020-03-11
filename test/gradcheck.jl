@@ -86,7 +86,7 @@ end
 @test gradient((x,y) -> prod(yi -> yi*x, y), 1, [1,1]) == (2, [1, 1])
 
 @test gradient((x,y) -> sum(map(yi -> yi*x, y)), 1, [1,1]) == (2, [1, 1])
-@test gradient((x,y) -> prod(map(yi -> yi*x, y)), 1, [1,1]) == (2, [1, 1]) 
+@test gradient((x,y) -> prod(map(yi -> yi*x, y)), 1, [1,1]) == (2, [1, 1])
 
 @test gradtest(x -> prod(x, dims = (2, 3)), (3,4,5))
 @test gradtest(x -> prod(x), (3,4))
@@ -166,8 +166,8 @@ end
   cdims = DenseConvDims(x, w)
   @test gradtest((x, w) -> conv(x, w, cdims), x, w)
   @test gradtest((x, w) -> sum(conv(x, w, cdims)), x, w)  # https://github.com/FluxML/Flux.jl/issues/1055
-  
-  y = conv(x, w, cdims) 
+
+  y = conv(x, w, cdims)
   @test gradtest((y, w) -> ∇conv_data(y, w, cdims), y, w)
   if spatial_rank == 3
     @test_broken gradtest((y, w) -> sum(∇conv_data(y, w, cdims)), y, w)
@@ -177,7 +177,7 @@ end
 
   dcdims = DepthwiseConvDims(x, w)
   @test gradtest((x, w) -> depthwiseconv(x, w, dcdims), x, w)
-  
+
   y = depthwiseconv(x, w, dcdims)
   @test gradtest((y, w) -> ∇depthwiseconv_data(y, w, dcdims), y, w)
   if spatial_rank == 3
@@ -1006,6 +1006,10 @@ end
   # Scalar
   @test gradient((x,y) -> sum(vcat(x,y)), 1,2) == (1,1)
   @test gradient((x,y) -> sum([x;y]), 1,2) == (1,1)
+
+  # Scalar + Vector
+  @test gradient(x -> sum(vcat(x, 1, x)), rand(3)) == ([2,2,2],)
+  @test gradient((x,y) -> sum(vcat(x, y, y)), rand(3), 4) == ([1,1,1], 2)
 
   # Vector-only.
   cat_test(vcat, randn(1))
