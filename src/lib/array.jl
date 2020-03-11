@@ -483,7 +483,7 @@ end
 @adjoint function cholesky(Σ::Diagonal; check = true)
   C = cholesky(Σ, check = check)
   return C, Δ::NamedTuple -> begin
-    issuccess(C) || return (zero(Δ.factors), nothing)
+    issuccess(C) || throw(PosDefException(C.info))
     return Diagonal(diag(Δ.factors) .* inv.(2 .* C.factors.diag)), nothing
   end
 end
@@ -492,7 +492,7 @@ end
 @adjoint function cholesky(Σ::Union{StridedMatrix, Symmetric{<:Real, <:StridedMatrix}}; check = true)
   C = cholesky(Σ, check = check)
   return C, function(Δ::NamedTuple)
-    issuccess(C) || return (zero(Δ.factors), nothing)
+    issuccess(C) || throw(PosDefException(C.info))
     U, Ū = C.U, Δ.factors
     Σ̄ = Ū * U'
     Σ̄ = copytri!(Σ̄, 'U')
