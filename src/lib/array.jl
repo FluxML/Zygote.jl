@@ -481,17 +481,22 @@ end
   return C, Δ::NamedTuple->(Δ.factors[1, 1] / (2 * C.U[1, 1]),)
 end
 
-@adjoint function cholesky(Σ::Diagonal)
-  C = cholesky(Σ)
-  return C, Δ::NamedTuple->(Diagonal(diag(Δ.factors) .* inv.(2 .* C.factors.diag)),)
+@adjoint function cholesky(Σ::Diagonal; check = true)
+  C = cholesky(Σ, check = check)
+  return C, Δ::NamedTuple -> begin
+    issuccess(C) || throw(PosDefException(C.info))
+    return Diagonal(diag(Δ.factors) .* inv.(2 .* C.factors.diag)), nothing
+  end
 end
 
 # Implementation due to Seeger, Matthias, et al. "Auto-differentiating linear algebra."
-@adjoint function cholesky(Σ::Union{StridedMatrix, Symmetric{<:Real, <:StridedMatrix}})
-  C = cholesky(Σ)
+@adjoint function cholesky(Σ::Union{StridedMatrix, Symmetric{<:Real, <:StridedMatrix}}; check = true)
+  C = cholesky(Σ, check = check)
   return C, function(Δ::NamedTuple)
+    issuccess(C) || throw(PosDefException(C.info))
     U, Ū = C.U, Δ.factors
-    Σ̄ = Ū * U'
+    Σ̄  = similar(U.data)
+    mul!(Σ̄ , Ū, U')
     Σ̄ = copytri!(Σ̄, 'U')
     Σ̄ = ldiv!(U, Σ̄)
     BLAS.trsm!('R', 'U', 'T', 'N', one(eltype(Σ)), U.data, Σ̄)

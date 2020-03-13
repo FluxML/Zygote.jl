@@ -496,13 +496,17 @@ end
   @test gradtest((U, Y) -> Y' / UnitUpperTriangular(U), U, y)
 
   @testset "Cholesky" begin
-
     # Check that the forwards pass computes the correct thing.
-    @test Zygote.pullback(X->cholesky(X * X' + I) \ Y, X)[1] == cholesky(X * X' + I) \ Y
-    @test gradtest(X->cholesky(X * X' + I) \ Y, X)
-    @test gradtest(Y->cholesky(X * X' + I) \ Y, Y)
-    @test gradtest(X->cholesky(X * X' + I) \ y, X)
-    @test gradtest(y->cholesky(X * X' + I) \ y, y)
+    f(X, Y) = cholesky(X * X' + I) \ Y
+    @test Zygote.pullback(X -> f(X, Y), X)[1] == cholesky(X * X' + I) \ Y
+    @test gradtest(X -> f(X, Y), X)
+    @test gradtest(Y -> f(X, Y), Y)
+    @test gradtest(X -> f(X, y), X)
+    @test gradtest(y -> f(X, y), y)
+    g(X) = cholesky(X * X' + I)
+    @test Zygote.pullback(g, X)[2]((factors=LowerTriangular(X),)) == 
+      Zygote.pullback(g, X)[2]((factors=Matrix(LowerTriangular(X)),))
+    @test_throws PosDefException Zygote.pullback(X -> cholesky(X, check = false), X)[2]((factors=X,))
   end
 end
 
