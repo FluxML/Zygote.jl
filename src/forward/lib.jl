@@ -1,7 +1,10 @@
 zerolike(x::Number) = zero(x)
 zerolike(x::Tuple) = zerolike.(x)
-zerolike(x::T) where T =
-  NamedTuple{fieldnames(T)}(map(f -> zerolike(getfield(x, f)), fieldnames(T)))
+
+@generated function zerolike(x::T) where T
+  :(NamedTuple{$(fieldnames(T))}(($(map(f -> :(zerolike(x.$f)), fieldnames(T))...),)))
+end
+
 # TODO figure out why this made a test fail
 zerolike(x::Union{Module,Type}) = false
 
