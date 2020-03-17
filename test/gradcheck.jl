@@ -110,6 +110,8 @@ end
 @test gradtest(det, (4, 4))
 @test gradtest(logdet, map(x -> x*x', (rand(4, 4),))[1])
 @test gradtest(x -> logabsdet(x)[1], (4, 4))
+@test gradient(det, 2.0)[1] == 1
+@test gradient(logdet, 2.0)[1] == 0.5
 
 @testset "getindex" begin
   @test gradtest(x -> x[:,2,:], (3,4,5))
@@ -389,6 +391,7 @@ end
   @test gradtest(pinv, A)
   @test gradtest(inv, B)
   @test gradtest(pinv, C)
+  @test gradient(inv, 2.0)[1] == -0.25
 end
 
 @testset "multiplication" begin

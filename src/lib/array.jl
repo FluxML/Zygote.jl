@@ -342,13 +342,13 @@ end
 
 @adjoint diag(A::AbstractMatrix) = diag(A), Δ->(Diagonal(Δ),)
 
-@adjoint det(xs) = det(xs), Δ -> (Δ * det(xs) * inv(xs)',)
+@adjoint det(xs::Union{Number, AbstractMatrix}) = det(xs), Δ -> (Δ * det(xs) * inv(xs)',)
 
-@adjoint logdet(xs) = logdet(xs), Δ -> (Δ * inv(xs)',)
+@adjoint logdet(xs::Union{Number, AbstractMatrix}) = logdet(xs), Δ -> (Δ * inv(xs)',)
 
-@adjoint logabsdet(xs) = logabsdet(xs), Δ -> (Δ[1] * inv(xs)',)
+@adjoint logabsdet(xs::AbstractMatrix) = logabsdet(xs), Δ -> (Δ[1] * inv(xs)',)
 
-@adjoint function inv(A)
+@adjoint function inv(A::Union{Number, AbstractMatrix})
   Ainv = inv(A)
   return Ainv, function (Δ)
     ∇A = - Ainv' * Δ * Ainv'
