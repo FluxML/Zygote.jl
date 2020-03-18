@@ -30,23 +30,34 @@ end
 @adjoint (::Type{T})(sz) where {T<:Zeros} = Zeros(sz), Δ->(nothing,)
 @adjoint (::Type{T})(sz) where {T<:Ones} = Ones(sz), Δ->(nothing,)
 
-_zero(xs::AbstractArray{<:Number}, T=float(eltype(xs))) = fill!(similar(xs, T), false)
-_zero(xs::AbstractArray, T=Any) = Union{Nothing, T}[nothing for x in xs]
-
 @adjoint getindex(x::AbstractArray, inds...) = x[inds...], ∇getindex(x, inds)
 
 @adjoint view(x::AbstractArray, inds...) = view(x, inds...), ∇getindex(x, inds)
 
 ∇getindex(x::AbstractArray, inds) = dy -> begin
-  if inds isa  NTuple{<:Any,Integer}
+  if inds isa  NTuple{<:Any, Integer}
     dx = _zero(x, typeof(dy))
     dx[inds...] = dy
   else
     dx = _zero(x, eltype(dy))
     dxv = view(dx, inds...)
-    dxv .+= _droplike(dy, dxv)
+    dxv .= accum.(dxv, _droplike(dy, dxv))
   end
-  (dx, map(_->nothing, inds)...)
+  return (dx, map(_->nothing, inds)...)
+end
+
+function _zero(xs::AbstractArray{<:Number}, T::Type{Nothing})
+  return fill!(similar(xs), zero(eltype(xs)))
+end
+
+# function _zero(xs::AbstractArray{<:Number}, T=float(eltype(xs)))
+function _zero(xs::AbstractArray{<:Number}, T)
+  return fill!(similar(xs, T), false)
+end
+
+# function _zero(xs::AbstractArray, T=Any)
+function _zero(xs::AbstractArray, T)
+  return fill!(similar(xs, Union{Nothing, T}), nothing)
 end
 
 _droplike(dy, dxv) = dy
