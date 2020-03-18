@@ -46,19 +46,9 @@ end
   return (dx, map(_->nothing, inds)...)
 end
 
-function _zero(xs::AbstractArray{<:Number}, T::Type{Nothing})
-  return fill!(similar(xs), zero(eltype(xs)))
-end
-
-# function _zero(xs::AbstractArray{<:Number}, T=float(eltype(xs)))
-function _zero(xs::AbstractArray{<:Number}, T)
-  return fill!(similar(xs, T), false)
-end
-
-# function _zero(xs::AbstractArray, T=Any)
-function _zero(xs::AbstractArray, T)
-  return fill!(similar(xs, Union{Nothing, T}), nothing)
-end
+_zero(xs::AbstractArray{<:Number}, T::Type{Nothing}) = fill!(similar(xs), zero(eltype(xs)))
+_zero(xs::AbstractArray{<:Number}, T) = fill!(similar(xs, T), false)
+_zero(xs::AbstractArray, T) = fill!(similar(xs, Union{Nothing, T}), nothing)
 
 _droplike(dy, dxv) = dy
 _droplike(dy::Union{LinearAlgebra.Adjoint, LinearAlgebra.Transpose}, dxv::AbstractVector) =
