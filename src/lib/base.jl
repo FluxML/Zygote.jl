@@ -1,4 +1,5 @@
-@nograd readline, Base.gc_num, Base.time_ns
+@nograd readline, Base.gc_num, Base.time_ns, Base.print, Base.println, Base.show,
+  Core.show, Core.print, Core.println
 
 # Gradient of AD stacks
 

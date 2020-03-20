@@ -40,6 +40,19 @@ end
 
 Random.seed!(0)
 
+@testset "println, show, print" begin
+  function foo(x)
+    Base.show(x)
+    Base.print(x)
+    Base.println(x)
+    Core.show(x)
+    Core.print(x)
+    Core.println(x)
+    return x
+  end
+  @test gradtest(foo, [5.0])
+end
+
 @test gradient(//, 2, 3) === (1//3, -2//9)
 
 @testset "power" begin
