@@ -19,11 +19,11 @@ version = "0.8.1"
 
 [[Documenter]]
 deps = ["Base64", "Dates", "DocStringExtensions", "InteractiveUtils", "JSON", "LibGit2", "Logging", "Markdown", "REPL", "Test", "Unicode"]
-git-tree-sha1 = "480951ac77f9e26654fdaae542d0d3f267be5c47"
+git-tree-sha1 = "65943b6b2ebbd0cb7253036ce0b5658607dff172"
 repo-rev = "master"
 repo-url = "https://github.com/JuliaDocs/Documenter.jl.git"
 uuid = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
-version = "0.24.5"
+version = "0.24.7+0.25-DEV"
 
 [[InteractiveUtils]]
 deps = ["Markdown"]
