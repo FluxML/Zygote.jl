@@ -1,4 +1,5 @@
 using DiffRules, SpecialFunctions, NaNMath
+using Base.FastMath: fast_op, make_fastmath
 
 @nograd isinf, isnan, isfinite, div
 
@@ -21,12 +22,19 @@ end
 
 for (M, f, arity) in DiffRules.diffrules()
   arity == 2 || continue
+  f == :^ && continue
   da, db = DiffRules.diffrule(M, f, :a, :b)
   @eval begin
     @adjoint $M.$f(a::Number, b::Number) = $M.$f(a, b),
       Δ -> (Δ * conj($da), Δ * conj($db))
   end
 end
+
+@adjoint Base.:^(x::Number, p::Number) = x^p,
+  Δ -> (Δ * conj(p * x^(p-1)), Δ * conj(x^p * log(complex(x))))
+@adjoint Base.literal_pow(::typeof(^), x::Number, ::Val{p}) where {p} =
+  Base.literal_pow(^,x,Val(p)),
+  Δ -> (nothing, Δ * conj(p * Base.literal_pow(^,x,Val(p-1))), nothing)
 
 @adjoint Base.convert(T::Type{<:Real}, x::Real) = convert(T, x), ȳ -> (nothing, ȳ)
 @adjoint (T::Type{<:Real})(x::Real) = T(x), ȳ -> (nothing, ȳ)
@@ -48,6 +56,9 @@ end
   (s, c), ((s̄, c̄),) -> (s̄*c - c̄*s,)
 end
 
+@adjoint acosh(x::Complex) =
+  acosh(x), Δ -> (Δ * conj(inv(sqrt(x - 1) * sqrt(x + 1))),)
+
 @adjoint a // b = (a // b, c̄ -> (c̄ * 1//b, - c̄ * a // b // b))
 
 @nograd floor, ceil, trunc, round, hash
@@ -61,3 +72,27 @@ end
 @adjoint imag(x::Number) = imag(x), ī -> (real(ī)*im,)
 
 DiffRules._abs_deriv(x::Complex) = x/abs(x)
+
+ # adjoint for Fastmath operations
+for (f, fastf) in fast_op
+  if DiffRules.hasdiffrule(:Base, f, 1)
+    dx = DiffRules.diffrule(:Base, f, :x)
+    Δ = :Δ
+    if f in [:abs, :abs2]
+      Δ = :(real($Δ))
+    else
+      dx = :(conj($dx))
+    end
+    @eval begin
+      @adjoint Base.FastMath.$fastf(x::Number) =
+        Base.FastMath.$fastf(x), Δ -> ($Δ * make_fastmath($dx),)
+    end
+  elseif DiffRules.hasdiffrule(:Base, f, 2)
+    dx, dy = DiffRules.diffrule(:Base, f, :x, :y)
+    @eval begin
+      @adjoint Base.FastMath.$fastf(x::Number, y::Number) =
+        Base.FastMath.$fastf(x, y),
+        Δ -> (Δ * make_fastmath(conj($dx)), Δ * make_fastmath(conj($dy)))
+    end
+  end
+end

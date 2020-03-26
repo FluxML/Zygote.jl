@@ -1,8 +1,7 @@
 using IRTools: IR, Variable, Pipe, xcall, var, prewalk, postwalk,
   blocks, predecessors, successors, argument!, arguments, branches,
-  exprtype, insertafter!, finish, expand!, prune!, substitute!, substitute,
-  block, block!, branch!, return!, stmt
-using Base: @get!
+  insertafter!, finish, expand!, prune!, substitute!, substitute,
+  block, block!, branch!, return!, stmt, meta
 
 @inline tuple_va(N, xs) = xs
 @inline tuple_va(N, x, xs...) = (x, tuple_va(N, xs...)...)
@@ -75,7 +74,7 @@ function instrument_global!(ir, v, ex)
   else
     ir[v] = prewalk(ex) do x
       istrackable(x) || return x
-      insert!(ir, v, stmt(xcall(Zygote, :unwrap, QuoteNode(x), x), type = exprtype(x)))
+      insert!(ir, v, xcall(Zygote, :unwrap, QuoteNode(x), x))
     end
   end
 end
@@ -84,13 +83,26 @@ function instrument(ir::IR)
   pr = Pipe(ir)
   for (v, st) in pr
     ex = st.expr
-    isexpr(ex, :foreigncall, :isdefined) && continue
-    isexpr(ex, :enter, :leave) && error("try/catch is not supported.")
-    ex = instrument_new!(pr, v, ex)
-    ex = instrument_literals!(pr, v, ex)
-    ex = instrument_global!(pr, v, ex)
+    if isexpr(ex, :foreigncall, :isdefined)
+      continue
+    elseif isexpr(ex, :enter, :leave)
+      error("try/catch is not supported.")
+    elseif isexpr(ex, :(=))
+      @assert ex.args[1] isa GlobalRef
+      pr[v] = xcall(Zygote, :global_set, QuoteNode(ex.args[1]), ex.args[2])
+    else
+      ex = instrument_new!(pr, v, ex)
+      ex = instrument_literals!(pr, v, ex)
+      ex = instrument_global!(pr, v, ex)
+    end
   end
-  return finish(pr)
+  ir = finish(pr)
+  # GlobalRefs can turn up in branch arguments
+  for b in blocks(ir), br in branches(b), i in 1:length(arguments(br))
+    (ref = arguments(br)[i]) isa GlobalRef || continue
+    arguments(br)[i] = push!(b, xcall(Zygote, :unwrap, QuoteNode(ref), ref))
+  end
+  return ir
 end
 
 const BranchNumber = UInt8
@@ -125,16 +137,6 @@ ignored_f(ir, f::Variable) = ignored_f(get(ir, f, nothing))
 ignored(ir, ex) = isexpr(ex, :call) && ignored_f(ir, ex.args[1])
 ignored(ir, ex::Variable) = ignored(ir, ir[ex])
 
-# TODO: remove this once we don't mess with type inference
-function _forward_type(Ts)
-  usetyped || return Any
-  all(T -> isconcretetype(T) || T <: DataType, Ts) || return Any
-  T = Core.Compiler.return_type(_forward, Tuple{Context,Ts...})
-  return T == Union{} ? Any : T
-end
-
-isvalidtype(jT, yT) = jT <: Tuple && length(jT.parameters) == 2 && jT.parameters[1] <: yT
-
 function primal(ir::IR)
   pr = Pipe(ir)
   pbs = Dict{Variable,Variable}()
@@ -143,23 +145,12 @@ function primal(ir::IR)
   for (v, st) in pr
     ex = st.expr
     if isexpr(ex, :call) && !ignored(ir, ex)
-      yT = exprtype(ir, v)
-      T = _forward_type(exprtype.((ir,), ex.args))
-      if yT == Any || isvalidtype(T, yT)
-        yJ = insert!(pr, v, stmt(xcall(Zygote, :_forward, cx, ex.args...),
-                                 line = ir[v].line))
-        pr[v] = xgetindex(yJ, 1)
-        J = insertafter!(pr, v, stmt(xgetindex(yJ, 2),
-                                     type = T == Any ? Any : T.parameters[2],
-                                     line = ir[v].line))
-        pbs[v] = substitute(pr, J)
-      else
-        yJ = insert!(pr, v, xcall(Zygote, :_forward, cx, ex.args...))
-        y =  insert!(pr, v, xgetindex(yJ, 1))
-        J =  insert!(pr, v, stmt(xgetindex(yJ, 2), line = ir[v].line))
-        pr[v] = xcall(Zygote, :typeassert, y, yT)
-        pbs[v] = substitute(pr, J)
-      end
+      yJ = insert!(pr, v, stmt(xcall(Zygote, :_pullback, cx, ex.args...),
+                               line = ir[v].line))
+      pr[v] = xgetindex(yJ, 1)
+      J = insertafter!(pr, v, stmt(xgetindex(yJ, 2),
+                                   line = ir[v].line))
+      pbs[v] = substitute(pr, J)
     end
   end
   pr = finish(pr)

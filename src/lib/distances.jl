@@ -1,11 +1,12 @@
 using .Distances
 
-@adjoint function sqeuclidean(x::AbstractVector, y::AbstractVector)
+@adjoint function (::SqEuclidean)(x::AbstractVector, y::AbstractVector)
   δ = x .- y
-  return sum(abs2, δ), function(Δ::Real)
+  function sqeuclidean(Δ::Real)
     x̄ = (2 * Δ) .* δ
     return x̄, -x̄
   end
+  return sum(abs2, δ), sqeuclidean
 end
 
 @adjoint function colwise(s::SqEuclidean, x::AbstractMatrix, y::AbstractMatrix)
@@ -22,8 +23,8 @@ end
     return pairwise(s, x, y; dims=dims), ∇pairwise(s, x, y, identity)
   end
 end
-  
-∇pairwise(s, x, y, f) = 
+
+∇pairwise(s, x, y, f) =
   function(Δ)
     x̄ = 2 .* (x * Diagonal(vec(sum(Δ; dims=2))) .- y * transpose(Δ))
     ȳ = 2 .* (y * Diagonal(vec(sum(Δ; dims=1))) .- x * Δ)
@@ -38,12 +39,22 @@ end
   end
 end
 
-∇pairwise(s, x, f) = 
+∇pairwise(s, x, f) =
   function(Δ)
     d1 = Diagonal(vec(sum(Δ; dims=1)))
     d2 = Diagonal(vec(sum(Δ; dims=2)))
     return (nothing, x * (2 .* (d1 .+ d2 .- Δ .- transpose(Δ))) |> f)
   end
+
+@adjoint function (::Euclidean)(x::AbstractVector, y::AbstractVector)
+  D = x.-y
+  δ = sqrt(sum(abs2, D))
+  function euclidean(Δ::Real)
+    x̄ = (Δ / δ) .* D
+    return x̄, -x̄
+  end
+  return δ, euclidean
+end
 
 @adjoint function colwise(s::Euclidean, x::AbstractMatrix, y::AbstractMatrix)
   d = colwise(s, x, y)
@@ -54,15 +65,13 @@ end
 end
 
 @adjoint function pairwise(::Euclidean, X::AbstractMatrix, Y::AbstractMatrix; dims=2)
-  @assert dims == 2
-  D, back = forward((X, Y)->pairwise(SqEuclidean(), X, Y; dims=2), X, Y)
+  D, back = pullback((X, Y) -> pairwise(SqEuclidean(), X, Y; dims = dims), X, Y)
   D .= sqrt.(D)
   return D, Δ -> (nothing, back(Δ ./ (2 .* D))...)
 end
 
 @adjoint function pairwise(::Euclidean, X::AbstractMatrix; dims=2)
-  @assert dims == 2
-  D, back = forward(X->pairwise(SqEuclidean(), X; dims=2), X)
+  D, back = pullback(X -> pairwise(SqEuclidean(), X; dims = dims), X)
   D .= sqrt.(D)
   return D, function(Δ)
     Δ = Δ ./ (2 .* D)

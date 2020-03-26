@@ -18,7 +18,7 @@ The list is certainly not complete; if you see new terms you'd like defined, or 
 
 **Graph**: ML people tend to think of models as "computation graphs", but this is no more true than any program is a graph. In fact, pretty much anything is a graph if you squint hard enough. This also refers to the data structure that e.g. TensorFlow and PyTorch build to represent your model, but see *trace* for that.
 
-**Pullback**: Given ``y = f(x)`` the function ``\bar x = back(̄\bar y)``. In other words, the function `back` in `y, back = Zygote.forward(f, x)`.
+**Pullback**: Given ``y = f(x)`` the function ``\bar x = back(̄\bar y)``. In other words, the function `back` in `y, back = Zygote.pullback(f, x)`.
 
 **Sensitivity**: Used to refer to the gradient ``\bar x = \frac{\partial l}{\partial x}`` with some scalar loss ``l``. In other words, you have a value ``x`` (which need not be scalar) at some point in your program, and ``\bar x`` tells you how you should change that value to decrease the loss. In the AD world, sometimes used to refer to adjoint rules.
 
@@ -32,6 +32,6 @@ To an extent, tracing ADs can be viewed as source transform of a Wengert list / 
 
 **Trace**: A recording of each mathematical operation used by a program, made at runtime and usually forming a Wengert list. Traces may or may not also record actual runtime values (e.g. PyTorch vs. TensorFlow). They can often be treated as an IR and compiled, but are distinguished from true IRs in that they unroll and inline all control flow, functions and data structures. The tracing process can be thought of as a kind of partial evaluation, though tracers are typically much less worried about losing information.
 
-**vector-Jacobian product**: see *pullback*. So called because all pullbacks are linear functions that can be represented by (left) multiplication with the Jacobian matrix.
+**Vector-Jacobian product**: see *pullback*. So called because all pullbacks are linear functions that can be represented by (left) multiplication with the Jacobian matrix.
 
 **Wengert List**: A set of simple variable assignments and mathematical expressions, forming a directed graph. Can be thought of as a limited programming language with variable bindings and numerical functions but no control flow or data structures. If you *trace* a program for AD it will typically take this form.

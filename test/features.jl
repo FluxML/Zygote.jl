@@ -5,13 +5,13 @@ add(a, b) = a+b
 _relu(x) = x > 0 ? x : 0
 f(a, b...) = +(a, b...)
 
-y, back = forward(identity, 1)
+y, back = pullback(identity, 1)
 dx = back(2)
 @test y == 1
 @test dx == (2,)
 
 mul(a, b) = a*b
-y, back = forward(mul, 2, 3)
+y, back = pullback(mul, 2, 3)
 dx = back(4)
 @test y == 6
 @test dx == (12, 8)
@@ -21,7 +21,7 @@ dx = back(4)
 bool = true
 b(x) = bool ? 2x : x
 
-y, back = forward(b, 3)
+y, back = pullback(b, 3)
 dx = back(4)
 @test y == 6
 @test dx == (8,)
@@ -33,12 +33,12 @@ gglobal = x -> fglobal(x)
 
 global bool = false
 
-y, back = forward(b, 3)
+y, back = pullback(b, 3)
 dx = back(4)
 @test y == 3
 @test getindex.(dx) == (4,)
 
-y, back = forward(x -> sum(x.*x), [1, 2, 3])
+y, back = pullback(x -> sum(x.*x), [1, 2, 3])
 dxs = back(1)
 @test y == 14
 @test dxs == ([2,4,6],)
@@ -64,6 +64,18 @@ function pow_mut(x, n)
 end
 
 @test gradient(pow_mut, 2, 3) == (12,nothing)
+
+r = 1
+function pow_global(x, n)
+  global r
+  while n > 0
+    r *= x
+    n -= 1
+  end
+  return r
+end
+
+@test gradient(pow_global, 2, 3) == (12,nothing)
 
 @test gradient(x -> 1, 2) == (nothing,)
 
@@ -137,13 +149,11 @@ end == (4,)
 
 pow_rec(x, n) = n == 0 ? 1 : x*pow_rec(x, n-1)
 
-if !Zygote.usetyped
-  @test gradient(pow_rec, 2, 3) == (12, nothing)
-end
+@test gradient(pow_rec, 2, 3) == (12, nothing)
 
 # For nested AD, until we support errors
 function grad(f, args...)
-  y, back = forward(f, args...)
+  y, back = pullback(f, args...)
   return back(1)
 end
 
@@ -170,13 +180,13 @@ end
 W = [1 0; 0 1]
 x = [1, 2]
 
-y, back = forward(() -> W * x, Params([W]))
+y, back = pullback(() -> W * x, Params([W]))
 @test y == [1, 2]
 @test back([1, 1])[W] == [1 2; 1 2]
 
 layer = Layer(W)
 
-y, back = forward(() -> layer(x), Params([W]))
+y, back = pullback(() -> layer(x), Params([W]))
 @test y == [1, 2]
 @test back([1, 1])[W] == [1 2; 1 2]
 
@@ -187,17 +197,14 @@ y, back = forward(() -> layer(x), Params([W]))
   sum(H)
 end[1] == 1
 
-# FIXME
-if !Zygote.usetyped
-  @test gradient(2) do x
-    if x < 0
-      throw("foo")
-    end
-    return x*5
-  end[1] == 5
+@test gradient(2) do x
+  if x < 0
+    throw("foo")
+  end
+  return x*5
+end[1] == 5
 
-  @test gradient(x -> one(eltype(x)), rand(10))[1] == nothing
-end
+@test gradient(x -> one(eltype(x)), rand(10))[1] == nothing
 
 # Thre-way control flow merge
 @test gradient(1) do x
@@ -214,17 +221,13 @@ grad_closure(x) = 2x
 
 Zygote.@adjoint (f::typeof(grad_closure))(x) = f(x), Δ -> (1, 2)
 
-Zygote.usetyped && Zygote.refresh()
-
 @test gradient((f, x) -> f(x), grad_closure, 5) == (1, 2)
 
-if !Zygote.usetyped
-  invokable(x) = 2x
-  invokable(x::Integer) = 3x
-  @test gradient(x -> invoke(invokable, Tuple{Any}, x), 5) == (2,)
-end
+invokable(x) = 2x
+invokable(x::Integer) = 3x
+@test gradient(x -> invoke(invokable, Tuple{Any}, x), 5) == (2,)
 
-y, back = Zygote.forward(x->tuple(x...), [1, 2, 3])
+y, back = Zygote.pullback(x->tuple(x...), [1, 2, 3])
 @test back((1, 1, 1)) == ((1,1,1),)
 
 # Test for some compiler errors on complex CFGs
@@ -269,10 +272,10 @@ global_param = 3
 
 @testset "Global Params" begin
   cx = Zygote.Context()
-  y, back = Zygote._forward(cx, x -> x*global_param, 2)
+  y, back = Zygote._pullback(cx, x -> x*global_param, 2)
   @test y == 6
   @test back(1) == (nothing, 3)
-  Zygote.globals(cx)[GlobalRef(Main, :global_param)] == 2
+  Zygote.cache(cx)[GlobalRef(Main, :global_param)] == 2
 end
 
 function pow_try(x)
@@ -304,3 +307,32 @@ end
   @test gradient((x,y,z) -> sum((x,y,z)[1:2]), 7, 8.8, 9.9) == (1.0, 1.0, nothing)
   @test gradient((x,y,z) -> sum((x,y,z)[[1,2,1]]), 1,2,3) == (2, 1, nothing)
 end
+
+@testset "@timed" begin
+  @test gradient(x -> (@timed x)[1], 0) == (1,)
+end
+
+mutable struct MyMutable
+    value::Float64
+end
+
+function foo!(m::MyMutable, x)
+    m.value = x
+end
+
+function baz(args)
+    m = MyMutable(0.)
+    foo!(m, args...)
+    m.value
+end
+
+let
+  value, back = Zygote.pullback(baz, (1.0,))
+  @test back(1.) == ((1.0,),)
+end
+
+function type_test()
+   Complex{<:Real}
+end
+
+@test pullback(type_test)[1] == Complex{<:Real}

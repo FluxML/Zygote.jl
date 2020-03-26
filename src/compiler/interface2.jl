@@ -1,8 +1,9 @@
-using IRTools: argnames!, varargs!, inlineable!, pis!, slots!
+using IRTools: varargs!, inlineable!, pis!, slots!
+using IRTools.Inner: argnames!, update!
 
 ignore(T) = all(T -> T <: Type, T.parameters)
 
-@generated function _forward(ctx::AContext, f, args...)
+@generated function _pullback(ctx::AContext, f, args...)
   T = Tuple{f,args...}
   ignore(T) && return :(f(args...), Pullback{$T}(()))
   g = try _lookup_grad(T) catch e e end
@@ -12,7 +13,7 @@ ignore(T) = all(T -> T <: Type, T.parameters)
   forw = varargs!(meta, forw, 3)
   # IRTools.verify(forw)
   forw = slots!(pis!(inlineable!(forw)))
-  return IRTools.update!(meta.code, forw)
+  return update!(meta.code, forw)
 end
 
 @generated function (j::Pullback{T})(Δ) where T
@@ -29,5 +30,5 @@ end
   argnames!(meta, Symbol("#self#"), :Δ)
   # IRTools.verify(back)
   back = slots!(inlineable!(back))
-  return IRTools.update!(meta.code, back)
+  return update!(meta.code, back)
 end
