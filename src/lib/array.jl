@@ -836,7 +836,12 @@ end
 end
 
 
-# to actually use rfft, one needs to insure that everything that happens in the Fourier domain could've been done in the space domain with real numbers. This means enforcing conjugate symmetry along all transformed dimensions besides the first. Otherwise this is going to result in *very* weird behavior.
+# to actually use rfft, one needs to insure that everything 
+# that happens in the Fourier domain could've been done in 
+# the space domain with real numbers. This means enforcing 
+# conjugate symmetry along all transformed dimensions besides 
+# the first. Otherwise this is going to result in *very* weird 
+# behavior.
 @adjoint function rfft(xs::AbstractArray{<:Real})
   return AbstractFFTs.rfft(xs), function(Δ)
     N = length(Δ)
@@ -920,16 +925,6 @@ end
         return (fftshift(Δ, dims), nothing)
     end
 end
-
-
-
-
-
-
-
-
-
-
 
 # FillArray functionality
 # =======================
