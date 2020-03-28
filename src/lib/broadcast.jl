@@ -179,7 +179,13 @@ end
 end
 
 @init @require CuArrays="3a865a2d-5b23-5a0f-bc46-62713ec82fae" begin
-  @adjoint function broadcasted(::Broadcast.ArrayStyle{CuArrays.CuArray}, f, args...)
+  if isdefined(CuArrays, :CuArrayStyle)  # Introduced in CuArrays v2.0
+    using CuArrays: CuArrayStyle
+  else
+    CuArrayStyle = Broadcast.ArrayStyle{CuArrays.CuArray}
+  end
+
+  @adjoint function broadcasted(::CuArrayStyle, f, args...)
     y, back = broadcast_forward(CuArrays.cufunc(f), args...)
     y, ȳ -> (nothing, nothing, back(ȳ)...)
   end
