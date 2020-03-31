@@ -54,6 +54,16 @@ Random.seed!(0)
   @test gradtest(foo, [5.0])
 end
 
+@testset "string, repr" begin
+  function foo(x)
+    string(x)
+    repr(x)
+    return x
+  end
+  @test gradtest(foo, [5.0])
+end
+
+
 @test gradient(//, 2, 3) === (1//3, -2//9)
 
 @testset "power" begin
