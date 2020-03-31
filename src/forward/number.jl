@@ -19,6 +19,19 @@ for (M, f, arity) in DiffRules.diffrules()
   end
 end
 
+# Some specific overrides
+# The DiffRules definitions are suboptimal due to repeated work in the tangent
+
+@tangent function tanh(x)
+  y = tanh(x)
+  y, ẋ -> ẋ * (1 - y^2)
+end
+
+@tangent function exp(x)
+  y = exp(x)
+  y, ẋ -> ẋ * y
+end
+
 for f in [>, <, ==, ===, !=, in]
   @eval @tangent $f(a, b) = $f(a, b), (_, _) -> false
 end
