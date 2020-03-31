@@ -4,6 +4,7 @@ version = "0.4.12"
 
 [deps]
 ArrayLayouts = "4c555306-a7a7-4459-81d9-ec55ddd5c99a"
+CuArrays = "3a865a2d-5b23-5a0f-bc46-62713ec82fae"
 DiffRules = "b552c78f-8df3-52c6-915a-8e097449b14b"
 FFTW = "7a1cc6ca-52ef-59f5-83cd-3a7055c09341"
 FillArrays = "1a297f60-69ca-5386-bcde-b61e274b549b"
@@ -22,6 +23,7 @@ ZygoteRules = "700de1a5-db45-46bc-99cf-38207098b444"
 
 [compat]
 ArrayLayouts = "0.1"
+CuArrays = "1.7"
 DiffRules = "0.0, 0.1, 1"
 FFTW = "1"
 FillArrays = "0.8"
