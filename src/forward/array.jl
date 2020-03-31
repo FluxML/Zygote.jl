@@ -22,4 +22,4 @@ end
 
 @tangent A::AbstractArray * B::AbstractArray = A*B, (Ȧ, Ḃ) -> Ȧ*B .+ A*Ḃ
 
-@tangent sum(x; dims = :) = sum(x; dims = dims), ẋ -> sum(x, dims = dims)
+@tangent sum(x; dims = :) = sum(x; dims = dims), ẋ -> sum(ẋ, dims = dims)
