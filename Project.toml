@@ -21,7 +21,7 @@ Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 ZygoteRules = "700de1a5-db45-46bc-99cf-38207098b444"
 
 [compat]
-ArrayLayouts = "0.1"
+ArrayLayouts = "0.1, 0.2"
 CuArrays = "1.7"
 DiffRules = "0.0, 0.1, 1"
 FFTW = "1"
