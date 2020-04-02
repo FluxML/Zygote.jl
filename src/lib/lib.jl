@@ -6,8 +6,8 @@ accum() = nothing
 accum(x) = x
 
 accum(x, y) =
-  x == nothing ? y :
-  y == nothing ? x :
+  x === nothing ? y :
+  y === nothing ? x :
   x + y
 
 accum(x, y, zs...) = accum(accum(x, y), zs...)
@@ -28,7 +28,7 @@ end
 # Core functions
 
 @nograd Core.apply_type, Core.typeof, nfields, fieldtype, Core.TypeVar, Core.UnionAll,
-  (==), (===), (>=), (<), (>), isempty, supertype, Base.typename,
+  (==), (===), (<=), (>=), (<), (>), isempty, supertype, Base.typename,
   Base.parameter_upper_bound, eps, Meta.parse, Base.eval, sleep
 
 @adjoint deepcopy(x) = deepcopy(x), ȳ -> (ȳ,)
@@ -41,6 +41,10 @@ end
 
 @adjoint Base.typeassert(x, T) = Base.typeassert(x, T), Δ -> (Δ, nothing)
 
+# TODO: check correctness. Gradients should be linear types. Right now it's
+# likely possible for gradients to be accumulated as params or globals and
+# backpropagated as values; these should be mutually exclusive options.
+
 @generated function accum_param(cx::Context, x, Δ)
   isbitstype(x) && return
   quote
@@ -50,7 +54,8 @@ end
 end
 
 function accum_global(cx::Context, ref, x̄)
-  gs = globals(cx)
+  (x̄ == nothing || isconst(ref.mod, ref.name)) && return
+  gs = cache(cx)
   gs[ref] = accum(get(gs, ref, nothing), x̄)
   return
 end
@@ -61,11 +66,23 @@ unwrap(x) = x
 
 unwrap(ref, x) = x
 
-# Right now we accumulate twice, for both implicit params and the `globals`
-# API. Eventually we'll deprecate implicit params.
 @adjoint unwrap(ref, x) = unwrap(x), function (x̄)
   accum_global(__context__, ref, x̄)
   accum_param(__context__, x, x̄)
+end
+
+function global_set(ref, val)
+  ccall(:jl_set_global, Cvoid, (Any, Any, Any),
+        ref.mod, ref.name, val)
+end
+
+@adjoint! function global_set(ref, x)
+  global_set(ref, x), function (x̄)
+    gs = cache(__context__)
+    x̄ = accum(get(gs, ref, nothing), x̄)
+    gs[ref] = nothing
+    return (nothing, x̄)
+  end
 end
 
 # Tuples
@@ -142,6 +159,18 @@ unapply(t, xs) = _unapply(t, xs)[1]
     Δ = back(Δ)
     Δ === nothing ? nothing :
       (first(Δ), unapply(st, Base.tail(Δ))...)
+  end
+end
+
+if VERSION >= v"1.4.0-DEV.304"
+  @adjoint! function Core._apply_iterate(::typeof(iterate), f, args...)
+    y, back = Core._apply(_pullback, (__context__, f), args...)
+    st = map(_empty, args)
+    y, function (Δ)
+      Δ = back(Δ)
+      Δ === nothing ? nothing :
+        (nothing, first(Δ), unapply(st, Base.tail(Δ))...)
+    end
   end
 end
 

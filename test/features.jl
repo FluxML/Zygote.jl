@@ -65,6 +65,18 @@ end
 
 @test gradient(pow_mut, 2, 3) == (12,nothing)
 
+r = 1
+function pow_global(x, n)
+  global r
+  while n > 0
+    r *= x
+    n -= 1
+  end
+  return r
+end
+
+@test gradient(pow_global, 2, 3) == (12,nothing)
+
 @test gradient(x -> 1, 2) == (nothing,)
 
 @test gradient(t -> t[1]*t[2], (2, 3)) == ((3, 2),)
@@ -263,7 +275,7 @@ global_param = 3
   y, back = Zygote._pullback(cx, x -> x*global_param, 2)
   @test y == 6
   @test back(1) == (nothing, 3)
-  Zygote.globals(cx)[GlobalRef(Main, :global_param)] == 2
+  Zygote.cache(cx)[GlobalRef(Main, :global_param)] == 2
 end
 
 function pow_try(x)

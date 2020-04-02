@@ -2,7 +2,6 @@ using IRTools: IR, Variable, Pipe, xcall, var, prewalk, postwalk,
   blocks, predecessors, successors, argument!, arguments, branches,
   insertafter!, finish, expand!, prune!, substitute!, substitute,
   block, block!, branch!, return!, stmt, meta
-using Base: @get!
 
 @inline tuple_va(N, xs) = xs
 @inline tuple_va(N, x, xs...) = (x, tuple_va(N, xs...)...)
@@ -84,13 +83,26 @@ function instrument(ir::IR)
   pr = Pipe(ir)
   for (v, st) in pr
     ex = st.expr
-    isexpr(ex, :foreigncall, :isdefined) && continue
-    isexpr(ex, :enter, :leave) && error("try/catch is not supported.")
-    ex = instrument_new!(pr, v, ex)
-    ex = instrument_literals!(pr, v, ex)
-    ex = instrument_global!(pr, v, ex)
+    if isexpr(ex, :foreigncall, :isdefined)
+      continue
+    elseif isexpr(ex, :enter, :leave)
+      error("try/catch is not supported.")
+    elseif isexpr(ex, :(=))
+      @assert ex.args[1] isa GlobalRef
+      pr[v] = xcall(Zygote, :global_set, QuoteNode(ex.args[1]), ex.args[2])
+    else
+      ex = instrument_new!(pr, v, ex)
+      ex = instrument_literals!(pr, v, ex)
+      ex = instrument_global!(pr, v, ex)
+    end
   end
-  return finish(pr)
+  ir = finish(pr)
+  # GlobalRefs can turn up in branch arguments
+  for b in blocks(ir), br in branches(b), i in 1:length(arguments(br))
+    (ref = arguments(br)[i]) isa GlobalRef || continue
+    arguments(br)[i] = push!(b, xcall(Zygote, :unwrap, QuoteNode(ref), ref))
+  end
+  return ir
 end
 
 const BranchNumber = UInt8
