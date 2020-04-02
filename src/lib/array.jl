@@ -495,14 +495,12 @@ end
   return C, function(Δ::NamedTuple)
     issuccess(C) || throw(PosDefException(C.info))
     U, Ū = C.U, Δ.factors
-    Σ̄  = similar(U.data)
-    mul!(Σ̄ , Ū, U')
+    Σ̄ = similar(U.data)
+    Σ̄ = mul!(Σ̄, Ū, U')
     Σ̄ = copytri!(Σ̄, 'U')
     Σ̄ = ldiv!(U, Σ̄)
-    BLAS.trsm!('R', 'U', 'T', 'N', one(eltype(Σ)), U.data, Σ̄)
-    @inbounds for n in diagind(Σ̄)
-      Σ̄[n] /= 2
-    end
+    Σ̄ = BLAS.trsm!('R', 'U', 'T', 'N', one(eltype(Σ)), U.data, Σ̄)
+    Σ̄[diagind(Σ̄)] ./= 2
     return (UpperTriangular(Σ̄),)
   end
 end
