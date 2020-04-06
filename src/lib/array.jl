@@ -186,8 +186,8 @@ end
 
 @adjoint iterate(r::UnitRange, i...) = iterate(r, i...), _ -> nothing
 
-@adjoint function sort(x::AbstractArray)
-  p = sortperm(x)
+@adjoint function sort(x::AbstractArray; by=identity)
+  p = sortperm(x, by=by)
   return x[p], x̄ -> (x̄[invperm(p)],)
 end
 
