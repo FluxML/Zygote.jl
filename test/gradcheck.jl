@@ -290,6 +290,18 @@ end
 
 @testset "sort" begin
   @test gradtest(sort, 5)
+  correct = [
+      [2,3,1],
+      [1, 2, 3],
+      [1,2,3],
+      [2,1,3]
+  ]
+  for i = 1:3
+    @test gradient(v->sort(v)[i], [3.,1,2])[1][correct[1][i]] == 1
+    @test gradient(v->sort(v)[i], [1.,2,3])[1][correct[2][i]] == 1
+    @test gradient(v->sort(v,by=x->x%10)[i], [11,2,99])[1][correct[3][i]] == 1
+    @test gradient(v->sort(v,by=x->x%10)[i], [2,11,99])[1][correct[4][i]] == 1
+  end
 end
 
 @testset "filter" begin
