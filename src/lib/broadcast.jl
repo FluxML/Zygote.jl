@@ -180,7 +180,7 @@ end
 
 @init @require CuArrays="3a865a2d-5b23-5a0f-bc46-62713ec82fae" begin
   if isdefined(CuArrays, :CuArrayStyle)  # Introduced in CuArrays v2.0
-    using CuArrays: CuArrayStyle
+    CuArrayStyle = CuArrays.CuArrayStyle
   else
     CuArrayStyle = Broadcast.ArrayStyle{CuArrays.CuArray}
   end
