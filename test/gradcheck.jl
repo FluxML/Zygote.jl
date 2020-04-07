@@ -1,4 +1,4 @@
-using Zygote, NNlib, Test, Random, LinearAlgebra, Statistics, FillArrays, 
+using Zygote, NNlib, Test, Random, LinearAlgebra, Statistics, FillArrays,
     AbstractFFTs, FFTW, Distances
 using Zygote: gradient
 using NNlib: conv, ∇conv_data, depthwiseconv, batched_mul
@@ -543,7 +543,7 @@ end
     @test gradtest(X -> f(X, y), X)
     @test gradtest(y -> f(X, y), y)
     g(X) = cholesky(X * X' + I)
-    @test Zygote.pullback(g, X)[2]((factors=LowerTriangular(X),)) == 
+    @test Zygote.pullback(g, X)[2]((factors=LowerTriangular(X),)) ==
       Zygote.pullback(g, X)[2]((factors=Matrix(LowerTriangular(X)),))
     @test_throws PosDefException Zygote.pullback(X -> cholesky(X, check = false), X)[2]((factors=X,))
   end
@@ -1338,7 +1338,7 @@ end
     end
   end
 
-  x = [-0.353213 -0.789656 -0.270151; -0.95719 -1.27933 0.223982]  
+  x = [-0.353213 -0.789656 -0.270151; -0.95719 -1.27933 0.223982]
   # check ffts for individual dimensions
   for trans in (fft, ifft, bfft)
     @test gradient((x)->sum(abs.(trans(x))), x)[1] ≈
@@ -1355,7 +1355,7 @@ end
     @test gradcheck(x->sum(abs.(trans(x))), x)
     @test gradcheck(x->sum(abs.(trans(x, 2))), x)
   end
-  
+
   @test gradient((x)->sum(abs.(rfft(x))), x)[1] ≈
     gradient( (x) -> sum(abs.(fft(rfft(x,1),2))),  x)[1]
   @test gradient((x, dims)->sum(abs.(rfft(x,dims))), x, (1,2))[1] ≈
@@ -1392,24 +1392,24 @@ end
   @test back(ones(N))[1] == ones(N) .* exp(x)
   @test gradtest(x->exp.(Fill(3 * first(x), N)), [x])
 
-  @testset "broadcast + and *" begin
+  @testset "broadcast +, -, *, /" begin
     for sx in [(M, N), (M, 1), (1, N), (1, 1)]
       for sy in [(M, N), (M, 1), (1, N), (1, 1)]
-        z = randn(rng, broadcast_shape(sx, sy))
+        
+        #addition, subtraction, multiplication
+        for f ∈ (+, -, *)
+          @test gradtest((x, y) -> f.(Fill(first(x), sx...), Fill(first(y), sy...)), [x], [y])
+          @test gradtest(x -> f.(Fill(first(x), sx...), Ones(sy...)), [x])
+          @test gradtest(x -> f.(Fill(first(x), sx...), Zeros(sy...)), [x])
+          @test gradtest(y -> f.(Ones(sx...), Fill(first(y), sy...)), [y])
+          @test gradtest(y -> f.(Zeros(sx...), Fill(first(y), sy...)), [y])
+        end
 
-        # Addition
-        @test gradtest((x, y)->Fill(first(x), sx...) .+ Fill(first(y), sy...), [x], [y])
-        @test gradtest(x->Fill(first(x), sx...) .+ Ones(sy...), [x])
-        @test gradtest(x->Fill(first(x), sx...) .+ Zeros(sy...), [x])
-        @test gradtest(y->Ones(sx...) .+ Fill(first(y), sy...), [y])
-        @test gradtest(y->Zeros(sx...) .+ Fill(first(y), sy...), [y])
-
-        # Multiplication
-        @test gradtest((x, y)->Fill(first(x), sx...) .* Fill(first(y), sy...), [x], [y])
-        @test gradtest(x->Fill(first(x), sx...) .* Ones(sy...), [x])
-        @test gradtest(x->Fill(first(x), sx...) .* Zeros(sy...), [x])
-        @test gradtest(y->Ones(sx...) .* Fill(first(y), sy...), [y])
-        @test gradtest(y->Zeros(sx...) .* Fill(first(y), sy...), [y])
+        #division
+        @test gradtest((x, y) -> Fill(first(x), sx...) ./ Fill(first(y), sy...), [x], [y])
+        @test gradtest(x -> Fill(first(x), sx...) ./ Ones(sy...), [x])
+        @test gradtest(y -> Ones(sx...) ./ Fill(first(y), sy...), [y])
+        @test gradtest(y -> Zeros(sx...) ./ Fill(first(y), sy...), [y])
       end
     end
   end
