@@ -220,6 +220,13 @@ end
   @test gradtest(x -> meanpool(x, pdims), x)
   @test gradtest(x -> sum(maxpool(x, pdims)), x)
   @test gradtest(x -> sum(meanpool(x, pdims)), x)
+
+  #https://github.com/FluxML/NNlib.jl/issues/188
+  k = ntuple(_ -> 2, spatial_rank)  # Kernel size of pool in ntuple format
+  @test gradtest(x -> maxpool(x, k), x)
+  @test gradtest(x -> meanpool(x, k), x)
+  @test gradtest(x -> sum(maxpool(x, k)), x)
+  @test gradtest(x -> sum(meanpool(x, k)), x)
 end
 
 @test gradtest(x -> reverse(x), rand(17))
