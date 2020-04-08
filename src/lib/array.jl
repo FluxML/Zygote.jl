@@ -27,8 +27,8 @@ using Base.Broadcast: broadcasted, broadcast_shape
     return Fill(x, sz), back
 end
 
-@adjoint (::Type{T})(sz) where {T<:Zeros} = Zeros(sz), Δ->(nothing,)
-@adjoint (::Type{T})(sz) where {T<:Ones} = Ones(sz), Δ->(nothing,)
+@adjoint (::Type{T})(sz) where {T<:Zeros} = T(sz), Δ->(nothing,)
+@adjoint (::Type{T})(sz) where {T<:Ones} = T(sz), Δ->(nothing,)
 
 _zero(xs::AbstractArray{<:Number}, T=float(eltype(xs))) = fill!(similar(xs, T), false)
 _zero(xs::AbstractArray, T=Any) = Union{Nothing, T}[nothing for x in xs]
