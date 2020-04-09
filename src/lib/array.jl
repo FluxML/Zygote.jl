@@ -1,4 +1,4 @@
-using FillArrays, FFTW
+using FillArrays, AbstractFFTs
 using FillArrays: AbstractFill, getindex_value
 using Base.Broadcast: broadcasted, broadcast_shape
 
@@ -8,7 +8,7 @@ using Base.Broadcast: broadcasted, broadcast_shape
 @adjoint Array(xs::Array) = Array(xs), ȳ -> (ȳ,)
 
 @nograd size, length, eachindex, axes, Colon(), findfirst, findlast, findall, randn, ones, zeros, one, zero,
-  print, println, any, all
+  any, all
 
 @adjoint rand(dims::Integer...) = rand(dims...), _ -> nothing
 
@@ -27,8 +27,8 @@ using Base.Broadcast: broadcasted, broadcast_shape
     return Fill(x, sz), back
 end
 
-@adjoint (::Type{T})(sz) where {T<:Zeros} = Zeros(sz), Δ->(nothing,)
-@adjoint (::Type{T})(sz) where {T<:Ones} = Ones(sz), Δ->(nothing,)
+@adjoint (::Type{T})(sz) where {T<:Zeros} = T(sz), Δ->(nothing,)
+@adjoint (::Type{T})(sz) where {T<:Ones} = T(sz), Δ->(nothing,)
 
 @adjoint getindex(x::AbstractArray, inds...) = x[inds...], ∇getindex(x, inds)
 
@@ -187,8 +187,8 @@ end
 
 @adjoint iterate(r::UnitRange, i...) = iterate(r, i...), _ -> nothing
 
-@adjoint function sort(x::AbstractArray)
-  p = sortperm(x)
+@adjoint function sort(x::AbstractArray; by=identity)
+  p = sortperm(x, by=by)
   return x[p], x̄ -> (x̄[invperm(p)],)
 end
 
@@ -496,14 +496,12 @@ end
   return C, function(Δ::NamedTuple)
     issuccess(C) || throw(PosDefException(C.info))
     U, Ū = C.U, Δ.factors
-    Σ̄  = similar(U.data)
-    mul!(Σ̄ , Ū, U')
+    Σ̄ = similar(U.data)
+    Σ̄ = mul!(Σ̄, Ū, U')
     Σ̄ = copytri!(Σ̄, 'U')
     Σ̄ = ldiv!(U, Σ̄)
-    BLAS.trsm!('R', 'U', 'T', 'N', one(eltype(Σ)), U.data, Σ̄)
-    @inbounds for n in diagind(Σ̄)
-      Σ̄[n] /= 2
-    end
+    Σ̄ = BLAS.trsm!('R', 'U', 'T', 'N', one(eltype(Σ)), U.data, Σ̄)
+    Σ̄[diagind(Σ̄)] ./= 2
     return (UpperTriangular(Σ̄),)
   end
 end
@@ -775,52 +773,156 @@ end
 @adjoint -(A::AbstractArray, B::AbstractArray) = A - B, Δ->(Δ, -Δ)
 @adjoint -(A::AbstractArray) = -A, Δ->(-Δ,)
 
-# FFTW
+# Abstract FFT
 # ===================
 
-# FFTW functions do not work with FillArrays, which are needed
+# AbstractFFTs functions do not work with FillArrays, which are needed
 # for some functionality of Zygote. To make it work with FillArrays
 # as well, overload the relevant functions
-FFTW.fft(x::Fill, dims...) = FFTW.fft(collect(x), dims...)
-FFTW.ifft(x::Fill, dims...) = FFTW.ifft(collect(x), dims...)
-
+AbstractFFTs.fft(x::Fill, dims...) = AbstractFFTs.fft(collect(x), dims...)
+AbstractFFTs.bfft(x::Fill, dims...) = AbstractFFTs.bfft(collect(x), dims...)
+AbstractFFTs.ifft(x::Fill, dims...) = AbstractFFTs.ifft(collect(x), dims...)
+AbstractFFTs.rfft(x::Fill, dims...) = AbstractFFTs.rfft(collect(x), dims...)
+AbstractFFTs.irfft(x::Fill, d, dims...) = AbstractFFTs.irfft(collect(x), d, dims...)
+AbstractFFTs.brfft(x::Fill, d, dims...) = AbstractFFTs.brfft(collect(x), d, dims...)
 
 # the adjoint jacobian of an FFT with respect to its input is the reverse FFT of the
 # gradient of its inputs, but with different normalization factor
-@adjoint function FFTW.fft(xs)
-  return FFTW.fft(xs), function(Δ)
-    N = length(xs)
-    return (N * FFTW.ifft(Δ),)
+@adjoint function fft(xs)
+  return AbstractFFTs.fft(xs), function(Δ)
+    return (AbstractFFTs.bfft(Δ),)
   end
 end
 
-@adjoint function FFTW.ifft(xs)
-  return FFTW.ifft(xs), function(Δ)
-    N = length(xs)
-    return (1/N* FFTW.fft(Δ),)
+@adjoint function *(P::AbstractFFTs.Plan, xs)
+  return P * xs, function(Δ)
+    N = prod(size(xs)[[P.region...]])
+    return (nothing, N * (P \ Δ))
   end
 end
 
-@adjoint function FFTW.fft(xs, dims)
-  return FFTW.fft(xs, dims), function(Δ)
+@adjoint function \(P::AbstractFFTs.Plan, xs)
+  return P \ xs, function(Δ)
+    N = prod(size(Δ)[[P.region...]])
+    return (nothing, 1/N * (P * Δ))
+  end
+end
+
+# all of the plans normalize their inverse, while we need the unnormalized one.
+@adjoint function ifft(xs)
+  return AbstractFFTs.ifft(xs), function(Δ)
+    N = length(xs)
+    return (1/N* AbstractFFTs.fft(Δ),)
+  end
+end
+
+@adjoint function bfft(xs)
+  return AbstractFFTs.bfft(xs), function(Δ)
+    return (AbstractFFTs.fft(Δ),)
+  end
+end
+
+@adjoint function fftshift(x)
+    return fftshift(x), function(Δ)
+        return (ifftshift(Δ),)
+    end
+end
+
+@adjoint function ifftshift(x)
+    return ifftshift(x), function(Δ)
+        return (fftshift(Δ),)
+    end
+end
+
+
+# to actually use rfft, one needs to insure that everything 
+# that happens in the Fourier domain could've been done in 
+# the space domain with real numbers. This means enforcing 
+# conjugate symmetry along all transformed dimensions besides 
+# the first. Otherwise this is going to result in *very* weird 
+# behavior.
+@adjoint function rfft(xs::AbstractArray{<:Real})
+  return AbstractFFTs.rfft(xs), function(Δ)
+    N = length(Δ)
+    originalSize = size(xs,1)
+    return (AbstractFFTs.brfft(Δ, originalSize),)
+  end
+end
+
+@adjoint function irfft(xs, d)
+  return AbstractFFTs.irfft(xs, d), function(Δ)
+    total = length(Δ)
+    fullTransform = 1/total * AbstractFFTs.rfft(real.(Δ))
+    return (fullTransform, nothing)
+  end
+end
+
+@adjoint function brfft(xs, d)
+  return AbstractFFTs.brfft(xs, d), function(Δ)
+    fullTransform = AbstractFFTs.rfft(real.(Δ))
+    return (fullTransform, nothing)
+  end
+end
+
+
+# if we're specifying the dimensions
+@adjoint function fft(xs, dims)
+  return AbstractFFTs.fft(xs, dims), function(Δ)
     # dims can be int, array or tuple,
     # convert to collection for use as index
     dims = collect(dims)
-    # we need to multiply by all dimensions that we FFT over
-    N = prod(collect(size(xs))[dims])
-    return (N * FFTW.ifft(Δ, dims), nothing)
+    return (AbstractFFTs.bfft(Δ, dims), nothing)
   end
 end
 
-@adjoint function FFTW.ifft(xs,dims)
-  return FFTW.ifft(xs, dims), function(Δ)
-    # dims can be int, array or tuple,
-    # convert to collection for use as index
+@adjoint function bfft(xs, dims)
+  return AbstractFFTs.ifft(xs, dims), function(Δ)
     dims = collect(dims)
-    # we need to divide by all dimensions that we FFT over
-    N = prod(collect(size(xs))[dims])
-    return (1/N * FFTW.fft(Δ, dims),nothing)
+    return (AbstractFFTs.fft(Δ, dims),nothing)
   end
+end
+
+@adjoint function ifft(xs, dims)
+  return AbstractFFTs.ifft(xs, dims), function(Δ)
+    dims = collect(dims)
+    N = prod(collect(size(xs))[dims])
+    return (1/N * AbstractFFTs.fft(Δ, dims),nothing)
+  end
+end
+
+@adjoint function rfft(xs, dims)
+  return AbstractFFTs.rfft(xs, dims), function(Δ)
+    dims = collect(dims)
+    N = prod(collect(size(xs))[dims])
+    return (N * AbstractFFTs.irfft(Δ, size(xs,dims[1]), dims), nothing)
+  end
+end
+
+@adjoint function irfft(xs, d, dims)
+  return AbstractFFTs.ifft(xs, dims), function(Δ)
+    dims = collect(dims)
+    N = prod(collect(size(xs))[dims])
+    return (1/N * AbstractFFTs.rfft(Δ, dims), nothing, nothing)
+  end
+end
+@adjoint function brfft(xs, d, dims)
+  return AbstractFFTs.ifft(xs, dims), function(Δ)
+    dims = collect(dims)
+    return (AbstractFFTs.rfft(Δ, dims), nothing, nothing)
+  end
+end
+
+
+@adjoint function fftshift(x, dims)
+    return fftshift(x), function(Δ)
+        return (ifftshift(Δ, dims), nothing)
+    end
+end
+
+@adjoint function ifftshift(x, dims)
+    return ifftshift(x), function(Δ)
+        return (fftshift(Δ, dims), nothing)
+    end
 end
 
 # FillArray functionality

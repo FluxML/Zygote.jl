@@ -8,9 +8,9 @@ version = "0.5.0"
 
 [[ArrayLayouts]]
 deps = ["FillArrays", "LinearAlgebra"]
-git-tree-sha1 = "bc779df8d73be70e4e05a63727d3a4dfb4c52b1f"
+git-tree-sha1 = "f8904599065b57f51715faf6278126f853aef6fc"
 uuid = "4c555306-a7a7-4459-81d9-ec55ddd5c99a"
-version = "0.1.5"
+version = "0.2.4"
 
 [[Base64]]
 uuid = "2a0f44e3-6c83-55bd-87e4-b1978d98bd5f"
@@ -29,15 +29,9 @@ version = "0.2.0"
 
 [[CompilerSupportLibraries_jll]]
 deps = ["Libdl", "Pkg"]
-git-tree-sha1 = "aa832564f930a7fc9290972526908d01a35aefac"
+git-tree-sha1 = "7c4f882c41faa72118841185afc58a2eb00ef612"
 uuid = "e66e0078-7015-5450-92f7-15fbd957f2ae"
-version = "0.3.0+0"
-
-[[DataStructures]]
-deps = ["InteractiveUtils", "OrderedCollections"]
-git-tree-sha1 = "5a431d46abf2ef2a4d5d00bd0ae61f651cf854c8"
-uuid = "864edb3b-99cc-5e75-8d2d-829cb0a9cfe8"
-version = "0.17.10"
+version = "0.3.3+0"
 
 [[Dates]]
 deps = ["Printf"]
@@ -59,29 +53,17 @@ version = "1.0.1"
 deps = ["Random", "Serialization", "Sockets"]
 uuid = "8ba89e20-285c-5b6f-9357-94700520ee1b"
 
-[[FFTW]]
-deps = ["AbstractFFTs", "FFTW_jll", "IntelOpenMP_jll", "Libdl", "LinearAlgebra", "MKL_jll", "Reexport"]
-git-tree-sha1 = "109d82fa4b00429f9afcce873e9f746f11f018d3"
-uuid = "7a1cc6ca-52ef-59f5-83cd-3a7055c09341"
-version = "1.2.0"
-
-[[FFTW_jll]]
-deps = ["Libdl", "Pkg"]
-git-tree-sha1 = "ddb57f4cf125243b4aa4908c94d73a805f3cbf2c"
-uuid = "f5851436-0d7a-5f13-b9de-f02708fd171a"
-version = "3.3.9+4"
-
 [[FillArrays]]
 deps = ["LinearAlgebra", "Random", "SparseArrays"]
-git-tree-sha1 = "85c6b57e2680fa28d5c8adc798967377646fbf66"
+git-tree-sha1 = "51cc2f9bc4eb9c6c0e81ec2f779d1085583cc956"
 uuid = "1a297f60-69ca-5386-bcde-b61e274b549b"
-version = "0.8.5"
+version = "0.8.7"
 
 [[ForwardDiff]]
 deps = ["CommonSubexpressions", "DiffResults", "DiffRules", "NaNMath", "Random", "SpecialFunctions", "StaticArrays"]
-git-tree-sha1 = "88b082d492be6b63f967b6c96b352e25ced1a34c"
+git-tree-sha1 = "869540e4367122fbffaace383a5bdc34d6e5e5ac"
 uuid = "f6369f11-7733-5829-9624-2563aa707210"
-version = "0.10.9"
+version = "0.10.10"
 
 [[IRTools]]
 deps = ["InteractiveUtils", "MacroTools", "Test"]
@@ -89,17 +71,12 @@ git-tree-sha1 = "1a4355e4b5b50be2311ebb644f34f3306dbd0410"
 uuid = "7869d1d1-7146-5819-86e3-90919afe41df"
 version = "0.3.1"
 
-[[IntelOpenMP_jll]]
-deps = ["Libdl", "Pkg"]
-git-tree-sha1 = "fb8e1c7a5594ba56f9011310790e03b5384998d6"
-uuid = "1d5cc7b8-4909-519e-a0f8-d0f5ad9712d0"
-version = "2018.0.3+0"
-
 [[InteractiveUtils]]
 deps = ["Markdown"]
 uuid = "b77e0a4c-d291-57a0-90e8-8db25a27a240"
 
 [[LibGit2]]
+deps = ["Printf"]
 uuid = "76f85450-5226-5b5a-8eaa-529ad045b433"
 
 [[Libdl]]
@@ -112,17 +89,11 @@ uuid = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 [[Logging]]
 uuid = "56ddb016-857b-54e1-b83d-db4d58db5568"
 
-[[MKL_jll]]
-deps = ["IntelOpenMP_jll", "Libdl", "Pkg"]
-git-tree-sha1 = "720629cc8cbd12c146ca01b661fd1a6cf66e2ff4"
-uuid = "856f044c-d86e-5d09-b602-aeab76dc8ba7"
-version = "2019.0.117+2"
-
 [[MacroTools]]
-deps = ["DataStructures", "Markdown", "Random"]
-git-tree-sha1 = "07ee65e03e28ca88bc9a338a3726ae0c3efaa94b"
+deps = ["Markdown", "Random"]
+git-tree-sha1 = "f7d2e3f654af75f01ec49be82c231c382214223a"
 uuid = "1914dd2f-81c6-5fcd-8719-6d5c9610ff09"
-version = "0.5.4"
+version = "0.5.5"
 
 [[Markdown]]
 deps = ["Base64"]
@@ -145,14 +116,8 @@ git-tree-sha1 = "d51c416559217d974a1113522d5919235ae67a87"
 uuid = "efe28fd5-8261-553b-a9e1-b2916fc3738e"
 version = "0.5.3+3"
 
-[[OrderedCollections]]
-deps = ["Random", "Serialization", "Test"]
-git-tree-sha1 = "c4c13474d23c60d20a67b217f1d7f22a40edf8f1"
-uuid = "bac558e1-5e72-5ebc-8fee-abe8a469f55d"
-version = "1.1.0"
-
 [[Pkg]]
-deps = ["Dates", "LibGit2", "Libdl", "Logging", "Markdown", "Printf", "REPL", "Random", "SHA", "Test", "UUIDs"]
+deps = ["Dates", "LibGit2", "Libdl", "Logging", "Markdown", "Printf", "REPL", "Random", "SHA", "UUIDs"]
 uuid = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
 
 [[Printf]]
@@ -166,12 +131,6 @@ uuid = "3fa0cd96-eef1-5676-8a61-b3b8758bbffb"
 [[Random]]
 deps = ["Serialization"]
 uuid = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
-
-[[Reexport]]
-deps = ["Pkg"]
-git-tree-sha1 = "7b1d07f411bc8ddb7977ec7f377b97b158514fe0"
-uuid = "189a3867-3050-52da-a836-e630ba90ab69"
-version = "0.2.0"
 
 [[Requires]]
 deps = ["UUIDs"]

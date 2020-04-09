@@ -68,6 +68,9 @@ Numeric{T<:Number} = Union{T,AbstractArray{<:T}}
 @adjoint broadcasted(::typeof(+), xs::Numeric...) =
   broadcast(+, xs...), ȳ -> (nothing, map(x -> unbroadcast(x, ȳ), xs)...)
 
+@adjoint broadcasted(::typeof(-), x::Numeric, y::Numeric) = x .- y,
+  Δ -> (nothing, unbroadcast(x, Δ), -unbroadcast(y, Δ))
+
 @adjoint broadcasted(::typeof(*), x::Numeric, y::Numeric) = x.*y,
   z̄ -> (nothing, unbroadcast(x, z̄ .* conj.(y)), unbroadcast(y, z̄ .* conj.(x)))
 
@@ -179,7 +182,13 @@ end
 end
 
 @init @require CuArrays="3a865a2d-5b23-5a0f-bc46-62713ec82fae" begin
-  @adjoint function broadcasted(::Broadcast.ArrayStyle{CuArrays.CuArray}, f, args...)
+  if isdefined(CuArrays, :CuArrayStyle)  # Introduced in CuArrays v2.0
+    CuArrayStyle = CuArrays.CuArrayStyle
+  else
+    CuArrayStyle = Broadcast.ArrayStyle{CuArrays.CuArray}
+  end
+
+  @adjoint function broadcasted(::CuArrayStyle, f, args...)
     y, back = broadcast_forward(CuArrays.cufunc(f), args...)
     y, ȳ -> (nothing, nothing, back(ȳ)...)
   end
