@@ -147,6 +147,9 @@ end
   irep = [1 2; 2 2]
   @test gradtest(x -> x[1,irep], (3,4))
 
+  # nested arrays
+  @test gradient(x -> x[1][1], [[1]]) == ([[1]],)
+
   # https://github.com/invenia/Nabla.jl/issues/139
   x = rand(3)
   z = [1,2,3,3]
@@ -165,6 +168,15 @@ end
   # https://github.com/FluxML/Zygote.jl/issues/513
   @test gradient(p -> sum(Float32[1,0] - p), [2,3]) == ([-1,-1],)
   @test gradient(x -> sum(Float32[1,x] .+ x), 4) == (3.0f0,)
+end
+
+@testset "reinterpret" begin
+  let T = Float64, T2 = Float32
+    @test_throws ErrorException gradient(x->reinterpret(T2, x), T[1.])
+    @test gradient(x -> reinterpret(T, x), rand(T)) == (1.,)
+    @test gradient(x -> sum(sum(reinterpret(NTuple{2,T}, x))), rand(T, 2)) == ([1., 1.],)
+    @test gradient(x -> sum(sum(reinterpret(T, x))), [(rand(T), rand(T))]) == ([(1., 1.)],)
+  end
 end
 
 @testset "view" begin
