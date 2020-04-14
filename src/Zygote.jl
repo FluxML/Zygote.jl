@@ -18,6 +18,7 @@ include("tools/buffer.jl")
 
 include("compiler/reverse.jl")
 include("compiler/emit.jl")
+include("compiler/chainrules.jl")
 include("compiler/interface.jl")
 include("compiler/show.jl")
 
