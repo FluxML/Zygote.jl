@@ -3,6 +3,7 @@ module Zygote
 using LinearAlgebra, Statistics
 using LinearAlgebra: copytri!, AbstractTriangular
 using ArrayLayouts: MemoryLayout, AbstractColumnMajor
+using ChainRules
 
 import ZygoteRules: @adjoint, @adjoint!, AContext, adjoint, _pullback, pullback, literal_getproperty
 
@@ -46,7 +47,7 @@ end
 precompile() = include(joinpath(@__DIR__, "precompile.jl"))
 
 # precompile()
-@init Requires.isprecompiling() || precompile()
+# @init Requires.isprecompiling() || precompile()
 
 # helps to work around 265-y issues
 function refresh()
