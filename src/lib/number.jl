@@ -1,5 +1,4 @@
-using DiffRules, SpecialFunctions, NaNMath
-using Base.FastMath: fast_op, make_fastmath
+#using Base.FastMath: fast_op, make_fastmath
 
 # @nograd isinf, isnan, isfinite, div
 
