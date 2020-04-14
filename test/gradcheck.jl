@@ -138,33 +138,41 @@ end
 @test gradient(logdet, 2.0)[1] == 0.5
 
 @testset "getindex" begin
-  @test gradtest(x -> x[:,2,:], (3,4,5))
-  @test gradtest(x -> x[1:2,3:4], (3,4))
+  @test gradtest(x -> x[:, 2, :], (3, 4, 5))
+  @test gradtest(x -> x[1:2, 3:4], (3, 4))
 
   imat = [1 2; 3 4]
-  @test gradtest(x -> x[:,imat], (3,4))
-  @test gradtest(x -> x[:,[1,2,2]], (3,4))
+  @test gradtest(x -> x[:, imat], (3, 4))
+  @test gradtest(x -> x[:, [1, 2, 2]], (3, 4))
   irep = [1 2; 2 2]
-  @test gradtest(x -> x[1,irep], (3,4))
+  @test gradtest(x -> x[1, irep], (3, 4))
 
   # https://github.com/invenia/Nabla.jl/issues/139
   x = rand(3)
-  z = [1,2,3,3]
-  y(x,z) = dot(ones(4), x[z])
-  @test gradient(y, x,z) == ([1,1,2], nothing)
+  z = [1, 2, 3, 3]
+  y(x, z) = dot(ones(4), x[z])
+  @test gradient(y, x, z) == ([1, 1, 2], nothing)
 
   # https://github.com/FluxML/Zygote.jl/issues/376
   _, back = Zygote._pullback(x->x[1]*im, randn(2))
   @test back(1.0)[2] == [-im, 0]
 
   # _droplike
-  @test gradient(x -> sum(inv, x[1,:]'), ones(2,2)) == ([-1 -1; 0 0],)
-  @test gradient(x -> sum(inv, x[1:1,:]'), ones(2,2)) == ([-1 -1; 0 0],)
-  @test gradient(x -> sum(inv, transpose(view(x,1,:))), ones(2,2)) == ([-1 -1; 0 0],)
+  @test gradient(x -> sum(inv, x[1, :]'), ones(2, 2)) == ([-1 -1; 0 0],)
+  @test gradient(x -> sum(inv, x[1:1, :]'), ones(2, 2)) == ([-1 -1; 0 0],)
+  @test gradient(x -> sum(inv, transpose(view(x, 1, :))), ones(2, 2)) == ([-1 -1; 0 0],)
 
   # https://github.com/FluxML/Zygote.jl/issues/513
-  @test gradient(p -> sum(Float32[1,0] - p), [2,3]) == ([-1,-1],)
-  @test gradient(x -> sum(Float32[1,x] .+ x), 4) == (3.0f0,)
+  @test gradient(p -> sum(Float32[1, 0] - p), [2, 3]) == ([-1, -1],)
+  @test gradient(x -> sum(Float32[1, x] .+ x), 4) == (3.0f0,)
+
+  # Ensure that nothings work with numeric types.
+  _, back = Zygote.pullback(getindex, randn(4), [1])
+  @test back([nothing]) == (zeros(4), nothing)
+
+  # Ensure that nothings work with non-numeric types.
+  _, back = Zygote.pullback(getindex, [randn(2) for _ in 1:3], [1])
+  @test back([nothing]) == ([nothing for _ in 1:3], nothing)
 end
 
 @testset "view" begin
