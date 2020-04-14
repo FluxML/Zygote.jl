@@ -2,6 +2,7 @@ zerolike(x::Number) = zero(x)
 zerolike(x::Tuple) = zerolike.(x)
 
 @generated function zerolike(x::T) where T
+  length(fieldnames(T)) == 0 ? nothing :
   :(NamedTuple{$(fieldnames(T))}(($(map(f -> :(zerolike(x.$f)), fieldnames(T))...),)))
 end
 
@@ -47,3 +48,14 @@ function _pushforward(dargs, ::typeof(Core._apply), f, args...)
   dargs = Core._apply(tuple, dargs...)
   Core._apply(_pushforward, ((df, dargs...), f), args...)
 end
+
+using ..Zygote: literal_getproperty, literal_getindex
+
+_pushforward(dargs, ::typeof(getproperty), x, f) =
+  _pushforward(dargs, literal_getproperty, x, Val(f))
+
+@tangent literal_getproperty(t, ::Val{i}) where i =
+  getproperty(t, i), (ṫ, _) -> getproperty(ṫ, i)
+
+@tangent literal_getindex(t, ::Val{i}) where i =
+  getindex(t, i), (ṫ, _) -> getindex(ṫ, i)

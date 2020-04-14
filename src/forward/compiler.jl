@@ -51,7 +51,9 @@ function dual(ir)
     if isexpr(st.expr, :meta, :inbounds, :loopinfo)
       Δs[v] = nothing
     elseif isexpr(st.expr, :boundscheck) ||
-           (isexpr(st.expr, :call) && st.expr.args[1] == GlobalRef(Base, :not_int))
+           (isexpr(st.expr, :call) && st.expr.args[1] == GlobalRef(Base, :not_int)) ||
+           (isexpr(st.expr, :call) && st.expr.args[1] == GlobalRef(Core, :(===))) ||
+           (isexpr(st.expr, :call) && st.expr.args[1] == GlobalRef(Main, :(===)))
       Δs[v] = false
     elseif isexpr(st.expr, :call)
       dargs = insert!(pr, v, xcall(:tuple, partial.((v,), st.expr.args)...))
@@ -71,5 +73,7 @@ end
 @dynamo function _pushforward(_, x...)
   ir = IR(x...)
   ir == nothing && return :(error("non-differentiable function $(args[2])"))
+  ir = Zygote.instrument(ir)
+  ir.meta.code.inlineable = true
   return dual(ir)
 end

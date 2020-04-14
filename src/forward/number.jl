@@ -42,3 +42,6 @@ end
   c = Colon()(xs...)
   c, (_...) -> zerolike(c)
 end
+
+zerolike(x::AbstractRange) =
+  invoke(zerolike, Tuple{Any}, x)
