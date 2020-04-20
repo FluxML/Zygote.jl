@@ -866,9 +866,8 @@ _randmatseries(rng, ::typeof(atanh), T, n, domain::Type{Complex}) = nothing
   MTs = (Symmetric{Float64}, Hermitian{Float64}, Hermitian{ComplexF64})
   rng, N = MersenneTwister(123), 7
   domains = (Real, Complex)
-  @testset "$func(::RealHermSymComplexHerm)" for func in (:exp, :log, :cos, :sin, :tan, :cosh, :sinh, :tanh, :acos, :asin, :atan, :acosh, :asinh, :atanh, :sqrt)
-    f = eval(func)
-    @testset "$func(::$MT)" for MT in MTs
+  @testset "$(nameof(f))(::RealHermSymComplexHerm)" for f in (exp, log, cos, sin, tan, cosh, sinh, tanh, acos, asin, atan, acosh, asinh, atanh, sqrt)
+    @testset "$(nameof(f))(::$MT)" for MT in MTs
       T = eltype(MT)
       ST = _hermsymtype(MT)
       @testset "domain $domain" for domain in domains
