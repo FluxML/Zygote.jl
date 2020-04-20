@@ -61,6 +61,7 @@ jobs:
           sed -i '/tasks3/d' deps/SnoopCompile/precompile/precompile_Zygote.jl
           sed -i '/threads1/d' deps/SnoopCompile/precompile/precompile_Zygote.jl
           sed -i '/threads2/d' deps/SnoopCompile/precompile/precompile_Zygote.jl
+          set -i '/Main.var/d' deps/SnoopCompile/precompile/precompile_Zygote.jl
       - name: Running Benchmark
         run: julia --project=@. -e 'include("deps/SnoopCompile/snoopBenchmark.jl")'
       # https://github.com/marketplace/actions/create-pull-request
