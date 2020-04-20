@@ -1,10 +1,12 @@
 using SnoopCompile
-println("loading infer benchmark")
 
-@snoopi_bench "Zygote loading" begin
+println("Loading benchmark")
+@snoopi_bench "Zygote" begin
     using Zygote
 end
 
-@snoopi_bench "Zygote compiler tests" begin
-    include(joinpath(@__DIR__,"..","..","test","compiler.jl"))
+println("Compiler test benchmark")
+@snoopi_bench "Zygote" begin
+    using Zygote
+    include(joinpath(pkgdir(Zygote),"test","compiler.jl"))
 end
