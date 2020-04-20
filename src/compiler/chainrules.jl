@@ -14,6 +14,8 @@ wrap_chainrules(x) = unthunk(x)
 wrap_chainrules(x::Tuple) = map(wrap_chainrules, x)
 
 function chain_rrule(f, args...)
-  y, back = rrule(f, args...)
-  y, dy -> wrap_chainrules(back(dy))
+  y, By = rrule(f, args...)
+  back(::Nothing) = nothing
+  back(dy) = wrap_chainrules(By(dy))
+  return y, back
 end
