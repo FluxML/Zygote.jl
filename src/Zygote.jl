@@ -43,15 +43,15 @@ include("profiler/Profile.jl")
   include("flux.jl")
 end
 
-precompile() = include(joinpath(@__DIR__, "precompile.jl"))
+_precompile() = include(joinpath(@__DIR__, "precompile.jl"))
 
-# precompile()
-@init Requires.isprecompiling() || precompile()
+# _precompile()
+@init Requires.isprecompiling() || _precompile()
 
 # helps to work around 265-y issues
 function refresh()
   include(joinpath(@__DIR__, "compiler/interface2.jl"))
-  precompile()
+  _precompile()
   return
 end
 
