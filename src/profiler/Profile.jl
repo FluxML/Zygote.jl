@@ -1,7 +1,9 @@
 module Profile
 
 using Requires
-using ..Zygote: Pullback, IdSet, meta, stacklines
+using ..Zygote: Pullback, IdSet
+using ..Zygote.Compiler: stacklines
+using IRTools: meta
 
 function loc(f)
   # TODO perhaps find most general method

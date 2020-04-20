@@ -3,14 +3,8 @@ using IRTools: IR, Variable, Pipe, xcall, var, prewalk, postwalk,
   insertafter!, finish, expand!, prune!, substitute!, substitute,
   block, block!, branch!, return!, stmt, meta
 
-@inline tuple_va(N, xs) = xs
-@inline tuple_va(N, x, xs...) = (x, tuple_va(N, xs...)...)
-@inline tuple_va(::Val{N}, ::Nothing) where N = ntuple(_ -> nothing, Val(N))
-
 iscall(x, m::Module, n::Symbol) = isexpr(x, :call) && x.args[1] == GlobalRef(m, n)
 
-gradindex(x, i) = x[i]
-gradindex(::Nothing, i) = nothing
 xgetindex(x, i...) = xcall(Base, :getindex, x, i...)
 xgradindex(x, i) = xcall(Zygote, :gradindex, x, i)
 
@@ -141,7 +135,7 @@ function primal(ir::IR)
   pr = Pipe(ir)
   pbs = Dict{Variable,Variable}()
   argument!(pr, at = 1)
-  cx = argument!(pr, Context, at = 2)
+  cx = argument!(pr, Zygote.Context, at = 2)
   for (v, st) in pr
     ex = st.expr
     if isexpr(ex, :call) && !ignored(ir, ex)

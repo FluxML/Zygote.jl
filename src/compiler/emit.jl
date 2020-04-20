@@ -1,25 +1,3 @@
-# Stacks
-
-mutable struct Stack{T}
-  idx::Int
-  data::Vector{T}
-end
-
-Stack(data::Vector{T}) where T =
-  Stack{T}(length(data), data)
-
-function Base.pop!(stk::Stack)
-  i = stk.idx
-  stk.idx = i == 1 ? length(stk.data) : i-1
-  @inbounds return stk.data[i]
-end
-
-function _push!(a::Vector{T}, x::T) where T
-  Base._growend!(a, 1)
-  @inbounds a[end] = x
-  return
-end
-
 # Emit
 
 xstack(T) = Expr(:call, Vector{T})
@@ -53,7 +31,7 @@ function forward_stacks!(adj, F)
   end
   args = arguments(pr)[3:end]
   rec = push!(pr, xtuple(recs...))
-  P = length(pr.blocks) == 1 ? Pullback{F} : Pullback{F,Any}
+  P = length(pr.blocks) == 1 ? Zygote.Pullback{F} : Zygote.Pullback{F,Any}
   # P = Pullback{F,Any} # reduce specialisation
   rec = push!(pr, Expr(:call, P, rec))
   ret = xtuple(pr.blocks[end].branches[end].args[1], rec)

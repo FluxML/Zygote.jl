@@ -1,3 +1,30 @@
+using MacroTools
+using IRTools: IR, meta
+
+# Stacks
+
+mutable struct Stack{T}
+  idx::Int
+  data::Vector{T}
+end
+
+Stack(data::Vector{T}) where T =
+  Stack{T}(length(data), data)
+
+function Base.pop!(stk::Stack)
+  i = stk.idx
+  stk.idx = i == 1 ? length(stk.data) : i-1
+  @inbounds return stk.data[i]
+end
+
+function _push!(a::Vector{T}, x::T) where T
+  Base._growend!(a, 1)
+  @inbounds a[end] = x
+  return
+end
+
+# Context
+
 mutable struct Context <: AContext
   cache::Union{IdDict{Any,Any},Nothing}
 end
@@ -27,6 +54,13 @@ end
 # Wrappers
 
 _pullback(f, args...) = _pullback(Context(), f, args...)
+
+@inline tuple_va(N, xs) = xs
+@inline tuple_va(N, x, xs...) = (x, tuple_va(N, xs...)...)
+@inline tuple_va(::Val{N}, ::Nothing) where N = ntuple(_ -> nothing, Val(N))
+
+gradindex(x, i) = x[i]
+gradindex(::Nothing, i) = nothing
 
 tailmemaybe(::Nothing) = nothing
 tailmemaybe(x::Tuple) = Base.tail(x)
@@ -132,5 +166,5 @@ macro code_ir(ex)
 end
 
 macro code_adjoint(ex)
-  :(Adjoint($(code_irm(ex)), varargs = varargs($(esc(:($InteractiveUtils.@which $ex))), length(($(esc.(ex.args)...),)))))
+  :(Compiler.Adjoint($(code_irm(ex)), varargs = Compiler.varargs($(esc(:($InteractiveUtils.@which $ex))), length(($(esc.(ex.args)...),)))))
 end
