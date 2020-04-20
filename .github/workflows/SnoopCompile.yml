@@ -1,0 +1,43 @@
+name: SnoopCompile
+
+on:
+  - push
+
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        julia-version: ['1.4'] # using 1.4 and higher is better
+        julia-arch: [x64]
+        os: [ubuntu-latest]
+    steps:
+      - uses: actions/checkout@v2
+      - uses: julia-actions/setup-julia@latest
+        with:
+          version: ${{ matrix.julia-version }}
+      - name: Install dependencies
+        run: julia --project -e 'using Pkg; Pkg.instantiate();'
+      - name : Add SnoopCompile and current package
+        run: julia -e 'using Pkg; Pkg.add("SnoopCompile"); Pkg.develop(PackageSpec(; path=pwd()));'
+      # - name: Install Test dependencies
+      #   run: julia -e 'using SnoopCompile; SnoopCompile.addtestdep()'
+      - name: Generating precompile files
+        run: julia --project=@. -e 'include("deps/SnoopCompile/snoopCompile.jl")'
+      - name: Running Benchmark
+        run: julia --project=@. -e 'include("deps/SnoopCompile/snoopBenchmark.jl")'
+
+      # https://github.com/marketplace/actions/create-pull-request
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: Update precompile_*.jl file
+          committer: SnoopCompile Bot # Change `committer` to your name and your email.
+          title: '[AUTO] Update precompile_*.jl file'
+          labels: SnoopCompile
+          branch: create-pull-request/SnoopCompile
+      - name: Check output environment variable
+        run: echo "Pull Request Number - ${{ env.PULL_REQUEST_NUMBER }}"
+        
