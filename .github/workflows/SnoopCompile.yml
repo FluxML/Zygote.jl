@@ -25,6 +25,7 @@ jobs:
         run: julia -e 'using SnoopCompile; SnoopCompile.addtestdep()'
       - name: Generating precompile files
         run: julia --project=@. -e 'include("deps/SnoopCompile/snoopCompile.jl")'
+      - run: cat deps/SnoopCompile/snoopCompile.jl
       - name: Remove precompile statements that are specific to tests only
         run: |
           sed -i '/MyMutable/d' deps/SnoopCompile/precompile/precompile_Zygote.jl
