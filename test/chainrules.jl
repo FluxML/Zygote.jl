@@ -47,3 +47,7 @@ end
         @test cr_inner_demo_rrule_hitcount[] == 1
     end
 end
+
+@test_broken gradient(2.0) do x
+  @fastmath x^2.0
+end == (4.0,)
