@@ -3,27 +3,29 @@ using IRTools.Inner: argnames!, update!
 
 ignore_sig(T) = all(T -> T <: Type, T.parameters)
 
-function _pullback(ctx::AContext, f, args...)
-  if chainrules_blacklist(f, args...)  || (res = ChainRules.rrule(f, args...)) === nothing
-    # Blacklisted or no ChainRule defined, time to do the source tranform
-    return _pullback_via_source2source(ctx, f, args...)
+const chainrules_fallback = which(rrule, Tuple{Any})
+
+function has_chainrule(T)
+  m = meta(Tuple{typeof(rrule),T.parameters...})
+  if m.method === chainrules_fallback
+    return false, m.code.edges
   else
-    # Can just use ChainRule answer
-    y, pb = res
-    return y, _pullback_via_chainrules(pb)
+    return true, nothing
   end
 end
 
-@generated function _pullback_via_source2source(ctx::AContext, f, args...)
+@generated function _pullback(ctx::AContext, f, args...)
   T = Tuple{f,args...}
   ignore(T) && return :(f(args...), Pullback{$T}(()))
+  hascr, cr_edges = has_chainrule(T)
+  hascr && return :(rrule(f, args...))
   g = try _lookup_grad(T) catch e e end
   !(g isa Tuple) && return :(f(args...), Pullback{$T}((f,)))
   meta, forw, _ = g
   argnames!(meta, Symbol("#self#"), :ctx, :f, :args)
   forw = varargs!(meta, forw, 3)
-  # IRTools.verify(forw)
   forw = slots!(pis!(inlineable!(forw)))
+  append!(meta.code.edges, cr_edges)
   return update!(meta.code, forw)
 end
 
@@ -39,7 +41,6 @@ end
   end
   meta, _, back = g
   argnames!(meta, Symbol("#self#"), :Δ)
-  # IRTools.verify(back)
   back = slots!(inlineable!(back))
   return update!(meta.code, back)
 end
