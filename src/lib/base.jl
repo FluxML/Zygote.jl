@@ -49,6 +49,45 @@ end
 
 @nograd haskey
 
+# Just for reuse between get and get!
+function ∇getdictkey(d::AbstractDict, k, ctx, Δ)
+    grad = grad_mut(ctx, d)
+    grad[k] = accum(get(grad, k, nothing), Δ)
+    return (nothing, grad, nothing)
+end
+
+@adjoint! function get!(f::Function, d::AbstractDict, k)
+    # Will be replaced if ∇f is called
+    back = Δ -> ∇getdictkey(d, k, __context__, Δ)
+
+    function ∇f()
+        res,fback = pullback(__context__,f)
+        back = function(Δ)
+                Δd = get(grad_mut(__context__, d), k, nothing)
+                delete!(grad_mut(__context__, d), k)
+                fback(Δ) # Always return empty tuple due to no arg?
+                return (nothing, Δd, nothing)
+            end
+        return res
+    end
+    return get!(∇f, d, k), back
+end
+
+@adjoint! function get(f::Function, d::AbstractDict, k)
+    # Will be replaced if ∇f is called
+    back = Δ -> ∇getdictkey(d, k, __context__, Δ)
+
+    function ∇f()
+        res,fback = pullback(__context__,f)
+        back = function(Δ)
+                fback(Δ) # Always return empty tuple due to no arg?
+                return (nothing, nothing, nothing)
+            end
+        return res
+    end
+    return get(∇f, d, k), back
+end
+
 # Channels
 
 @nograd Channel, schedule
