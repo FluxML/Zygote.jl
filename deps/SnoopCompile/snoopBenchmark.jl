@@ -1,12 +1,12 @@
 using SnoopCompile
 
-println("Loading benchmark")
+println("Benchmarking `using Zygote`")
 @snoopi_bench "Zygote" begin
     using Zygote
 end
 
-println("Compiler test benchmark")
+println("Benchmarking `using Zygote` & basic function test")
 @snoopi_bench "Zygote" begin
     using Zygote
-    include(joinpath(pkgdir(Zygote),"test","compiler.jl"))
+    include(joinpath(pkgdir(Zygote),"src","precompile.jl"))
 end
