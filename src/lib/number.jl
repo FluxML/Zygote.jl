@@ -70,6 +70,11 @@ end
 @adjoint conj(x::Number) = conj(x), r̄ -> (conj(r̄),)
 @adjoint imag(x::Number) = imag(x), ī -> (real(ī)*im,)
 
+@adjoint abs(x::Real) = abs(x), Δ -> (real(Δ)*sign(x),)
+@adjoint abs(x::Complex) = abs(x), Δ -> (real(Δ)*x/abs(x),)
+@adjoint abs2(x::Number) = abs2(x), Δ -> (real(Δ)*(x + x),)
+
+
 # DiffRules._abs_deriv(x::Complex) = x/abs(x)
 
 #  # adjoint for Fastmath operations
