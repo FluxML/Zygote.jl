@@ -46,7 +46,7 @@ end
 _precompile() = include(joinpath(@__DIR__, "precompile.jl"))
 
 # _precompile()
-@init Requires.isprecompiling() || _precompile()
+#@init Requires.isprecompiling() || _precompile()
 
 # helps to work around 265-y issues
 function refresh()
