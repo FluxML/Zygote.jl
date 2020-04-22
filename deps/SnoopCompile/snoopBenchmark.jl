@@ -1,7 +1,7 @@
 using SnoopCompile
 
 println("Benchmarking `using Zygote`")
-@snoopi_bench "Zygote" begin
+@snoopi_bench BotConfig("Zygote") begin
     using Zygote
 end
 
