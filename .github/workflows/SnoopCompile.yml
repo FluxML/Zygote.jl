@@ -21,47 +21,14 @@ jobs:
         run: julia --project -e 'using Pkg; Pkg.instantiate();'
       - name : Add SnoopCompile and current package
         run: julia -e 'using Pkg; Pkg.add("SnoopCompile"); Pkg.develop(PackageSpec(; path=pwd()));'
-      - name: Install Test dependencies
-        run: julia -e 'using SnoopCompile; SnoopCompile.addtestdep()'
+      # - name: Install Test dependencies
+      #   run: julia -e 'using SnoopCompile; SnoopCompile.addtestdep()'
       - name: Generating precompile files
         run: julia --project=@. -e 'include("deps/SnoopCompile/snoopCompile.jl")'
       - run: cat deps/SnoopCompile/precompile/precompile_Zygote.jl
       - name: Remove precompile statements that are specific to tests only
         run: |
-          sed -i '/MyMutable/d' deps/SnoopCompile/precompile/precompile_Zygote.jl
-          sed -i '/Foo/d' deps/SnoopCompile/precompile/precompile_Zygote.jl
-          sed -i '/Layer/d' deps/SnoopCompile/precompile/precompile_Zygote.jl
-          sed -i '/_dropimaggrad/d' deps/SnoopCompile/precompile/precompile_Zygote.jl
-          sed -i '/badly/d' deps/SnoopCompile/precompile/precompile_Zygote.jl
           sed -i '/pow/d' deps/SnoopCompile/precompile/precompile_Zygote.jl
-          sed -i '/pow_mut/d' deps/SnoopCompile/precompile/precompile_Zygote.jl
-          sed -i '/pow_global/d' deps/SnoopCompile/precompile/precompile_Zygote.jl
-          sed -i '/mul_struct/d' deps/SnoopCompile/precompile/precompile_Zygote.jl
-          sed -i '/mul_tuple/d' deps/SnoopCompile/precompile/precompile_Zygote.jl
-          sed -i '/mul_lambda/d' deps/SnoopCompile/precompile/precompile_Zygote.jl
-          sed -i '/myprod/d' deps/SnoopCompile/precompile/precompile_Zygote.jl
-          sed -i '/mul_vec/d' deps/SnoopCompile/precompile/precompile_Zygote.jl
-          sed -i '/grad/d' deps/SnoopCompile/precompile/precompile_Zygote.jl
-          sed -i '/pow_try/d' deps/SnoopCompile/precompile/precompile_Zygote.jl
-          sed -i '/pow_simd/d' deps/SnoopCompile/precompile/precompile_Zygote.jl
-          sed -i '/foo!/d' deps/SnoopCompile/precompile/precompile_Zygote.jl
-          sed -i '/baz/d' deps/SnoopCompile/precompile/precompile_Zygote.jl
-          sed -i '/type_test/d' deps/SnoopCompile/precompile/precompile_Zygote.jl
-          sed -i '/ngradient/d' deps/SnoopCompile/precompile/precompile_Zygote.jl
-          sed -i '/_dropimaggrad/d' deps/SnoopCompile/precompile/precompile_Zygote.jl
-          sed -i '/foo/d' deps/SnoopCompile/precompile/precompile_Zygote.jl
-          sed -i '/_gradtest_hermsym/d' deps/SnoopCompile/precompile/precompile_Zygote.jl
-          sed -i '/randvectorin/d' deps/SnoopCompile/precompile/precompile_Zygote.jl
-          sed -i '/_randmatseries/d' deps/SnoopCompile/precompile/precompile_Zygote.jl
-          sed -i '/cat_test/d' deps/SnoopCompile/precompile/precompile_Zygote.jl
-          sed -i '/test_log1pexp/d' deps/SnoopCompile/precompile/precompile_Zygote.jl
-          sed -i '/vstack/d' deps/SnoopCompile/precompile/precompile_Zygote.jl
-          sed -i '/tasks1/d' deps/SnoopCompile/precompile/precompile_Zygote.jl
-          sed -i '/tasks2/d' deps/SnoopCompile/precompile/precompile_Zygote.jl
-          sed -i '/tasks3/d' deps/SnoopCompile/precompile/precompile_Zygote.jl
-          sed -i '/threads1/d' deps/SnoopCompile/precompile/precompile_Zygote.jl
-          sed -i '/threads2/d' deps/SnoopCompile/precompile/precompile_Zygote.jl
-          sed -i '/Main.var/d' deps/SnoopCompile/precompile/precompile_Zygote.jl
       - name: Running Benchmark
         run: julia --project=@. -e 'include("deps/SnoopCompile/snoopBenchmark.jl")'
       # https://github.com/marketplace/actions/create-pull-request
