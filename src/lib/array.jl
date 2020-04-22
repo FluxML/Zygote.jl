@@ -27,27 +27,28 @@ using Base.Broadcast: broadcasted, broadcast_shape
     return Fill(x, sz), back
 end
 
-@adjoint (::Type{T})(sz) where {T<:Zeros} = Zeros(sz), Δ->(nothing,)
-@adjoint (::Type{T})(sz) where {T<:Ones} = Ones(sz), Δ->(nothing,)
-
-_zero(xs::AbstractArray{<:Number}, T=float(eltype(xs))) = fill!(similar(xs, T), false)
-_zero(xs::AbstractArray, T=Any) = Union{Nothing, T}[nothing for x in xs]
+@adjoint (::Type{T})(sz) where {T<:Zeros} = T(sz), Δ->(nothing,)
+@adjoint (::Type{T})(sz) where {T<:Ones} = T(sz), Δ->(nothing,)
 
 @adjoint getindex(x::AbstractArray, inds...) = x[inds...], ∇getindex(x, inds)
 
 @adjoint view(x::AbstractArray, inds...) = view(x, inds...), ∇getindex(x, inds)
 
 ∇getindex(x::AbstractArray, inds) = dy -> begin
-  if inds isa  NTuple{<:Any,Integer}
+  if inds isa  NTuple{<:Any, Integer}
     dx = _zero(x, typeof(dy))
     dx[inds...] = dy
   else
     dx = _zero(x, eltype(dy))
     dxv = view(dx, inds...)
-    dxv .+= _droplike(dy, dxv)
+    dxv .= accum.(dxv, _droplike(dy, dxv))
   end
-  (dx, map(_->nothing, inds)...)
+  return (dx, map(_->nothing, inds)...)
 end
+
+_zero(xs::AbstractArray{<:Number}, T::Type{Nothing}) = fill!(similar(xs), zero(eltype(xs)))
+_zero(xs::AbstractArray{<:Number}, T) = fill!(similar(xs, T), false)
+_zero(xs::AbstractArray, T) = fill!(similar(xs, Union{Nothing, T}), nothing)
 
 _droplike(dy, dxv) = dy
 _droplike(dy::Union{LinearAlgebra.Adjoint, LinearAlgebra.Transpose}, dxv::AbstractVector) =
@@ -56,6 +57,9 @@ _droplike(dy::Union{LinearAlgebra.Adjoint, LinearAlgebra.Transpose}, dxv::Abstra
 @adjoint getindex(::Type{T}, xs...) where {T} = T[xs...], dy -> (nothing, dy...)
 
 @adjoint! setindex!(xs::AbstractArray, x...) = setindex!(xs, x...),
+  _ -> error("Mutating arrays is not supported")
+
+@adjoint! copyto!(args...) = copyto!(args...),
   _ -> error("Mutating arrays is not supported")
 
 for f in [push!, pop!, pushfirst!, popfirst!]
@@ -186,8 +190,8 @@ end
 
 @adjoint iterate(r::UnitRange, i...) = iterate(r, i...), _ -> nothing
 
-@adjoint function sort(x::AbstractArray)
-  p = sortperm(x)
+@adjoint function sort(x::AbstractArray; by=identity)
+  p = sortperm(x, by=by)
   return x[p], x̄ -> (x̄[invperm(p)],)
 end
 

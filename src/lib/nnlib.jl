@@ -67,12 +67,12 @@ colmajor(::AbstractColumnMajor, x) = x
        )
    end
 
-@adjoint function maxpool(x, pdims; kw...)
+@adjoint function maxpool(x, pdims::NNlib.PoolDims; kw...)
   y = maxpool(x, pdims; kw...)
   y, Δ -> (NNlib.∇maxpool(Δ, y, x, pdims; kw...), nothing)
 end
 
-@adjoint function meanpool(x, pdims; kw...)
+@adjoint function meanpool(x, pdims::NNlib.PoolDims; kw...)
   y = meanpool(x, pdims; kw...)
   y, Δ -> (NNlib.∇meanpool(Δ, y, x, pdims; kw...), nothing)
 end

@@ -1,4 +1,4 @@
-using Zygote, NNlib, Test, Random, LinearAlgebra, Statistics, FillArrays, 
+using Zygote, NNlib, Test, Random, LinearAlgebra, Statistics, FillArrays,
     AbstractFFTs, FFTW, Distances
 using Zygote: gradient
 using NNlib: conv, ∇conv_data, depthwiseconv, batched_mul
@@ -138,33 +138,41 @@ end
 @test gradient(logdet, 2.0)[1] == 0.5
 
 @testset "getindex" begin
-  @test gradtest(x -> x[:,2,:], (3,4,5))
-  @test gradtest(x -> x[1:2,3:4], (3,4))
+  @test gradtest(x -> x[:, 2, :], (3, 4, 5))
+  @test gradtest(x -> x[1:2, 3:4], (3, 4))
 
   imat = [1 2; 3 4]
-  @test gradtest(x -> x[:,imat], (3,4))
-  @test gradtest(x -> x[:,[1,2,2]], (3,4))
+  @test gradtest(x -> x[:, imat], (3, 4))
+  @test gradtest(x -> x[:, [1, 2, 2]], (3, 4))
   irep = [1 2; 2 2]
-  @test gradtest(x -> x[1,irep], (3,4))
+  @test gradtest(x -> x[1, irep], (3, 4))
 
   # https://github.com/invenia/Nabla.jl/issues/139
   x = rand(3)
-  z = [1,2,3,3]
-  y(x,z) = dot(ones(4), x[z])
-  @test gradient(y, x,z) == ([1,1,2], nothing)
+  z = [1, 2, 3, 3]
+  y(x, z) = dot(ones(4), x[z])
+  @test gradient(y, x, z) == ([1, 1, 2], nothing)
 
   # https://github.com/FluxML/Zygote.jl/issues/376
   _, back = Zygote._pullback(x->x[1]*im, randn(2))
   @test back(1.0)[2] == [-im, 0]
 
   # _droplike
-  @test gradient(x -> sum(inv, x[1,:]'), ones(2,2)) == ([-1 -1; 0 0],)
-  @test gradient(x -> sum(inv, x[1:1,:]'), ones(2,2)) == ([-1 -1; 0 0],)
-  @test gradient(x -> sum(inv, transpose(view(x,1,:))), ones(2,2)) == ([-1 -1; 0 0],)
+  @test gradient(x -> sum(inv, x[1, :]'), ones(2, 2)) == ([-1 -1; 0 0],)
+  @test gradient(x -> sum(inv, x[1:1, :]'), ones(2, 2)) == ([-1 -1; 0 0],)
+  @test gradient(x -> sum(inv, transpose(view(x, 1, :))), ones(2, 2)) == ([-1 -1; 0 0],)
 
   # https://github.com/FluxML/Zygote.jl/issues/513
-  @test gradient(p -> sum(Float32[1,0] - p), [2,3]) == ([-1,-1],)
-  @test gradient(x -> sum(Float32[1,x] .+ x), 4) == (3.0f0,)
+  @test gradient(p -> sum(Float32[1, 0] - p), [2, 3]) == ([-1, -1],)
+  @test gradient(x -> sum(Float32[1, x] .+ x), 4) == (3.0f0,)
+
+  # Ensure that nothings work with numeric types.
+  _, back = Zygote.pullback(getindex, randn(4), [1])
+  @test back([nothing]) == (zeros(4), nothing)
+
+  # Ensure that nothings work with non-numeric types.
+  _, back = Zygote.pullback(getindex, [randn(2) for _ in 1:3], [1])
+  @test back([nothing]) == ([nothing for _ in 1:3], nothing)
 end
 
 @testset "view" begin
@@ -220,6 +228,13 @@ end
   @test gradtest(x -> meanpool(x, pdims), x)
   @test gradtest(x -> sum(maxpool(x, pdims)), x)
   @test gradtest(x -> sum(meanpool(x, pdims)), x)
+
+  #https://github.com/FluxML/NNlib.jl/issues/188
+  k = ntuple(_ -> 2, spatial_rank)  # Kernel size of pool in ntuple format
+  @test gradtest(x -> maxpool(x, k), x)
+  @test gradtest(x -> meanpool(x, k), x)
+  @test gradtest(x -> sum(maxpool(x, k)), x)
+  @test gradtest(x -> sum(meanpool(x, k)), x)
 end
 
 @test gradtest(x -> reverse(x), rand(17))
@@ -290,6 +305,18 @@ end
 
 @testset "sort" begin
   @test gradtest(sort, 5)
+  correct = [
+      [2,3,1],
+      [1, 2, 3],
+      [1,2,3],
+      [2,1,3]
+  ]
+  for i = 1:3
+    @test gradient(v->sort(v)[i], [3.,1,2])[1][correct[1][i]] == 1
+    @test gradient(v->sort(v)[i], [1.,2,3])[1][correct[2][i]] == 1
+    @test gradient(v->sort(v,by=x->x%10)[i], [11,2,99])[1][correct[3][i]] == 1
+    @test gradient(v->sort(v,by=x->x%10)[i], [2,11,99])[1][correct[4][i]] == 1
+  end
 end
 
 @testset "filter" begin
@@ -531,7 +558,7 @@ end
     @test gradtest(X -> f(X, y), X)
     @test gradtest(y -> f(X, y), y)
     g(X) = cholesky(X * X' + I)
-    @test Zygote.pullback(g, X)[2]((factors=LowerTriangular(X),)) == 
+    @test Zygote.pullback(g, X)[2]((factors=LowerTriangular(X),)) ==
       Zygote.pullback(g, X)[2]((factors=Matrix(LowerTriangular(X)),))
     @test_throws PosDefException Zygote.pullback(X -> cholesky(X, check = false), X)[2]((factors=X,))
   end
@@ -839,9 +866,8 @@ _randmatseries(rng, ::typeof(atanh), T, n, domain::Type{Complex}) = nothing
   MTs = (Symmetric{Float64}, Hermitian{Float64}, Hermitian{ComplexF64})
   rng, N = MersenneTwister(123), 7
   domains = (Real, Complex)
-  @testset "$func(::RealHermSymComplexHerm)" for func in (:exp, :log, :cos, :sin, :tan, :cosh, :sinh, :tanh, :acos, :asin, :atan, :acosh, :asinh, :atanh, :sqrt)
-    f = eval(func)
-    @testset "$func(::$MT)" for MT in MTs
+  @testset "$(nameof(f))(::RealHermSymComplexHerm)" for f in (exp, log, cos, sin, tan, cosh, sinh, tanh, acos, asin, atan, acosh, asinh, atanh, sqrt)
+    @testset "$(nameof(f))(::$MT)" for MT in MTs
       T = eltype(MT)
       ST = _hermsymtype(MT)
       @testset "domain $domain" for domain in domains
@@ -1257,6 +1283,9 @@ end
   @test first(Zygote.gradient(sz->sum(Zeros(sz)), 6)) === nothing
   @test gradcheck(x->Fill(x[], 5).value, [0.1])
   @test gradcheck(x->FillArrays.getindex_value(Fill(x[], 5)), [0.1])
+
+  @test first(Zygote.pullback(Ones{Float32}, 10)) isa Ones{Float32}
+  @test first(Zygote.pullback(Zeros{Float32}, 10)) isa Zeros{Float32}
 end
 
 @testset "AbstractArray Addition / Subtraction / Negation" begin
@@ -1326,7 +1355,7 @@ end
     end
   end
 
-  x = [-0.353213 -0.789656 -0.270151; -0.95719 -1.27933 0.223982]  
+  x = [-0.353213 -0.789656 -0.270151; -0.95719 -1.27933 0.223982]
   # check ffts for individual dimensions
   for trans in (fft, ifft, bfft)
     @test gradient((x)->sum(abs.(trans(x))), x)[1] ≈
@@ -1343,7 +1372,7 @@ end
     @test gradcheck(x->sum(abs.(trans(x))), x)
     @test gradcheck(x->sum(abs.(trans(x, 2))), x)
   end
-  
+
   @test gradient((x)->sum(abs.(rfft(x))), x)[1] ≈
     gradient( (x) -> sum(abs.(fft(rfft(x,1),2))),  x)[1]
   @test gradient((x, dims)->sum(abs.(rfft(x,dims))), x, (1,2))[1] ≈
@@ -1380,24 +1409,24 @@ end
   @test back(ones(N))[1] == ones(N) .* exp(x)
   @test gradtest(x->exp.(Fill(3 * first(x), N)), [x])
 
-  @testset "broadcast + and *" begin
+  @testset "broadcast +, -, *, /" begin
     for sx in [(M, N), (M, 1), (1, N), (1, 1)]
       for sy in [(M, N), (M, 1), (1, N), (1, 1)]
-        z = randn(rng, broadcast_shape(sx, sy))
+        
+        #addition, subtraction, multiplication
+        for f ∈ (+, -, *)
+          @test gradtest((x, y) -> f.(Fill(first(x), sx...), Fill(first(y), sy...)), [x], [y])
+          @test gradtest(x -> f.(Fill(first(x), sx...), Ones(sy...)), [x])
+          @test gradtest(x -> f.(Fill(first(x), sx...), Zeros(sy...)), [x])
+          @test gradtest(y -> f.(Ones(sx...), Fill(first(y), sy...)), [y])
+          @test gradtest(y -> f.(Zeros(sx...), Fill(first(y), sy...)), [y])
+        end
 
-        # Addition
-        @test gradtest((x, y)->Fill(first(x), sx...) .+ Fill(first(y), sy...), [x], [y])
-        @test gradtest(x->Fill(first(x), sx...) .+ Ones(sy...), [x])
-        @test gradtest(x->Fill(first(x), sx...) .+ Zeros(sy...), [x])
-        @test gradtest(y->Ones(sx...) .+ Fill(first(y), sy...), [y])
-        @test gradtest(y->Zeros(sx...) .+ Fill(first(y), sy...), [y])
-
-        # Multiplication
-        @test gradtest((x, y)->Fill(first(x), sx...) .* Fill(first(y), sy...), [x], [y])
-        @test gradtest(x->Fill(first(x), sx...) .* Ones(sy...), [x])
-        @test gradtest(x->Fill(first(x), sx...) .* Zeros(sy...), [x])
-        @test gradtest(y->Ones(sx...) .* Fill(first(y), sy...), [y])
-        @test gradtest(y->Zeros(sx...) .* Fill(first(y), sy...), [y])
+        #division
+        @test gradtest((x, y) -> Fill(first(x), sx...) ./ Fill(first(y), sy...), [x], [y])
+        @test gradtest(x -> Fill(first(x), sx...) ./ Ones(sy...), [x])
+        @test gradtest(y -> Ones(sx...) ./ Fill(first(y), sy...), [y])
+        @test gradtest(y -> Zeros(sx...) ./ Fill(first(y), sy...), [y])
       end
     end
   end
