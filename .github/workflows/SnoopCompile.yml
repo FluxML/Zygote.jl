@@ -2,10 +2,10 @@ name: SnoopCompile
 
 # Only runs on pushes. Edit based on your taste.
 on:
-  push:
-    branches:
-      # - 'master'
-  # pull_request:
+  # push:
+  #   branches:
+  #     # - 'master'
+  pull_request:
 
 defaults:
   run:
