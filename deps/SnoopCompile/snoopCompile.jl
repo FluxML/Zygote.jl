@@ -1,6 +1,6 @@
 using SnoopCompile
 
-@snoopi_bot "Zygote" begin
+@snoopi_bot BotConfig("Zygote") begin
   using Zygote
   using InteractiveUtils
 
