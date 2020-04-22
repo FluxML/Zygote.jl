@@ -65,7 +65,7 @@ end
 end
 
 @adjoint function pairwise(::Euclidean, X::AbstractMatrix, Y::AbstractMatrix; dims=2)
-  D, back = pullback((X, Y) -> pairwise(SqEuclidean(), X, Y; dims = dims), X, Y)
+  D, back = pullback((X, Y) -> pairwise(SqEuclidean(100 * eps()), X, Y; dims = dims), X, Y)
   D .= sqrt.(D)
   return D, Δ -> (nothing, back(Δ ./ (2 .* D))...)
 end
