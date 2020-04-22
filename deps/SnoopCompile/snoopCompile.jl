@@ -1,9 +1,5 @@
 using SnoopCompile
 
-@snoopi_bot BotConfig("Zygote") begin
-  using Zygote
-  using InteractiveUtils
-
   function pow(x, n)
     r = 1
     while n > 0
@@ -12,6 +8,10 @@ using SnoopCompile
     end
     return r
   end
+  
+@snoopi_bot BotConfig("Zygote") begin
+  using Zygote
+  using InteractiveUtils
 
   Zygote.@code_adjoint pow(2, 3)
 
