@@ -34,3 +34,10 @@ tasks4(x) = fetch(@async x^2)
 VERSION > v"1.3-" && include("threads.jl")
 
 @test Zygote.pullback(Array, [1f0])[1] == [1f0]
+
+@testset "#300" begin
+  t = (rand(2, 2), rand(2, 2))
+  ps = Params(t)
+  gs = gradient(()->sum(t[1]), ps)
+  @test gs[t[1]] == ones(2, 2)
+end

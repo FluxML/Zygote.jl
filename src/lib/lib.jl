@@ -95,11 +95,23 @@ literal_getindex(x, ::Val{i}) where i = getindex(x, i)
 literal_indexed_iterate(x, ::Val{i}) where i = Base.indexed_iterate(x, i)
 literal_indexed_iterate(x, ::Val{i}, state) where i = Base.indexed_iterate(x, i, state)
 
-@adjoint literal_getindex(xs::NTuple{N,Any}, ::Val{i}) where {N,i} =
-  (xs[i], Δ -> (ntuple(j -> i == j ? Δ : nothing, Val(N)), nothing))
+@adjoint function literal_getindex(xs::NTuple{N,Any}, ::Val{i}) where {N,i}
+  val = xs[i]
+  function back(Δ)
+    accum_param(__context__, val, Δ)
+    return ntuple(j -> i == j ? Δ : nothing, Val(N)), nothing
+  end
+  val, back
+end
 
-@adjoint getindex(xs::NTuple{N,Any}, i::Integer) where N =
-  (xs[i], Δ -> (ntuple(j -> i == j ? Δ : nothing, Val(N)), nothing))
+@adjoint function getindex(xs::NTuple{N,Any}, i::Integer) where N
+  val = xs[i]
+  function back(Δ)
+    accum_param(__context__, val, Δ)
+    return ntuple(j -> i == j ? Δ : nothing, Val(N)), nothing
+  end
+  return val, back
+end
 
 @adjoint getindex(xs::NTuple{N,Any}, r::AbstractUnitRange) where N =
   (xs[r], Δ -> (ntuple(j -> j in r ? Δ[findfirst(isequal(j), r)] : nothing, Val(N)), nothing))
