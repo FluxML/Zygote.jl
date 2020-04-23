@@ -7,7 +7,7 @@
   @test first(ps.order) == first(ps.params) == w
 end
 
-@teset "copyto!" begin
+@testset "copyto!" begin
   x = [0,0]
   ps = Params([x])
   copyto!(ps, [1, 2])
