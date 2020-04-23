@@ -1040,6 +1040,14 @@ end
       @test gradtest(Y->pairwise(metric, X, Y; dims=2), Y)
     end
 
+    # Check binary pairwise when X and Y are close.
+    let
+      X = randn(rng, D, P)
+      Y = X .+ 1e-10
+      dist = pairwise(metric, X, Y; dims=2)
+      @test first(pullback((X, Y)->pairwise(metric, X, Y; dims=2), X, Y)) ≈ dist
+    end
+
     let
       Xt, Yt = randn(rng, P, D), randn(rng, Q, D)
       @test gradtest(Xt->pairwise(metric, Xt, Yt; dims=1), Xt)
