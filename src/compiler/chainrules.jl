@@ -13,7 +13,7 @@ end
 wrap_chainrules_output(x) = conj(unthunk(x))
 wrap_chainrules_output(x::Tuple) = map(wrap_chainrules_output, x)
 function wrap_chainrules_output(x::ChainRules.Composite{P, T}) where {P, T}
-  T_outer = T <: NamedTuple  ? NamedTuple : Tuple  # must be a Tuple or NamedTuple, don't care about exact parameter types  
+  T_outer = T <: NamedTuple  ? NamedTuple : Tuple  # must be a Tuple or NamedTuple, don't care about exact parameter types
   # Composite supports map as name preserving, and is fast
   xp = map(wrap_chainrules_output, x)
   convert(T_outer, xp)
@@ -28,12 +28,15 @@ function wrap_chainrules_input(xs::NamedTuple)
   xs_comp_p = map(wrap_chainrules_input, xs_comp)
 end
 
+wrap_chainrules(f, args...) = wrap_chainrules_output(f(wrap_chainrules_input(args)...))
+
 
 function chain_rrule(f, args...)
   #@info "Using ChainRule" f, typeof.(args)
   y, back = rrule(f, args...)
 
-  zpullback(dy) = wrap_chainrules_output(back(wrap_chainrules_input(dy)))
+  zpullback(dy) = wrap_chainrules(back, dy)
+  zpullback(dy::Tuple) = wrap_chainrules(back, dy...)
   # `nothing->nothing` can be deleted after https://github.com/FluxML/Zygote.jl/issues/603
   # though it might be worth keeping as a performance optimization (benchmarking pending)
   zpullback(::Nothing) = nothing
