@@ -85,8 +85,40 @@ function Base.show(io::IO, ps::Params)
   print(io, "])")
 end
 
+
+"""
+    copyto!(ps::Params, x::AbstractVector)
+    copyto!(x::AbstractVector, ps::Params)
+    
+Copies the content of array `x` into the parameters `ps` or viceversa.
+The length of `x` has to be equal to the sum of the lenghts
+of all parameters.
+"""
+function Base.copyto!(ps::Params, x::AbstractVector)
+  @assert length(x) == sum(length(p) for p in ps)
+  i = 0
+  for p in ps
+      p .= reshape(x[i+1:i+length(p)], size(p))
+      i += length(p)
+  end
+  ps
+end
+
+function Base.copyto!(x::AbstractVector, ps::Params)
+  @assert length(x) == sum(length(p) for p in ps)
+  i = 0
+  for p in ps
+      x[i+1:i+length(p)] .= vec(p) 
+      i += length(p)
+  end
+  ps
+end
+
+
+
 struct Grads
   grads::IdDict{Any,Any}
+  params::Params
 end
 
 Base.show(io::IO, ps::Grads) = print(io, "Grads(...)")
@@ -98,6 +130,33 @@ function Base.getindex(gs::Grads, x)
   return gs.grads[x]
 end
 
+
+"""
+    copyto!(gs::Grads, x::AbstractVector)
+    copyto!(x::AbstractVector, gs::Grads)
+
+Copies the content of array `x` into the gradient object `gs` or viceversa.
+The length of `x` has to be equal to the sum of the lenghts
+of all gradients.
+"""
+function Base.copyto!(gs::Grads, x::AbstractVector)
+  i = 0
+  for p in gs.params
+      gs[p] .= reshape(x[i+1:i+length(p)], size(p))
+      i += length(p)
+  end
+  x
+end
+
+function Base.copyto!(x::AbstractVector,  gs::Grads)
+  i = 0
+  for p in gs.params
+      x[i+1:i+length(p)] .= vec(gs[p]) 
+      i += length(p)
+  end
+  x
+end
+
 function pullback(f, ps::Params)
   cx = Context()
   y, back = _pullback(cx, f)
@@ -106,7 +165,7 @@ function pullback(f, ps::Params)
       cache(cx)[p] = nothing
     end
     back(Δ)
-    Grads(cx.cache) # TODO make a copy
+    Grads(cx.cache, ps) # TODO make a copy
   end
 end
 
