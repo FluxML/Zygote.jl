@@ -94,7 +94,7 @@ using Zygote, Test, ChainRules
         @test miso_rrule_hitcount[] == 1
         @test miso_pullback_hitcount[] == 1
     end
-    
+
     @testset "multiple input multiple output" begin
         mimo_rrule_hitcount = Ref(0)
         mimo_pullback_hitcount = Ref(0)
@@ -128,11 +128,3 @@ end
 @test_broken gradient(2.0) do x
   @fastmath x^2.0
 end == (4.0,)
-
-
-
-
-mimo(a, b) = (5a + 7b, 100a, 10b)
-_, pb = Zygote.pullback(mimo, 10, 100)
-
-pb((1, 1, 1))
