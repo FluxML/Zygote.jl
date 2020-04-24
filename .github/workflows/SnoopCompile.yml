@@ -1,11 +1,12 @@
 name: SnoopCompile
 
+
 # Edit based on your repository.
 on:
   push:
     branches:
-      # - 'master' # Uncomment for big repositories
-  pull_request:  # Comment for big repositories
+      - 'master' # use for big repositories
+  # pull_request:
 
 defaults:
   run:
@@ -71,7 +72,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           commit-message: Update precompile_*.jl file
           # committer: YOUR NAME <yourEmail@something.com> # Change `committer` to your name and your email.
-          title: "[AUTO] Update precompiles'"
+          title: "[AUTO] Update precompiles"
           labels: SnoopCompile
           branch: "SnoopCompile_AutoPR"
 
