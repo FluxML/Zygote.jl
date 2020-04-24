@@ -1,11 +1,11 @@
 name: SnoopCompile
 
-# Only runs on pushes. Edit based on your taste.
+# Edit based on your repository.
 on:
   push:
     branches:
-      # - 'master'
-  pull_request:
+      # - 'master' # Uncomment for big repositories
+  pull_request:  # Comment for big repositories
 
 defaults:
   run:
@@ -21,12 +21,12 @@ jobs:
         version:
           - '1.4.1'
           # - '1.2.0'
-          # - '1.0.5'
+          - '1.0.5'
         # Uncomment other options if you want multi-os signatures (currently only these are supported by Github):
         os:
           - ubuntu-latest
-          # - windows-latest
-          # - macos-latest
+          - windows-latest
+          - macos-latest
         arch:
           - x64
     steps:
