@@ -1,8 +1,6 @@
 using SnoopCompile
 
-@snoopi_bot BotConfig("Zygote") begin
-  # we should hide them in a file, so Julia doesn't exapnd the macros before executing `using Zygote`
-  using Zygote
-  zygote_rootpath = dirname(dirname(pathof(Zygote)))
-  include("$zygote_rootpath/deps/SnoopCompile/example_script.jl")
-end
+snoopi_bot(
+  BotConfig("Zygote"; os = ["linux", "windows", "macos"], version = [v"1.4.1", v"1.0.5"]),
+  "$(@__DIR__)/example_script.jl",
+)

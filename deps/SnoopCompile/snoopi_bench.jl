@@ -1,13 +1,14 @@
 using SnoopCompile
 
 println("Benchmarking the inference time of `using Zygote`")
-@snoopi_bench BotConfig("Zygote") begin
-    using Zygote
-end
+snoopi_bench(
+  BotConfig("Zygote"; os = ["linux", "windows", "macos"], version = [v"1.4.1", v"1.0.5"]),
+  :(using Zygote)
+)
+
 
 println("Benchmarking the inference time of `using Zygote` & basic function test")
-@snoopi_bench BotConfig("Zygote") begin
-    using Zygote
-    zygote_rootpath = dirname(dirname(pathof(Zygote)))
-    include("$zygote_rootpath/deps/SnoopCompile/example_script.jl")
-end
+snoopi_bench(
+  BotConfig("Zygote"; os = ["linux", "windows", "macos"], version = [v"1.4.1", v"1.0.5"]),
+  "$(@__DIR__)/example_script.jl",
+)
