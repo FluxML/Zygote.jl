@@ -91,7 +91,7 @@ end
     copyto!(x::AbstractVector, ps::Params)
     
 Copies the content of array `x` into the parameters `ps` or viceversa.
-The length of `x` has to be equal to the sum of the lenghts
+The length of `x` has to be equal to the sum of the lengths
 of all parameters.
 """
 function Base.copyto!(ps::Params, x::AbstractVector)
