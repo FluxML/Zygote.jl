@@ -130,15 +130,24 @@ using Zygote, Test, ChainRules
         # and `identity(::Tuple)`s pullback has multiple inputs
         # (since the primal had multiple outputs)
 
-        function g(y)
-            f(x) = tuple(x, 2x, 3x)
-            a1, pb1 = Zygote.pullback(f, π)
+        f(x) = tuple(x, 2x, 3x)
 
+        function g(y)
+            a1, pb1 = Zygote.pullback(f, π)
             pb1((y,0,0))
         end
 
-        a2, pb2 = Zygote.pullback(g, 1)
-        @test pb2(1) == (1,)
+        @test (1,) == g(1)
+
+        function h(n)
+            a2, pb2 = Zygote.pullback(g, 1)
+            pb2(n)
+        end
+
+        @test (1,) == h(1)
+
+        a3, pb3 = Zygote.pullback(h, 1)
+        @test ((1,),) == pb3(1)
     end
 end
 

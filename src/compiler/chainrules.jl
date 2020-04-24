@@ -9,30 +9,31 @@ function has_chain_rrule(T)
   end
 end
 
-# For now we are just not going to deal with thunks
-wrap_chainrules_output(x) = conj(unthunk(x))
+
+wrap_chainrules_output(x) = conj(unthunk(x))  # For now we are just not going to deal with thunks
 wrap_chainrules_output(x::Tuple) = map(wrap_chainrules_output, x)
+wrap_chainrules_output(x::ChainRules.AbstractZero) = nothing
 function wrap_chainrules_output(x::ChainRules.Composite{P, T}) where {P, T}
   T_outer = T <: NamedTuple  ? NamedTuple : Tuple  # must be a Tuple or NamedTuple, don't care about exact parameter types
-  # Composite supports map as name preserving, and is fast
   xp = map(wrap_chainrules_output, x)
   convert(T_outer, xp)
 end
 
 wrap_chainrules_input(x) = conj(x)
-wrap_chainrules_input(x::Tuple) = map(wrap_chainrules_input, x)
 wrap_chainrules_input(::Nothing) = ChainRules.Zero()
-function wrap_chainrules_input(xs::NamedTuple)
-  xs_comp = ChainRules.Composite{Any}(xs...)
-  # Composite supports map as name preserving, and is fast
-  xs_comp_p = map(wrap_chainrules_input, xs_comp)
+function wrap_chainrules_input(xs::Union{Tuple, NamedTuple})
+  xp = map(wrap_chainrules_input, xs)
+  ChainRules.Composite{Any, typeof(xp)}(xp)
 end
 
 wrap_chainrules(f, args...) = wrap_chainrules_output(f(wrap_chainrules_input(args)...))
 
 
+
 function chain_rrule(f, args...)
   #@info "Using ChainRule" f, typeof.(args)
+#  Core.println("Using ChainRule ", f," ", typeof.(args))
+
   y, back = rrule(f, args...)
 
   zpullback(dy) = wrap_chainrules(back, dy)
@@ -41,5 +42,16 @@ function chain_rrule(f, args...)
   # though it might be worth keeping as a performance optimization (benchmarking pending)
   zpullback(::Nothing) = nothing
 
+  #==
+  function _zpullback(dy)
+    Core.print("Using ChainRule f=", f," args=", typeof.(args), "\n\tdy=", typeof(dy))
+    dx = zpullback(dy)
+    Core.println(" dx=", typeof.(dx))
+    return dx
+  end
+  ==#
   y, zpullback
 end
+
+# Required for nested AD
+@adjoint ChainRules.Composite{Any, T}(x::T) where T = ChainRules.Composite{Any, T}(x), x->(x,)
