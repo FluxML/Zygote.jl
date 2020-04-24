@@ -44,9 +44,12 @@ accum_sum(xs::AbstractArray{<:AbstractArray{<:Number}}; dims = :) = sum(xs, dims
 accum_sum(xs::Number; dims = :) = xs
 
 # https://github.com/FluxML/Zygote.jl/issues/594
-function Base.reducedim_init(::typeof(identity), ::typeof(accum), A::AbstractArray, region)
-  Base.reducedim_initarray(A, region, nothing, Union{Nothing,eltype(A)})
-end
+accum_zero(::Type{T}) where {T} = zero(T)
+accum_zero(::Type{<:Nothing}) = nothing
+accum_zero(::Type{S}) where {names,types,S<:NamedTuple{names,types}} =
+  S(accum_zero.(types.types))
+accum_sum(xs::AbstractArray{T}; dims=:) where {T<:NamedTuple} =
+  reduce(accum, xs; dims=dims, init=accum_zero(T))
 
 trim(x, Δ) = reshape(Δ, ntuple(i -> size(Δ, i), Val(ndims(x))))
 

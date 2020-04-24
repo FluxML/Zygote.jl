@@ -45,10 +45,21 @@ end
 @testset "#594" begin
   struct A x::Float64 end
   f(a,v) = a.x + v
-  g(A,V) = sum(f.(A,V))
+  g(X,Y) = sum(f.(X,Y))
   X = A.(randn(2))
   Y = randn(2,2)
   ∇ = gradient(g,X,Y)
   @test ∇[1] == [(x = 2.0,); (x = 2.0,)]
+  @test ∇[2] == [1 1; 1 1]
+end
+
+@testset "#594 2" begin
+  struct B x::Float64; y::Float64 end
+  f(a,v) = a.x + v
+  g(X,Y) = sum(f.(X,Y))
+  X = B.(randn(2),randn(2))
+  Y = randn(2,2)
+  ∇ = gradient(g,X,Y)
+  @test ∇[1] == [(x=2.0, y=nothing); (x=2.0, y=nothing)]
   @test ∇[2] == [1 1; 1 1]
 end
