@@ -123,6 +123,23 @@ using Zygote, Test, ChainRules
         @test mimo_rrule_hitcount[] == 1
         @test mimo_pullback_hitcount[] == 1
     end
+
+    @testset "nested AD hitting identity(::Tuple) pullback" begin
+        # This is is  a particularly fiddly case.
+        # the adjoint of `tuple` is `identity`
+        # and `identity(::Tuple)`s pullback has multiple inputs
+        # (since the primal had multiple outputs)
+
+        function g(y)
+            f(x) = tuple(x, 2x, 3x)
+            a1, pb1 = Zygote.pullback(f, π)
+
+            pb1((y,0,0))
+        end
+
+        a2, pb2 = Zygote.pullback(g, 1)
+        @test pb2(1) == (1,)
+    end
 end
 
 @test_broken gradient(2.0) do x
