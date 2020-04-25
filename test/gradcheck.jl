@@ -96,7 +96,12 @@ end
 @test gradtest((x, W, b) -> logσ.(W*x .+ b), (5,3), (2,5), 2)
 
 @test gradtest((w, x) -> w'*x, randn(10, 2), randn(10))
+@test gradtest((w, x) -> Adjoint(w)*x, randn(10, 2), randn(10))
 @test gradtest((w, x) -> transpose(w)*x, randn(5,5), randn(5,5))
+@test gradtest((w, x) -> Transpose(w)*x, randn(5,5), randn(5,5))
+
+@test gradtest((w, x) -> parent(w)*x, randn(5,5)', randn(5,5))
+@test gradtest((w, x) -> parent(w)*x, transpose(randn(5,5)), randn(5,5))
 
 @test gradtest(x -> sum(x, dims = (2, 3)), (3,4,5))
 @test gradtest(x -> sum(abs2, x), randn(4, 3, 2))
@@ -453,6 +458,7 @@ end
     @test gradtest(*, randn(rng, M, P), randn(rng, P))
     @test gradtest(*, randn(rng, M, 1), randn(rng, 1, Q))
     @test gradtest(*, randn(rng, M), randn(rng, 1, Q))
+    @test gradtest(*, randn(rng, 10)', randn(rng, 10))
     @test gradtest(*, randn(rng, 10)', randn(rng, 10))
 
     let
