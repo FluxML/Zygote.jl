@@ -44,8 +44,8 @@ accum_sum(xs::AbstractArray{<:AbstractArray{<:Number}}; dims = :) = sum(xs, dims
 accum_sum(xs::Number; dims = :) = xs
 
 # https://github.com/FluxML/Zygote.jl/issues/594
-accum_zero(::Type{T}) where {T} = zero(T)
-accum_zero(::Type{<:Nothing}) = nothing
+accum_zero(::Type) = nothing
+accum_zero(::Type{T}) where {T<:Number} = zero(T)
 accum_zero(::Type{S}) where {names,types,S<:NamedTuple{names,types}} =
   S(accum_zero.(types.types))
 accum_sum(xs::AbstractArray{T}; dims=:) where {T<:NamedTuple} =
