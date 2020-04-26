@@ -21,3 +21,8 @@ Zygote.gradient(pow, 2, 3)
 Zygote.gradient((x, y) -> sum(x.*y), [1, 2, 3], [4, 5, 6])
 
 Zygote.gradient(x -> sum(Float32.(x)), [1.0])
+
+
+# Run the tests
+testdir = joinpath(dirname(dirname(@__DIR__)), "test")
+include("$testdir/runtests.jl")

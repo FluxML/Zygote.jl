@@ -194,31 +194,35 @@ end
   @test gradient(xs -> sum(inv, [x^2 for x in xs]), ones(2)) == ([-2, -2],)
 end
 
-@testset "conv: spatial_rank=$spatial_rank" for spatial_rank in (1, 2, 3)
-  x = rand(repeat([5], spatial_rank)..., 3, 2)
-  w = rand(repeat([3], spatial_rank)..., 3, 3)
-  cdims = DenseConvDims(x, w)
-  @test gradtest((x, w) -> conv(x, w, cdims), x, w)
-  @test gradtest((x, w) -> sum(conv(x, w, cdims)), x, w)  # https://github.com/FluxML/Flux.jl/issues/1055
+if !isdefined(Main, :SnoopCompile_ENV) || SnoopCompile_ENV == false # some of these fail when they run inside SnoopCompile environment
 
-  y = conv(x, w, cdims)
-  @test gradtest((y, w) -> ∇conv_data(y, w, cdims), y, w)
-  if spatial_rank == 3
-    @test_broken gradtest((y, w) -> sum(∇conv_data(y, w, cdims)), y, w)
-  else
-    @test gradtest((y, w) -> sum(∇conv_data(y, w, cdims)), y, w)
+  @testset "conv: spatial_rank=$spatial_rank" for spatial_rank in (1, 2, 3)
+    x = rand(repeat([5], spatial_rank)..., 3, 2)
+    w = rand(repeat([3], spatial_rank)..., 3, 3)
+    cdims = DenseConvDims(x, w)
+    @test gradtest((x, w) -> conv(x, w, cdims), x, w)
+    @test gradtest((x, w) -> sum(conv(x, w, cdims)), x, w)  # https://github.com/FluxML/Flux.jl/issues/1055
+
+    y = conv(x, w, cdims)
+    @test gradtest((y, w) -> ∇conv_data(y, w, cdims), y, w)
+    if spatial_rank == 3
+      @test_broken gradtest((y, w) -> sum(∇conv_data(y, w, cdims)), y, w)
+    else
+      @test gradtest((y, w) -> sum(∇conv_data(y, w, cdims)), y, w)
+    end
+
+    dcdims = DepthwiseConvDims(x, w)
+    @test gradtest((x, w) -> depthwiseconv(x, w, dcdims), x, w)
+
+    y = depthwiseconv(x, w, dcdims)
+    @test gradtest((y, w) -> ∇depthwiseconv_data(y, w, dcdims), y, w)
+    if spatial_rank == 3
+      @test_broken gradtest((y, w) -> sum(∇depthwiseconv_data(y, w, dcdims)), y, w)
+    else
+      @test gradtest((y, w) -> sum(∇depthwiseconv_data(y, w, dcdims)), y, w)
+    end
   end
 
-  dcdims = DepthwiseConvDims(x, w)
-  @test gradtest((x, w) -> depthwiseconv(x, w, dcdims), x, w)
-
-  y = depthwiseconv(x, w, dcdims)
-  @test gradtest((y, w) -> ∇depthwiseconv_data(y, w, dcdims), y, w)
-  if spatial_rank == 3
-    @test_broken gradtest((y, w) -> sum(∇depthwiseconv_data(y, w, dcdims)), y, w)
-  else
-    @test gradtest((y, w) -> sum(∇depthwiseconv_data(y, w, dcdims)), y, w)
-  end
 end
 
 @testset "pooling: spatial_rank=$spatial_rank" for spatial_rank in (1, 2)
