@@ -56,7 +56,7 @@ struct Params
   Params() = new(Buffer([], false), IdSet())
 end
 
-@forward Params.order Base.iterate, Base.length
+@forward Params.order Base.iterate, Base.length, Base.getindex
 
 function Base.push!(ps::Params, x)
   if !(x in ps.params)
@@ -78,6 +78,10 @@ function Base.delete!(ps::Params, x)
 end
 
 Params(xs) = push!(Params(), xs...)
+
+Base.broadcasted(f, ps::Params) = broadcasted(f, ps.order)
+
+Base.:(==)(x::Params, y::Params) = x.order.data == y.order.data
 
 function Base.show(io::IO, ps::Params)
   print(io, "Params([")
@@ -115,7 +119,6 @@ function Base.copyto!(x::AbstractVector, ps::Params)
 end
 
 
-
 struct Grads
   grads::IdDict{Any,Any}
   params::Params
@@ -129,7 +132,6 @@ function Base.getindex(gs::Grads, x)
   isbits(x) && error("Only reference types can be differentiated with `Params`.")
   return gs.grads[x]
 end
-
 
 """
     copyto!(gs::Grads, x::AbstractVector)
