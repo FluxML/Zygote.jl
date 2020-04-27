@@ -309,7 +309,7 @@ end
 end
 
 @testset "@timed" begin
-  @test gradient(x -> (@timed x)[1], 0) == (1,)
+  @test gradient(x -> first(@timed x), 0) == (1,)
 end
 
 mutable struct MyMutable
