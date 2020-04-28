@@ -359,8 +359,6 @@ end
 
 @adjoint kron(a::AbstractMatrix, b::AbstractMatrix) = pullback(_kron, a, b)
 
-@adjoint diag(A::AbstractMatrix) = diag(A), Δ->(Diagonal(Δ),)
-
 @adjoint logabsdet(xs::AbstractMatrix) = logabsdet(xs), Δ -> (Δ[1] * inv(xs)',)
 
 @adjoint function inv(A::Union{Number, AbstractMatrix})
