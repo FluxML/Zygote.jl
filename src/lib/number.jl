@@ -1,36 +1,3 @@
-#using Base.FastMath: fast_op, make_fastmath
-
-# @nograd isinf, isnan, isfinite, div
-
-# TODO use CSE here
-
-# for (M, f, arity) in DiffRules.diffrules()
-#   arity == 1 || continue
-#   Δ = :Δ
-#   dx = DiffRules.diffrule(M, f, :x)
-#   if f in [:abs, :abs2]
-#     Δ = :(real($Δ))
-#   else
-#     dx = :(conj($dx))
-#   end
-#   @eval begin
-#     @adjoint $M.$f(x::Number) = $M.$f(x),
-#       Δ -> ($Δ * $dx,)
-#   end
-# end
-#
-# for (M, f, arity) in DiffRules.diffrules()
-#   arity == 2 || continue
-#   f == :^ && continue
-#   da, db = DiffRules.diffrule(M, f, :a, :b)
-#   @eval begin
-#     @adjoint $M.$f(a::Number, b::Number) = $M.$f(a, b),
-#       Δ -> (Δ * conj($da), Δ * conj($db))
-#   end
-# end
-
-@adjoint Base.:^(x::Number, p::Number) = x^p,
-  Δ -> (Δ * conj(p * x^(p-1)), Δ * conj(x^p * log(complex(x))))
 @adjoint Base.literal_pow(::typeof(^), x::Number, ::Val{p}) where {p} =
   Base.literal_pow(^,x,Val(p)),
   Δ -> (nothing, Δ * conj(p * Base.literal_pow(^,x,Val(p-1))), nothing)
@@ -44,20 +11,6 @@ end
 
 @adjoint Base.:+(xs::Number...) = +(xs...), Δ -> map(_ -> Δ, xs)
 
-@adjoint Base.muladd(x::Number, y::Number, z::Number) =
-  Base.muladd(x, y, z), ō -> (y'ō, x'ō, ō)
-
-@adjoint Base.fma(x::Number, y::Number, z::Number) =
-  Base.fma(x, y, z), ō -> (y'ō, x'ō, ō)
-
-@adjoint function sincos(x)
-  s, c = sincos(x)
-  (s, c), ((s̄, c̄),) -> (s̄*c - c̄*s,)
-end
-
-@adjoint acosh(x::Complex) =
-  acosh(x), Δ -> (Δ * conj(inv(sqrt(x - 1) * sqrt(x + 1))),)
-
 @adjoint a // b = (a // b, c̄ -> (c̄ * 1//b, - c̄ * a // b // b))
 
 @nograd floor, ceil, trunc, round, hash
@@ -70,6 +23,8 @@ end
 @adjoint conj(x::Number) = conj(x), r̄ -> (conj(r̄),)
 @adjoint imag(x::Number) = imag(x), ī -> (real(ī)*im,)
 
+# we intentionally define these here rather than falling back on ChainRules.jl
+# because ChainRules doesn't really handle nonanalytic complex functions
 @adjoint abs(x::Real) = abs(x), Δ -> (real(Δ)*sign(x),)
 @adjoint abs(x::Complex) = abs(x), Δ -> (real(Δ)*x/abs(x),)
 @adjoint abs2(x::Number) = abs2(x), Δ -> (real(Δ)*(x + x),)
