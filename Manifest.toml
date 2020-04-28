@@ -67,9 +67,9 @@ version = "0.10.10"
 
 [[IRTools]]
 deps = ["InteractiveUtils", "MacroTools", "Test"]
-git-tree-sha1 = "1a4355e4b5b50be2311ebb644f34f3306dbd0410"
+git-tree-sha1 = "8845400bd2d9815d37720251f1b53d27a335e1f4"
 uuid = "7869d1d1-7146-5819-86e3-90919afe41df"
-version = "0.3.1"
+version = "0.3.2"
 
 [[InteractiveUtils]]
 deps = ["Markdown"]
@@ -159,9 +159,9 @@ version = "0.10.0"
 
 [[StaticArrays]]
 deps = ["LinearAlgebra", "Random", "Statistics"]
-git-tree-sha1 = "5a3bcb6233adabde68ebc97be66e95dcb787424c"
+git-tree-sha1 = "4118cba3529e99af61aea9a83f7bfd3cff5ffb28"
 uuid = "90137ffa-7385-5640-81b9-e52037218182"
-version = "0.12.1"
+version = "0.12.2"
 
 [[Statistics]]
 deps = ["LinearAlgebra", "SparseArrays"]
