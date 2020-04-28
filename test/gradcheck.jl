@@ -1452,11 +1452,6 @@ end
   @test gradient(x -> findall(ismissing, x)[1], [1, missing]) == (nothing,)
 end
 
-@testset "nograd" begin
-  f(x) = sum(Zygote.nograd(x) + x)
-  @test gradient(f, randn(5)) == (ones(5),)
-end
-
 @testset "fastmath" begin
   @test gradient(x -> begin @fastmath sin(x) end, 1) == gradient(x -> sin(x), 1)
   @test gradient(x -> begin @fastmath tanh(x) end, 1) == gradient(x -> tanh(x), 1)
