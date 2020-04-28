@@ -1,11 +1,11 @@
 using IRTools: varargs!, inlineable!, pis!, slots!
 using IRTools.Inner: argnames!, update!
 
-ignore(T) = all(T -> T <: Type, T.parameters)
+ignore_sig(T) = all(T -> T <: Type, T.parameters)
 
 @generated function _pullback(ctx::AContext, f, args...)
   T = Tuple{f,args...}
-  ignore(T) && return :(f(args...), Pullback{$T}(()))
+  ignore_sig(T) && return :(f(args...), Pullback{$T}(()))
   g = try _lookup_grad(T) catch e e end
   !(g isa Tuple) && return :(f(args...), Pullback{$T}((f,)))
   meta, forw, _ = g
@@ -17,7 +17,7 @@ ignore(T) = all(T -> T <: Type, T.parameters)
 end
 
 @generated function (j::Pullback{T})(Δ) where T
-  ignore(T) && return :nothing
+  ignore_sig(T) && return :nothing
   g = try _lookup_grad(T)
   catch e
     rethrow(CompileError(T,e))

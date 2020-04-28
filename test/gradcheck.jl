@@ -1426,7 +1426,7 @@ end
   @testset "broadcast +, -, *, /" begin
     for sx in [(M, N), (M, 1), (1, N), (1, 1)]
       for sy in [(M, N), (M, 1), (1, N), (1, 1)]
-        
+
         #addition, subtraction, multiplication
         for f ∈ (+, -, *)
           @test gradtest((x, y) -> f.(Fill(first(x), sx...), Fill(first(y), sy...)), [x], [y])
@@ -1450,6 +1450,7 @@ end
   @test gradient(x -> findfirst(ismissing, x), [1, missing]) == (nothing,)
   @test gradient(x -> findlast(ismissing, x), [1, missing]) == (nothing,)
   @test gradient(x -> findall(ismissing, x)[1], [1, missing]) == (nothing,)
+  @test gradient(x -> Zygote.ignore(x -> x*x), 1) == (nothing,)
 end
 
 @testset "fastmath" begin

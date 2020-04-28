@@ -11,5 +11,6 @@ Zygote.dropgrad
 Zygote.hessian
 Zygote.Buffer
 Zygote.forwarddiff
+Zygote.ignore
 copyto!
 ```
