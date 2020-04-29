@@ -1,5 +1,15 @@
 # Custom Adjoints
 
+!!! note "Prefer to use ChainRules to define custom adjoints"
+    Zygote supports the use of [ChainRulesCore](http://www.juliadiff.org/ChainRulesCore.jl/stable/) to define custom sensitivities.
+    It is prefered to define the custom sensitivities using `ChainRulesCore.rrule` as they will work for many AD systems, not just Zygote.
+    These sensitivities can be added in your own package, or for Base functions they can be added to ChainRules.jl.
+
+    This documentation exists to descibe how Zygote works, and how adjoints can be directly defined for Zygote.
+    Defining adjoints this way does not make them accessable to other AD systems, but does let you do things that directly depend on how Zygote works.
+    It allows for specific definations of adjoints that are only defined for Zgyote (which might work differently to more generic definations defined for all AD)
+
+
 The `@adjoint` macro is an important part of Zygote's interface; customising your backwards pass is not only possible but widely used and encouraged. While there are specific utilities available for common things like gradient clipping, understanding adjoints will give you the most flexibility. We first give a bit more background on what these pullback things are.
 
 ## Pullbacks

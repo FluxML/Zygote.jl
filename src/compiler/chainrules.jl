@@ -31,9 +31,6 @@ wrap_chainrules(f, args...) = wrap_chainrules_output(f(wrap_chainrules_input(arg
 
 
 function chain_rrule(f, args...)
-  #@info "Using ChainRule" f, typeof.(args)
-#  Core.println("Using ChainRule ", f," ", typeof.(args))
-
   y, back = rrule(f, args...)
 
   zpullback(dy) = wrap_chainrules(back, dy)
@@ -42,14 +39,6 @@ function chain_rrule(f, args...)
   # though it might be worth keeping as a performance optimization (benchmarking pending)
   zpullback(::Nothing) = nothing
 
-  #==
-  function _zpullback(dy)
-    Core.print("Using ChainRule f=", f," args=", typeof.(args), "\n\tdy=", typeof(dy))
-    dx = zpullback(dy)
-    Core.println(" dx=", typeof.(dx))
-    return dx
-  end
-  ==#
   y, zpullback
 end
 
