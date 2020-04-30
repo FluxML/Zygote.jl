@@ -28,30 +28,3 @@ end
 @adjoint abs(x::Real) = abs(x), Δ -> (real(Δ)*sign(x),)
 @adjoint abs(x::Complex) = abs(x), Δ -> (real(Δ)*x/abs(x),)
 @adjoint abs2(x::Number) = abs2(x), Δ -> (real(Δ)*(x + x),)
-
-
-# DiffRules._abs_deriv(x::Complex) = x/abs(x)
-
-#  # adjoint for Fastmath operations
-# for (f, fastf) in fast_op
-#   if DiffRules.hasdiffrule(:Base, f, 1)
-#     dx = DiffRules.diffrule(:Base, f, :x)
-#     Δ = :Δ
-#     if f in [:abs, :abs2]
-#       Δ = :(real($Δ))
-#     else
-#       dx = :(conj($dx))
-#     end
-#     @eval begin
-#       @adjoint Base.FastMath.$fastf(x::Number) =
-#         Base.FastMath.$fastf(x), Δ -> ($Δ * make_fastmath($dx),)
-#     end
-#   elseif DiffRules.hasdiffrule(:Base, f, 2)
-#     dx, dy = DiffRules.diffrule(:Base, f, :x, :y)
-#     @eval begin
-#       @adjoint Base.FastMath.$fastf(x::Number, y::Number) =
-#         Base.FastMath.$fastf(x, y),
-#         Δ -> (Δ * make_fastmath(conj($dx)), Δ * make_fastmath(conj($dy)))
-#     end
-#   end
-# end

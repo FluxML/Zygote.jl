@@ -151,6 +151,8 @@ using Zygote, Test, ChainRules
     end
 end
 
+# ChainRules doesn't have support for FastMath yet, so this fails
+# https://github.com/JuliaDiff/ChainRules.jl/issues/174
 @test_broken gradient(2.0) do x
   @fastmath x^2.0
 end == (4.0,)
