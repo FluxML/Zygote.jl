@@ -79,7 +79,7 @@ end
 
 Params(xs) = push!(Params(), xs...)
 
-Base.broadcasted(f, ps::Params) = broadcasted(f, ps.order)
+Base.Broadcast.broadcasted(f, ps::Params) = broadcasted(f, ps.order)
 
 Base.:(==)(x::Params, y::Params) = x.order.data == y.order.data
 
