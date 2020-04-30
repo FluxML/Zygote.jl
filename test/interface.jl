@@ -8,27 +8,27 @@
     @test first(ps.order) == first(ps.params) == w
   end
 
-  @testset "copyto!" begin
+  @testset "copy!" begin
     x = [0,0]
     ps = Params([x])
-    copyto!(ps, [1, 2])
+    copy!(ps, [1, 2])
     @test x == [1, 2]
     
     x = [0,0]
     y = [0]
     ps = Params([x, y])
-    copyto!(ps, [1, 2, 3])
+    copy!(ps, [1, 2, 3])
     @test x == [1, 2]
     @test y == [3]
 
     ps = Params([[1,2]])
     x = [0, 0]
-    copyto!(x, ps)
+    copy!(x, ps)
     @test x == [1, 2]
     
     ps = Params([[1,2], [3]])
     x = [0, 0, 0]
-    copyto!(x, ps)
+    copy!(x, ps)
     @test x == [1, 2, 3]
   end
 
@@ -36,6 +36,7 @@
     x, y = [1,2], [1]
     ps = Params([x, y])
     @test length.(ps) == length.([x, y]) # 617
+    @test all(Params([[1,1]]) .== Params([[1,1]]))
   end
 
   @testset "indexing" begin
