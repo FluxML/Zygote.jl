@@ -12,6 +12,7 @@ such that if a suitable rule is defined later, the generated function will recom
 function has_chain_rrule(T)
   m = meta(Tuple{typeof(rrule),T.parameters...})
   if m.method === chainrules_fallback
+    @assert m.code.edges !== nothing
     return false, m.code.edges
   else
     return true, nothing
@@ -54,7 +55,7 @@ Wrap a chainrule's pullback `f`, converting the format of the inputs (`args`),
 and the outputs.
 """
 function wrap_chainrules_pullback(pb, args...)
-  returun wrap_chainrules_output(pb(wrap_chainrules_input(args)...))
+  return wrap_chainrules_output(pb(wrap_chainrules_input(args)...))
 end
 
 
@@ -76,7 +77,7 @@ function chain_rrule(f, args...)
   # though it might be worth keeping as a performance optimization (benchmarking pending)
   zpullback(::Nothing) = nothing
 
-  y, zpullback
+  return y, zpullback
 end
 
 # Required for nested AD
