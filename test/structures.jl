@@ -42,11 +42,12 @@ VERSION > v"1.3-" && include("threads.jl")
   @test gs[t[1]] == ones(2, 2)
 end
 
+struct A594 x::Float64 end
+  
 @testset "#594" begin
-  struct A x::Float64 end
   f(a,v) = a.x + v
   g(A,V) = sum(f.(A,V))
-  X = A.(randn(2))
+  X = A594.(randn(2))
   Y = randn(2,2)
   ∇ = gradient(g,X,Y)
   @test ∇[1] == [(x = 2.0,); (x = 2.0,)]
