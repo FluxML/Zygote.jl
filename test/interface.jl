@@ -1,3 +1,9 @@
+@static if VERSION >= v"1.1"
+  using Base: copy!
+else
+  using Future: copy!
+end
+
 @testset "Parmas" begin
   @testset "delete!" begin
     w = rand(2,3)
