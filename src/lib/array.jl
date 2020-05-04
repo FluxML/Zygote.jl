@@ -723,7 +723,7 @@ end
   end
 end
 
-# ChainRules has this also but does not use FillArrays, so we have out own defination
+# ChainRules has this also but does not use FillArrays, so we have our own definition
 # for improved performance. See https://github.com/JuliaDiff/ChainRules.jl/issues/46
 Zygote.@adjoint function LinearAlgebra.tr(x::AbstractMatrix)
   # x is a squre matrix checked by tr,
