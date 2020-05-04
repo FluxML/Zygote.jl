@@ -6,8 +6,8 @@
     These sensitivities can be added in your own package, or for Base functions they can be added to ChainRules.jl.
 
     This documentation exists to descibe how Zygote works, and how adjoints can be directly defined for Zygote.
-    Defining adjoints this way does not make them accessable to other AD systems, but does let you do things that directly depend on how Zygote works.
-    It allows for specific definations of adjoints that are only defined for Zgyote (which might work differently to more generic definations defined for all AD)
+    Defining adjoints this way does not make them accessible to other AD systems, but does let you do things that directly depend on how Zygote works.
+    It allows for specific definitions of adjoints that are only defined for Zgyote (which might work differently to more generic definitions defined for all AD).
 
 
 The `@adjoint` macro is an important part of Zygote's interface; customising your backwards pass is not only possible but widely used and encouraged. While there are specific utilities available for common things like gradient clipping, understanding adjoints will give you the most flexibility. We first give a bit more background on what these pullback things are.
