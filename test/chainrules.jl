@@ -149,6 +149,32 @@ using Zygote, Test, ChainRules
         a3, pb3 = Zygote.pullback(h, 1)
         @test ((1,),) == pb3(1)
     end
+
+
+    @testset "kwargs" begin
+        kwfoo_rrule_hitcount = Ref(0)
+        kwfoo_pullback_hitcount = Ref(0)
+        kwfoo(x; k=10) = x + k
+        function ChainRules.rrule(::typeof(kwfoo), x; k=10)
+            kwfoo_rrule_hitcount[] += 1
+            function kwfoo_pullback(Δy)
+                kwfoo_pullback_hitcount[] += 1
+                return ChainRules.NO_FIELDS, Δy
+            end
+            return kwfoo(x; k=k), kwfoo_pullback
+        end
+
+        kwfoo_outer_unused(x) = kwfoo(x)
+        kwfoo_outer_used(x) = kwfoo(x; k=-15)
+
+        @testset "$outer" for outer in (kwfoo_outer_used, kwfoo_outer_unused)
+            kwfoo_rrule_hitcount[] = 0
+            kwfoo_pullback_hitcount[] = 0
+            @test (1,) == Zygote.gradient(outer, π)
+            @test kwfoo_rrule_hitcount[] == 1
+            @test kwfoo_pullback_hitcount[] == 1
+        end
+    end
 end
 
 # ChainRules doesn't have support for FastMath yet, so this fails
