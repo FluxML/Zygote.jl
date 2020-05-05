@@ -107,7 +107,9 @@ Returns a the (primal) value of `f(args...)` and a pullback, by invoking `ChainR
 The pullback is appropriately wrapped up to follow Zygote conventions.
 """
 function chain_rrule(f, args...)
-  if is_kwfunc(typeof(f), map(typeof, args)...)
+  # Note we avoid using `map(typeof, args)...` in the condition as it complicates nested AD
+  # so we just check relevent ones by hand
+  if length(args) >= 2 && is_kwfunc(typeof(f), typeof(args[1]), typeof(args[2]))
     kwargs = args[1]
     base_f = args[2]
     pos_args = args[3:end]
