@@ -5,7 +5,7 @@ const chainrules_fallback = which(rrule, Tuple{Any})
 
 For a type-tuple `T` e.g. `Tuple{typeof(f), Int, Float64}`, checks if there is a `rrule` defined for it.
 Excluding the generic fallback.
-The first return value is a Bool is whether or not the `rrule` exists.
+The first return value is `true` if the `rrule` exists, `false` otherwise.
 If it does not, then the second argument is a list of edges to attach to the CodeInfo for a generated function,
 such that if a suitable rule is defined later, the generated function will recompile.
 """
