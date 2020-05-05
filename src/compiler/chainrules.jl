@@ -38,8 +38,10 @@ or the first argument is the base function type and it is not a kwfunction.
 the remaining types in `sigt` are the types of the argument.
 
 """
-is_kwfunc(k, ::Type{<:NamedTuple}, f, args...) = k==Core.kwftype(f)
 is_kwfunc(::Vararg{Any}) = false
+# Needs `@pure` because else will not run during type inference.
+# This is pure enough, the only generic function it calls is in `Core` overloading `Core.kwftype` will no doubt break many other things also
+Base.@pure is_kwfunc(k, ::Type{<:NamedTuple}, f, args...) = k===Core.kwftype(f)
 
 
 """
@@ -81,6 +83,22 @@ function wrap_chainrules_pullback(pb, args...)
   return wrap_chainrules_output(pb(wrap_chainrules_input(args)...))
 end
 
+"""
+  ZBack{F}(back) <: Function
+
+Wrapper for a ChainRules pullback `back`, that causes it to follow Zygote conventions.
+(A functor here is used rather than a closure to avoid boxing issues);
+"""
+struct ZBack{F} <: Function
+  back::F
+end
+(s::ZBack)(dy) = wrap_chainrules_pullback(s.back, dy)
+# Dispatch here handles chainrules considing pullbacks to have multiple input if Tuple.
+# TODO: this could be removed if: https://github.com/JuliaDiff/ChainRulesCore.jl/issues/152
+(s::ZBack)(dy::Tuple) = wrap_chainrules_pullback(s.back, dy...)
+# `nothing->nothing` can be deleted after https://github.com/FluxML/Zygote.jl/issues/603
+# though it might be worth keeping as a performance optimization (benchmarking pending)
+(s::ZBack)(::Nothing) = nothing
 
 """
     chain_rrule(f, args...)
@@ -89,28 +107,17 @@ Returns a the (primal) value of `f(args...)` and a pullback, by invoking `ChainR
 The pullback is appropriately wrapped up to follow Zygote conventions.
 """
 function chain_rrule(f, args...)
-  local back
-
-  # Dispatch here handles chainrules considing pullbacks to have multiple input if Tuple.
-  # TODO: this could be removed if: https://github.com/JuliaDiff/ChainRulesCore.jl/issues/152
-  zpullback(dy) = wrap_chainrules_pullback(back, dy)
-  zpullback(dy::Tuple) = wrap_chainrules_pullback(back, dy...)
-
-  # `nothing->nothing` can be deleted after https://github.com/FluxML/Zygote.jl/issues/603
-  # though it might be worth keeping as a performance optimization (benchmarking pending)
-  zpullback(::Nothing) = nothing
-
-  if is_kwfunc(typeof(f), typeof.(args)...)
+  if is_kwfunc(typeof(f), map(typeof, args)...)
     kwargs = args[1]
     base_f = args[2]
     pos_args = args[3:end]
-    y, back = rrule(base_f, pos_args...; kwargs...)
+    y, base_f_back = rrule(base_f, pos_args...; kwargs...)
 
-    kw_zpullback(dy) = (nothing, nothing, zpullback(dy)...)  # first two nothings are for kwfunc and kwargs
+    kw_zpullback(dy) = (nothing, nothing, ZBack(base_f_back)(dy)...)  # first two nothings are for kwfunc and kwargs
     return y, kw_zpullback
   else
     y, back = rrule(f, args...)
-    return y, zpullback
+    return y, ZBack(back)
   end
 end
 
