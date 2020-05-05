@@ -38,15 +38,13 @@ jobs:
       - name: Install dependencies
         run: |
           julia --project -e 'using Pkg; Pkg.instantiate();'
-          julia -e 'using Pkg; Pkg.add(PackageSpec(url = "https://github.com/aminya/SnoopCompile.jl", rev = "multios")); Pkg.develop(PackageSpec(; path=pwd())); Pkg.add("JuliaFormatter"); using SnoopCompile; SnoopCompile.addtestdep();'
+          julia -e 'using Pkg; Pkg.add(PackageSpec(url = "https://github.com/aminya/SnoopCompile.jl", rev = "multios")); Pkg.develop(PackageSpec(; path=pwd())); using SnoopCompile; SnoopCompile.addtestdep();'
       - name: Generating precompile files
         run: julia --project -e 'include("deps/SnoopCompile/snoopi_bot.jl")'
       - name: Running Benchmark
         run: julia --project -e 'include("deps/SnoopCompile/snoopi_bench.jl")'
-      - name: Format precompile_includer.jl
-        run: julia --project -e 'using JuliaFormatter; format_file("src/precompile_includer.jl")'
       - name: Upload all
-        uses: actions/upload-artifact@v2-preview
+        uses: actions/upload-artifact@v2
         with:
           path: ./
 
@@ -55,16 +53,20 @@ jobs:
     needs: SnoopCompile
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v2
       - name: Download all
-        uses: actions/download-artifact@v2-preview
+        uses: actions/download-artifact@v2
       - name: Move the content of the directory to the root
         run: |
-          mv -v artifact/* ./
-          mv -v artifact/.[^.]* ./
+          rsync -a artifact/* ./
+          rm -d -r artifact
       - name: Discard unrelated changes
         run: |
-          git checkout -- Project.toml
-          git diff -w --no-color | git apply --cached --ignore-whitespace && git checkout -- . && git reset && git add -p
+          test -f 'Project.toml' && git checkout -- 'Project.toml'
+          git ls-files 'Manifest.toml' | grep . && git checkout -- 'Manifest.toml'
+          (git diff -w --no-color || git apply --cached --ignore-whitespace && git checkout -- . && git reset && git add -p) || echo done
+      - name: Format precompile_includer.jl
+        run: julia -e 'using Pkg; Pkg.add("JuliaFormatter"); using JuliaFormatter; format_file("src/precompile_includer.jl")'
       - name: Create Pull Request
         # https://github.com/marketplace/actions/create-pull-request
         uses: peter-evans/create-pull-request@v2
