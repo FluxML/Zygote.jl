@@ -14,7 +14,9 @@ ignore_sig(T) = all(T -> T <: Type, T.parameters)
   argnames!(meta, Symbol("#self#"), :ctx, :f, :args)
   forw = varargs!(meta, forw, 3)
   forw = slots!(pis!(inlineable!(forw)))
-  append!(meta.code.edges, cr_edges)  # be ready to swap to using chainrule if one is declared
+  @static if VERSION >= v"1.3"  # no edges pre-1.3
+    append!(meta.code.edges, cr_edges)  # be ready to swap to using chainrule if one is declared
+  end
   return update!(meta.code, forw)
 end
 

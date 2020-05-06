@@ -24,8 +24,13 @@ function has_chain_rrule(T)
   end
 
   # did not find anything, will have to attach edges so it recompiles if one is added
-  @assert m.code.edges !== nothing
-  return false, m.code.edges
+  @static if VERSION >= v"1.3"
+    @assert m.code.edges !== nothing
+    return false, m.code.edges
+  else
+    # pre-julia 1.3 there are no edges
+    return false, tuple()
+  end
 end
 
 """
