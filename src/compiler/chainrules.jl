@@ -16,13 +16,6 @@ function has_chain_rrule(T)
     return true, nothing
   end
 
-  # Could be a kwarg function, handle that case
-  if is_kwfunc(T.parameters...)
-    # Need to check for rrule for function not the kwfunction.
-    base_T = Tuple{T.parameters[3:end]...}
-    return has_chain_rrule(base_T)
-  end
-
   # did not find anything, will have to attach edges so it recompiles if one is added
   @static if VERSION >= v"1.3"
     @assert m.code.edges !== nothing
@@ -45,7 +38,7 @@ the remaining types in `sigt` are the types of the argument.
 """
 is_kwfunc(::Vararg{Any}) = false
 # Needs `@pure` because else will not run during type inference.
-# This is pure enough, the only generic function it calls is in `Core` 
+# This is pure enough, the only generic function it calls is in `Core`
 # overloading `Core.kwftype` will no doubt break many other things also
 Base.@pure is_kwfunc(k, ::Type{<:NamedTuple}, f, args...) = k===Core.kwftype(f)
 
@@ -56,10 +49,10 @@ Base.@pure is_kwfunc(k, ::Type{<:NamedTuple}, f, args...) = k===Core.kwftype(f)
 Convert `x` from the differentials types ChainRules uses  to the format Zygote uses internally
 (including conjugating complex gradients).
 """
-wrap_chainrules_output(x) = conj(unthunk(x))  # For now we are just not going to deal with thunks
-wrap_chainrules_output(x::Tuple) = map(wrap_chainrules_output, x)
-wrap_chainrules_output(x::ChainRules.AbstractZero) = nothing
-function wrap_chainrules_output(x::ChainRules.Composite{P, T}) where {P, T}
+@inline wrap_chainrules_output(x) = conj(unthunk(x))  # For now we are just not going to deal with thunks
+@inline wrap_chainrules_output(x::Tuple) = map(wrap_chainrules_output, x)
+@inline wrap_chainrules_output(x::ChainRules.AbstractZero) = nothing
+@inline function wrap_chainrules_output(x::ChainRules.Composite{P, T}) where {P, T}
   T_outer = T <: NamedTuple  ? NamedTuple : Tuple  # must be a Tuple or NamedTuple, don't care about exact parameter types
   xp = map(wrap_chainrules_output, x)
   convert(T_outer, xp)
@@ -72,9 +65,9 @@ end
 Convert `x` from the format  Zygote uses internally (including conjugated complex gradients)
 to differentials types ChainRules uses.
 """
-wrap_chainrules_input(x) = conj(x)
-wrap_chainrules_input(::Nothing) = ChainRules.Zero()
-function wrap_chainrules_input(xs::Union{Tuple, NamedTuple})
+@inline wrap_chainrules_input(x) = conj(x)
+@inline wrap_chainrules_input(::Nothing) = ChainRules.Zero()
+@inline function wrap_chainrules_input(xs::Union{Tuple, NamedTuple})
   xp = map(wrap_chainrules_input, xs)
   ChainRules.Composite{Any, typeof(xp)}(xp)
 end
@@ -85,9 +78,17 @@ end
 Wrap a chainrule's pullback `f`, converting the format of the inputs (`args`),
 and the outputs.
 """
-function wrap_chainrules_pullback(pb, args...)
+@inline function wrap_chainrules_pullback(pb, args...)
   return wrap_chainrules_output(pb(wrap_chainrules_input(args)...))
 end
+
+# Note we hand-expess the single arg version of this to remove splatting
+# because splatting breaks constant folding
+# This can be removed after https://github.com/JuliaDiff/ChainRulesCore.jl/issues/152
+@inline function wrap_chainrules_pullback(pb, a)
+  return wrap_chainrules_output(pb(wrap_chainrules_input(a)))
+end
+
 
 """
   ZBack{F}(back) <: Function
@@ -98,13 +99,13 @@ Wrapper for a ChainRules pullback `back`, that causes it to follow Zygote conven
 struct ZBack{F} <: Function
   back::F
 end
-(s::ZBack)(dy) = wrap_chainrules_pullback(s.back, dy)
+@inline (s::ZBack)(dy) = wrap_chainrules_pullback(s.back, dy)
 # Dispatch here handles chainrules considing pullbacks to have multiple input if Tuple.
 # TODO: this could be removed if: https://github.com/JuliaDiff/ChainRulesCore.jl/issues/152
-(s::ZBack)(dy::Tuple) = wrap_chainrules_pullback(s.back, dy...)
+@inline (s::ZBack)(dy::Tuple) = wrap_chainrules_pullback(s.back, dy...)
 # `nothing->nothing` can be deleted after https://github.com/FluxML/Zygote.jl/issues/603
 # though it might be worth keeping as a performance optimization (benchmarking pending)
-(s::ZBack)(::Nothing) = nothing
+@inline (s::ZBack)(::Nothing) = nothing
 
 """
     chain_rrule(f, args...)
@@ -112,21 +113,22 @@ end
 Returns a the (primal) value of `f(args...)` and a pullback, by invoking `ChainRulesCore.rrule(f, args...)`.
 The pullback is appropriately wrapped up to follow Zygote conventions.
 """
-function chain_rrule(f, args...)
-  # Note we avoid using `map(typeof, args)...` in the condition as it complicates nested AD
-  # so we just check relevent ones by hand
-  if length(args) >= 2 && is_kwfunc(typeof(f), typeof(args[1]), typeof(args[2]))
-    kwargs = args[1]
-    base_f = args[2]
-    pos_args = args[3:end]
-    y, base_f_back = rrule(base_f, pos_args...; kwargs...)
+@inline function chain_rrule(f, args...)
+  y, back = rrule(f, args...)
+  return y, ZBack(back)
+end
 
-    kw_zpullback(dy) = (nothing, nothing, ZBack(base_f_back)(dy)...)  # first two nothings are for kwfunc and kwargs
-    return y, kw_zpullback
-  else
-    y, back = rrule(f, args...)
-    return y, ZBack(back)
-  end
+
+"""
+  chain_rrule_kw(kwf, kwargs, f, args...)
+
+As per [`chain_rrule`](@ref) but with support for kwargs.
+`kwf` should be the kwfunc matching to `f`, and `kwargs` are a `NamedTuple` of keyword arguments.
+"""
+@inline function chain_rrule_kw(kwf, kwargs, f, args...)
+  y, back = rrule(f, args...; kwargs...)
+  kw_zpullback(dy) = (nothing, nothing, ZBack(back)(dy)...)  # first two nothings are for kwfunc and kwargs
+  return y, kw_zpullback
 end
 
 # Required for nested AD
