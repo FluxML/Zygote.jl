@@ -37,10 +37,7 @@ the remaining types in `sigt` are the types of the argument.
 
 """
 is_kwfunc(::Vararg{Any}) = false
-# Needs `@pure` because else will not run during type inference.
-# This is pure enough, the only generic function it calls is in `Core`
-# overloading `Core.kwftype` will no doubt break many other things also
-Base.@pure is_kwfunc(k, ::Type{<:NamedTuple}, f, args...) = k===Core.kwftype(f)
+is_kwfunc(k, ::Type{<:NamedTuple}, f, args...) = k===Core.kwftype(f)
 
 
 """
