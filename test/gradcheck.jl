@@ -1146,6 +1146,11 @@ end
   @test gradtest(catdim, rand(2,5,3), rand(2,5,3), rand(2,5,3))
 end
 
+@testset "cat empty" begin
+  catdim = (x...) -> cat(x..., dims = (1, 2))
+  @test gradtest(catdim, rand(0,5,3), rand(2,5,3), rand(2,5,3))
+end
+
 @testset "one(s) and zero(s)" begin
   @test Zygote.gradient(x->sum(ones(size(x))), randn(5))[1] isa Nothing
   @test Zygote.gradient(x->sum(one(x)), randn(3, 3))[1] isa Nothing

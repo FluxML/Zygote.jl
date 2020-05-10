@@ -122,7 +122,7 @@ end
     start = ntuple(_ -> 0, ndims(Δ))
     dXs = map(Xs) do x
       move = ntuple(d -> d in dims ? size(x,d) : 0, ndims(Δ))
-      x_in_Δ = ntuple(d -> move[d] > 0 ? (start[d]+1:start[d]+move[d]) : Colon(), ndims(Δ))
+      x_in_Δ = ntuple(d -> d in dims ? (start[d]+1:start[d]+move[d]) : Colon(), ndims(Δ))
       start = start .+ move
       dx = reshape(Δ[x_in_Δ...], size(x))
     end
