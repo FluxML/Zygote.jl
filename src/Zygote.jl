@@ -12,6 +12,12 @@ using MacroTools: @forward
 
 export Params, gradient, pullback, @code_grad
 
+macro include(file)
+  file = joinpath(@__DIR__, file)
+  s = String(read(file))
+  :(include_string($Zygote, $s, $file))
+end
+
 include("tools/idset.jl")
 include("tools/buffer.jl")
 
@@ -31,8 +37,8 @@ include("lib/nnlib.jl")
 include("lib/forward.jl")
 include("lib/utils.jl")
 include("lib/range.jl")
-@init @require Distances="b4f34e82-e78d-54a5-968a-f98e89d6e8f7" include("lib/distances.jl")
-@init @require StatsFuns="4c63d2b9-4356-54db-8cca-17b64c39e42c" include("lib/statsfuns.jl")
+@init @require Distances="b4f34e82-e78d-54a5-968a-f98e89d6e8f7" @include("lib/distances.jl")
+@init @require StatsFuns="4c63d2b9-4356-54db-8cca-17b64c39e42c" @include("lib/statsfuns.jl")
 
 # we need to define this late, so that the genfuncs see lib.jl
 include("compiler/interface2.jl")
@@ -40,7 +46,7 @@ include("compiler/interface2.jl")
 include("profiler/Profile.jl")
 
 @init @require Tracker="9f7883ad-71c0-57eb-9f7f-b5c9e6d3789c" begin
-  include("flux.jl")
+  @include("flux.jl")
 end
 
 precompile() = include(joinpath(@__DIR__, "precompile.jl"))
