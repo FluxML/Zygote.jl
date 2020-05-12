@@ -1,8 +1,10 @@
 using NNlib
 import NNlib: softmax, ∇softmax, logsoftmax, ∇logsoftmax, conv, depthwiseconv, ∇conv_data, ∇depthwiseconv_data, maxpool, meanpool, σ, relu, batched_mul, batched_adjoint
 
+drelu(x, Δ) = ifelse(x > 0, Δ, zero(x))
+
 @adjoint function Base.Broadcast.broadcasted(::typeof(relu), x::Numeric)
-  relu.(x), Δ -> (nothing, ifelse.(x .> 0, Δ, zero.(x)))
+  relu.(x), Δ -> (nothing, drelu.(x, Δ))
 end
 
 @adjoint function σ(x::Real)
