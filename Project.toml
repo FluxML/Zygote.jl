@@ -5,6 +5,7 @@ version = "0.4.20"
 [deps]
 AbstractFFTs = "621f4979-c628-5d54-868e-fcf4e3e8185c"
 ArrayLayouts = "4c555306-a7a7-4459-81d9-ec55ddd5c99a"
+Buffers = "f06dc053-dc01-43d6-9774-6ac660c29876"
 DiffRules = "b552c78f-8df3-52c6-915a-8e097449b14b"
 FillArrays = "1a297f60-69ca-5386-bcde-b61e274b549b"
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
