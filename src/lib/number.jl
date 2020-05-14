@@ -61,7 +61,7 @@ end
 
 @adjoint a // b = (a // b, c̄ -> (c̄ * 1//b, - c̄ * a // b // b))
 
-@nograd floor, ceil, trunc, round, hash
+@nograd floor, ceil, trunc, round, hash, <<, >>
 
 # Complex Numbers
 
