@@ -23,7 +23,7 @@ version = "0.5.9"
 
 [[Buffers]]
 deps = ["MacroTools", "ZygoteRules"]
-git-tree-sha1 = "65c547d44b5a0b771b811053a5b9d711fdafc502"
+git-tree-sha1 = "ae8092bb50cb5e8fcbcbadace2703eeb2362cc2e"
 repo-rev = "master"
 repo-url = "https://github.com/sethaxen/Buffers.jl"
 uuid = "f06dc053-dc01-43d6-9774-6ac660c29876"
