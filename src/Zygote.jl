@@ -14,7 +14,6 @@ using MacroTools: @forward
 export Params, gradient, pullback, @code_grad
 
 include("tools/idset.jl")
-include("tools/buffer.jl")
 
 include("compiler/reverse.jl")
 include("compiler/emit.jl")
@@ -26,7 +25,6 @@ include("lib/lib.jl")
 include("lib/number.jl")
 include("lib/base.jl")
 include("lib/array.jl")
-include("lib/buffer.jl")
 include("lib/broadcast.jl")
 include("lib/nnlib.jl")
 include("lib/forward.jl")
