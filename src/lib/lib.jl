@@ -91,10 +91,6 @@ using Base: tail
 
 @adjoint tuple(xs...) = xs, identity
 
-literal_getindex(x, ::Val{i}) where i = getindex(x, i)
-literal_indexed_iterate(x, ::Val{i}) where i = Base.indexed_iterate(x, i)
-literal_indexed_iterate(x, ::Val{i}, state) where i = Base.indexed_iterate(x, i, state)
-
 @adjoint function literal_getindex(xs::NTuple{N,Any}, ::Val{i}) where {N,i}
   val = xs[i]
   function back(Δ)
