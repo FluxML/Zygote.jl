@@ -7,7 +7,7 @@ using CuArrays
 end
 
 @testset "basic bcasting" begin
-  a = cu(collect(1:9))
+  a = cu(Float32.(1:9))
   v(x, n) = x .^ n
   pow_grada = cu(Float32[7.0, 448.0, 5103.0, 28672.0, 109375.0, 326592.0, 823543.0, 1.835008e6, 3.720087e6])
   @test gradient(x -> v(x, 7) |> sum, a) == (pow_grada,)

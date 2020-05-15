@@ -22,7 +22,7 @@ julia> y
 To make this concrete, take the function ``y = \sin(x)``. ``\frac{\partial y}{\partial x} = \cos(x)``, so the pullback is ``\bar{y} \cos(x)``. In other words `pullback(sin, x)` behaves the same as
 
 ```julia
-dsin(x) = sin(x), ȳ -> (ȳ * cos(x),)
+dsin(x) = (sin(x), ȳ -> (ȳ * cos(x),))
 ```
 
 `gradient` takes a function ``l = f(x)`` and assumes ``l̄ = \frac{\partial l}{\partial l} = 1`` and feeds this in to the pullback. In the case of `sin`,

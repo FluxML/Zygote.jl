@@ -66,7 +66,15 @@ function Base.copy(b::Buffer)
   return b.data
 end
 
-@forward Buffer.data Base.eltype, Base.length, Base.ndims, Base.size, Base.axes, Base.eachindex, Base.stride, Base.strides
+function Base.deleteat!(b::Buffer, i)
+  b.freeze && error("Buffer is frozen")
+  deleteat!(b.data, i)
+  return b
+end
+
+@forward Buffer.data  Base.eltype, Base.length, Base.ndims, Base.size, Base.axes, 
+                      Base.eachindex, Base.stride, Base.strides, Base.findfirst, 
+                      Base.keys
 
 Base.IteratorSize(::Type{<:Buffer{<:Any, A}}) where {A} = Base.IteratorSize(A)
 

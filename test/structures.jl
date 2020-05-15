@@ -34,3 +34,22 @@ tasks4(x) = fetch(@async x^2)
 VERSION > v"1.3-" && include("threads.jl")
 
 @test Zygote.pullback(Array, [1f0])[1] == [1f0]
+
+@testset "#300" begin
+  t = (rand(2, 2), rand(2, 2))
+  ps = Params(t)
+  gs = gradient(()->sum(t[1]), ps)
+  @test gs[t[1]] == ones(2, 2)
+end
+
+struct A594 x::Float64 end
+  
+@testset "#594" begin
+  f(a,v) = a.x + v
+  g(A,V) = sum(f.(A,V))
+  X = A594.(randn(2))
+  Y = randn(2,2)
+  ∇ = gradient(g,X,Y)
+  @test ∇[1] == [(x = 2.0,); (x = 2.0,)]
+  @test ∇[2] == [1 1; 1 1]
+end

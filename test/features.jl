@@ -275,7 +275,7 @@ global_param = 3
   y, back = Zygote._pullback(cx, x -> x*global_param, 2)
   @test y == 6
   @test back(1) == (nothing, 3)
-  Zygote.globals(cx)[GlobalRef(Main, :global_param)] == 2
+  Zygote.cache(cx)[GlobalRef(Main, :global_param)] == 2
 end
 
 function pow_try(x)
@@ -309,7 +309,7 @@ end
 end
 
 @testset "@timed" begin
-  @test gradient(x -> (@timed x)[1], 0) == (1,)
+  @test gradient(x -> first(@timed x), 0) == (1,)
 end
 
 mutable struct MyMutable

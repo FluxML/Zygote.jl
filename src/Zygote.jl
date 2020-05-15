@@ -2,6 +2,7 @@ module Zygote
 
 using LinearAlgebra, Statistics
 using LinearAlgebra: copytri!, AbstractTriangular
+using ArrayLayouts: MemoryLayout, AbstractColumnMajor
 
 import ZygoteRules: @adjoint, @adjoint!, AContext, adjoint, _pullback, pullback, literal_getproperty
 
@@ -33,6 +34,7 @@ include("lib/broadcast.jl")
 include("lib/nnlib.jl")
 include("lib/forward.jl")
 include("lib/utils.jl")
+include("lib/range.jl")
 @init @require Distances="b4f34e82-e78d-54a5-968a-f98e89d6e8f7" include("lib/distances.jl")
 @init @require StatsFuns="4c63d2b9-4356-54db-8cca-17b64c39e42c" include("lib/statsfuns.jl")
 
@@ -46,9 +48,6 @@ include("profiler/Profile.jl")
 end
 
 precompile() = include(joinpath(@__DIR__, "precompile.jl"))
-
-# precompile()
-@init Requires.isprecompiling() || precompile()
 
 # helps to work around 265-y issues
 function refresh()
