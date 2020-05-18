@@ -26,12 +26,12 @@ end
 
 # Wrappers
 
-_pullback(f, args...) = _pullback(Context(), f, args...)
+@specialize_vararg 5 _pullback(f, args...) = _pullback(Context(), f, args...)
 
 tailmemaybe(::Nothing) = nothing
 tailmemaybe(x::Tuple) = Base.tail(x)
 
-function pullback(f, args...)
+@specialize_vararg 5 function pullback(f, args...)
   y, back = _pullback(f, args...)
   y, Δ -> tailmemaybe(back(Δ))
 end
@@ -40,7 +40,7 @@ sensitivity(y::Number) = one(y)
 sensitivity(y::Complex) = error("Output is complex, so the gradient is not defined.")
 sensitivity(y) = error("Output should be scalar; gradients are not defined for output $(repr(y))")
 
-function gradient(f, args...)
+@specialize_vararg 5 function gradient(f, args...)
   y, back = pullback(f, args...)
   return back(sensitivity(y))
 end

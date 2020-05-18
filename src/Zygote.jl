@@ -10,6 +10,8 @@ using IRTools
 using MacroTools, Requires
 using MacroTools: @forward
 
+using SpecializeVarargs
+
 export Params, gradient, pullback, @code_grad
 
 include("tools/idset.jl")

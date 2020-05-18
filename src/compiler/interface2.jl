@@ -16,6 +16,20 @@ ignore(T) = all(T -> T <: Type, T.parameters)
   return update!(meta.code, forw)
 end
 
+@generated function _pullback(ctx::AContext, f, x)
+  #Core.println("p2: ", x)
+  T = Tuple{f,x}
+  ignore(T) && return :(f(x), Pullback{$T}(()))
+  g = try _lookup_grad(T) catch e e end
+  !(g isa Tuple) && return :(f(x), Pullback{$T}((f,)))
+  meta, forw, _ = g
+  argnames!(meta, Symbol("#self#"), :ctx, :f, :x)
+  # IRTools.verify(forw)
+  forw = slots!(pis!(inlineable!(forw)))
+  return update!(meta.code, forw)
+end
+
+
 @generated function (j::Pullback{T})(Δ) where T
   ignore(T) && return :nothing
   g = try _lookup_grad(T)
