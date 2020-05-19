@@ -18,7 +18,7 @@ end
 @tangent setindex!(x::AbstractArray, v, inds...) =
   setindex!(x, v, inds...), (ẋ, v̇, _...) -> setindex!(ẋ, v̇, inds...)
 
-@tangent mul!(C, A, B) = mul!(C, A, B), (Ċ, Ȧ, Ḃ) -> Ċ .+= Ȧ*B .+ A*Ḃ
+@tangent mul!(C, A, B) = mul!(C, A, B), (Ċ, Ȧ, Ḃ) -> Ċ .= Ȧ*B .+ A*Ḃ
 
 @tangent A::AbstractArray * B::AbstractArray = A*B, (Ȧ, Ḃ) -> Ȧ*B .+ A*Ḃ
 
