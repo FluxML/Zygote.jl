@@ -57,7 +57,7 @@ using Zygote, Test, ChainRules
         simo(x) = (5x, 7x)
         function ChainRules.rrule(::typeof(simo), x)
             simo_rrule_hitcount[] += 1
-            function simo_pullback(Δa, Δb)
+            function simo_pullback((Δa, Δb))
                 simo_pullback_hitcount[] += 1
                 return ChainRules.NO_FIELDS, 5*Δa + 7*Δb
             end
@@ -101,7 +101,7 @@ using Zygote, Test, ChainRules
         mimo(a, b) = (5a + 7b, 100a, 10b)
         function ChainRules.rrule(::typeof(mimo), a, b)
             mimo_rrule_hitcount[] += 1
-            function mimo_pullback(Δx, Δy, Δz)
+            function mimo_pullback((Δx, Δy, Δz))
                 mimo_pullback_hitcount[] += 1
                 return ChainRules.NO_FIELDS, 5Δx + 100Δy , 7Δx + 10Δz
             end
@@ -126,9 +126,7 @@ using Zygote, Test, ChainRules
 
     @testset "nested AD hitting identity(::Tuple) pullback" begin
         # This is is  a particularly fiddly case.
-        # the adjoint of `tuple` is `identity`
-        # and `identity(::Tuple)`s pullback has multiple inputs
-        # (since the primal had multiple outputs)
+        # Its kind of a simplified version of `sin'''(0.5)` but different in some places.
 
         f(x) = tuple(x, 2x, 3x)
 
@@ -177,8 +175,8 @@ using Zygote, Test, ChainRules
     end
 end
 
-# ChainRules doesn't have support for FastMath yet, so this fails
-# https://github.com/JuliaDiff/ChainRules.jl/issues/174
-@test_broken gradient(2.0) do x
-  @fastmath x^2.0
-end == (4.0,)
+@testset "FastMath support" begin
+    @test gradient(2.0) do x
+      @fastmath x^2.0
+    end == (4.0,)
+end

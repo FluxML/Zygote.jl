@@ -49,12 +49,15 @@ Convert `x` from the differentials types ChainRules uses  to the format Zygote u
 @inline wrap_chainrules_output(x) = conj(unthunk(x))  # For now we are just not going to deal with thunks
 @inline wrap_chainrules_output(x::Tuple) = map(wrap_chainrules_output, x)
 @inline wrap_chainrules_output(x::ChainRules.AbstractZero) = nothing
-@inline function wrap_chainrules_output(x::ChainRules.Composite{P, T}) where {P, T}
-  T_outer = T <: NamedTuple  ? NamedTuple : Tuple  # must be a Tuple or NamedTuple, don't care about exact parameter types
-  xp = map(wrap_chainrules_output, x)
-  convert(T_outer, xp)
+for T_outer in (:Tuple, :NamedTuple)
+  # we create separate methods rather than using a `Union` + an `if` so that we avoid a
+  # branch that changes output type, because nested AD on that kinda thing makes Zygote less
+  # than happy.
+  @eval @inline function wrap_chainrules_output(x::ChainRules.Composite{P, T}) where {P, T<:$T_outer}
+    xp = map(wrap_chainrules_output, x)
+    convert($T_outer, xp)
+  end
 end
-
 
 """
     wrap_chainrules_input(x)
@@ -70,24 +73,6 @@ to differentials types ChainRules uses.
 end
 
 """
-    wrap_chainrules_pullback(f, args...)
-
-Wrap a chainrule's pullback `f`, converting the format of the inputs (`args`),
-and the outputs.
-"""
-@inline function wrap_chainrules_pullback(pb, args...)
-  return wrap_chainrules_output(pb(wrap_chainrules_input(args)...))
-end
-
-# Note we hand-expess the single arg version of this to remove splatting
-# because splatting breaks constant folding
-# This can be removed after https://github.com/JuliaDiff/ChainRulesCore.jl/issues/152
-@inline function wrap_chainrules_pullback(pb, a)
-  return wrap_chainrules_output(pb(wrap_chainrules_input(a)))
-end
-
-
-"""
   ZBack{F}(back) <: Function
 
 Wrapper for a ChainRules pullback `back`, that causes it to follow Zygote conventions.
@@ -96,10 +81,7 @@ Wrapper for a ChainRules pullback `back`, that causes it to follow Zygote conven
 struct ZBack{F} <: Function
   back::F
 end
-@inline (s::ZBack)(dy) = wrap_chainrules_pullback(s.back, dy)
-# Dispatch here handles chainrules considing pullbacks to have multiple input if Tuple.
-# TODO: this could be removed if: https://github.com/JuliaDiff/ChainRulesCore.jl/issues/152
-@inline (s::ZBack)(dy::Tuple) = wrap_chainrules_pullback(s.back, dy...)
+@inline (s::ZBack)(dy) = wrap_chainrules_output(s.back(wrap_chainrules_input(dy)))
 # `nothing->nothing` can be deleted after https://github.com/FluxML/Zygote.jl/issues/603
 # though it might be worth keeping as a performance optimization (benchmarking pending)
 @inline (s::ZBack)(::Nothing) = nothing
@@ -127,6 +109,3 @@ As per [`chain_rrule`](@ref) but with support for kwargs.
   kw_zpullback(dy) = (nothing, nothing, ZBack(back)(dy)...)  # first two nothings are for kwfunc and kwargs
   return y, kw_zpullback
 end
-
-# Required for nested AD
-@adjoint ChainRules.Composite{Any, T}(x::T) where T = ChainRules.Composite{Any, T}(x), x->(x,)
