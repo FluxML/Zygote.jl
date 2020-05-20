@@ -7,12 +7,13 @@ zerolike(x::Tuple) = zerolike.(x)
 end
 
 # TODO figure out why this made a test fail
-zerolike(x::Union{Module,Type}) = false
+zerolike(x::Union{Module,Type}) = nothing
 
 # TODO: `@nograd` and `@linear`
 
 @tangent zerolike(x) = zerolike(x), _ -> zerolike(x)
 @tangent one(x) = one(x), _ -> zerolike(x)
+@tangent Core.Typeof(x) = Core.Typeof(x), _ -> nothing
 @tangent typeof(x) = typeof(x), _ -> nothing
 @tangent Core.apply_type(args...) = Core.apply_type(args...), (_...) -> nothing
 @tangent fieldtype(args...) = fieldtype(args...), (_...) -> nothing
@@ -21,12 +22,13 @@ zerolike(x::Union{Module,Type}) = false
 @tangent println(x...) = println(x...), (_...) -> nothing
 @tangent typeassert(x, T) = typeassert(x, T), (ẋ, _) -> ẋ
 @tangent fieldnames(T) = fieldnames(T), _ -> zerolike(fieldnames(T))
+@tangent eltype(x) = eltype(x), ẋ -> zerolike(eltype(ẋ))
+
 @tangent fieldcount(T) = fieldcount(T), _ -> zerolike(fieldcount(T))
 
 @tangent tuple(t...) = t, (ṫ...) -> ṫ
 @tangent tail(t) = tail(t), ṫ -> tail(ṫ)
 
-@tangent getfield(t, i) = getfield(t, i), (ṫ, _) -> getfield(ṫ, i)
 @tangent setfield!(t, i, x) = setfield!(t, i, x), (ṫ, _, ẋ) -> setfield!(ṫ, i, ẋ)
 @tangent getindex(t, i) = getindex(t, i), (ṫ, _) -> getindex(ṫ, i)
 @tangent isdefined(t, i) = isdefined(t, i), (_, _) -> false
@@ -35,6 +37,7 @@ zerolike(x::Union{Module,Type}) = false
 zerolike(x::Core.Box) = isdefined(x, :contents) ? Core.Box(zerolike(x.contents)) : Core.Box()
 @tangent Core.Box() = Core.Box(), () -> Core.Box()
 @tangent Core.Box(x) = Core.Box(x), ẋ -> Core.Box(x)
+@tangent Base.copy(x) = copy(x), ẋ -> copy(ẋ)
 
 @tangent __new__(T, s...) =
   __new__(T, s...), (_, ṡ...) -> NamedTuple{fieldnames(T)}(ṡ)
@@ -61,6 +64,9 @@ _pushforward(dargs, ::typeof(getproperty), x, f) =
 
 @tangent literal_getproperty(t, ::Val{i}) where i =
   getproperty(t, i), (ṫ, _) -> getproperty(ṫ, i)
+
+@tangent literal_getproperty(t::DataType, ::Val{i}) where i =
+  getproperty(t, i), (ṫ, _) -> nothing
 
 @tangent literal_getindex(t, ::Val{i}) where i =
   getindex(t, i), (ṫ, _) -> getindex(ṫ, i)
