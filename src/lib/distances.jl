@@ -66,7 +66,7 @@ end
 
 @adjoint function pairwise(::Euclidean, X::AbstractMatrix, Y::AbstractMatrix; dims=2)
   D, back = pullback(
-    (X, Y) -> pairwise(SqEuclidean(100 * eps(eltype(X))), X, Y; dims = dims),
+    (X, Y) -> pairwise(SqEuclidean(), X, Y; dims = dims),
     X,
     Y,
   )
