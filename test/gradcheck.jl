@@ -1172,6 +1172,12 @@ Zygote.refresh()
   @test gradcheck(x->2.5 * StatsFuns.xlogx(x[1]), [2.45])
 end
 
+@testset "xlogy" begin
+  @test gradcheck(x -> StatsFuns.xlogy(x[1], x[2]), [1.0, 2.0])
+  @test gradcheck(x -> StatsFuns.xlogy(x[1], x[2]), [0.0, 2.0])
+  @test gradtest((x,y) -> StatsFuns.xlogy.(x,y), (3,3), (3,3))
+end
+
 @testset "logistic" begin
   @test gradcheck(x->3.0 * StatsFuns.logistic(x[1]), [-5.0])
   @test gradcheck(x->3.0 * StatsFuns.logistic(x[1]), [-1.0])
@@ -1218,6 +1224,13 @@ end
       @test gradcheck(x->5.1 * StatsFuns.log1psq(x[1]), [x])
     end
   end
+end
+
+@testset "logaddexp" begin
+  @test gradcheck(x -> StatsFuns.logaddexp(x[1], x[2]), [1.0, 2.0])
+  @test gradcheck(x -> StatsFuns.logaddexp(x[1], x[2]), [1.0, -1.0])
+  @test gradcheck(x -> StatsFuns.logaddexp(x[1], x[2]), [-2.0, -3.0])
+  @test gradtest((x,y) -> StatsFuns.logaddexp.(x,y), (3,3), (3,3))
 end
 
 @testset "logsumexp" begin
