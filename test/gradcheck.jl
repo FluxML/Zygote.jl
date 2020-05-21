@@ -1492,6 +1492,16 @@ end
   @test gradient(x -> sum(randexp(Float32, 1,1)), 1) == (nothing,)
   @test gradient(x -> sum(randexp(Float32, (1,1))), 1) == (nothing,)
 
+  @test gradient(x -> rand(), 1) == (nothing,)
+  @test gradient(x -> sum(rand(Random.GLOBAL_RNG, 4)), 1) == (nothing,)
+  @test gradient(x -> sum(rand(Random.GLOBAL_RNG, 4)), 1) == (nothing,)
+  @test gradient(x -> sum(rand(Random.GLOBAL_RNG, Float32, 1,1)), 1) == (nothing,)
+  @test gradient(x -> sum(rand(Random.GLOBAL_RNG, Float32, (1,1))), 1) == (nothing,)
+  @test gradient(x -> sum(randn(Random.GLOBAL_RNG, Float32, 1,1)), 1) == (nothing,)
+  @test gradient(x -> sum(randn(Random.GLOBAL_RNG, Float32, (1,1))), 1) == (nothing,)
+  @test gradient(x -> sum(randexp(Random.GLOBAL_RNG, Float32, 1,1)), 1) == (nothing,)
+  @test gradient(x -> sum(randexp(Random.GLOBAL_RNG, Float32, (1,1))), 1) == (nothing,)
+
   @static if VERSION > v"1.3"
     @test gradient(x -> sum(rand(Random.default_rng(), 4)), 1) == (nothing,)
     @test gradient(x -> sum(rand(Random.default_rng(), Float32, 1,1)), 1) == (nothing,)
