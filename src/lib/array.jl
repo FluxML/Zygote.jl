@@ -7,12 +7,10 @@ using Base.Broadcast: broadcasted, broadcast_shape
 @adjoint Array(xs::AbstractArray) = Array(xs), ȳ -> (ȳ,)
 @adjoint Array(xs::Array) = Array(xs), ȳ -> (ȳ,)
 
-@nograd size, length, eachindex, axes, Colon(), findfirst, findlast, findall, randn, randexp, randn!, randexp!, ones, zeros, one, zero,
-  any, all
+@nograd size, length, eachindex, axes, Colon(), findfirst, findlast, findall, ones, zeros, one, zero, any, all
+@nograd randn, randexp, randn!, randexp!, Random.default_rng
 
-@adjoint Base.rand(rng::AbstractRNG, ::Type{T}, dims::Integer...) where {T<:Number} =
-  rand(rng, T, dims...), _ -> nothing
-@adjoint Base.rand(rng::AbstractRNG, ::Type{T}, dims::NTuple{N,Int}) where {T<:Number,N} =
+@adjoint Base.rand(rng::AbstractRNG, ::Type{T}, dims...) where {T<:Number} =
   rand(rng, T, dims...), _ -> nothing
 
 @adjoint Base.vect(xs...) = Base.vect(xs...), Δ -> (Δ...,)

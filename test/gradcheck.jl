@@ -1480,3 +1480,15 @@ end
   @test gradient(x -> sum(Matrix{Float64}(x[1]*I, 2, 2)), [1.0]) == ([2.0],)
   @test gradient(x -> sum(Matrix{Float64}(x[1]*I, (2, 2))), [1.0]) == ([2.0],)
 end
+
+@testset "random" begin
+  @test gradient(x -> rand(), 1) == (nothing,)
+  @test gradient(x -> sum(rand(4)), 1) == (nothing,)
+  @test gradient(x -> sum(rand(Random.default_rng(), 4)), 1) == (nothing,)
+  @test gradient(x -> sum(rand(Random.default_rng(), Float32, 1,1)), [1])[1] === nothing
+  @test gradient(x -> sum(rand(Random.default_rng(), Float32, (1,1))), [1])[1] === nothing
+  @test gradient(x -> sum(randn(Random.default_rng(), Float32, 1,1)), [1])[1] === nothing
+  @test gradient(x -> sum(randn(Random.default_rng(), Float32, (1,1))), [1])[1] === nothing
+  @test gradient(x -> sum(randexp(Random.default_rng(), Float32, 1,1)), [1])[1] === nothing
+  @test gradient(x -> sum(randexp(Random.default_rng(), Float32, (1,1))), [1])[1] === nothing
+end
