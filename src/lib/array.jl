@@ -158,6 +158,7 @@ function unzip(tuples)
       map(tuple -> tuple[i], tuples)
   end
 end
+# Special-case for this particularly commonly called varient that has outer loop unrolled 
 function unzip(tuples::AbstractVector{<:Tuple{Any, Any}})
   map(first, tuples), map(last, tuples)
 end
