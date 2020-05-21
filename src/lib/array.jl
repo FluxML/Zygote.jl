@@ -1,17 +1,20 @@
-using FillArrays, AbstractFFTs
+using Random, FillArrays, AbstractFFTs
 using FillArrays: AbstractFill, getindex_value
 using Base.Broadcast: broadcasted, broadcast_shape
-import Random.randn!
 
 @adjoint (::Type{T})(::UndefInitializer, args...) where T<:Array = T(undef, args...), Δ -> nothing
 
 @adjoint Array(xs::AbstractArray) = Array(xs), ȳ -> (ȳ,)
 @adjoint Array(xs::Array) = Array(xs), ȳ -> (ȳ,)
 
-@nograd size, length, eachindex, axes, Colon(), findfirst, findlast, findall, randn, randn!, ones, zeros, one, zero,
-  any, all
+@nograd size, length, eachindex, axes, Colon(), findfirst, findlast, findall, ones, zeros, one, zero, any, all
+@nograd randn, randexp, randn!, randexp!
+@static if VERSION > v"1.3"
+  @nograd Random.default_rng
+end
 
-@adjoint rand(dims::Integer...) = rand(dims...), _ -> nothing
+@adjoint Base.rand(rng::AbstractRNG, ::Type{T}, dims...) where {T<:Number} =
+  rand(rng, T, dims...), _ -> nothing
 
 @adjoint Base.vect(xs...) = Base.vect(xs...), Δ -> (Δ...,)
 
