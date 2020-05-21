@@ -12,6 +12,8 @@ using Base.Broadcast: broadcasted, broadcast_shape
 
 @adjoint Base.rand(rng::AbstractRNG, ::Type{T}, dims::Integer...) where {T<:Number} =
   rand(rng, T, dims...), _ -> nothing
+@adjoint Base.rand(rng::AbstractRNG, ::Type{T}, dims::NTuple{N,Int}) where {T<:Number,N} =
+  rand(rng, T, dims...), _ -> nothing
 
 @adjoint Base.vect(xs...) = Base.vect(xs...), Δ -> (Δ...,)
 
