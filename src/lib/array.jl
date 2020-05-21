@@ -160,15 +160,16 @@ end
 
 @adjoint getindex(i::Int, j::Int) = i[j], _ -> nothing
 
+struct StaticGetter{i} end
+(::StaticGetter{i})(v) where {i} = v[i]
+@generated function _unzip(tuples, ::Val{N}) where {N}
+  Expr(:tuple, (:(map($(StaticGetter{i}()), tuples)) for i ∈ 1:N)...)
+end
 function unzip(tuples)
-  map(1:length(first(tuples))) do i
-      map(tuple -> tuple[i], tuples)
-  end
+  N = length(first(tuples))
+  _unzip(tuples, Val(N))
 end
-# Special-case for this particularly commonly called varient that has outer loop unrolled 
-function unzip(tuples::AbstractVector{<:Tuple{Any, Any}})
-  map(first, tuples), map(last, tuples)
-end
+
 function ∇map(cx, f, args...)
   ys_and_backs = map((args...) -> _pullback(cx, f, args...), args...)
   if isempty(ys_and_backs)
