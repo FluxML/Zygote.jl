@@ -66,14 +66,16 @@ _pushforward(dargs, ::typeof(getproperty), x, f) =
   getproperty(t, i), (ṫ, _) -> getproperty(ṫ, i)
 
 @tangent literal_getproperty(t::DataType, ::Val{i}) where i =
-  getproperty(t, i), (ṫ, _) -> getproperty(t, i)
+  getproperty(t, i), (ṫ, _) -> nothing
 
 @tangent literal_getindex(t, ::Val{i}) where i =
   getindex(t, i), (ṫ, _) -> getindex(ṫ, i)
 
-import Base.Broadcast.broadcasted
-@tangent function broadcasted(f, args...)
-  broadcasted(f, args...), (ḟ, dargs...) -> begin
-    broadcasted(f, dargs...)
-  end
-end
+# import Base.Broadcast.broadcasted
+# @tangent function broadcasted(f, args...)
+#   broadcasted(f, args...), (ḟ, dargs...) -> begin
+#     @show f, ḟ
+#     @show dargs
+#     broadcasted(f, dargs...)
+#   end
+# end
