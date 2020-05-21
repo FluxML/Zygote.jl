@@ -1,7 +1,6 @@
 using Random, FillArrays, AbstractFFTs
 using FillArrays: AbstractFill, getindex_value
 using Base.Broadcast: broadcasted, broadcast_shape
-using Random: default_rng
 
 @adjoint (::Type{T})(::UndefInitializer, args...) where T<:Array = T(undef, args...), Δ -> nothing
 
@@ -9,7 +8,10 @@ using Random: default_rng
 @adjoint Array(xs::Array) = Array(xs), ȳ -> (ȳ,)
 
 @nograd size, length, eachindex, axes, Colon(), findfirst, findlast, findall, ones, zeros, one, zero, any, all
-@nograd randn, randexp, randn!, randexp!, default_rng
+@nograd randn, randexp, randn!, randexp!
+@static if VERSION > v"1.3"
+  @nograd Random.default_rng
+end
 
 @adjoint Base.rand(rng::AbstractRNG, ::Type{T}, dims...) where {T<:Number} =
   rand(rng, T, dims...), _ -> nothing
