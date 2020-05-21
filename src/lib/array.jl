@@ -162,6 +162,10 @@ function unzip(tuples)
       map(tuple -> tuple[i], tuples)
   end
 end
+# Special-case for this particularly commonly called varient that has outer loop unrolled 
+function unzip(tuples::AbstractVector{<:Tuple{Any, Any}})
+  map(first, tuples), map(last, tuples)
+end
 function ∇map(cx, f, args...)
   ys_and_backs = map((args...) -> _pullback(cx, f, args...), args...)
   if isempty(ys_and_backs)
@@ -853,11 +857,11 @@ end
 end
 
 
-# to actually use rfft, one needs to insure that everything 
-# that happens in the Fourier domain could've been done in 
-# the space domain with real numbers. This means enforcing 
-# conjugate symmetry along all transformed dimensions besides 
-# the first. Otherwise this is going to result in *very* weird 
+# to actually use rfft, one needs to insure that everything
+# that happens in the Fourier domain could've been done in
+# the space domain with real numbers. This means enforcing
+# conjugate symmetry along all transformed dimensions besides
+# the first. Otherwise this is going to result in *very* weird
 # behavior.
 @adjoint function rfft(xs::AbstractArray{<:Real})
   return AbstractFFTs.rfft(xs), function(Δ)
