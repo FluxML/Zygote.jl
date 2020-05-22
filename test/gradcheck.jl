@@ -1216,6 +1216,9 @@ end
       test_log1pexp(Float64, [33.3, 33.3 + eps(), 100.0])
     end
   end
+  @test gradcheck(x->2.5 * StatsFuns.log1pexp(x[1]), [1.0])
+  @test gradcheck(x->2.5 * StatsFuns.log1pexp(x[1]), [2.45])
+  @test gradtest(x -> StatsFuns.log1pexp.(x), (3,3))
 end
 
 @testset "log1psq" begin
