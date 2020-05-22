@@ -37,7 +37,7 @@ zerolike(x::Union{Module,Type}) = x # false -> x
 zerolike(x::Core.Box) = isdefined(x, :contents) ? Core.Box(zerolike(x.contents)) : Core.Box()
 @tangent Core.Box() = Core.Box(), () -> Core.Box()
 @tangent Core.Box(x) = Core.Box(x), ẋ -> Core.Box(x)
-@tangent Base.copy(x) = copy(x), ẋ -> copy(x)
+@tangent Base.copy(x) = copy(x), ẋ -> copy(ẋ)
 
 @tangent __new__(T, s...) =
   __new__(T, s...), (_, ṡ...) -> NamedTuple{fieldnames(T)}(ṡ)
