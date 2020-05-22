@@ -77,7 +77,7 @@ end
 function ∇logaddexp(x::Numeric, y::Numeric)
     result = logaddexp.(x, y)
     t = @. exp(-abs(x - y))
-    dx, dy = swap(x .≥ y, inv.(one.(t) .+ t), t ./ (one.(t) .+ t))
+    dx, dy = select(x .≥ y, inv.(one.(t) .+ t), t ./ (one.(t) .+ t))
     return result, dx, dy
 end
 
@@ -94,16 +94,16 @@ end
 function ∇logsubexp(x::Numeric, y::Numeric)
     result = logsubexp.(x, y)
     t = @. -inv(expm1(-abs(x - y)))
-    dx, dy = swap(x .≥ y, t, one.(t) .- t)
+    dx, dy = select(x .≥ y, t, one.(t) .- t)
     return result, dx, dy
 end
 
 """
-	swap(cond, x, y)
+	select(cond, x, y)
 
-The call `a, b = swap(cond, x, y)` constructs two arrays `a, b`, where
+The call `a, b = select(cond, x, y)` constructs two arrays `a, b`, where
 `a[i], b[i] = x[i], y[i]` if `cond[i]` is `true`, and `a[i], b[i] = y[i], x[i]`
  if `cond[i]` is `false`.
 """
-swap(cond, x, y) = ifelse.(cond, x, y), ifelse.(cond, y, x)
+select(cond, x, y) = ifelse.(cond, x, y), ifelse.(cond, y, x)
 
