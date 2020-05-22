@@ -4,10 +4,23 @@ using .StatsFuns: xlogx, xlogy, logistic, logit, log1psq, log1pexp,
 using Base.Broadcast: broadcasted
 
 @adjoint function xlogx(x::Real)
-    y = xlogx(x)
-    return y, function(Δ::Real)
-        return (x > zero(x) ? Δ * (log(x) + one(y)) : zero(y),)
-    end
+    result, dx = ∇xlogx(x)
+    back(δ) = (dx * δ,)
+    return result, back
+end
+
+@adjoint function broadcasted(::typeof(xlogx), x::Numeric)
+    result, dx = ∇xlogx(x)
+    back(δ) = (nothing, unbroadcast(x, δ .* dx))
+    return result, back
+end
+
+function ∇xlogx(x::Numeric)
+    logx = log.(x)
+    xlogx = x .* logx
+    result = @. ifelse(iszero(x), zero(xlogx), xlogx)
+    dx = @. one(x) + logx
+    return result, dx
 end
 
 @adjoint function logistic(x::Real)
@@ -78,15 +91,15 @@ end
 end
 
 @adjoint function broadcasted(::typeof(logsubexp), x::Numeric, y::Numeric)
-    result, dx, dy = ∇logsubexp.(x, y)
+    result, dx, dy = ∇logsubexp(x, y)
     back(δ) = (nothing, unbroadcast(x, δ .* dx), unbroadcast(y, δ .* dy))
     return result, back
 end
 
 function ∇logsubexp(x::Numeric, y::Numeric)
     result = logsubexp.(x, y)
-    t = @. exp(-abs(x - y))
-    dx, dy = select(x .≥ y, inv.(one.(t) .+ t), t ./ (one.(t) .+ t))
+    t = @. -inv(expm1(-abs(x - y)))
+    dx, dy = select(x .≥ y, t, one.(t) .- t)
     return result, dx, dy
 end
 
