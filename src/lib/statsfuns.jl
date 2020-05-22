@@ -106,8 +106,9 @@ end
 """
 	select(cond, x, y)
 
-Given a Boolean array `cond`, construct two arrays, where items from `x` or `y`
-are selected according to whether the corresponding item from `cond` is `true` or `false`.
+The call `a, b = select(cond, x, y)` constructs two arrays `a, b`, where
+`a[i], b[i] = x[i], y[i]` if `cond[i]` is `true`, and `a[i], b[i] = y[i], x[i]`
+ if `cond[i]` is `false`.
 """
 select(cond, x, y) = ifelse.(cond, x, y), ifelse.(cond, y, x)
 
