@@ -103,7 +103,7 @@ end
 """
     copy!(ps::Params, x::AbstractVector)
     copy!(x::AbstractVector, ps::Params)
-    
+
 Copies the content of array `x` into the parameters `ps` or viceversa.
 The length of `x` has to be equal to the sum of the lengths
 of all parameters.
@@ -122,7 +122,7 @@ function copy!(x::AbstractVector, ps::Params)
   @assert length(x) == sum(length(p) for p in ps)
   i = 0
   for p in ps
-      x[i+1:i+length(p)] .= vec(p) 
+      x[i+1:i+length(p)] .= vec(p)
       i += length(p)
   end
   ps
@@ -147,9 +147,8 @@ end
     copy!(gs::Grads, x::AbstractVector)
     copy!(x::AbstractVector, gs::Grads)
 
-Copies the content of array `x` into the gradient object `gs` or viceversa.
-The length of `x` has to be equal to the sum of the lenghts
-of all gradients.
+Copies the content of array `x` into the gradient object `gs` or vice versa. The
+length of `x` has to be equal to the sum of the lengths of all gradients.
 """
 function copy!(gs::Grads, x::AbstractVector)
   i = 0
@@ -163,7 +162,7 @@ end
 function copy!(x::AbstractVector,  gs::Grads)
   i = 0
   for p in gs.params
-      x[i+1:i+length(p)] .= vec(gs[p]) 
+      x[i+1:i+length(p)] .= vec(gs[p])
       i += length(p)
   end
   x
