@@ -29,10 +29,16 @@ ignore(f) = f()
     @ignore (...)
 
 Tell Zygote to ignore an expression. Equivalent to `ignore() do (...) end`.
+Example:
+
+```julia-repl	
+julia> f(x) = (y = Zygote.@ignore x; x * y); f'(1)
+1
+```	
 """
 macro ignore(ex)
-    return :(ignore() do
-        $ex
+    return :(Zygote.ignore() do
+        $(esc(ex))
     end)
 end
 

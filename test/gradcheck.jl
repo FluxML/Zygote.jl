@@ -1481,7 +1481,11 @@ end
   @test gradient(x -> findlast(ismissing, x), [1, missing]) == (nothing,)
   @test gradient(x -> findall(ismissing, x)[1], [1, missing]) == (nothing,)
   @test gradient(x -> Zygote.ignore(() -> x*x), 1) == (nothing,)
-  @test gradient(x -> Zygote.@ignore x*x, 1) == (nothing,)
+  @test gradient(x -> Zygote.@ignore(x*x), 1) == (nothing,)
+  @test gradient(1) do x
+    y = Zygote.@ignore x
+    x * y
+  end == (1,)
 end
 
 @testset "fastmath" begin
