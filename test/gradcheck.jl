@@ -1146,6 +1146,11 @@ end
   @test gradtest(catdim, rand(2,5,3), rand(2,5,3), rand(2,5,3))
 end
 
+@testset "cat empty" begin
+  catdim = (x...) -> cat(x..., dims = (1, 2))
+  @test gradtest(catdim, rand(0,5,3), rand(2,5,3), rand(2,5,3))
+end
+
 @testset "one(s) and zero(s)" begin
   @test Zygote.gradient(x->sum(ones(size(x))), randn(5))[1] isa Nothing
   @test Zygote.gradient(x->sum(one(x)), randn(3, 3))[1] isa Nothing
@@ -1165,6 +1170,13 @@ Zygote.refresh()
 @testset "xlogx" begin
   @test gradcheck(x->2.5 * StatsFuns.xlogx(x[1]), [1.0])
   @test gradcheck(x->2.5 * StatsFuns.xlogx(x[1]), [2.45])
+  @test gradtest(x -> StatsFuns.xlogx.(x), (3,3))
+end
+
+@testset "xlogy" begin
+  @test gradcheck(x -> StatsFuns.xlogy(x[1], x[2]), [1.0, 2.0])
+  @test gradcheck(x -> StatsFuns.xlogy(x[1], x[2]), [0.0, 2.0])
+  @test gradtest((x,y) -> StatsFuns.xlogy.(x,y), (3,3), (3,3))
 end
 
 @testset "logistic" begin
@@ -1204,6 +1216,9 @@ end
       test_log1pexp(Float64, [33.3, 33.3 + eps(), 100.0])
     end
   end
+  @test gradcheck(x->2.5 * StatsFuns.log1pexp(x[1]), [1.0])
+  @test gradcheck(x->2.5 * StatsFuns.log1pexp(x[1]), [2.45])
+  @test gradtest(x -> StatsFuns.log1pexp.(x), (3,3))
 end
 
 @testset "log1psq" begin
@@ -1213,6 +1228,21 @@ end
       @test gradcheck(x->5.1 * StatsFuns.log1psq(x[1]), [x])
     end
   end
+end
+
+@testset "logaddexp" begin
+  @test gradcheck(x -> StatsFuns.logaddexp(x[1], x[2]), [1.0, 2.0])
+  @test gradcheck(x -> StatsFuns.logaddexp(x[1], x[2]), [1.0, -1.0])
+  @test gradcheck(x -> StatsFuns.logaddexp(x[1], x[2]), [-2.0, -3.0])
+  @test gradcheck(x -> StatsFuns.logaddexp(x[1], x[2]), [5.0, 5.0])
+  @test gradtest((x,y) -> StatsFuns.logaddexp.(x,y), (3,3), (3,3))
+end
+
+@testset "logsubexp" begin
+  @test gradcheck(x -> StatsFuns.logsubexp(x[1], x[2]), [1.0, 2.0])
+  @test gradcheck(x -> StatsFuns.logsubexp(x[1], x[2]), [1.0, -1.0])
+  @test gradcheck(x -> StatsFuns.logsubexp(x[1], x[2]), [-2.0, -3.0])
+  @test gradtest((x,y) -> StatsFuns.logsubexp.(x,y), (3,3), (3,3))
 end
 
 @testset "logsumexp" begin
@@ -1470,4 +1500,36 @@ end
   @test gradient(x -> sum(Matrix(x[1]*I, (2, 2))), [1.0]) == ([2.0],)
   @test gradient(x -> sum(Matrix{Float64}(x[1]*I, 2, 2)), [1.0]) == ([2.0],)
   @test gradient(x -> sum(Matrix{Float64}(x[1]*I, (2, 2))), [1.0]) == ([2.0],)
+end
+
+@testset "random" begin
+  @test gradient(x -> rand(), 1) == (nothing,)
+  @test gradient(x -> sum(rand(4)), 1) == (nothing,)
+  @test gradient(x -> sum(rand(4)), 1) == (nothing,)
+  @test gradient(x -> sum(rand(Float32, 1,1)), 1) == (nothing,)
+  @test gradient(x -> sum(rand(Float32, (1,1))), 1) == (nothing,)
+  @test gradient(x -> sum(randn(Float32, 1,1)), 1) == (nothing,)
+  @test gradient(x -> sum(randn(Float32, (1,1))), 1) == (nothing,)
+  @test gradient(x -> sum(randexp(Float32, 1,1)), 1) == (nothing,)
+  @test gradient(x -> sum(randexp(Float32, (1,1))), 1) == (nothing,)
+
+  @test gradient(x -> rand(), 1) == (nothing,)
+  @test gradient(x -> sum(rand(Random.GLOBAL_RNG, 4)), 1) == (nothing,)
+  @test gradient(x -> sum(rand(Random.GLOBAL_RNG, 4)), 1) == (nothing,)
+  @test gradient(x -> sum(rand(Random.GLOBAL_RNG, Float32, 1,1)), 1) == (nothing,)
+  @test gradient(x -> sum(rand(Random.GLOBAL_RNG, Float32, (1,1))), 1) == (nothing,)
+  @test gradient(x -> sum(randn(Random.GLOBAL_RNG, Float32, 1,1)), 1) == (nothing,)
+  @test gradient(x -> sum(randn(Random.GLOBAL_RNG, Float32, (1,1))), 1) == (nothing,)
+  @test gradient(x -> sum(randexp(Random.GLOBAL_RNG, Float32, 1,1)), 1) == (nothing,)
+  @test gradient(x -> sum(randexp(Random.GLOBAL_RNG, Float32, (1,1))), 1) == (nothing,)
+
+  @static if VERSION > v"1.3"
+    @test gradient(x -> sum(rand(Random.default_rng(), 4)), 1) == (nothing,)
+    @test gradient(x -> sum(rand(Random.default_rng(), Float32, 1,1)), 1) == (nothing,)
+    @test gradient(x -> sum(rand(Random.default_rng(), Float32, (1,1))), 1) == (nothing,)
+    @test gradient(x -> sum(randn(Random.default_rng(), Float32, 1,1)), 1) == (nothing,)
+    @test gradient(x -> sum(randn(Random.default_rng(), Float32, (1,1))), 1) == (nothing,)
+    @test gradient(x -> sum(randexp(Random.default_rng(), Float32, 1,1)), 1) == (nothing,)
+    @test gradient(x -> sum(randexp(Random.default_rng(), Float32, (1,1))), 1) == (nothing,)
+  end
 end

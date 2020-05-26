@@ -1,5 +1,5 @@
 @nograd readline, Base.gc_num, Base.time_ns, Base.print, Base.println, Base.show,
-  Core.show, Core.print, Core.println, string, repr
+  Core.show, Core.print, Core.println, string, repr, Threads.nthreads, Threads.threadid
 
 # Gradient of AD stacks
 

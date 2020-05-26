@@ -1,17 +1,20 @@
-using FillArrays, AbstractFFTs
+using Random, FillArrays, AbstractFFTs
 using FillArrays: AbstractFill, getindex_value
 using Base.Broadcast: broadcasted, broadcast_shape
-import Random.randn!
 
 @adjoint (::Type{T})(::UndefInitializer, args...) where T<:Array = T(undef, args...), Δ -> nothing
 
 @adjoint Array(xs::AbstractArray) = Array(xs), ȳ -> (ȳ,)
 @adjoint Array(xs::Array) = Array(xs), ȳ -> (ȳ,)
 
-@nograd size, length, eachindex, axes, Colon(), findfirst, findlast, findall, randn, randn!, ones, zeros, one, zero,
-  any, all
+@nograd size, length, eachindex, axes, Colon(), findfirst, findlast, findall, ones, zeros, one, zero, any, all
+@nograd randn, randexp, randn!, randexp!
+@static if VERSION > v"1.3"
+  @nograd Random.default_rng
+end
 
-@adjoint rand(dims::Integer...) = rand(dims...), _ -> nothing
+@adjoint Base.rand(rng::AbstractRNG, ::Type{T}, dims...) where {T<:Number} =
+  rand(rng, T, dims...), _ -> nothing
 
 @adjoint Base.vect(xs...) = Base.vect(xs...), Δ -> (Δ...,)
 
@@ -122,7 +125,7 @@ end
     start = ntuple(_ -> 0, ndims(Δ))
     dXs = map(Xs) do x
       move = ntuple(d -> d in dims ? size(x,d) : 0, ndims(Δ))
-      x_in_Δ = ntuple(d -> move[d] > 0 ? (start[d]+1:start[d]+move[d]) : Colon(), ndims(Δ))
+      x_in_Δ = ntuple(d -> d in dims ? (start[d]+1:start[d]+move[d]) : Colon(), ndims(Δ))
       start = start .+ move
       dx = reshape(Δ[x_in_Δ...], size(x))
     end
@@ -157,11 +160,16 @@ end
 
 @adjoint getindex(i::Int, j::Int) = i[j], _ -> nothing
 
-function unzip(tuples)
-  map(1:length(first(tuples))) do i
-      map(tuple -> tuple[i], tuples)
-  end
+struct StaticGetter{i} end
+(::StaticGetter{i})(v) where {i} = v[i]
+@generated function _unzip(tuples, ::Val{N}) where {N}
+  Expr(:tuple, (:(map($(StaticGetter{i}()), tuples)) for i ∈ 1:N)...)
 end
+function unzip(tuples)
+  N = length(first(tuples))
+  _unzip(tuples, Val(N))
+end
+
 function ∇map(cx, f, args...)
   ys_and_backs = map((args...) -> _pullback(cx, f, args...), args...)
   if isempty(ys_and_backs)
@@ -853,11 +861,11 @@ end
 end
 
 
-# to actually use rfft, one needs to insure that everything 
-# that happens in the Fourier domain could've been done in 
-# the space domain with real numbers. This means enforcing 
-# conjugate symmetry along all transformed dimensions besides 
-# the first. Otherwise this is going to result in *very* weird 
+# to actually use rfft, one needs to insure that everything
+# that happens in the Fourier domain could've been done in
+# the space domain with real numbers. This means enforcing
+# conjugate symmetry along all transformed dimensions besides
+# the first. Otherwise this is going to result in *very* weird
 # behavior.
 @adjoint function rfft(xs::AbstractArray{<:Real})
   return AbstractFFTs.rfft(xs), function(Δ)

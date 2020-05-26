@@ -1,3 +1,13 @@
+using InteractiveUtils
+using InteractiveUtils: typesof
+using Core: Typeof
+
+@static if VERSION >= v"1.1"
+  import Base: copy!
+else
+  import Future: copy!
+end
+
 mutable struct Context <: AContext
   cache::Union{IdDict{Any,Any},Nothing}
 end
@@ -56,7 +66,7 @@ struct Params
   Params() = new(Buffer([], false), IdSet())
 end
 
-@forward Params.order Base.iterate, Base.length
+@forward Params.order Base.iterate, Base.length, Base.getindex
 
 function Base.push!(ps::Params, x)
   if !(x in ps.params)
@@ -79,6 +89,10 @@ end
 
 Params(xs) = push!(Params(), xs...)
 
+Base.Broadcast.broadcasted(f, ps::Params) = broadcasted(f, ps.order)
+
+Base.:(==)(x::Params, y::Params) = x.order.data == y.order.data
+
 function Base.show(io::IO, ps::Params)
   print(io, "Params([")
   join(io, ps.order, ", ")
@@ -87,14 +101,14 @@ end
 
 
 """
-    copyto!(ps::Params, x::AbstractVector)
-    copyto!(x::AbstractVector, ps::Params)
+    copy!(ps::Params, x::AbstractVector)
+    copy!(x::AbstractVector, ps::Params)
 
 Copies the content of array `x` into the parameters `ps` or viceversa.
 The length of `x` has to be equal to the sum of the lengths
 of all parameters.
 """
-function Base.copyto!(ps::Params, x::AbstractVector)
+function copy!(ps::Params, x::AbstractVector)
   @assert length(x) == sum(length(p) for p in ps)
   i = 0
   for p in ps
@@ -104,7 +118,7 @@ function Base.copyto!(ps::Params, x::AbstractVector)
   ps
 end
 
-function Base.copyto!(x::AbstractVector, ps::Params)
+function copy!(x::AbstractVector, ps::Params)
   @assert length(x) == sum(length(p) for p in ps)
   i = 0
   for p in ps
@@ -113,7 +127,6 @@ function Base.copyto!(x::AbstractVector, ps::Params)
   end
   ps
 end
-
 
 
 struct Grads
@@ -130,15 +143,14 @@ function Base.getindex(gs::Grads, x)
   return gs.grads[x]
 end
 
-
 """
-    copyto!(gs::Grads, x::AbstractVector)
-    copyto!(x::AbstractVector, gs::Grads)
+    copy!(gs::Grads, x::AbstractVector)
+    copy!(x::AbstractVector, gs::Grads)
 
 Copies the content of array `x` into the gradient object `gs` or vice versa. The
 length of `x` has to be equal to the sum of the lengths of all gradients.
 """
-function Base.copyto!(gs::Grads, x::AbstractVector)
+function copy!(gs::Grads, x::AbstractVector)
   i = 0
   for p in gs.params
       gs[p] .= reshape(x[i+1:i+length(p)], size(p))
@@ -147,7 +159,7 @@ function Base.copyto!(gs::Grads, x::AbstractVector)
   x
 end
 
-function Base.copyto!(x::AbstractVector,  gs::Grads)
+function copy!(x::AbstractVector,  gs::Grads)
   i = 0
   for p in gs.params
       x[i+1:i+length(p)] .= vec(gs[p])
@@ -169,10 +181,6 @@ function pullback(f, ps::Params)
 end
 
 # Code Reflection
-
-using InteractiveUtils
-using InteractiveUtils: typesof
-using Core: Typeof
 
 function code_ir(f, T)
   m = meta(Tuple{Typeof(f),T.parameters...})

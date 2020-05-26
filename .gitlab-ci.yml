@@ -17,3 +17,10 @@ julia:nightly:
   tags:
     - nvidia
   allow_failure: true
+
+documentation:
+  extends:
+    - .julia:1.3
+    - .documentation
+  tags:
+    - nvidia
