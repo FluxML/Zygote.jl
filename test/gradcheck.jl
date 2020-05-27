@@ -272,6 +272,11 @@ end
   @test gradtest(x->fill(first(x), N), randn(rng, 1))
   @test gradtest(x->fill(first(x), N, M), randn(rng, 1))
   @test gradtest(x->fill(first(x), N, M, P), randn(rng, 1))
+  # checking fill still works if the gradient is nothing
+  let 
+    out, back = pullback(fill, 5, 3)
+    @test back((nothing,)) == (nothing,nothing)
+  end
 end
 
 @testset "circshift" begin

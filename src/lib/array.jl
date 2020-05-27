@@ -75,7 +75,11 @@ end
 
 @adjoint collect(x::Array) = collect(x), Δ -> (Δ,)
 
-@adjoint fill(x::Real, dims...) = fill(x, dims...), Δ->(sum(Δ), map(_->nothing, dims)...)
+@adjoint function fill(x::Real, dims...) 
+    back(Δ) =(sum(x->((x==nothing) ? 0 : x), Δ), map(_->nothing, dims)...)
+    back(Δ::NTuple{N, <:Nothing}) where N = (nothing, map(_->nothing, dims)...)
+    return fill(x, dims...), back
+end
 
 @adjoint function circshift(A, shifts)
   circshift(A, shifts), Δ -> (circshift(Δ, map(-, shifts)), nothing)
