@@ -12,7 +12,8 @@ zerolike(x::Union{Module,Type}) = nothing
 # TODO: `@nograd` and `@linear`
 
 @tangent zerolike(x) = zerolike(x), _ -> zerolike(x)
-@tangent one(x) = one(x), _ -> zerolike(x)
+@tangent one(x::Number) = one(x), _ -> zero(x)
+@tangent one(T::Type) = one(T), _ -> zero(T)
 @tangent Core.Typeof(x) = Core.Typeof(x), _ -> nothing
 @tangent typeof(x) = typeof(x), _ -> nothing
 @tangent Core.apply_type(args...) = Core.apply_type(args...), (_...) -> nothing
@@ -37,7 +38,11 @@ zerolike(x::Union{Module,Type}) = nothing
 zerolike(x::Core.Box) = isdefined(x, :contents) ? Core.Box(zerolike(x.contents)) : Core.Box()
 @tangent Core.Box() = Core.Box(), () -> Core.Box()
 @tangent Core.Box(x) = Core.Box(x), ẋ -> Core.Box(x)
-@tangent Base.copy(x) = copy(x), ẋ -> copy(ẋ)
+# TODO: this is too generic (e.g. broadcast).
+# @tangent Base.copy(x) = copy(@show x), ẋ -> copy(ẋ)
+
+@tangent Core.Compiler.return_type(args...) =
+  Core.Compiler.return_type(args...), (_...) -> nothing
 
 @tangent __new__(T, s...) =
   __new__(T, s...), (_, ṡ...) -> NamedTuple{fieldnames(T)}(ṡ)
@@ -62,11 +67,12 @@ using ..Zygote: literal_getproperty, literal_getindex
 _pushforward(dargs, ::typeof(getproperty), x, f) =
   _pushforward(dargs, literal_getproperty, x, Val(f))
 
-@tangent literal_getproperty(t, ::Val{i}) where i =
-  getproperty(t, i), (ṫ, _) -> getproperty(ṫ, i)
-
-@tangent literal_getproperty(t::DataType, ::Val{i}) where i =
-  getproperty(t, i), (ṫ, _) -> nothing
+@tangent function literal_getproperty(t, ::Val{i}) where i
+  y = getproperty(t, i)
+  forw(ṫ::Union{NamedTuple,Tuple}, _) = getproperty(ṫ, i)
+  forw(ṫ::Nothing, _) = zerolike(y)
+  return y, forw
+end
 
 @tangent literal_getindex(t, ::Val{i}) where i =
   getindex(t, i), (ṫ, _) -> getindex(ṫ, i)
