@@ -5,7 +5,7 @@ ignore_sig(T) = all(T -> T <: Type, T.parameters)
 
 @generated function _pullback(ctx::AContext, f, args...)
   T = Tuple{f,args...}
-  ignore(T) && return :(f(args...), Pullback{$T}(()))
+  ignore_sig(T) && return :(f(args...), Pullback{$T}(()))
 
   iskw = is_kwfunc(f, args...)
   # if it is_kw then `args[1]` are the keyword args, `args[2]` is actual function
@@ -19,6 +19,7 @@ ignore_sig(T) = all(T -> T <: Type, T.parameters)
   meta, forw, _ = g
   argnames!(meta, Symbol("#self#"), :ctx, :f, :args)
   forw = varargs!(meta, forw, 3)
+  # IRTools.verify(forw)
   forw = slots!(pis!(inlineable!(forw)))
   @static if VERSION >= v"1.3"  # no edges pre-1.3
     append!(meta.code.edges, cr_edges)  # be ready to swap to using chainrule if one is declared
@@ -27,7 +28,7 @@ ignore_sig(T) = all(T -> T <: Type, T.parameters)
 end
 
 @generated function (j::Pullback{T})(Δ) where T
-  ignore(T) && return :nothing
+  ignore_sig(T) && return :nothing
   g = try _lookup_grad(T)
   catch e
     rethrow(CompileError(T,e))
@@ -38,6 +39,7 @@ end
   end
   meta, _, back = g
   argnames!(meta, Symbol("#self#"), :Δ)
+  # IRTools.verify(back)
   back = slots!(inlineable!(back))
   return update!(meta.code, back)
 end
