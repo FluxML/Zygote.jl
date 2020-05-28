@@ -13,6 +13,8 @@ end
 
 @tangent Base.vect(xs...) = Base.vect(xs...), Base.vect
 
+@tangent fill(x, dims::Tuple) = fill(x, dims), (ẋ, _) -> fill(ẋ, dims)
+
 @tangent first(x) = first(x), ẋ -> first(ẋ)
 
 @tangent setindex!(x::AbstractArray, v, inds...) =
