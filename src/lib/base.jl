@@ -49,6 +49,9 @@ end
 
 @nograd haskey
 
+# Needed for kwarg handling #664
+@adjoint Base.pairs(x::NamedTuple) = pairs(x), Δ -> (Δ.data, )
+
 # Channels
 
 @nograd Channel, schedule
