@@ -570,6 +570,34 @@ end
   end
 end
 
+
+@testset "norm(::AbstractVector)" begin
+  rng = MersenneTwister(8710)
+  x = randn(rng, 5)
+  @test gradtest(norm, x)
+  y, back = Zygote.pullback(norm, x)
+  @test y isa Float64
+  x̄, p̄ = back(1)
+  @test eltype(x̄) == Float64
+  @test p̄ isa ComplexF64
+  @testset for p in [-3, -2, 1, 2, 0.5, -0.5]
+    @test gradtest(x -> norm(x, p), x)
+    @test gradtest(p -> norm(x, only(p)), [p])
+    y2, back2 = Zygote.pullback(norm, x)
+    @test y2 isa Float64
+    x̄2, p̄2 = back2(1)
+    @test eltype(x̄2) == Float64
+    @test p̄2 isa ComplexF64
+  end
+  x3 = randn(rng, Float32, 5)
+  p = 2
+  y3, back3 = Zygote.pullback(norm, x3, p)
+  @test y3 isa Float32
+  x̄3, p̄3 = back3(1)
+  @test eltype(x̄3) == Float32
+  @test p̄3 isa ComplexF32
+end
+
 @testset "Symmetric" begin
   @testset "real" begin
     rng, P = MersenneTwister(123456), 7
