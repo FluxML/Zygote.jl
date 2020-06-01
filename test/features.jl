@@ -147,6 +147,10 @@ end
   x * d[:x]
 end == (4,)
 
+f(args...;a=nothing,kwargs...) = g(a,args...;kwargs...)
+g(args...;x=1,idx=Colon(),kwargs...) = x[idx]
+@test gradient(x->sum(f(;x=x,idx=1:1)),ones(2))[1] == [1., 0.]
+
 pow_rec(x, n) = n == 0 ? 1 : x*pow_rec(x, n-1)
 
 @test gradient(pow_rec, 2, 3) == (12, nothing)
