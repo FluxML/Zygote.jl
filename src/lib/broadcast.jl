@@ -186,27 +186,27 @@ end
   return y, back
 end
 
-@init @require CuArrays="3a865a2d-5b23-5a0f-bc46-62713ec82fae" begin
-  if isdefined(CuArrays, :CuArrayStyle)  # Introduced in CuArrays v2.0
-    CuArrayStyle = CuArrays.CuArrayStyle
+@init @require CUDA="052768ef-5323-5732-b1bb-66c8b64840ba" begin
+  if isdefined(CUDA, :CuArrayStyle)
+    CuArrayStyle = CUDA.CuArrayStyle
   else
-    CuArrayStyle = Broadcast.ArrayStyle{CuArrays.CuArray}
+    CuArrayStyle = Broadcast.ArrayStyle{CUDA.CuArray}
   end
 
   @adjoint function broadcasted(::CuArrayStyle, f, args...)
-    y, back = broadcast_forward(CuArrays.cufunc(f), args...)
+    y, back = broadcast_forward(CUDA.cufunc(f), args...)
     y, ȳ -> (nothing, nothing, back(ȳ)...)
   end
 
-  @adjoint CuArrays.CuArray{N,T}(xs::Array) where {N,T} =
-    CuArrays.CuArray{N,T}(xs), Δ -> (convert(Array, Δ), )
+  @adjoint CUDA.CuArray{N,T}(xs::Array) where {N,T} =
+    CUDA.CuArray{N,T}(xs), Δ -> (convert(Array, Δ), )
 
-  @adjoint function sum(xs::CuArrays.CuArray; dims = :)
+  @adjoint function sum(xs::CUDA.CuArray; dims = :)
     placeholder = similar(xs)
     sum(xs, dims = dims), Δ -> (placeholder .= Δ,)
   end
 
-  @adjoint function Base.convert(::Type{T}, xs::Array)  where {T<:CuArrays.CuArray}
+  @adjoint function Base.convert(::Type{T}, xs::Array)  where {T<:CUDA.CuArray}
     Base.convert(T, xs), Δ -> (nothing, Base.convert(Array, Δ),)
   end
 
