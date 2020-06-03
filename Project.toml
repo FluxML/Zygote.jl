@@ -33,12 +33,11 @@ ZygoteRules = "0.2"
 julia = "1"
 
 [extras]
-CUDAapi = "3895d2a7-ec45-59b8-82bb-cfc6a382f9b3"
-CuArrays = "3a865a2d-5b23-5a0f-bc46-62713ec82fae"
+CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
 Distances = "b4f34e82-e78d-54a5-968a-f98e89d6e8f7"
 FFTW = "7a1cc6ca-52ef-59f5-83cd-3a7055c09341"
 StatsFuns = "4c63d2b9-4356-54db-8cca-17b64c39e42c"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["Test", "Distances", "StatsFuns", "CUDAapi", "CuArrays", "FFTW"]
+test = ["Test", "Distances", "StatsFuns", "CUDA", "FFTW"]
