@@ -171,6 +171,10 @@ function unzip(tuples)
   _unzip(tuples, Val(N))
 end
 
+_tryreverse(backs, Δ) = backs, Δ
+_tryreverse(backs, Δ::AbstractVector) = reverse(backs), reverse(Δ)
+
+
 for (mapfunc,∇mapfunc) in [(:map,:∇map),(:pmap,:∇pmap),(:vmap,:∇vmap)]
   @eval function $∇mapfunc(cx, f, args...)
     ys_and_backs = $mapfunc((args...) -> _pullback(cx, f, args...), args...)
@@ -179,7 +183,8 @@ for (mapfunc,∇mapfunc) in [(:map,:∇map),(:pmap,:∇pmap),(:vmap,:∇vmap)]
     else
       ys, backs = unzip(ys_and_backs)
       ys, function (Δ)
-        Δf_and_args_zipped = $mapfunc((f, δ) -> f(δ), backs, Δ)
+        # Apply pullbacks in reverse order. Needed for correctness if `f` is stateful.
+        Δf_and_args_zipped = $mapfunc((f, δ) -> f(δ), _tryreverse(backs, Δ)...)
         Δf_and_args = unzip(Δf_and_args_zipped)
         Δf = reduce(accum, Δf_and_args[1])
         (Δf, Δf_and_args[2:end]...)
