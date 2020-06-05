@@ -3,6 +3,12 @@ using IRTools.Inner: argnames!, update!
 
 ignore_sig(T) = all(T -> T <: Type, T.parameters)
 
+function edge!(m::IRTools.Meta, edge::Core.MethodInstance)
+  m.code.edges == nothing && (m.code.edges = Core.MethodInstance[])
+  push!(m.code.edges, edge)
+  return
+end
+
 @generated function _pullback(ctx::AContext, f, args...)
   T = Tuple{f,args...}
   ignore_sig(T) && return :(f(args...), Pullback{$T}(()))
@@ -10,7 +16,7 @@ ignore_sig(T) = all(T -> T <: Type, T.parameters)
   iskw = is_kwfunc(f, args...)
   # if it is_kw then `args[1]` are the keyword args, `args[2]` is actual function
   base_T = iskw ? Tuple{args[2:end]...} : T
-  hascr, cr_edges = has_chain_rrule(base_T)
+  hascr, cr_edge = has_chain_rrule(base_T)
   chain_rrule_f = iskw ? :chain_rrule_kw : :chain_rrule
   hascr && return :($chain_rrule_f(f, args...))
 
@@ -21,8 +27,9 @@ ignore_sig(T) = all(T -> T <: Type, T.parameters)
   forw = varargs!(meta, forw, 3)
   # IRTools.verify(forw)
   forw = slots!(pis!(inlineable!(forw)))
-  @static if VERSION >= v"1.3"  # no edges pre-1.3
-    append!(meta.code.edges, cr_edges)  # be ready to swap to using chainrule if one is declared
+  @static if VERSION >= v"1.3" # no edges pre-1.3
+    # be ready to swap to using chainrule if one is declared
+    cr_edge != nothing && edge!(meta, cr_edge)
   end
   return update!(meta.code, forw)
 end
