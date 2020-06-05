@@ -10,6 +10,11 @@ end
     return y, Δ -> (Δ * y * (1 - y),)
 end
 
+@adjoint function softplus(x::Real)
+    y = softplus(x)
+    return y, Δ -> (Δ * σ(*),)
+end
+
 @adjoint softmax(xs; dims=1) = softmax(xs, dims=dims), Δ -> (∇softmax(Δ, xs, dims=dims),)
 
 @adjoint logsoftmax(xs; dims=1) = logsoftmax(xs, dims=dims), Δ -> (∇logsoftmax(Δ, xs, dims=dims),)
