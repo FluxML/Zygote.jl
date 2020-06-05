@@ -12,7 +12,7 @@ end
 
 @adjoint function softplus(x::Real)
     y = softplus(x)
-    return y, Δ -> (Δ * σ(*),)
+    return y, Δ -> (Δ * σ(Δ),)
 end
 
 @adjoint softmax(xs; dims=1) = softmax(xs, dims=dims), Δ -> (∇softmax(Δ, xs, dims=dims),)
