@@ -171,6 +171,7 @@ function unzip(tuples)
   _unzip(tuples, Val(N))
 end
 
+<<<<<<< HEAD
 _tryreverse(backs, Δ) = backs, Δ
 _tryreverse(backs, Δ::AbstractVector) = reverse(backs), reverse(Δ)
 
@@ -189,6 +190,20 @@ for (mapfunc,∇mapfunc) in [(:map,:∇map),(:pmap,:∇pmap),(:vmap,:∇vmap)]
         Δf = reduce(accum, Δf_and_args[1])
         (Δf, Δf_and_args[2:end]...)
       end
+=======
+function ∇map(cx, f, args...)
+  ys_and_backs = map((args...) -> _pullback(cx, f, args...), args...)
+  if isempty(ys_and_backs)
+    ys_and_backs, _ -> nothing
+  else
+    ys, backs = unzip(ys_and_backs)
+    ys, function (Δ)
+      # Apply pullbacks in reverse order. Needed for correctness if `f` is stateful.
+      Δf_and_args_zipped = map((f, δ) -> f(δ), reverse(backs), reverse(Δ)) |> reverse
+      Δf_and_args = unzip(Δf_and_args_zipped)
+      Δf = reduce(accum, Δf_and_args[1])
+      (Δf, Δf_and_args[2:end]...)
+>>>>>>> f0eb94b... reverse apply in broadcast too
     end
   end
 
