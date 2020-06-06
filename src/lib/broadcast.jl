@@ -186,9 +186,6 @@ end
   return y, back
 end
 
-# For CUDA integeration
-@nograd Core.Intrinsics.checked_sdiv_int
-
 @init @require CUDA="052768ef-5323-5732-b1bb-66c8b64840ba" begin
   if isdefined(CUDA, :CuArrayStyle)
     CuArrayStyle = CUDA.CuArrayStyle
