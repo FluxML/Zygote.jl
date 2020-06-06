@@ -1,5 +1,3 @@
-using CUDA
-
 # Test GPU movement inside the call to `gradient`
 @testset "GPU movement" begin
   r = rand(Float32, 3,3)

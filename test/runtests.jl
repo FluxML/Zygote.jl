@@ -49,7 +49,7 @@ end
   include("compiler.jl")
 end
 
-using CUDAapi
+using CUDA
 if has_cuda()
   @info "Starting GPU integration tests..."
   @testset "CUDA tests" begin
