@@ -179,7 +179,7 @@ end
 @inline function broadcast_forward(f, args::Vararg{Any,N}) where N
   T = Broadcast.combine_eltypes(f, args)
   out = dual_function(f).(args...)
-  eltype(out) <: Dual || return (out, _ -> nothing)
+  eltype(out) <: Dual || return (out, _ -> (nothing, ntuple(_ -> nothing, N)...)
   y = map(x -> x.value, out)
   _back(ȳ, i) = unbroadcast(args[i], ((a, b) -> a*b.partials[i]).(ȳ, out))
   back(ȳ) = ntuple(i -> _back(ȳ, i), N)
