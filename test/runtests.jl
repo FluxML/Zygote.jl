@@ -3,6 +3,18 @@ using Zygote: gradient
 
 @testset "Zygote" begin
 
+@info "Testing interface" 
+
+@testset "Interface" begin  
+  include("interface.jl")
+end
+
+@info "Testing tools" 
+
+@testset "Tools" begin  
+  include("tools.jl")
+end
+
 @info "Testing compiler features"
 
 @testset "Features" begin
@@ -13,6 +25,12 @@ end
 
 @testset "Data Structures" begin
   include("structures.jl")
+end
+
+@info "Testing ChainRules integration"
+
+@testset "ChainRules" begin
+  include("chainrules.jl")
 end
 
 @info "Running Gradient Checks"

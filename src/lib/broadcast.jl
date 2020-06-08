@@ -43,6 +43,11 @@ accum_sum(xs::AbstractArray{<:Number}; dims = :) = sum(xs, dims = dims)
 accum_sum(xs::AbstractArray{<:AbstractArray{<:Number}}; dims = :) = sum(xs, dims = dims)
 accum_sum(xs::Number; dims = :) = xs
 
+# https://github.com/FluxML/Zygote.jl/issues/594
+function Base.reducedim_init(::typeof(identity), ::typeof(accum), A::AbstractArray, region)
+  Base.reducedim_initarray(A, region, nothing, Union{Nothing,eltype(A)})
+end
+
 trim(x, Δ) = reshape(Δ, ntuple(i -> size(Δ, i), Val(ndims(x))))
 
 unbroadcast(x::AbstractArray, x̄) =
@@ -68,12 +73,20 @@ Numeric{T<:Number} = Union{T,AbstractArray{<:T}}
 @adjoint broadcasted(::typeof(+), xs::Numeric...) =
   broadcast(+, xs...), ȳ -> (nothing, map(x -> unbroadcast(x, ȳ), xs)...)
 
+@adjoint broadcasted(::typeof(-), x::Numeric, y::Numeric) = x .- y,
+  Δ -> (nothing, unbroadcast(x, Δ), -unbroadcast(y, Δ))
+
 @adjoint broadcasted(::typeof(*), x::Numeric, y::Numeric) = x.*y,
   z̄ -> (nothing, unbroadcast(x, z̄ .* conj.(y)), unbroadcast(y, z̄ .* conj.(x)))
 
 @adjoint function broadcasted(::typeof(/), x::Numeric, y::Numeric)
   res = x ./ y
-  res, Δ -> (nothing, unbroadcast(x, Δ ./ y), unbroadcast(y, -Δ .* res ./ y))
+  res, Δ -> (nothing, unbroadcast(x, Δ ./ conj.(y)), unbroadcast(y, -Δ .* conj.(res ./ y)))
+end
+
+@adjoint function broadcasted(::typeof(Base.literal_pow), ::typeof(^), x::Numeric, exp::Val{p}) where p
+  y = Base.literal_pow.(^, x, exp)
+  y, ȳ -> (nothing, nothing, ȳ .* p .* conj.(x .^ (p - 1)), nothing)
 end
 
 @adjoint broadcasted(::typeof(identity), x::Numeric) = x, Δ -> (nothing, Δ)
@@ -174,7 +187,13 @@ end
 end
 
 @init @require CuArrays="3a865a2d-5b23-5a0f-bc46-62713ec82fae" begin
-  @adjoint function broadcasted(::Broadcast.ArrayStyle{CuArrays.CuArray}, f, args...)
+  if isdefined(CuArrays, :CuArrayStyle)  # Introduced in CuArrays v2.0
+    CuArrayStyle = CuArrays.CuArrayStyle
+  else
+    CuArrayStyle = Broadcast.ArrayStyle{CuArrays.CuArray}
+  end
+
+  @adjoint function broadcasted(::CuArrayStyle, f, args...)
     y, back = broadcast_forward(CuArrays.cufunc(f), args...)
     y, ȳ -> (nothing, nothing, back(ȳ)...)
   end
@@ -185,6 +204,10 @@ end
   @adjoint function sum(xs::CuArrays.CuArray; dims = :)
     placeholder = similar(xs)
     sum(xs, dims = dims), Δ -> (placeholder .= Δ,)
+  end
+
+  @adjoint function Base.convert(::Type{T}, xs::Array)  where {T<:CuArrays.CuArray}
+    Base.convert(T, xs), Δ -> (nothing, Base.convert(Array, Δ),)
   end
 
 end
