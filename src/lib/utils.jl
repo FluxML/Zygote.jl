@@ -26,6 +26,24 @@ ignore(f) = f()
 @adjoint ignore(f) = ignore(f), _ -> nothing
 
 """
+    @ignore (...)
+
+Tell Zygote to ignore an expression. Equivalent to `ignore() do (...) end`.
+Example:
+
+```julia-repl	
+julia> f(x) = (y = Zygote.@ignore x; x * y); 
+julia> f'(1)
+1
+```	
+"""
+macro ignore(ex)
+    return :(Zygote.ignore() do
+        $(esc(ex))
+    end)
+end
+
+"""
     hook(x̄ -> ..., x) -> x
 
 Gradient hooks. Allows you to apply an arbitrary function to the gradient for
