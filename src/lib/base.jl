@@ -49,9 +49,6 @@ end
 
 @nograd haskey
 
-# Needed for kwarg handling #664
-@adjoint Base.pairs(x::NamedTuple) = pairs(x), Δ -> (Δ.data, )
-
 # Channels
 
 @nograd Channel, schedule
@@ -110,10 +107,12 @@ end
 
 # named tuple
 @adjoint function pairs(t::NamedTuple{N}) where N
-    function pairs_namedtuple(Δ)
+    pairs_namedtuple(dx::NamedTuple) = (dx.data,)
+    function pairs_namedtuple(Δ::Dict)
         t0 = map(zero, t)
-        idx, Δ = first(Δ)
-        t0 = NamedTuple{N}(Base.setindex((t0...,), Δ, idx))
+        for (idx, v) in Δ
+            t0 = NamedTuple{N}(Base.setindex((t0...,), v, idx))
+        end
         return (t0,)
     end
     return pairs(t), pairs_namedtuple
