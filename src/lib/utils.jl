@@ -32,7 +32,8 @@ Tell Zygote to ignore an expression. Equivalent to `ignore() do (...) end`.
 Example:
 
 ```julia-repl	
-julia> f(x) = (y = Zygote.@ignore x; x * y); f'(1)
+julia> f(x) = (y = Zygote.@ignore x; x * y); 
+julia> f'(1)
 1
 ```	
 """
