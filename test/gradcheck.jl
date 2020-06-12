@@ -103,29 +103,33 @@ end
 @test gradtest((w, x) -> parent(w)*x, randn(5,5)', randn(5,5))
 @test gradtest((w, x) -> parent(w)*x, transpose(randn(5,5)), randn(5,5))
 
-@test gradtest(x -> sum(x, dims = (2, 3)), (3,4,5))
-@test gradtest(x -> sum(abs2, x), randn(4, 3, 2))
-@test gradtest(x -> sum(abs2, x; dims=1), randn(4, 3, 2))
-@test gradtest(x -> sum(x[i] for i in 1:length(x)), randn(10))
-@test gradtest(x -> sum(i->x[i], 1:length(x)), randn(10)) # https://github.com/FluxML/Zygote.jl/issues/231
-@test gradtest(x -> sum((i->x[i]).(1:length(x))), randn(10))
+@testset "sum, prod, cumsum" begin 
+  @test gradtest(x -> sum(x, dims = (2, 3)), (3,4,5))
+  @test gradtest(x -> sum(abs2, x), randn(4, 3, 2))
+  @test gradtest(x -> sum(abs2, x; dims=1), randn(4, 3, 2))
+  @test gradtest(x -> sum(x[i] for i in 1:length(x)), randn(10))
+  @test gradtest(x -> sum(i->x[i], 1:length(x)), randn(10)) #  issue #231
+  @test gradtest(x -> sum((i->x[i]).(1:length(x))), randn(10))
+  @test gradtest(X -> sum(x -> x^2, X), randn(10))
+  @test gradtest(X -> sum(sum(x -> x^2, X; dims=1)), randn(10)) # issue #681
 
-# https://github.com/FluxML/Zygote.jl/issues/314
-@test gradient((x,y) -> sum(yi -> yi*x, y), 1, [1,1]) == (2, [1, 1])
-@test gradient((x,y) -> prod(yi -> yi*x, y), 1, [1,1]) == (2, [1, 1])
+  # https://github.com/FluxML/Zygote.jl/issues/314
+  @test gradient((x,y) -> sum(yi -> yi*x, y), 1, [1,1]) == (2, [1, 1])
+  @test gradient((x,y) -> prod(yi -> yi*x, y), 1, [1,1]) == (2, [1, 1])
 
-@test gradient((x,y) -> sum(map(yi -> yi*x, y)), 1, [1,1]) == (2, [1, 1])
-@test gradient((x,y) -> prod(map(yi -> yi*x, y)), 1, [1,1]) == (2, [1, 1])
+  @test gradient((x,y) -> sum(map(yi -> yi*x, y)), 1, [1,1]) == (2, [1, 1])
+  @test gradient((x,y) -> prod(map(yi -> yi*x, y)), 1, [1,1]) == (2, [1, 1])
 
-@test gradtest(x -> prod(x, dims = (2, 3)), (3,4,5))
-@test gradtest(x -> prod(x), (3,4))
-@test gradient(x -> prod(x), (1,2,3))[1] == (6,3,2)
+  @test gradtest(x -> prod(x, dims = (2, 3)), (3,4,5))
+  @test gradtest(x -> prod(x), (3,4))
+  @test gradient(x -> prod(x), (1,2,3))[1] == (6,3,2)
 
-@test gradtest(x -> cumsum(x, dims=2), (3,4,5))
-@test gradtest(x -> cumsum(x, dims=1), (3,))
-@test gradtest(x -> cumsum(x), (4,))
-@test gradtest(x -> cumsum(x, dims=3), (5,))  # trivial
-@test gradtest(x -> cumsum(x, dims=3), (3,4)) # trivial
+  @test gradtest(x -> cumsum(x, dims=2), (3,4,5))
+  @test gradtest(x -> cumsum(x, dims=1), (3,))
+  @test gradtest(x -> cumsum(x), (4,))
+  @test gradtest(x -> cumsum(x, dims=3), (5,))  # trivial
+  @test gradtest(x -> cumsum(x, dims=3), (3,4)) # trivial
+end
 
 @test gradtest(x -> softmax(x).*(1:3), 3)
 @test gradtest(x -> softmax(x).*(1:3), (3,5))
