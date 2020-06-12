@@ -316,6 +316,12 @@ for mapfunc in [map,pmap,vmap]
   end
 end
 
+s = 0
+f(x) = (s += x)
+gradient(x -> sum(f.(x)), 1:10) == (10:-1:1,)
+s = 0
+gradient(x -> sum(map(f, x)), 1:10) == (10:-1:1,)
+
 @testset "sort" begin
   @test gradtest(sort, 5)
   correct = [
