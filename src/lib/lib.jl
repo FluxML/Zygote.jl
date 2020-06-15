@@ -46,10 +46,14 @@ end
 # backpropagated as values; these should be mutually exclusive options.
 
 @generated function accum_param(cx::Context, x, Δ)
-  isbitstype(x) && return
+  isbitstype(x) && return :(Δ)
   quote
-    haskey(cache(cx), x) && (cache(cx)[x] = accum(cache(cx)[x],Δ))
-    return
+    if haskey(cache(cx), x)
+      cache(cx)[x] = accum(cache(cx)[x],Δ)
+      return
+    else
+      return Δ
+    end
   end
 end
 
@@ -69,6 +73,7 @@ unwrap(ref, x) = x
 @adjoint unwrap(ref, x) = unwrap(x), function (x̄)
   accum_global(__context__, ref, x̄)
   accum_param(__context__, x, x̄)
+  return
 end
 
 function global_set(ref, val)
@@ -98,7 +103,8 @@ literal_indexed_iterate(x, ::Val{i}, state) where i = Base.indexed_iterate(x, i,
 @adjoint function literal_getindex(xs::NTuple{N,Any}, ::Val{i}) where {N,i}
   val = xs[i]
   function back(Δ)
-    accum_param(__context__, val, Δ)
+    Δ = accum_param(__context__, val, Δ)
+    Δ == nothing && return
     return ntuple(j -> i == j ? Δ : nothing, Val(N)), nothing
   end
   val, back
@@ -107,7 +113,8 @@ end
 @adjoint function getindex(xs::NTuple{N,Any}, i::Integer) where N
   val = xs[i]
   function back(Δ)
-    accum_param(__context__, val, Δ)
+    Δ = accum_param(__context__, val, Δ)
+    Δ == nothing && return
     return ntuple(j -> i == j ? Δ : nothing, Val(N)), nothing
   end
   return val, back
@@ -203,7 +210,8 @@ end
 @adjoint function literal_getproperty(x, ::Val{f}) where f
   val = getproperty(x, f)
   function back(Δ)
-    accum_param(__context__, val, Δ)
+    Δ = accum_param(__context__, val, Δ)
+    Δ == nothing && return
     if isimmutable(x)
       ((;nt_nothing(x)...,pair(Val(f), Δ)...), nothing)
     else
