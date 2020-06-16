@@ -49,9 +49,6 @@ end
 
 @nograd haskey
 
-# Needed for kwarg handling #664
-@adjoint Base.pairs(x::NamedTuple) = pairs(x), Δ -> (Δ.data, )
-
 # Channels
 
 @nograd Channel, schedule
@@ -107,3 +104,24 @@ end
 # Make @sync work
 # Safe as long as other kinds of mutation are disallowed
 @adjoint push!(refs::Vector{Any}, t::Task) = push!(refs, t), _ -> nothing
+
+# named tuple
+@adjoint function pairs(t::NamedTuple{N}) where N
+    pairs_namedtuple(dx::NamedTuple) = (dx.data,)
+    function pairs_namedtuple(Δ::Dict)
+        t0 = map(zero, t)
+        for (idx, v) in Δ
+            t0 = NamedTuple{N}(Base.setindex((t0...,), v, idx))
+        end
+        return (t0,)
+    end
+    return pairs(t), pairs_namedtuple
+end
+
+@adjoint function Base.getfield(p::Pair, i::Int)
+    function pair_getfield(Δ)
+        f, s = i == 1 ? (Δ, zero(p[2])) : (zero(p[1]), Δ)
+        return (first=f, second=s), nothing
+    end
+    return getfield(p, i), pair_getfield
+end
