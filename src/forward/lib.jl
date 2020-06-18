@@ -28,7 +28,7 @@ zerolike(x::Union{Module,Type}) = nothing
 @tangent fieldcount(T) = fieldcount(T), _ -> zerolike(fieldcount(T))
 
 @tangent tuple(t...) = t, (ṫ...) -> ṫ
-@tangent tail(t) = tail(t), ṫ -> tail(ṫ)
+@tangent tail(t) = tail(t), tail
 
 @tangent setfield!(t, i, x) = setfield!(t, i, x), (ṫ, _, ẋ) -> setfield!(ṫ, i, ẋ)
 @tangent getindex(t, i) = getindex(t, i), (ṫ, _) -> getindex(ṫ, i)
