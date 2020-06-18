@@ -41,10 +41,6 @@ end
 
 @adjoint Base.typeassert(x, T) = Base.typeassert(x, T), Δ -> (Δ, nothing)
 
-# TODO: check correctness. Gradients should be linear types. Right now it's
-# likely possible for gradients to be accumulated as params or globals and
-# backpropagated as values; these should be mutually exclusive options.
-
 @generated function accum_param(cx::Context, x, Δ)
   isbitstype(x) && return :(Δ)
   quote
