@@ -31,6 +31,12 @@ end
   include("structures.jl")
 end
 
+@info "Testing ChainRules integration"
+
+@testset "ChainRules" begin
+  include("chainrules.jl")
+end
+
 @info "Running Gradient Checks"
 
 @testset "Gradients" begin
