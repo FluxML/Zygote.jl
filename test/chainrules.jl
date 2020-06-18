@@ -124,11 +124,11 @@ using Zygote, Test, ChainRules
         @test mimo_pullback_hitcount[] == 1
     end
 
-    if VERSION >= v"1.3" # test failing on Julia 1.0
-        @testset "nested AD hitting identity(::Tuple) pullback" begin
-            # This is is  a particularly fiddly case.
-            # Its kind of a simplified version of `sin'''(0.5)` but different in some places.
+    @testset "nested AD hitting identity(::Tuple) pullback" begin
+        # This is is  a particularly fiddly case.
+        # Its kind of a simplified version of `sin'''(0.5)` but different in some places.
 
+        if VERSION > v"1.0"
             f(x) = tuple(x, 2x, 3x)
 
             function g(y)
@@ -144,20 +144,12 @@ using Zygote, Test, ChainRules
             end
 
             @test (1,) == h(1)
-
-
-            if VERSION > v"1"
-                a3, pb3 = Zygote.pullback(h, 1)
-                @test ((1,),) == pb3(1)
-            else
-                # broken on Julia 1.0 because of https://github.com/FluxML/Zygote.jl/issues/638
-                @test_broken begin
-                    a3, pb3 = Zygote.pullback(h, 1);  # line that errors
-                    ((1,),) == pb3(1)  # line actually being tested
-                end
-            end
+        
+            # broken on Julia 1.0 because of https://github.com/FluxML/Zygote.jl/issues/638
+            a3, pb3 = Zygote.pullback(h, 1)
+            @test ((1,),) == pb3(1)
         end
-    end #if
+    end 
 
     @testset "kwargs" begin
         kwfoo_rrule_hitcount = Ref(0)
