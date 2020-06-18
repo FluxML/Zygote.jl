@@ -69,10 +69,13 @@ _pushforward(dargs, ::typeof(getproperty), x, f) =
 
 @tangent function literal_getproperty(t, ::Val{i}) where i
   y = getproperty(t, i)
-  forw(ṫ::Union{NamedTuple,Tuple}, _) = getproperty(ṫ, i)
+  forw(ṫ, _) = getproperty(ṫ, i)
   forw(ṫ::Nothing, _) = zerolike(y)
   return y, forw
 end
 
 @tangent literal_getindex(t, ::Val{i}) where i =
   getindex(t, i), (ṫ, _) -> getindex(ṫ, i)
+
+@tangent getfield(t::Tuple, i::Integer) =
+  getfield(t, i), (ṫ, _) -> getfield(ṫ, i)

@@ -47,4 +47,4 @@ using LinearAlgebra
   A[1, 1] = x
   mul!(B, A, A)
   sum(B)
-end == 9
+end == 6
