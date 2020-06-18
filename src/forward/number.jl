@@ -45,3 +45,5 @@ end
 
 zerolike(x::AbstractRange) =
   invoke(zerolike, Tuple{Any}, x)
+
+DiffRules._abs_deriv(x::Complex) = x/abs(x)
