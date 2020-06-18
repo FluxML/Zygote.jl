@@ -1,5 +1,6 @@
 using Zygote, Test
 using Zygote: gradient
+using CUDAapi: has_cuda
 
 @testset "Zygote" begin
 
@@ -49,7 +50,6 @@ end
   include("compiler.jl")
 end
 
-using CUDAapi
 if has_cuda()
   @info "Starting GPU integration tests..."
   @testset "CUDA tests" begin
