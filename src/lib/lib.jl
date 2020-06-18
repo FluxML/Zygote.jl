@@ -58,7 +58,7 @@ end
 end
 
 function accum_global(cx::Context, ref, x̄)
-  (x̄ == nothing || isconst(ref.mod, ref.name)) && return
+  (x̄ === nothing || isconst(ref.mod, ref.name)) && return
   gs = cache(cx)
   gs[ref] = accum(get(gs, ref, nothing), x̄)
   return
@@ -66,14 +66,13 @@ end
 
 unwrap(x) = x
 
-@adjoint unwrap(x) = unwrap(x), x̄ -> (accum_param(__context__, x, x̄); (x̄,))
+@adjoint unwrap(x) = unwrap(x), x̄ -> (accum_param(__context__, x, x̄),)
 
 unwrap(ref, x) = x
 
 @adjoint unwrap(ref, x) = unwrap(x), function (x̄)
   accum_global(__context__, ref, x̄)
-  accum_param(__context__, x, x̄)
-  return
+  (accum_param(__context__, x, x̄),)
 end
 
 function global_set(ref, val)
@@ -103,8 +102,7 @@ literal_indexed_iterate(x, ::Val{i}, state) where i = Base.indexed_iterate(x, i,
 @adjoint function literal_getindex(xs::NTuple{N,Any}, ::Val{i}) where {N,i}
   val = xs[i]
   function back(Δ)
-    Δ = accum_param(__context__, val, Δ)
-    Δ == nothing && return
+    accum_param(__context__, val, Δ) === nothing && return
     return ntuple(j -> i == j ? Δ : nothing, Val(N)), nothing
   end
   val, back
@@ -113,8 +111,7 @@ end
 @adjoint function getindex(xs::NTuple{N,Any}, i::Integer) where N
   val = xs[i]
   function back(Δ)
-    Δ = accum_param(__context__, val, Δ)
-    Δ == nothing && return
+    accum_param(__context__, val, Δ) === nothing && return
     return ntuple(j -> i == j ? Δ : nothing, Val(N)), nothing
   end
   return val, back
@@ -210,8 +207,7 @@ end
 @adjoint function literal_getproperty(x, ::Val{f}) where f
   val = getproperty(x, f)
   function back(Δ)
-    Δ = accum_param(__context__, val, Δ)
-    Δ == nothing && return
+    accum_param(__context__, val, Δ) === nothing && return
     if isimmutable(x)
       ((;nt_nothing(x)...,pair(Val(f), Δ)...), nothing)
     else
