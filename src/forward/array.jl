@@ -15,7 +15,7 @@ end
 
 @tangent fill(x, dims::Tuple) = fill(x, dims), (ẋ, _) -> fill(ẋ, dims)
 
-@tangent first(x) = first(x), ẋ -> first(ẋ)
+@tangent first(x) = first(x), first
 
 @tangent setindex!(x::AbstractArray, v, inds...) =
   setindex!(x, v, inds...), (ẋ, v̇, _...) -> setindex!(ẋ, v̇, inds...)
