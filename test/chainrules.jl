@@ -128,23 +128,23 @@ using Zygote, Test, ChainRules
         # This is is  a particularly fiddly case.
         # Its kind of a simplified version of `sin'''(0.5)` but different in some places.
 
-        if VERSION > v"1.0"
-            f(x) = tuple(x, 2x, 3x)
+        f(x) = tuple(x, 2x, 3x)
 
-            function g(y)
-                a1, pb1 = Zygote.pullback(f, π)
-                pb1((y,0,0))
-            end
+        function g(y)
+            a1, pb1 = Zygote.pullback(f, π)
+            pb1((y,0,0))
+        end
 
-            @test (1,) == g(1)
+        @test (1,) == g(1)
 
-            function h(n)
-                a2, pb2 = Zygote.pullback(g, 1)
-                pb2(n)
-            end
+        function h(n)
+            a2, pb2 = Zygote.pullback(g, 1)
+            pb2(n)
+        end
 
-            @test (1,) == h(1)
+        @test (1,) == h(1)
         
+        if VERSION >= v"1.3"
             # broken on Julia 1.0 because of https://github.com/FluxML/Zygote.jl/issues/638
             a3, pb3 = Zygote.pullback(h, 1)
             @test ((1,),) == pb3(1)
