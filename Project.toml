@@ -35,6 +35,7 @@ IRTools = "0.4"
 MacroTools = "0.5"
 NNlib = "0.6.5"
 Requires = "0.5, 1.0"
+StatsFuns = "0.9"
 ZygoteRules = "0.2"
 julia = "1"
 
