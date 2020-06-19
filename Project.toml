@@ -1,6 +1,6 @@
 name = "Zygote"
 uuid = "e88e6eb3-aa80-5325-afca-941959d7151f"
-version = "0.4.21"
+version = "0.5.0"
 
 [deps]
 AbstractFFTs = "621f4979-c628-5d54-868e-fcf4e3e8185c"
@@ -27,7 +27,7 @@ FillArrays = "0.8"
 ForwardDiff = "0"
 IRTools = "0.4"
 MacroTools = "0.5"
-NNlib = "0.6.5"
+NNlib = "0.7"
 Requires = "0.5, 1.0"
 ZygoteRules = "0.2"
 julia = "1.3"
