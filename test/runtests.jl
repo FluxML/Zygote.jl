@@ -1,21 +1,19 @@
 using Zygote, Test
 using Zygote: gradient
+using CUDA: has_cuda
 
-@testset "Zygote" begin
-
-@info "Testing interface" 
-
-@testset "Interface" begin  
+@testset "Interface" begin
   include("interface.jl")
 end
 
-@info "Testing tools" 
 
-@testset "Tools" begin  
+@testset "Tools" begin
   include("tools.jl")
 end
 
-@info "Testing compiler features"
+@testset "lib/number" begin
+  include("lib/number.jl")
+end
 
 @testset "Features" begin
   include("features.jl")
@@ -25,19 +23,13 @@ end
   include("forward/forward.jl")
 end
 
-@info "Testing data structures"
-
 @testset "Data Structures" begin
   include("structures.jl")
 end
 
-@info "Testing ChainRules integration"
-
 @testset "ChainRules" begin
   include("chainrules.jl")
 end
-
-@info "Running Gradient Checks"
 
 @testset "Gradients" begin
   include("gradcheck.jl")
@@ -47,20 +39,14 @@ end
   include("complex.jl")
 end
 
-@info "Testing Inference & Debug Info"
-
 @testset "Compiler" begin
   include("compiler.jl")
 end
 
-using CUDAapi
 if has_cuda()
-  @info "Starting GPU integration tests..."
   @testset "CUDA tests" begin
     include("cuda.jl")
   end
 else
   @warn "CUDA not found - Skipping CUDA Tests"
-end
-
 end

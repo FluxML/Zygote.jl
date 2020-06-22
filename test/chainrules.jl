@@ -143,19 +143,13 @@ using Zygote, Test, ChainRules
         end
 
         @test (1,) == h(1)
-
-
-        if VERSION > v"1"
+        
+        if VERSION >= v"1.3"
+            # broken on Julia 1.0 because of https://github.com/FluxML/Zygote.jl/issues/638
             a3, pb3 = Zygote.pullback(h, 1)
             @test ((1,),) == pb3(1)
-        else
-            # broken on Julia 1.0 because of https://github.com/FluxML/Zygote.jl/issues/638
-            @test_broken begin
-                a3, pb3 = Zygote.pullback(h, 1);  # line that errors
-                ((1,),) == pb3(1)  # line actually being tested
-            end
         end
-    end
+    end 
 
     @testset "kwargs" begin
         kwfoo_rrule_hitcount = Ref(0)
