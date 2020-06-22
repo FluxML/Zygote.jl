@@ -11,6 +11,9 @@ end
   include("tools.jl")
 end
 
+@testset "lib/number" begin  
+  include("lib/number.jl")
+end
 
 @testset "Features" begin
   include("features.jl")
