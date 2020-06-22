@@ -1,3 +1,6 @@
+
+@nograd floor, ceil, trunc, round, hash, div
+
 @adjoint Base.literal_pow(::typeof(^), x::Number, ::Val{p}) where {p} =
   Base.literal_pow(^,x,Val(p)),
   Δ -> (nothing, Δ * conj(p * Base.literal_pow(^,x,Val(p-1))), nothing)
@@ -12,8 +15,6 @@ end
 @adjoint Base.:+(xs::Number...) = +(xs...), Δ -> map(_ -> Δ, xs)
 
 @adjoint a // b = (a // b, c̄ -> (c̄ * 1//b, - c̄ * a // b // b))
-
-@nograd floor, ceil, trunc, round, hash
 
 # Complex Numbers
 
