@@ -18,6 +18,10 @@ end
 
 @info "Testing compiler features"
 
+@testset "lib/number" begin  
+  include("lib/number.jl")
+end
+
 @testset "Features" begin
   include("features.jl")
 end
