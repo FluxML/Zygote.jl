@@ -1,17 +1,20 @@
-using FillArrays, AbstractFFTs
+using Random, FillArrays, AbstractFFTs
 using FillArrays: AbstractFill, getindex_value
 using Base.Broadcast: broadcasted, broadcast_shape
-import Random.randn!
 
 @adjoint (::Type{T})(::UndefInitializer, args...) where T<:Array = T(undef, args...), Δ -> nothing
 
 @adjoint Array(xs::AbstractArray) = Array(xs), ȳ -> (ȳ,)
 @adjoint Array(xs::Array) = Array(xs), ȳ -> (ȳ,)
 
-@nograd size, length, eachindex, axes, Colon(), findfirst, findlast, findall, randn, randn!, ones, zeros, one, zero,
-  any, all
+@nograd size, length, eachindex, axes, Colon(), findfirst, findlast, findall, ones, zeros, one, zero, any, all
+@nograd randn, randexp, randn!, randexp!
+@static if VERSION > v"1.3"
+  @nograd Random.default_rng
+end
 
-@adjoint rand(dims::Integer...) = rand(dims...), _ -> nothing
+@adjoint Base.rand(rng::AbstractRNG, ::Type{T}, dims...) where {T<:Number} =
+  rand(rng, T, dims...), _ -> nothing
 
 @adjoint Base.vect(xs...) = Base.vect(xs...), Δ -> (Δ...,)
 
@@ -157,11 +160,16 @@ end
 
 @adjoint getindex(i::Int, j::Int) = i[j], _ -> nothing
 
-function unzip(tuples)
-  map(1:length(first(tuples))) do i
-      map(tuple -> tuple[i], tuples)
-  end
+struct StaticGetter{i} end
+(::StaticGetter{i})(v) where {i} = v[i]
+@generated function _unzip(tuples, ::Val{N}) where {N}
+  Expr(:tuple, (:(map($(StaticGetter{i}()), tuples)) for i ∈ 1:N)...)
 end
+function unzip(tuples)
+  N = length(first(tuples))
+  _unzip(tuples, Val(N))
+end
+
 function ∇map(cx, f, args...)
   ys_and_backs = map((args...) -> _pullback(cx, f, args...), args...)
   if isempty(ys_and_backs)
@@ -215,9 +223,14 @@ end
   end
 end
 
-function _pullback(cx::AContext, ::typeof(sum), f, xs::AbstractArray)
-  y, back = pullback(cx, ((f, xs) -> sum(f.(xs))), f, xs)
-  y, ȳ -> (nothing, back(ȳ)...)
+_normalize_kws(kws::NamedTuple) = kws
+_normalize_kws(kws) = NamedTuple()
+
+function _pullback(cx::AContext, kwtype, kws, ::typeof(sum), f, xs::AbstractArray)
+  norm_kws = _normalize_kws(kws)
+  @assert !haskey(norm_kws, :init) # TODO add init support (julia 1.6)
+  y, back = pullback(cx, (f, xs) -> sum(f.(xs); norm_kws...), f, xs)
+  y, ȳ -> (nothing, nothing, nothing, back(ȳ)...)
 end
 
 @adjoint function sum(::typeof(abs2), X::AbstractArray; dims = :)
@@ -339,8 +352,6 @@ end
 @adjoint parent(x::LinearAlgebra.Adjoint) = parent(x), ȳ -> (LinearAlgebra.Adjoint(ȳ),)
 @adjoint parent(x::LinearAlgebra.Transpose) = parent(x), ȳ -> (LinearAlgebra.Transpose(ȳ),)
 
-@adjoint dot(x::AbstractArray, y::AbstractArray) = dot(x, y), Δ->(Δ .* y, Δ .* x)
-
 function _kron(mat1::AbstractMatrix,mat2::AbstractMatrix)
     m1, n1 = size(mat1)
     mat1_rsh = reshape(mat1,(1,m1,1,n1))
@@ -352,18 +363,6 @@ function _kron(mat1::AbstractMatrix,mat2::AbstractMatrix)
 end
 
 @adjoint kron(a::AbstractMatrix, b::AbstractMatrix) = pullback(_kron, a, b)
-
-@adjoint function Diagonal(d::AbstractVector)
-  back(Δ::NamedTuple) = (Δ.diag,)
-  back(Δ::AbstractMatrix) = (diag(Δ),)
-  return Diagonal(d), back
-end
-
-@adjoint diag(A::AbstractMatrix) = diag(A), Δ->(Diagonal(Δ),)
-
-@adjoint det(xs::Union{Number, AbstractMatrix}) = det(xs), Δ -> (Δ * det(xs) * inv(xs)',)
-
-@adjoint logdet(xs::Union{Number, AbstractMatrix}) = logdet(xs), Δ -> (Δ * inv(xs)',)
 
 @adjoint logabsdet(xs::AbstractMatrix) = logabsdet(xs), Δ -> (Δ[1] * inv(xs)',)
 
@@ -729,6 +728,8 @@ end
   end
 end
 
+# ChainRules has this also but does not use FillArrays, so we have our own definition
+# for improved performance. See https://github.com/JuliaDiff/ChainRules.jl/issues/46
 Zygote.@adjoint function LinearAlgebra.tr(x::AbstractMatrix)
   # x is a squre matrix checked by tr,
   # so we could just use Eye(size(x, 1))
@@ -853,11 +854,11 @@ end
 end
 
 
-# to actually use rfft, one needs to insure that everything 
-# that happens in the Fourier domain could've been done in 
-# the space domain with real numbers. This means enforcing 
-# conjugate symmetry along all transformed dimensions besides 
-# the first. Otherwise this is going to result in *very* weird 
+# to actually use rfft, one needs to insure that everything
+# that happens in the Fourier domain could've been done in
+# the space domain with real numbers. This means enforcing
+# conjugate symmetry along all transformed dimensions besides
+# the first. Otherwise this is going to result in *very* weird
 # behavior.
 @adjoint function rfft(xs::AbstractArray{<:Real})
   return AbstractFFTs.rfft(xs), function(Δ)

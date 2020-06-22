@@ -1,4 +1,4 @@
-using CuArrays
+using CUDA
 
 # Test GPU movement inside the call to `gradient`
 @testset "GPU movement" begin

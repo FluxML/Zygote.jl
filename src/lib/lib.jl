@@ -29,7 +29,7 @@ end
 
 @nograd Core.apply_type, Core.typeof, nfields, fieldtype, Core.TypeVar, Core.UnionAll,
   (==), (===), (<=), (>=), (<), (>), isempty, supertype, Base.typename,
-  Base.parameter_upper_bound, eps, Meta.parse, Base.eval, sleep
+  Base.parameter_upper_bound, eps, Meta.parse, Base.eval, sleep, isassigned
 
 @adjoint deepcopy(x) = deepcopy(x), ȳ -> (ȳ,)
 
@@ -41,20 +41,20 @@ end
 
 @adjoint Base.typeassert(x, T) = Base.typeassert(x, T), Δ -> (Δ, nothing)
 
-# TODO: check correctness. Gradients should be linear types. Right now it's
-# likely possible for gradients to be accumulated as params or globals and
-# backpropagated as values; these should be mutually exclusive options.
-
 @generated function accum_param(cx::Context, x, Δ)
-  isbitstype(x) && return
+  isbitstype(x) && return :(Δ)
   quote
-    haskey(cache(cx), x) && (cache(cx)[x] = accum(cache(cx)[x],Δ))
-    return
+    if haskey(cache(cx), x)
+      cache(cx)[x] = accum(cache(cx)[x],Δ)
+      return
+    else
+      return Δ
+    end
   end
 end
 
 function accum_global(cx::Context, ref, x̄)
-  (x̄ == nothing || isconst(ref.mod, ref.name)) && return
+  (x̄ === nothing || isconst(ref.mod, ref.name)) && return
   gs = cache(cx)
   gs[ref] = accum(get(gs, ref, nothing), x̄)
   return
@@ -62,13 +62,13 @@ end
 
 unwrap(x) = x
 
-@adjoint unwrap(x) = unwrap(x), x̄ -> (accum_param(__context__, x, x̄); (x̄,))
+@adjoint unwrap(x) = unwrap(x), x̄ -> (accum_param(__context__, x, x̄),)
 
 unwrap(ref, x) = x
 
 @adjoint unwrap(ref, x) = unwrap(x), function (x̄)
   accum_global(__context__, ref, x̄)
-  accum_param(__context__, x, x̄)
+  (accum_param(__context__, x, x̄),)
 end
 
 function global_set(ref, val)
@@ -98,7 +98,7 @@ literal_indexed_iterate(x, ::Val{i}, state) where i = Base.indexed_iterate(x, i,
 @adjoint function literal_getindex(xs::NTuple{N,Any}, ::Val{i}) where {N,i}
   val = xs[i]
   function back(Δ)
-    accum_param(__context__, val, Δ)
+    accum_param(__context__, val, Δ) === nothing && return
     return ntuple(j -> i == j ? Δ : nothing, Val(N)), nothing
   end
   val, back
@@ -107,7 +107,7 @@ end
 @adjoint function getindex(xs::NTuple{N,Any}, i::Integer) where N
   val = xs[i]
   function back(Δ)
-    accum_param(__context__, val, Δ)
+    accum_param(__context__, val, Δ) === nothing && return
     return ntuple(j -> i == j ? Δ : nothing, Val(N)), nothing
   end
   return val, back
@@ -203,7 +203,7 @@ end
 @adjoint function literal_getproperty(x, ::Val{f}) where f
   val = getproperty(x, f)
   function back(Δ)
-    accum_param(__context__, val, Δ)
+    accum_param(__context__, val, Δ) === nothing && return
     if isimmutable(x)
       ((;nt_nothing(x)...,pair(Val(f), Δ)...), nothing)
     else

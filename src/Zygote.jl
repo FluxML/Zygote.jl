@@ -7,6 +7,7 @@ using ArrayLayouts: MemoryLayout, AbstractColumnMajor
 import ZygoteRules: @adjoint, @adjoint!, AContext, adjoint, _pullback, pullback, literal_getproperty
 using Buffers: Buffer, bufferfrom
 
+using ChainRules: ChainRules, rrule, unthunk
 using IRTools
 using MacroTools, Requires
 using MacroTools: @forward
@@ -17,6 +18,7 @@ include("tools/idset.jl")
 
 include("compiler/reverse.jl")
 include("compiler/emit.jl")
+include("compiler/chainrules.jl")
 include("compiler/interface.jl")
 include("compiler/show.jl")
 

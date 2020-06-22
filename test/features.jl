@@ -147,6 +147,10 @@ end
   x * d[:x]
 end == (4,)
 
+f(args...;a=nothing,kwargs...) = g(a,args...;kwargs...)
+g(args...;x=1,idx=Colon(),kwargs...) = x[idx]
+@test gradient(x->sum(f(;x=x,idx=1:1)),ones(2))[1] == [1., 0.]
+
 pow_rec(x, n) = n == 0 ? 1 : x*pow_rec(x, n-1)
 
 @test gradient(pow_rec, 2, 3) == (12, nothing)
@@ -191,6 +195,16 @@ y, back = pullback(() -> layer(x), Params([W]))
 @test back([1, 1])[W] == [1 2; 1 2]
 
 @test gradient(() -> sum(W * x), Params([W]))[W] == [1 2; 1 2]
+
+let
+  p = [1]
+  θ = Zygote.Params([p])
+  θ̄ = gradient(θ) do
+    p′ = (p,)[1]
+    p′[1]
+  end
+  @test θ̄[p][1] == 1
+end
 
 @test gradient(2) do x
   H = [1 x; 3 4]
@@ -336,3 +350,13 @@ function type_test()
 end
 
 @test pullback(type_test)[1] == Complex{<:Real}
+
+@testset "Pairs" begin
+    @test (x->10*pairs((a=x, b=2))[1])'(100) === 10
+    @test (x->10*pairs((a=x, b=2))[2])'(100) === 0
+    foo(;kw...) = 1
+    @test gradient(() -> foo(a=1,b=2.0)) === ()
+
+    @test (x->10*(x => 2)[1])'(100) === 10
+    @test (x->10*(x => 2)[2])'(100) === 0
+end
