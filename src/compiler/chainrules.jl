@@ -36,10 +36,9 @@ is_kwfunc(k, ::Type{<:NamedTuple}, f, args...) = k===Core.kwftype(f)
 """
     wrap_chainrules_output(x)
 
-Convert `x` from the differentials types ChainRules uses  to the format Zygote uses internally
-(including conjugating complex gradients).
+Convert `x` from the differentials types ChainRules uses to the format Zygote uses internally.
 """
-@inline wrap_chainrules_output(x) = conj(unthunk(x))  # For now we are just not going to deal with thunks
+@inline wrap_chainrules_output(x) = unthunk(x)  # For now we are just not going to deal with thunks
 @inline wrap_chainrules_output(x::Tuple) = map(wrap_chainrules_output, x)
 @inline wrap_chainrules_output(x::ChainRules.AbstractZero) = nothing
 for T_outer in (:Tuple, :NamedTuple)
@@ -55,10 +54,9 @@ end
 """
     wrap_chainrules_input(x)
 
-Convert `x` from the format  Zygote uses internally (including conjugated complex gradients)
-to differentials types ChainRules uses.
+Convert `x` from the format Zygote uses internally to differentials types ChainRules uses.
 """
-@inline wrap_chainrules_input(x) = conj(x)
+@inline wrap_chainrules_input(x) = x
 @inline wrap_chainrules_input(::Nothing) = ChainRules.Zero()
 @inline function wrap_chainrules_input(xs::Union{Tuple, NamedTuple})
   xp = map(wrap_chainrules_input, xs)
