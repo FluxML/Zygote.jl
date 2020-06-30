@@ -24,8 +24,4 @@ end
 @adjoint conj(x::Number) = conj(x), r̄ -> (conj(r̄),)
 @adjoint imag(x::Number) = imag(x), ī -> (real(ī)*im,)
 
-# we intentionally define these here rather than falling back on ChainRules.jl
-# because ChainRules doesn't really handle nonanalytic complex functions
-@adjoint abs(x::Real) = abs(x), Δ -> (real(Δ)*sign(x),)
-@adjoint abs(x::Complex) = abs(x), Δ -> (real(Δ)*x/abs(x),)
 @adjoint abs2(x::Number) = abs2(x), Δ -> (real(Δ)*(x + x),)
