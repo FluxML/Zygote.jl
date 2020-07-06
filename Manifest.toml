@@ -25,15 +25,15 @@ version = "0.1.0"
 
 [[ChainRules]]
 deps = ["ChainRulesCore", "LinearAlgebra", "Random", "Reexport", "Requires", "Statistics"]
-git-tree-sha1 = "49a636fcd40d624124529871228c38ceeab8e46b"
+git-tree-sha1 = "cb6638807e41b771337cf3dbb7b67c5be16e2018"
 uuid = "082447d4-558c-5d27-93f4-14fc19e9eca2"
-version = "0.7.5"
+version = "0.7.6"
 
 [[ChainRulesCore]]
 deps = ["MuladdMacro"]
-git-tree-sha1 = "bd1e56ac59d408c63ea26ab23aab78f827f13511"
+git-tree-sha1 = "4177411bef28d680948562abd25059dceb4d53ed"
 uuid = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
-version = "0.9.1"
+version = "0.9.2"
 
 [[CommonSubexpressions]]
 deps = ["MacroTools", "Test"]
