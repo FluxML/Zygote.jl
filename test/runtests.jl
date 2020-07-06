@@ -2,18 +2,25 @@ using Zygote, Test
 using Zygote: gradient
 using CUDA: has_cuda
 
-@testset "Interface" begin  
+@testset "Interface" begin
   include("interface.jl")
 end
 
 
-@testset "Tools" begin  
+@testset "Tools" begin
   include("tools.jl")
 end
 
+@testset "lib/number" begin
+  include("lib/number.jl")
+end
 
 @testset "Features" begin
   include("features.jl")
+end
+
+@testset "Forward" begin
+  include("forward/forward.jl")
 end
 
 @testset "Data Structures" begin

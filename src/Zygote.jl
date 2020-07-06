@@ -12,9 +12,13 @@ using IRTools
 using MacroTools, Requires
 using MacroTools: @forward
 
-export Params, gradient, pullback, @code_grad
+export Params, gradient, pullback, pushforward, @code_grad
 
 include("tools/idset.jl")
+include("tools/builtins.jl")
+
+include("forward/Forward.jl")
+using .Forward
 
 include("compiler/reverse.jl")
 include("compiler/emit.jl")
