@@ -170,7 +170,7 @@ function unzip(tuples)
   _unzip(tuples, Val(N))
 end
 
-for mapfunc,∇mapfunc in [(:map,:∇map),(:pmap,:∇pmap),(:vmap,:∇vmap),(:tmap,:∇tmap)]
+for mapfunc,∇mapfunc in [(:map,:∇map),(:pmap,:∇pmap)]
   @eval function $∇mapfunc(cx, f, args...)
     ys_and_backs = $mapfunc((args...) -> _pullback(cx, f, args...), args...)
     if isempty(ys_and_backs)
