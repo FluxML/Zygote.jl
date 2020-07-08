@@ -13,6 +13,7 @@ using MacroTools: @forward
 
 export Params, gradient, pullback, pushforward, @code_grad
 
+include("tmap.jl")
 include("tools/idset.jl")
 include("tools/buffer.jl")
 include("tools/builtins.jl")
