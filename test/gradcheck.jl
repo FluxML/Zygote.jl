@@ -3,7 +3,7 @@ using Zygote, NNlib, Test, Random, LinearAlgebra, Statistics, FillArrays,
 using Zygote: gradient
 using NNlib: conv, ∇conv_data, depthwiseconv, batched_mul
 using Base.Broadcast: broadcast_shape
-using LoopVectorization
+using LoopVectorization, Distributed
 
 function ngradient(f, xs::AbstractArray...)
   grads = zero.(xs)
