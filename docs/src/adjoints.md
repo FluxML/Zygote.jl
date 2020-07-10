@@ -5,7 +5,7 @@
     It is prefered to define the custom sensitivities using `ChainRulesCore.rrule` as they will work for many AD systems, not just Zygote.
     These sensitivities can be added in your own package, or for Base/StdLib functions they can be added to [ChainRules.jl](https://github.com/JuliaDiff/ChainRules.jl/).
     To use define custom sensitivities using ChainRulesCore, define a `ChainRulesCore.rrule(f, args...; kwargs...)` [ChainRules project's documentation for more information](https://www.juliadiff.org/ChainRulesCore.jl/stable/).
-    **If using ChainRulesCore you do not need to read this page**, and can consider it as documenting a legacy feature.
+    **If you are defining your custom adjoints using ChainRulesCore then you do not need to read this page**, and can consider it as documenting a legacy feature.
     
     This page exists to descibe how Zygote works, and how adjoints can be directly defined for Zygote.
     Defining adjoints this way does not make them accessible to other AD systems, but does let you do things that directly depend on how Zygote works.
