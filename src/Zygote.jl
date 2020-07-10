@@ -11,7 +11,7 @@ using IRTools
 using MacroTools, Requires
 using MacroTools: @forward
 
-using LoopVectorization # for vmap
+using LoopVectorization: vmap
 
 export Params, gradient, pullback, pushforward, @code_grad
 
