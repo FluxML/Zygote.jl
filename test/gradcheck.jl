@@ -3,6 +3,7 @@ using Zygote, NNlib, Test, Random, LinearAlgebra, Statistics, FillArrays,
 using Zygote: gradient
 using NNlib: conv, ∇conv_data, depthwiseconv, batched_mul
 using Base.Broadcast: broadcast_shape
+using LoopVectorization, Distributed
 
 function ngradient(f, xs::AbstractArray...)
   grads = zero.(xs)
@@ -103,7 +104,7 @@ end
 @test gradtest((w, x) -> parent(w)*x, randn(5,5)', randn(5,5))
 @test gradtest((w, x) -> parent(w)*x, transpose(randn(5,5)), randn(5,5))
 
-@testset "sum, prod, cumsum" begin 
+@testset "sum, prod, cumsum" begin
   @test gradtest(x -> sum(x, dims = (2, 3)), (3,4,5))
   @test gradtest(x -> sum(abs2, x), randn(4, 3, 2))
   @test gradtest(x -> sum(abs2, x; dims=1), randn(4, 3, 2))
@@ -301,15 +302,17 @@ end
 @test gradtest(kron, rand(5,1), rand(3,1), rand(8,1))
 @test gradtest(kron, rand(5,2), rand(3,2), rand(8,2))
 
-@testset "map" begin
-  @test gradtest(xs -> sum(map(x -> x^2, xs)), rand(2,3))
-  @test gradtest((xss...) -> sum(map((xs...) -> sqrt(sum(xs.^2)), xss...)), [rand(5) for _ in 1:6]...)
-  function foo(y)
-    bar = (x) -> x*y
-    sum(map(bar, 1:5))
+for mapfunc in [map,pmap,vmap]
+  @testset "$mapfunc" begin
+    @test gradtest(xs -> sum(mapfunc(x -> x^2, xs)), rand(2,3))
+    @test gradtest((xss...) -> sum(mapfunc((xs...) -> sqrt(sum(xs.^2)), xss...)), [rand(5) for _ in 1:6]...)
+    function foo(y)
+      bar = (x) -> x*y
+      sum(mapfunc(bar, 1:5))
+    end
+    @test gradtest(foo, 3)
+    @test gradient(v -> sum([x for x in v]), [1.1,2.2,3.3]) == ([1, 1, 1],)
   end
-  @test gradtest(foo, 3)
-  @test gradient(v -> sum([x for x in v]), [1.1,2.2,3.3]) == ([1, 1, 1],)
 end
 
 @testset "sort" begin

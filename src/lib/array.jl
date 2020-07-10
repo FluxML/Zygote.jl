@@ -1,6 +1,7 @@
 using Random, FillArrays, AbstractFFTs
 using FillArrays: AbstractFill, getindex_value
 using Base.Broadcast: broadcasted, broadcast_shape
+using Distributed: pmap
 
 @adjoint (::Type{T})(::UndefInitializer, args...) where T<:Array = T(undef, args...), Δ -> nothing
 
@@ -170,23 +171,25 @@ function unzip(tuples)
   _unzip(tuples, Val(N))
 end
 
-function ∇map(cx, f, args...)
-  ys_and_backs = map((args...) -> _pullback(cx, f, args...), args...)
-  if isempty(ys_and_backs)
-    ys_and_backs, _ -> nothing
-  else
-    ys, backs = unzip(ys_and_backs)
-    ys, function (Δ)
-      Δf_and_args_zipped = map((f, δ) -> f(δ), backs, Δ)
-      Δf_and_args = unzip(Δf_and_args_zipped)
-      Δf = reduce(accum, Δf_and_args[1])
-      (Δf, Δf_and_args[2:end]...)
+for (mapfunc,∇mapfunc) in [(:map,:∇map),(:pmap,:∇pmap),(:vmap,:∇vmap)]
+  @eval function $∇mapfunc(cx, f, args...)
+    ys_and_backs = $mapfunc((args...) -> _pullback(cx, f, args...), args...)
+    if isempty(ys_and_backs)
+      ys_and_backs, _ -> nothing
+    else
+      ys, backs = unzip(ys_and_backs)
+      ys, function (Δ)
+        Δf_and_args_zipped = $mapfunc((f, δ) -> f(δ), backs, Δ)
+        Δf_and_args = unzip(Δf_and_args_zipped)
+        Δf = reduce(accum, Δf_and_args[1])
+        (Δf, Δf_and_args[2:end]...)
+      end
     end
   end
-end
 
-@adjoint function map(f, args::Union{AbstractArray,Tuple}...)
-  ∇map(__context__, f, args...)
+  @eval @adjoint function $mapfunc(f, args::Union{AbstractArray,Tuple}...)
+    $∇mapfunc(__context__, f, args...)
+  end
 end
 
 function _pullback(cx::AContext, ::typeof(collect), g::Base.Generator)
