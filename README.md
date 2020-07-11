@@ -25,6 +25,47 @@ top:
 }
 ```
 
+An example to differentiate a general function gg: R2->R3.
+
+```julia
+julia> g1(x)=cos(x[1])+sin(x[2])
+g1 (generic function with 1 method)
+
+julia> g2(x)=x[1]^2 + x[2]^2
+g2 (generic function with 1 method)
+
+julia> g3(x)=log(x[1]) + exp(x[2])
+g3 (generic function with 1 method)
+
+julia> gg(x)= [g1(x);g2(x);g3(x)]
+gg (generic function with 1 method)
+
+julia> x=[1.;2.]
+2-element Array{Float64,1}:
+ 1.0
+ 2.0
+
+julia> Zygote.gradient(g1,x)
+([-0.8414709848078965, -0.4161468365471424],)
+
+julia> Zygote.gradient(g2,x)
+([2.0, 4.0],)
+
+julia> Zygote.gradient(g3,x)
+([1.0, 7.38905609893065],)
+
+julia> Zygote.forward_jacobian(gg,x)[2]
+2×3 Array{Float64,2}:
+ -0.841471  2.0  1.0
+ -0.416147  4.0  7.38906
+
+julia> Zygote.hessian(g1,x)
+2×2 Array{Float64,2}:
+ -0.540302   0.0
+  0.0       -0.909297
+```
+
+
 "Source-to-source" means that Zygote hooks into Julia's compiler, and generates the backwards pass for you – as if you had written it by hand.
 
 Without compromising on performance, Zygote supports the full flexibility and dynamism of the Julia language, including control flow, recursion, closures, structs, dictionaries, and more.
