@@ -319,9 +319,9 @@ end
 @testset "Stateful Map" begin
   s = 0
   f(x) = (s += x)
-  gradient(x -> sum(f.(x)), 1:10) == (10:-1:1,)
+  @test_broken gradient(x -> sum(f.(x)), 1:10) == (10:-1:1,)
   s = 0
-  gradient(x -> sum(map(f, x)), 1:10) == (10:-1:1,)
+  @test gradient(x -> sum(map(f, x)), 1:10) == (10:-1:1,)
 end
 
 @testset "sort" begin
