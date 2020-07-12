@@ -28,19 +28,19 @@ top:
 An example to differentiate a general function gg: R2->R3.
 
 ```julia
-julia> g1(x)=cos(x[1])+sin(x[2])
+julia> g1(x) = cos(x[1]) + sin(x[2])
 g1 (generic function with 1 method)
 
-julia> g2(x)=x[1]^2 + x[2]^2
+julia> g2(x) = x[1]^2 + x[2]^2
 g2 (generic function with 1 method)
 
-julia> g3(x)=log(x[1]) + exp(x[2])
+julia> g3(x) = log(x[1]) + exp(x[2])
 g3 (generic function with 1 method)
 
-julia> gg(x)= [g1(x);g2(x);g3(x)]
+julia> gg(x) = [g1(x); g2(x); g3(x)]
 gg (generic function with 1 method)
 
-julia> x=[1.;2.]
+julia> x = [1.;2.]
 2-element Array{Float64,1}:
  1.0
  2.0
