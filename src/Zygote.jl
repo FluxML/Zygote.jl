@@ -13,7 +13,7 @@ using MacroTools: @forward
 
 using LoopVectorization: vmap
 
-export Params, gradient, pullback, pushforward, @code_grad
+export Params, gradient, pullback, pushforward, @code_adjoint
 
 include("tools/idset.jl")
 include("tools/buffer.jl")
