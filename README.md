@@ -40,7 +40,7 @@ g3 (generic function with 1 method)
 julia> gg(x) = [g1(x); g2(x); g3(x)]
 gg (generic function with 1 method)
 
-julia> x = [1.;2.]
+julia> x = [1.0; 2.0]
 2-element Array{Float64,1}:
  1.0
  2.0
