@@ -71,7 +71,7 @@ unbroadcast(x::AbstractArray, x̄::Nothing) = nothing
 Numeric{T<:Number} = Union{T,AbstractArray{<:T}}
 
 @adjoint broadcasted(::typeof(+), xs::Numeric...) =
-  broadcast(+, xs...), ȳ -> (nothing, map(x -> unbroadcast(x, ȳ), xs)...)
+  broadcast(+, xs...), ȳ -> (nothing, map(x -> unbroadcast(x, ȳ), xs)...)
 
 @adjoint broadcasted(::typeof(-), x::Numeric, y::Numeric) = x .- y,
   Δ -> (nothing, unbroadcast(x, Δ), -unbroadcast(y, Δ))
@@ -86,19 +86,19 @@ end
 
 @adjoint function broadcasted(::typeof(Base.literal_pow), ::typeof(^), x::Numeric, exp::Val{p}) where p
   y = Base.literal_pow.(^, x, exp)
-  y, ȳ -> (nothing, nothing, ȳ .* p .* conj.(x .^ (p - 1)), nothing)
+  y, ȳ -> (nothing, nothing, ȳ .* p .* conj.(x .^ (p - 1)), nothing)
 end
 
 @adjoint broadcasted(::typeof(identity), x::Numeric) = x, Δ -> (nothing, Δ)
 
 @adjoint function broadcasted(::typeof(σ), x::Numeric)
   y = σ.(x)
-  y, ȳ -> (nothing, ȳ .* conj.(y .* (1 .- y)))
+  y, ȳ -> (nothing, ȳ .* conj.(y .* (1 .- y)))
 end
 
 @adjoint function broadcasted(::typeof(tanh), x::Numeric)
   y = tanh.(x)
-  y, ȳ -> (nothing, ȳ .* conj.(1 .- y.^2))
+  y, ȳ -> (nothing, ȳ .* conj.(1 .- y.^2))
 end
 
 @adjoint broadcasted(::typeof(conj), x::Numeric) =
@@ -138,8 +138,8 @@ collapse_nothings(xs) = xs
   y∂b = _broadcast((x...) -> _pullback(__context__, f, x...), args...)
   y = map(x -> x[1], y∂b)
   ∂b = map(x -> x[2], y∂b)
-  y, function (ȳ)
-    dxs_zip = map((∂b, ȳ) -> ∂b(ȳ), ∂b, ȳ)
+  y, function (ȳ)
+    dxs_zip = map((∂b, ȳ) -> ∂b(ȳ), ∂b, ȳ)
     dxs = collapse_nothings.(ntuple(i -> map(x -> _get(x, i), dxs_zip), len))
     (nothing, accum_sum(dxs[1]), map(unbroadcast, args, Base.tail(dxs))...)
   end
@@ -148,11 +148,20 @@ end
 @adjoint function broadcasted(::AbstractArrayStyle{0}, f, args...)
   len = inclen(args)
   y, ∂b = _broadcast((x...) -> _pullback(__context__, f, x...), args...)
-  y, function (ȳ)
-    dxs = ∂b(ȳ)
+  y, function (ȳ)
+    dxs = ∂b(ȳ)
     (nothing, dxs...)
   end
 end
+
+# Use the `map` adjoint in this special case, which is the same but applies
+# pullbacks in reverse order.
+# This leaves regular `broadcast` technically incorrect when the broadcasted
+# function is stateful.
+# Look, I'm not proud of it, but this is extremely rare in practice.
+# @adjoint function broadcasted(f, x)
+#   ∇map(__context__, f, x)
+# end
 
 @adjoint! (b::typeof(broadcast))(f, args...) = _pullback(__context__, broadcasted, f, args...)
 
@@ -181,8 +190,8 @@ end
   out = dual_function(f).(args...)
   eltype(out) <: Dual || return (out, _ -> nothing)
   y = map(x -> x.value, out)
-  _back(ȳ, i) = unbroadcast(args[i], ((a, b) -> a*b.partials[i]).(ȳ, out))
-  back(ȳ) = ntuple(i -> _back(ȳ, i), N)
+  _back(ȳ, i) = unbroadcast(args[i], ((a, b) -> a*b.partials[i]).(ȳ, out))
+  back(ȳ) = ntuple(i -> _back(ȳ, i), N)
   return y, back
 end
 
@@ -191,7 +200,7 @@ end
   
   @adjoint function broadcasted(::CuArrayStyle, f, args...)
     y, back = broadcast_forward(CUDA.cufunc(f), args...)
-    y, ȳ -> (nothing, nothing, back(ȳ)...)
+    y, ȳ -> (nothing, nothing, back(ȳ)...)
   end
 
   @adjoint CUDA.CuArray{N,T}(xs::Array) where {N,T} =
