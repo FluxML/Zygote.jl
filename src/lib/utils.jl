@@ -100,6 +100,26 @@ macro showgrad(x)
 end
 
 """
+jacobian(f,x)
+
+Construct the Jacobian of `f` where `x` is a real-valued array
+and `f(x)` is real-valued.
+"""
+function jacobian(f,x)
+    y,back  = Zygote.pullback(f,x)
+    k  = length(y)
+    n  = length(x)
+    J  = Matrix{eltype(y)}(undef,k,n)
+    e_i = zero(x)
+    for i = 1:k
+        e_i[i] = oneunit(eltype(x))
+        J[i,:] = back(e_i)[1]
+        e_i[i] = zero(eltype(x))
+    end
+    J
+end
+
+"""
     hessian(f, x)
 
 Construct the Hessian of `f`, where `x` is a real or real array and `f(x)` is
