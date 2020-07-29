@@ -1,8 +1,7 @@
 using NNlib
 import NNlib: softmax, ∇softmax, logsoftmax, ∇logsoftmax, conv, depthwiseconv, ∇conv_data, ∇depthwiseconv_data, maxpool, meanpool, σ, relu, batched_mul, batched_adjoint
-import LoopVectorization: vifelse
 
-drelu(x, Δ) = vifelse(x > 0, Δ, zero(x))
+drelu(x, Δ) = ifelse(x > 0, Δ, zero(x))
 
 @adjoint function Base.Broadcast.broadcasted(::typeof(relu), x::Numeric)
   relu.(x), Δ -> (nothing, drelu.(x, Δ))
@@ -11,7 +10,7 @@ end
 function dselu(x)
   λ = oftype(x/1, 1.0507009873554804934193349852946)
   α = oftype(x/1, 1.6732632423543772848170429916717)
-  λ * vifelse(x > 0, 1, α * exp(x))
+  λ * ifelse(x > 0, 1, α * exp(x))
 end
 
 @adjoint function Base.Broadcast.broadcasted(::typeof(selu), x::Numeric)
