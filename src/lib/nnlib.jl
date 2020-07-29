@@ -19,7 +19,7 @@ end
 
 dtanh(x) = 1 - tanh(x)^2
 
-@adjoint function Base.Broadcast.broadcasted(::typeof(selu), x::Numeric)
+@adjoint function Base.Broadcast.broadcasted(::typeof(tanh), x::Numeric)
   tanh.(x), Δ -> (nothing, dtanh.(x) .* Δ)
 end
 
