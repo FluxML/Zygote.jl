@@ -91,6 +91,8 @@ end
 
 @test gradtest((x, W, b) -> relu.(W*x .+ b), 5, (2,5), 2)
 @test gradtest((x, W, b) -> relu.(W*x .+ b), (5,3), (2,5), 2)
+@test gradtest((x, W, b) -> selu.(W*x .+ b), 5, (2,5), 2)
+@test gradtest((x, W, b) -> selu.(W*x .+ b), (5,3), (2,5), 2)
 
 @test gradtest((x, W, b) -> σ.(W*x .+ b), 5, (2,5), 2)
 @test gradtest((x, W, b) -> σ.(W*x .+ b), (5,3), (2,5), 2)
