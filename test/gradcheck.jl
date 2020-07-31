@@ -1441,7 +1441,31 @@ end
   @test gradient((x)->sum(abs.(rfft(x))), x)[1] ≈
     gradient( (x) -> sum(abs.(fft(rfft(x,1),2))),  x)[1]
   @test gradient((x, dims)->sum(abs.(rfft(x,dims))), x, (1,2))[1] ≈
-    gradient( (x) -> sum(abs.(rfft(x))), x)[1]
+      gradient( (x) -> sum(abs.(rfft(x))), x)[1]
+
+  # Test type stability of fft
+
+  x = randn(Float64,16)
+  P = plan_fft(x)
+  @test typeof(gradient(x->sum(abs2,ifft(fft(x))),x)[1]) == Array{Complex{Float64},1}
+  @test typeof(gradient(x->sum(abs2,P\(P*x)),x)[1]) == Array{Complex{Float64},1}
+  @test typeof(gradient(x->sum(abs2,irfft(rfft(x),16)),x)[1]) == Array{Float64,1}
+
+  x = randn(Float64,16,16)
+  @test typeof(gradient(x->sum(abs2,ifft(fft(x,1),1)),x)[1]) == Array{Complex{Float64},2}
+  # This errors: something is the wrong size
+  #@test typeof(gradient(x->sum(abs2,irfft(rfft(x,1),16,1)),x)[1]) == Array{Float64,2} 
+
+  x = randn(Float32,16)
+  P = plan_fft(x)
+  @test typeof(gradient(x->sum(abs2,ifft(fft(x))),x)[1]) == Array{Complex{Float32},1}
+  @test typeof(gradient(x->sum(abs2,P\(P*x)),x)[1]) == Array{Complex{Float32},1}
+  @test typeof(gradient(x->sum(abs2,irfft(rfft(x),16)),x)[1]) == Array{Float32,1}
+
+  x = randn(Float32,16,16)
+  @test typeof(gradient(x->sum(abs2,ifft(fft(x,1),1)),x)[1]) == Array{Complex{Float32},2}
+  # This errors: something is the wrong size
+  #@test typeof(gradient(x->sum(abs2,irfft(rfft(x,1),16,1)),x)[1]) == Array{Float32,2}
 end
 
 @testset "FillArrays" begin
