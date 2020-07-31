@@ -836,7 +836,7 @@ end
 @adjoint function \(P::AbstractFFTs.Plan, xs)
   return P \ xs, function(Δ)
     N = prod(size(Δ)[[P.region...]])
-    return (nothing, 1/N * (P * Δ))
+    return (nothing, (P * Δ)/N)
   end
 end
 
@@ -844,7 +844,7 @@ end
 @adjoint function ifft(xs)
   return AbstractFFTs.ifft(xs), function(Δ)
     N = length(xs)
-    return (1/N* AbstractFFTs.fft(Δ),)
+    return (AbstractFFTs.fft(Δ)/N,)
   end
 end
 
@@ -884,7 +884,7 @@ end
 @adjoint function irfft(xs, d)
   return AbstractFFTs.irfft(xs, d), function(Δ)
     total = length(Δ)
-    fullTransform = 1/total * AbstractFFTs.rfft(real.(Δ))
+    fullTransform = AbstractFFTs.rfft(real.(Δ))/total
     return (fullTransform, nothing)
   end
 end
@@ -918,7 +918,7 @@ end
   return AbstractFFTs.ifft(xs, dims), function(Δ)
     dims = collect(dims)
     N = prod(collect(size(xs))[dims])
-    return (1/N * AbstractFFTs.fft(Δ, dims),nothing)
+    return (AbstractFFTs.fft(Δ, dims)/N,nothing)
   end
 end
 
@@ -934,7 +934,7 @@ end
   return AbstractFFTs.ifft(xs, dims), function(Δ)
     dims = collect(dims)
     N = prod(collect(size(xs))[dims])
-    return (1/N * AbstractFFTs.rfft(Δ, dims), nothing, nothing)
+    return (AbstractFFTs.rfft(Δ, dims)/N, nothing, nothing)
   end
 end
 @adjoint function brfft(xs, d, dims)
