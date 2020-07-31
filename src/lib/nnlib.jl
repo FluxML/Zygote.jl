@@ -17,12 +17,6 @@ end
   selu.(x), Δ -> (nothing, dselu.(x) .* Δ)
 end
 
-dtanh(x) = 1 - tanh(x)^2
-
-@adjoint function Base.Broadcast.broadcasted(::typeof(tanh), x::Numeric)
-  tanh.(x), Δ -> (nothing, dtanh.(x) .* Δ)
-end
-
 @adjoint function σ(x::Real)
     y = σ(x)
     return y, Δ -> (Δ * y * (1 - y),)
