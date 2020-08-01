@@ -1,5 +1,7 @@
 module Forward
 
+using ChainRules
+
 import ..Zygote
 import ..Zygote: __new__, __splatnew__
 

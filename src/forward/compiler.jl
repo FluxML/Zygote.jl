@@ -70,7 +70,90 @@ function dual(ir)
   return ir
 end
 
-@dynamo function _pushforward(_, x...)
+const chainrules_frule_fallback = which(frule, Tuple{Any})
+
+"""
+  has_chain_frule(T)
+
+For a type-tuple `T` e.g. `Tuple{typeof(f), Int, Float64}`, checks if there is a `rrule` defined for it.
+Excluding the generic fallback.
+The first return value is `true` if the `rrule` exists, `false` otherwise.
+If it does not, then the second argument is a list of edges to attach to the CodeInfo for a generated function,
+such that if a suitable rule is defined later, the generated function will recompile.
+"""
+function has_chain_frule(T)
+  m = meta(Tuple{typeof(frule), T.parameters...})
+
+  if m.method !== chainrules_frule_fallback
+    # found a frule, no need to add any edges
+    return true, nothing
+  end
+
+  return false, m.instance
+end
+
+"""
+    chain_frule(f, args...)
+
+Returns a the (primal) value of `f(args...)` and tangent, by invoking
+`ChainRulesCore.frule(f, args...)`.
+"""
+@inline chain_frule(dargs, args...) = frule(dargs, args...)
+
+"""
+  chain_frule_kw(kwf, kwargs, f, args...)
+
+As per [`chain_frule`](@ref) but with support for kwargs.
+`kwf` should be the kwfunc matching to `f`, and `kwargs` are a `NamedTuple` of keyword arguments.
+"""
+@inline chain_frule_kw(kwf, kwargs, f, args...) = frule(f, args...; kwargs...)
+
+ignore_sig(T) = all(T -> T <: Type, T.parameters)
+
+"""
+    is_kwfunc(sigt...)
+
+Determines if `sigt` is the type signature of a kwfunction.
+Each element of `sigt` should be a type.
+Either the first 3 types are a kwfunc type, a NamedTuple and the matching base function type,
+or the first argument is the base function type and it is not a kwfunction.
+the remaining types in `sigt` are the types of the argument.
+
+"""
+is_kwfunc(::Vararg{Any}) = false
+is_kwfunc(k, ::Type{<:NamedTuple}, f, args...) = k===Core.kwftype(f)
+
+@generated function _pushforward(dargs, f, args...)
+  T = Tuple{dargs, f, args...}
+  ignore_sig(T) && return :(f(args...), Zero())
+
+  iskw = is_kwfunc(dargs, f, args...)
+  # if it is_kw then `args[1]` are the keyword args, `args[2]` is actual function
+  base_T = iskw ? Tuple{args[2:end]...} : T
+  hascr, cr_edge = has_chain_frule(base_T)
+
+  chain_frule_f = iskw ? :chain_frule_kw : :chain_frule
+  if hascr
+    return :($chain_frule_f(dargs, f, args...))
+  else
+    return :(__pushforward(dargs, f, args...))
+  end
+
+  # g = try _lookup_grad(T) catch e e end
+  # !(g isa Tuple) && return :(f(args...), Pullback{$T}((f,)))
+  # meta, forw, _ = g
+  # argnames!(meta, Symbol("#self#"), :ctx, :f, :args)
+  # forw = varargs!(meta, forw, 3)
+  # # IRTools.verify(forw)
+  # forw = slots!(pis!(inlineable!(forw)))
+  # @static if VERSION >= v"1.3" # no edges pre-1.3
+  #   # be ready to swap to using chainrule if one is declared
+  #   cr_edge != nothing && edge!(meta, cr_edge)
+  # end
+  # return update!(meta.code, forw)
+end
+
+@dynamo function __pushforward(_, x...)
   ir = IR(x...)
   ir == nothing && return :(error("non-differentiable function $(args[2])"))
   ir = Zygote.instrument(ir)
