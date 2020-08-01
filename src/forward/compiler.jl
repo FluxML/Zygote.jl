@@ -96,15 +96,16 @@ end
     chain_frule(f, args...)
 
 Returns a the (primal) value of `f(args...)` and tangent, by invoking
-`ChainRulesCore.frule(f, args...)`.
+`ChainRules.frule(f, args...)`.
 """
-@inline chain_frule(dargs, args...) = frule(dargs, args...)
+@noinline chain_frule(dargs, args...) = frule(dargs, args...)
 
 """
   chain_frule_kw(kwf, kwargs, f, args...)
 
 As per [`chain_frule`](@ref) but with support for kwargs.
-`kwf` should be the kwfunc matching to `f`, and `kwargs` are a `NamedTuple` of keyword arguments.
+`kwf` should be the kwfunc matching to `f`, and `kwargs` are a `NamedTuple` of keyword
+arguments.
 """
 @inline chain_frule_kw(kwf, kwargs, f, args...) = frule(f, args...; kwargs...)
 
