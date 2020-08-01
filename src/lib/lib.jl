@@ -76,6 +76,10 @@ function global_set(ref, val)
         ref.mod, ref.name, val)
 end
 
+function ChainRules.frule(dargs, ::typeof(Zygote.global_set), ref, val::Nothing)
+  return Zygote.global_set(ref, val), nothing
+end
+
 @adjoint! function global_set(ref, x)
   global_set(ref, x), function (x̄)
     gs = cache(__context__)
