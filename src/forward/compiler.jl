@@ -107,7 +107,7 @@ As per [`chain_frule`](@ref) but with support for kwargs.
 `kwf` should be the kwfunc matching to `f`, and `kwargs` are a `NamedTuple` of keyword
 arguments.
 """
-@inline chain_frule_kw(kwf, kwargs, f, args...) = frule(f, args...; kwargs...)
+@inline chain_frule_kw(kwf, kwargs, dargs, f, args...) = frule(dargs, f, args...; kwargs...)
 
 ignore_sig(T) = all(T -> T <: Type, T.parameters)
 
