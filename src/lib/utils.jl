@@ -103,7 +103,7 @@ end
 jacobian(f,x)
 
 Construct the Jacobian of `f` where `x` is a real-valued array
-and `f(x)` is real-valued.
+and `f(x)` is also a real-valued array.
 """
 function jacobian(f,x)
     y,back  = Zygote.pullback(f,x)
