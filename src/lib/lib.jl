@@ -29,7 +29,7 @@ end
 
 @nograd Core.apply_type, Core.typeof, nfields, fieldtype, Core.TypeVar, Core.UnionAll,
   (==), (===), (<=), (>=), (<), (>), isempty, supertype, Base.typename,
-  Base.parameter_upper_bound, eps, Meta.parse, Base.eval, sleep, isassigned
+  eps, Meta.parse, Base.eval, sleep, isassigned
 
 @adjoint deepcopy(x) = deepcopy(x), ȳ -> (ȳ,)
 
