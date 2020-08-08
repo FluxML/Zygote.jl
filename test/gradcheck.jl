@@ -323,8 +323,10 @@ end
 
 @testset "Stateful Map" begin
   s = 0
-  f(x) = (s += x)
-  @test_broken gradient(x -> sum(f.(x)), 1:10) == (10:-1:1,)
+  function f(x)
+    global s += x
+  end
+  @test gradient(x -> sum(f.(x)), 1:10) == (10:-1:1,)
   s = 0
   @test gradient(x -> sum(map(f, x)), 1:10) == (10:-1:1,)
 end
