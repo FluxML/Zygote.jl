@@ -931,16 +931,16 @@ end
 end
 
 @adjoint function irfft(xs, d, dims)
-  return AbstractFFTs.ifft(xs, dims), function(Δ)
+  return AbstractFFTs.irfft(xs, d, dims), function(Δ)
     dims = collect(dims)
     N = prod(collect(size(xs))[dims])
-    return (AbstractFFTs.rfft(Δ, dims)/N, nothing, nothing)
+    return (AbstractFFTs.rfft(real.(Δ), dims)/N, nothing, nothing)
   end
 end
 @adjoint function brfft(xs, d, dims)
-  return AbstractFFTs.ifft(xs, dims), function(Δ)
+  return AbstractFFTs.brfft(xs, d, dims), function(Δ)
     dims = collect(dims)
-    return (AbstractFFTs.rfft(Δ, dims), nothing, nothing)
+    return (AbstractFFTs.rfft(real.(Δ), dims), nothing, nothing)
   end
 end
 
