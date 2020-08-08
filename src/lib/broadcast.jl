@@ -159,9 +159,9 @@ end
 # This leaves regular `broadcast` technically incorrect when the broadcasted
 # function is stateful.
 # Look, I'm not proud of it, but this is extremely rare in practice.
-# @adjoint function broadcasted(f, x)
-#   ∇map(__context__, f, x)
-# end
+@adjoint function broadcasted(f, x)
+  ∇map(__context__, f, x)
+end
 
 @adjoint! (b::typeof(broadcast))(f, args...) = _pullback(__context__, broadcasted, f, args...)
 
