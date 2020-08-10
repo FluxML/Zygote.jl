@@ -5,6 +5,7 @@ using NNlib: conv, ∇conv_data, depthwiseconv, batched_mul
 using Base.Broadcast: broadcast_shape
 using LoopVectorization: vmap
 using Distributed: pmap
+using SparseArrays
 
 function ngradient(f, xs::AbstractArray...)
   grads = zero.(xs)
@@ -1586,5 +1587,5 @@ end
 
 @testset "Sparse" begin
   @test gradtest(x -> sum(sparse(x)), rand(Float32, 3,3))
-  @test gradcheck(x -> sum(diagm(x)), rand(Float32, 3))
+  @test gradcheck(x -> sum(diagm(x)), rand(3))
 end
