@@ -1583,3 +1583,7 @@ end
     @test gradient(x -> sum(randexp(Random.default_rng(), Float32, (1,1))), 1) == (nothing,)
   end
 end
+
+@testset "Sparse" begin
+  @test gradtest(x -> sum(sparse(x)), rand(Float32, 3,3))
+end
