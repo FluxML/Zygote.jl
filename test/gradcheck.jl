@@ -1586,4 +1586,5 @@ end
 
 @testset "Sparse" begin
   @test gradtest(x -> sum(sparse(x)), rand(Float32, 3,3))
+  @test gradcheck(x -> sum(diagm(x)), rand(Float32, 3))
 end
