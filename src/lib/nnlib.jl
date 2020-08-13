@@ -13,15 +13,14 @@ function dselu(x)
   λ * ifelse(x > 0, one(x), α * exp(x))
 end
 
-@adjoint selu(x) = selu(x), Δ -> (dselu(x) * Δ,)
+@adjoint selu(x::Numeric) = selu(x), Δ -> (dselu(x) * Δ,)
 @adjoint function Base.Broadcast.broadcasted(::typeof(selu), x::Numeric)
   selu.(x), Δ -> (nothing, dselu.(x) .* Δ)
 end
 
 delu(x, α) = ifelse(x ≥ 0, one(x), α * exp(x))
 
-@adjoint elu(x, α) = softmax(xs, dims=dims), Δ -> (∇softmax(Δ, xs, dims=dims),)
-@adjoint elu(x, α) = elu(x, α), Δ -> (delu.(x, α) .* Δ, nothing)
+@adjoint elu(x::Numeric, α::Numeric) = elu(x, α), Δ -> (delu.(x, α) .* Δ, nothing)
 @adjoint function Base.Broadcast.broadcasted(::typeof(elu), x::Numeric, α::Numeric)
   elu.(x, α), Δ -> (nothing, delu.(x, α) .* Δ, nothing)
 end
