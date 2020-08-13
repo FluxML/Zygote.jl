@@ -93,6 +93,15 @@ end
 @test gradtest((x, W, b) -> relu.(W*x .+ b), (5,3), (2,5), 2)
 @test gradtest((x, W, b) -> selu.(W*x .+ b), 5, (2,5), 2)
 @test gradtest((x, W, b) -> selu.(W*x .+ b), (5,3), (2,5), 2)
+@test gradtest((x, W, b) -> elu.(W*x .+ b, 2), 5, (2,5), 2)
+@test gradtest((x, W, b) -> elu.(W*x .+ b, 2), (5,3), (2,5), 2)
+
+# tests for https://github.com/FluxML/Zygote.jl/issues/758
+@test gradient(xs -> sum(selu.(xs)), [1_000, 10_000]) == ([1.0507009873554805, 1.0507009873554805],)
+@test gradient(x -> selu(x), 1_000) == (1.0507009873554805,)
+@test gradient(xs -> sum(elu.(xs, 2)), [1_000, 10_000]) == ([1., 1.],)
+@test gradient(x -> elu(x, 2), 1_000) == (1.,)
+@test gradient(x -> elu(x, 2), -1) == (2*exp(-1),)
 
 @test gradtest((x, W, b) -> tanh.(W*x .+ b), 5, (2,5), 2)
 @test gradtest((x, W, b) -> tanh.(W*x .+ b), (5,3), (2,5), 2)
@@ -1453,7 +1462,7 @@ end
 
   x = randn(Float64,16,16)
   @test typeof(gradient(x->sum(abs2,ifft(fft(x,1),1)),x)[1]) == Array{Complex{Float64},2}
-  @test typeof(gradient(x->sum(abs2,irfft(rfft(x,1),16,1)),x)[1]) == Array{Float64,2} 
+  @test typeof(gradient(x->sum(abs2,irfft(rfft(x,1),16,1)),x)[1]) == Array{Float64,2}
 
   x = randn(Float32,16)
   P = plan_fft(x)
@@ -1462,7 +1471,7 @@ end
   @test typeof(gradient(x->sum(abs2,irfft(rfft(x),16)),x)[1]) == Array{Float32,1}
 
   x = randn(Float32,16,16)
-  @test typeof(gradient(x->sum(abs2,ifft(fft(x,1),1)),x)[1]) == Array{Complex{Float32},2}  
+  @test typeof(gradient(x->sum(abs2,ifft(fft(x,1),1)),x)[1]) == Array{Complex{Float32},2}
   @test typeof(gradient(x->sum(abs2,irfft(rfft(x,1),16,1)),x)[1]) == Array{Float32,2}
 end
 
