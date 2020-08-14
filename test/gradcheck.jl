@@ -102,8 +102,8 @@ end
 @test gradient(xs -> sum(elu.(xs, 2)), [1_000, 10_000]) == ([1., 1.],)
 @test gradient(x -> elu(x, 2), 1_000) == (1.,)
 @test gradient(x -> elu(x, 2), -1) == (2*exp(-1),)
-@test gradcheck(x->sum(selu.(x)),[1_000, 10_000])
-@test gradcheck(x->sum(elu.(x, 3.5)),[1_000, 10_000])
+@test gradcheck(x->sum(selu.(x)),[1_000., 10_000.])
+@test gradcheck(x->sum(elu.(x, 3.5)),[1_000., 10_000.])
 
 @test gradtest((x, W, b) -> tanh.(W*x .+ b), 5, (2,5), 2)
 @test gradtest((x, W, b) -> tanh.(W*x .+ b), (5,3), (2,5), 2)
