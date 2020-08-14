@@ -102,6 +102,8 @@ end
 @test gradient(xs -> sum(elu.(xs, 2)), [1_000, 10_000]) == ([1., 1.],)
 @test gradient(x -> elu(x, 2), 1_000) == (1.,)
 @test gradient(x -> elu(x, 2), -1) == (2*exp(-1),)
+@test gradcheck(x->sum(selu.(x)),[1_000, 10_000])
+@test gradcheck(x->sum(elu.(x, 3.5)),[1_000, 10_000])
 
 @test gradtest((x, W, b) -> tanh.(W*x .+ b), 5, (2,5), 2)
 @test gradtest((x, W, b) -> tanh.(W*x .+ b), (5,3), (2,5), 2)
@@ -1462,7 +1464,7 @@ end
 
   x = randn(Float64,16,16)
   @test typeof(gradient(x->sum(abs2,ifft(fft(x,1),1)),x)[1]) == Array{Complex{Float64},2}
-  @test typeof(gradient(x->sum(abs2,irfft(rfft(x,1),16,1)),x)[1]) == Array{Float64,2} 
+  @test typeof(gradient(x->sum(abs2,irfft(rfft(x,1),16,1)),x)[1]) == Array{Float64,2}
 
   x = randn(Float32,16)
   P = plan_fft(x)
