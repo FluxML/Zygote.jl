@@ -978,4 +978,4 @@ end
 @adjoint function Broadcast.broadcasted(Float32, a::SparseMatrixCSC{T,N}) where {T,N}
   Float32.(a), Δ -> (nothing, T.(Δ), )
 end
-@nograd issymmetric
+@adjoint issymmetric(x) = issymmetric(x), Δ -> (Δ,)
