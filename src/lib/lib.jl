@@ -109,7 +109,7 @@ end
   return val, back
 end
 
-@adjoint getindex(xs::NTuple{N,Any}, r::AbstractUnitRange) where N =
+@adjoint getindex(xs::NTuple{N,Any}, r::Union{AbstractVector,AbstractUnitRange}) where N =
   (xs[r], Δ -> (ntuple(j -> j in r ? Δ[findfirst(isequal(j), r)] : nothing, Val(N)), nothing))
 
 function _pullback(cx::Context, ::typeof(literal_indexed_iterate), xs::Tuple, ::Val{i}) where i
