@@ -176,9 +176,11 @@ end
 # See https://github.com/FluxML/Flux.jl/issues/1209
 # Should be generalized to abstract array, but reverse takes a dims keyword there
 _tryreverse(m, backs, Δ) = backs, Δ
-_tryreverse(m::typeof(map), backs, Δ::AbstractVector) = reverse(backs), reverse(Δ)
+function _tryreverse(m::typeof(map), backs, Δ::Union{AbstractVector, Tuple})
+  return reverse(backs), reverse(Δ)
+end
 _tryreverse(m, x) = x
-_tryreverse(m::typeof(map), x::AbstractVector) = reverse(x)
+_tryreverse(m::typeof(map), x::Union{AbstractVector, Tuple}) = reverse(x)
 
 for (mapfunc,∇mapfunc) in [(:map,:∇map),(:pmap,:∇pmap),(:vmap,:∇vmap)]
   @eval function $∇mapfunc(cx, f, args...)
