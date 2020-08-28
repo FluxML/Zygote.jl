@@ -315,11 +315,20 @@ end
 @testset "tuple getindex" begin
   @test gradient(x -> size(x)[2], ones(2,2,2)) == (nothing,)
   @test gradient(x -> sum(size(x)[1:2]), ones(2,2,2)) == (nothing,)
-  @test gradient(x -> sum(size(x)[1:2:3]), ones(2,2,2,2)) == (nothing,)
-  @test gradient(x -> sum(size(x)[[1,2,1]]), ones(2,2,2)) == (nothing,)
+  if VERSION <= v"1.4"
+    @test gradient(x -> sum(size(x)[1:2:3]), ones(2,2,2,2)) == (nothing,)
+    @test gradient(x -> sum(size(x)[[1,2,1]]), ones(2,2,2)) == (nothing,)
+  else
+    @test_broken gradient(x -> sum(size(x)[1:2:3]), ones(2,2,2,2)) == (nothing,)
+    @test_broken gradient(x -> sum(size(x)[[1,2,1]]), ones(2,2,2)) == (nothing,)
+  end
 
   @test gradient((x,y,z) -> sum((x,y,z)[1:2]), 7, 8.8, 9.9) == (1.0, 1.0, nothing)
-  @test gradient((x,y,z) -> sum((x,y,z)[[1,2,1]]), 1,2,3) == (2, 1, nothing)
+  if VERSION <= v"1.4"
+    @test gradient((x,y,z) -> sum((x,y,z)[[1,2,1]]), 1,2,3) == (2, 1, nothing)
+  else
+    @test_broken gradient((x,y,z) -> sum((x,y,z)[[1,2,1]]), 1,2,3) == (2, 1, nothing)
+  end
 end
 
 @testset "@timed" begin
