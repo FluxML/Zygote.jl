@@ -109,8 +109,16 @@ end
   return val, back
 end
 
-@adjoint getindex(xs::NTuple{N,Any}, r::Union{AbstractVector,AbstractUnitRange}) where N =
+@adjoint getindex(xs::NTuple{N,Any}, r::AbstractUnitRange) where N =
   (xs[r], Δ -> (ntuple(j -> j in r ? Δ[findfirst(isequal(j), r)] : nothing, Val(N)), nothing))
+
+@adjoint function getindex(xs::NTuple{N,Any}, r::AbstractVector) where N
+  val = xs[r]
+  function back(Δ)
+    return (ntuple(j -> j in r ? count(isequal(j), r) * Δ[j] : nothing, Val(N)), nothing)
+  end
+  val, back
+end
 
 function _pullback(cx::Context, ::typeof(literal_indexed_iterate), xs::Tuple, ::Val{i}) where i
   y, b = _pullback(cx, literal_getindex, xs, Val(i))
