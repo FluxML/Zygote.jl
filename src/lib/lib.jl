@@ -26,10 +26,7 @@ function accum(x::RefValue, y::RefValue)
 end
 
 # Core functions
-
-@nograd Core.apply_type, Core.typeof, nfields, fieldtype, Core.TypeVar, Core.UnionAll,
-  (==), (===), (<=), (>=), (<), (>), isempty, supertype, Base.typename,
-  eps, Meta.parse, Base.eval, sleep, isassigned
+@nograd eps, Base.eval, Core.TypeVar, Core.UnionAll
 
 @adjoint deepcopy(x) = deepcopy(x), ȳ -> (ȳ,)
 
