@@ -40,6 +40,8 @@ Convert `x` from the differentials types ChainRules uses to the format Zygote us
 """
 @inline wrap_chainrules_output(x) = unthunk(x)  # For now we are just not going to deal with thunks
 @inline wrap_chainrules_output(x::Tuple) = map(wrap_chainrules_output, x)
+# Zygote convention: even if many AbstractZero partials (i.e. multi-input function), make just 1 nothing.
+@inline wrap_chainrules_output(x::Tuple{Vararg{ChainRules.AbstractZero}}) = nothing
 @inline wrap_chainrules_output(x::ChainRules.AbstractZero) = nothing
 for T_outer in (:Tuple, :NamedTuple)
   # we create separate methods rather than using a `Union` + an `if` so that we avoid a

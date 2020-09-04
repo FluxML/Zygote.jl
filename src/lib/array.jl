@@ -8,14 +8,7 @@ using Distributed: pmap
 @adjoint Array(xs::AbstractArray) = Array(xs), ȳ -> (ȳ,)
 @adjoint Array(xs::Array) = Array(xs), ȳ -> (ȳ,)
 
-@nograd size, length, eachindex, Base.OneTo, axes, Colon(), findfirst, findlast, findall, ones, zeros, one, zero, any, all
-@nograd randn, randexp, randn!, randexp!
-@static if VERSION > v"1.3"
-  @nograd Random.default_rng
-end
-
-@adjoint Base.rand(rng::AbstractRNG, ::Type{T}, dims...) where {T<:Number} =
-  rand(rng, T, dims...), _ -> nothing
+@nograd ones, zeros, Base.OneTo, Colon(), one, zero
 
 @adjoint Base.vect(xs...) = Base.vect(xs...), Δ -> (Δ...,)
 

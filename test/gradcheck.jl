@@ -1538,9 +1538,14 @@ end
 end
 
 @testset "@nograd" begin
+  @test gradient(x->eachindex([10,20,30])[1], 11) == (nothing,)
+
+  #These are defined in ChainRules, we test them here to check we are handling them right 
   @test gradient(x -> findfirst(ismissing, x), [1, missing]) == (nothing,)
   @test gradient(x -> findlast(ismissing, x), [1, missing]) == (nothing,)
   @test gradient(x -> findall(ismissing, x)[1], [1, missing]) == (nothing,)
+  
+
   @test gradient(x -> Zygote.ignore(() -> x*x), 1) == (nothing,)
   @test gradient(x -> Zygote.@ignore(x*x), 1) == (nothing,)
   @test gradient(1) do x

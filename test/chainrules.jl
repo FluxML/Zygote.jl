@@ -124,6 +124,22 @@ using Zygote, Test, ChainRules
         @test mimo_pullback_hitcount[] == 1
     end
 
+    @testset "all AbstractZero partials" begin
+        # while ChainRules always has a partial for every input, Zygote combined them all
+        # to a single `nothing` if they are all zero-like.
+
+        not_diff_eg(x, i) = [10, 20][i]
+        function ChainRules.rrule(::typeof(not_diff_eg), x, i)
+            function not_diff_eg_pullback(Δ)
+                return ChainRules.NO_FIELDS, ChainRules.Zero(), ChainRules.DoesNotExist()
+            end
+            return not_diff_eg(x, i), not_diff_eg_pullback
+        end
+
+        _, pb = Zygote.pullback(not_diff_eg, 10.4, 2)
+        @test pb(1.2) === nothing
+    end
+
     @testset "nested AD hitting identity(::Tuple) pullback" begin
         # This is is  a particularly fiddly case.
         # Its kind of a simplified version of `sin'''(0.5)` but different in some places.
