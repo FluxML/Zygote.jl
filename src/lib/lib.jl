@@ -94,7 +94,6 @@ using Base: tail
 @adjoint function literal_getindex(xs::NTuple{N,Any}, ::Val{i}) where {N,i}
   val = xs[i]
   function back(Δ)
-    @show typeof(accum_param(__context__, val, Δ))
     accum_param(__context__, val, Δ) === nothing && return
     return ntuple(j -> i == j ? Δ : nothing, Val(N)), nothing
   end
@@ -104,16 +103,22 @@ end
 @adjoint function getindex(xs::NTuple{N,Any}, i::Integer) where N
   val = xs[i]
   function back(Δ)
-    @show typeof(accum_param(__context__, val, Δ))
     accum_param(__context__, val, Δ) === nothing && return
-    @show __context__
     return ntuple(j -> i == j ? Δ : nothing, Val(N)), nothing
   end
   return val, back
 end
 
-@adjoint getindex(xs::NTuple{N,Any}, r::Union{AbstractVector,AbstractUnitRange}) where N =
+@adjoint getindex(xs::NTuple{N,Any}, r::AbstractUnitRange) where N =
   (xs[r], Δ -> (ntuple(j -> j in r ? Δ[findfirst(isequal(j), r)] : nothing, Val(N)), nothing))
+
+@adjoint function getindex(xs::NTuple{N,Any}, r::AbstractVector) where N
+  val = xs[r]
+  function back(Δ)
+    (ntuple(x -> x in r ? count(isequal(x), r) * Δ[findfirst(isequal(x), r)] : nothing, Val(N)), nothing)
+  end
+  val, back
+end
 
 function _pullback(cx::Context, ::typeof(literal_indexed_iterate), xs::Tuple, ::Val{i}) where i
   y, b = _pullback(cx, literal_getindex, xs, Val(i))
