@@ -57,7 +57,8 @@ grad_mut(ch::Channel) = Channel(ch.sz_max)
 
 @adjoint! function put!(ch::Channel, x)
   put!(ch, x), function (ȳ)
-    x̄ = take!(grad_mut(__context__, ch))
+    x̄ = grad_mut(__context__, ch)
+    x̄ = x̄ isa Channel ? isready(x̄) ? take!(x̄) : nothing : x̄
     (nothing, accum(x̄, ȳ), nothing)
   end
 end
@@ -73,10 +74,13 @@ end
   t = Task(f)
   t.code = function ()
     y, back = _pullback(__context__, f)
-    cache(__context__)[t] = Task(back)
+    cache(__context__)[t] = Task(() -> back(1.f0))
     return y
   end
-  t, _ -> fetch(cache(__context__)[t])
+  t, _ -> begin
+    istaskdone(cache(__context__)[t]) || schedule(cache(__context__)[t])
+    fetch(cache(__context__)[t])
+  end
 end
 
 function runadjoint(cx, t, ȳ = nothing)
@@ -98,7 +102,10 @@ end
 end
 
 @adjoint! function Base.sync_end(refs)
-  Base.sync_end(refs), _ -> foreach(t -> runadjoint(__context__, t), refs)
+  Base.sync_end(refs), _ -> begin
+    foreach(t -> runadjoint(__context__, t), refs)
+    return
+  end
 end
 
 # Make @sync work
