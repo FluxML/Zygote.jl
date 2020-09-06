@@ -74,7 +74,7 @@ end
   t = Task(f)
   t.code = function ()
     y, back = _pullback(__context__, f)
-    cache(__context__)[t] = Task(() -> back(1.f0))
+    cache(__context__)[t] = Task(() -> back(sensitivity(y)))
     return y
   end
   t, _ -> begin
