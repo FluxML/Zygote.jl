@@ -77,9 +77,7 @@ end
     cache(__context__)[t] = Task(back)
     return y
   end
-  t, _ -> begin
-    fetch(cache(__context__)[t])
-  end
+  t, _ -> fetch(cache(__context__)[t])
 end
 
 function runadjoint(cx, t, ȳ = nothing)
@@ -105,10 +103,19 @@ end
 end
 
 @adjoint! function Base.sync_end(ch::Channel)
-  at = take!(ch)
   c = grad_mut(__context__, ch)
-  put!(c, at)
-  Base.sync_end(c), _ -> foreach(t -> runadjoint(__context__, t), (at,))
+  b = grad_mut(c)
+  while !isempty(ch)
+    i = take!(ch)
+    put!(c, i)
+    push!(b, i)
+  end
+  Base.sync_end(c), _ -> begin
+    while !isempty(b)
+      t = take!(b)
+      runadjoint(__context__, t)
+    end
+  end
 end
 
 # Make @sync work
