@@ -337,6 +337,13 @@ for mapfunc in [map,pmap,vmap]
     @test gradtest(foo, 3)
     @test gradient(v -> sum([x for x in v]), [1.1,2.2,3.3]) == ([1, 1, 1],)
   end
+
+  @testset "Tuple adjoint" begin
+    x = randn(3)
+    _, pb = Zygote.pullback(x -> map(abs2, x), x)
+    Δy = randn(3)
+    @test first(pb((Δy..., ))) ≈ first(pb(Δy))
+  end
 end
 
 @testset "Stateful Map" begin
