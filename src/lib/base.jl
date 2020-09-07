@@ -58,7 +58,7 @@ grad_mut(ch::Channel) = Channel(ch.sz_max)
 @adjoint! function put!(ch::Channel, x)
   put!(ch, x), function (ȳ)
     x̄ = grad_mut(__context__, ch)
-    x̄ = x̄ isa Channel ? isready(x̄) ? take!(x̄) : x̄ : nothing
+    x̄ = isready(x̄) ? take!(x̄) : x̄
     (nothing, accum(x̄, ȳ), nothing)
   end
 end
