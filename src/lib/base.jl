@@ -108,7 +108,7 @@ end
   while !isempty(ch)
     i = take!(ch)
     put!(c, i)
-    push!(b, i)
+    put!(b, i)
   end
   Base.sync_end(c), _ -> begin
     while !isempty(b)
