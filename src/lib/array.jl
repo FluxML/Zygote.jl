@@ -247,10 +247,14 @@ _ndims(x) = Base.IteratorSize(x) isa Base.HasShape ? _ndims(Base.IteratorSize(x)
   end
 end
 
-Zygote.@adjoint Iterators.Zip(xs) = Iterators.Zip(xs), dy -> ntuple(length(xs)) do d
-  dx = map(y->y[d], dy)
-  length(dx) == length(xs[d]) ? dx : vcat(dx, falses(length(xs[d])-length(dx)))
-end |> tuple
+@adjoint function Iterators.Zip(xs)
+  back(dy::NamedTuple{(:is,)}) = tuple(dy.is)
+  back(dy::AbstractArray) = ntuple(length(xs)) do d
+    dx = map(y->y[d], dy)
+    length(dx) == length(xs[d]) ? dx : vcat(dx, falses(length(xs[d])-length(dx)))
+  end |> tuple
+  Iterators.Zip(xs), back
+end
 
 # Reductions
 
