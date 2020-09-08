@@ -165,7 +165,7 @@ function unzip(tuples)
 end
 
 # Reverse iteration order when ∇map is applied to vector,
-# needed for stateful functions. 
+# needed for stateful functions.
 # See https://github.com/FluxML/Flux.jl/issues/1209
 # Should be generalized to abstract array, but reverse takes a dims keyword there
 _tryreverse(m, backs, Δ) = backs, Δ
@@ -184,7 +184,7 @@ for (mapfunc,∇mapfunc) in [(:map,:∇map),(:pmap,:∇pmap),(:vmap,:∇vmap)]
       ys, backs = unzip(ys_and_backs)
       ys, function (Δ)
         # Apply pullbacks in reverse order. Needed for correctness if `f` is stateful.
-        Δf_and_args_zipped = $mapfunc((f, δ) -> f(δ), _tryreverse($mapfunc, backs, Δ)...) 
+        Δf_and_args_zipped = $mapfunc((f, δ) -> f(δ), _tryreverse($mapfunc, backs, Δ)...)
         Δf_and_args = unzip(_tryreverse($mapfunc, Δf_and_args_zipped))
         Δf = reduce(accum, Δf_and_args[1])
         (Δf, Δf_and_args[2:end]...)
@@ -219,6 +219,32 @@ end
         dx[t] .= Δ
         (nothing, dx)
     end
+end
+
+# Iterators
+
+@adjoint enumerate(xs) = enumerate(xs), diys -> (map(last, diys),)
+
+@adjoint function Iterators.Filter(f, x)
+  b = map(f, x)
+  Iterators.Filter(f, x), dy -> begin
+    dx = similar(x, eltype(dy)) .= 0
+    dx[b] .= dy
+    (nothing, dx,)
+  end
+end
+
+_ndims(::Base.HasShape{d}) where {d} = d
+_ndims(x) = Base.IteratorSize(x) isa Base.HasShape ? _ndims(Base.IteratorSize(x)) : 1
+
+@adjoint function Iterators.product(xs...)
+  d = 1
+  Iterators.product(xs...), dy -> ntuple(length(xs)) do n
+    nd = _ndims(xs[n])
+    dims = ntuple(i -> i<d ? i : i+nd, ndims(dy)-nd)
+    d += nd
+    reshape(sum(y->y[n], dy; dims=dims), axes(xs[n]))
+  end
 end
 
 # Reductions
