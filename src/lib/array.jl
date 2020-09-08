@@ -260,6 +260,32 @@ end
     end
 end
 
+# Iterators
+
+@adjoint enumerate(xs) = enumerate(xs), diys -> (map(last, diys),)
+
+@adjoint function Iterators.Filter(f, x)
+  b = map(f, x)
+  Iterators.Filter(f, x), dy -> begin
+    dx = similar(x, eltype(dy)) .= 0
+    dx[b] .= dy
+    (nothing, dx,)
+  end
+end
+
+_ndims(::Base.HasShape{d}) where {d} = d
+_ndims(x) = Base.IteratorSize(x) isa Base.HasShape ? _ndims(Base.IteratorSize(x)) : 1
+
+@adjoint function Iterators.product(xs...)
+  d = 1
+  Iterators.product(xs...), dy -> ntuple(length(xs)) do n
+    nd = _ndims(xs[n])
+    dims = ntuple(i -> i<d ? i : i+nd, ndims(dy)-nd)
+    d += nd
+    reshape(sum(y->y[n], dy; dims=dims), axes(xs[n]))
+  end
+end
+
 # Reductions
 @adjoint function sum(xs::AbstractArray; dims = :)
   if dims === (:)
