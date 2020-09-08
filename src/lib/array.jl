@@ -286,6 +286,11 @@ _ndims(x) = Base.IteratorSize(x) isa Base.HasShape ? _ndims(Base.IteratorSize(x)
   end
 end
 
+Zygote.@adjoint Iterators.Zip(xs) = Iterators.Zip(xs), dy -> ntuple(length(xs)) do d
+  dx = map(y->y[d], dy)
+  length(dx) == length(xs[d]) ? dx : vcat(dx, falses(length(xs[d])-length(dx)))
+end |> tuple
+
 # Reductions
 @adjoint function sum(xs::AbstractArray; dims = :)
   if dims === (:)
