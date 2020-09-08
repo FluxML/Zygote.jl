@@ -162,8 +162,14 @@ unapply(t, xs) = _unapply(t, xs)[1]
   st = map(_empty, args)
   y, function (Δ)
     Δ = back(Δ)
-    Δ === nothing ? nothing :
+    if Δ isa AbstractZero
+      return Δ
+    elseif Δ === nothing
+      @warn "'nothing' is deprecated, use ChainRules Zero() instead."
+      return Zero()
+    else
       (first(Δ), unapply(st, Base.tail(Δ))...)
+    end
   end
 end
 

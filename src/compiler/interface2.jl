@@ -35,13 +35,17 @@ end
 end
 
 @generated function (j::Pullback{T})(Δ) where T
-  ignore_sig(T) && return :nothing
+  ignore_sig(T) && return :(DoesNotExist())
   g = try _lookup_grad(T)
   catch e
     rethrow(CompileError(T,e))
   end
   if g == nothing
-    Δ == Nothing && return :nothing
+    Δ isa AbstractZero && return :(DoesNotExist())
+    if Δ == Nothing
+        Core.println("'nothing' for zero gradients is deprecated. Use Zero() from ChainRules.")
+        return :(DoesNotExist())
+    end
     return :(error("Non-differentiable function $(repr(j.t[1]))"))
   end
   meta, _, back = g
