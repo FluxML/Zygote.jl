@@ -374,9 +374,13 @@ end
     sum([x^2+y for x in xs, y in ys])  # Iterators.Product
   end == (10:10:100, fill(10, 5))
 
-  gradient(ones(3,5), 1:7) do xs, ys
+  @test gradient(ones(3,5), 1:7) do xs, ys
     sum([x+y for x in xs, y in ys])
   end == (fill(7, 3,5), fill(15, 7))
+
+  @test gradient(10:14, 1:10) do xs, ys
+    sum([x/y for (x,y) in zip(xs, ys)])
+  end[2] ≈ vcat(.-(10:14) ./ (1:5).^2, zeros(5))
 end
 
 # https://github.com/JuliaDiff/ChainRules.jl/issues/257
