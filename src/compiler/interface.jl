@@ -41,7 +41,7 @@ tailmemaybe(::Nothing) = nothing
 tailmemaybe(x::Tuple) = Base.tail(x)
 
 replacezero(x) = x
-replacezero(::Nothing) = @warn "Use of 'nothing' to represent zero gradients is deprecated, use Zero() or DoesNotExist() from ChainRules"; return nothing
+replacezero(::Nothing) = Base.depwarn("Use of 'nothing' to represent zero gradients is deprecated, use Zero() or DoesNotExist() from ChainRules", :replacezero); return nothing
 replacezero(::AbstractZero) = nothing
 replacezero(t::Tuple) = ntuple(i -> replacezero(t[i]), length(t))
 
