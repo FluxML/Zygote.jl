@@ -119,6 +119,7 @@ end
 function _pullback(cx::Context, ::typeof(literal_indexed_iterate), xs::Tuple, ::Val{i}, st) where i
   y, b = _pullback(cx, literal_getindex, xs, Val(i))
   back(::Nothing) = nothing
+  back(x::AbstractZero) = x
   back(ȳ) = (b(ȳ[1])..., nothing)
   (y, i+1), back
 end
@@ -266,9 +267,12 @@ end
 end
 
 # TODO captured mutables + multiple calls to `back`
-@generated function (back::Jnew{T,G,false})(Δ::Union{NamedTuple,Nothing,RefValue}) where {T,G}
-  !T.mutable && Δ == Nothing && return :nothing
-  Δ = G == Nothing ? :Δ :
+@generated function (back::Jnew{T,G,false})(Δ::Union{NamedTuple,Nothing,AbstractZero,RefValue}) where {T,G}
+  if !T.mutable
+      Δ == Nothing && return :nothing
+      Δ <: AbstractZero && return :(Zero())
+  end
+  Δ = G == Nothing ? :Δ : # what is G?
       Δ <: RefValue ? :(back.g[]) :
       :(accum(back.g[], Δ))
   quote
@@ -278,9 +282,12 @@ end
   end
 end
 
-@generated function (back::Jnew{T,G,true})(Δ::Union{NamedTuple,Nothing,RefValue}) where {T,G}
-  !T.mutable && Δ == Nothing && return :nothing
-  Δ = G == Nothing ? :Δ : :(back.g)
+@generated function (back::Jnew{T,G,true})(Δ::Union{NamedTuple,Nothing,AbstractZero,RefValue}) where {T,G}
+  if !T.mutable
+      Δ == Nothing && return :nothing
+      Δ <: AbstractZero && return :(Zero())
+  end
+  Δ = G == Nothing ? :Δ : :(back.g) # what is G?
   quote
     x̄ = $Δ
     $(G == Nothing || :($Δ = nt_nothing($Δ)))

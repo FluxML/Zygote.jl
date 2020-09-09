@@ -95,6 +95,7 @@ end
 
 varargs(m::Method, n) = m.isva ? n - m.nargs + 1 : nothing
 
+# returns IR code for backward pass, or nothing
 function _lookup_grad(T)
   (m = meta(T)) == nothing && return
   va = varargs(m.method, length(T.parameters))
