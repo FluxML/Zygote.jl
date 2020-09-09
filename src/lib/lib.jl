@@ -278,7 +278,7 @@ end
   quote
     x̄ = $Δ
     $(G == Nothing || :(back.g[] = nt_nothing($Δ)))
-    (DoesNotExist(), $(map(f -> :(x̄.$f), fieldnames(T))...))
+    (nothing, $(map(f -> :(x̄.$f), fieldnames(T))...))
   end
 end
 
@@ -291,7 +291,7 @@ end
   quote
     x̄ = $Δ
     $(G == Nothing || :($Δ = nt_nothing($Δ)))
-    (DoesNotExist(), ($(map(f -> :(x̄.$f), fieldnames(T))...),))
+    (nothing, ($(map(f -> :(x̄.$f), fieldnames(T))...),))
   end
 end
 
