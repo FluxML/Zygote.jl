@@ -269,7 +269,7 @@ end
 # TODO captured mutables + multiple calls to `back`
 @generated function (back::Jnew{T,G,false})(Δ::Union{NamedTuple,Nothing,AbstractZero,RefValue}) where {T,G}
   if !T.mutable
-      Δ == Nothing && return :nothing
+      Δ == Nothing && return :(Zero())
       Δ <: AbstractZero && return :(Zero())
   end
   Δ = G == Nothing ? :Δ : # what is G?
