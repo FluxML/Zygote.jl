@@ -40,14 +40,9 @@ _pullback(f, args...) = _pullback(Context(), f, args...)
 tailmemaybe(::Nothing) = nothing
 tailmemaybe(x::Tuple) = Base.tail(x)
 
-replacezero(x) = x
-replacezero(::Nothing) = Base.depwarn("Use of 'nothing' to represent zero gradients is deprecated, use Zero() or DoesNotExist() from ChainRules", :replacezero); return nothing
-replacezero(::AbstractZero) = nothing
-replacezero(t::Tuple) = ntuple(i -> replacezero(t[i]), length(t))
-
 function pullback(f, args...)
   y, back = _pullback(f, args...)
-  y, Δ -> replacezero(tailmemaybe(back(Δ)))
+  y, Δ -> tailmemaybe(wrap_chainrules_output(back(Δ)))
 end
 
 sensitivity(y::Number) = one(y)
