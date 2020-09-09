@@ -272,26 +272,26 @@ end
       Δ == Nothing && return :(Zero())
       Δ <: AbstractZero && return :(Zero())
   end
-  Δ = G == Nothing ? :Δ : # what is G?
+  Δ = G == Nothing ? :Δ :
       Δ <: RefValue ? :(back.g[]) :
       :(accum(back.g[], Δ))
   quote
     x̄ = $Δ
     $(G == Nothing || :(back.g[] = nt_nothing($Δ)))
-    (nothing, $(map(f -> :(x̄.$f), fieldnames(T))...))
+    (DoesNotExist(), $(map(f -> :(x̄.$f), fieldnames(T))...))
   end
 end
 
 @generated function (back::Jnew{T,G,true})(Δ::Union{NamedTuple,Nothing,AbstractZero,RefValue}) where {T,G}
   if !T.mutable
-      Δ == Nothing && return :nothing
+      Δ == Nothing && return :(Zero())
       Δ <: AbstractZero && return :(Zero())
   end
-  Δ = G == Nothing ? :Δ : :(back.g) # what is G?
+  Δ = G == Nothing ? :Δ : :(back.g)
   quote
     x̄ = $Δ
     $(G == Nothing || :($Δ = nt_nothing($Δ)))
-    (nothing, ($(map(f -> :(x̄.$f), fieldnames(T))...),))
+    (DoesNotExist(), ($(map(f -> :(x̄.$f), fieldnames(T))...),))
   end
 end
 
