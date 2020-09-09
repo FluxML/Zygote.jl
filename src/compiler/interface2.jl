@@ -43,7 +43,7 @@ end
   if g == nothing
     Δ isa AbstractZero && return :(DoesNotExist())
     if Δ == Nothing
-        Core.println("'nothing' for zero gradients is deprecated. Use Zero() from ChainRules.")
+        Core.println("hit 'nothing' in (j::Pullback{T})(Δ)")
         return :(DoesNotExist())
     end
     return :(error("Non-differentiable function $(repr(j.t[1]))"))

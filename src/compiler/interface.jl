@@ -40,9 +40,10 @@ _pullback(f, args...) = _pullback(Context(), f, args...)
 tailmemaybe(::Nothing) = nothing
 tailmemaybe(x::Tuple) = Base.tail(x)
 
-replacezero(t) = ntuple(i -> t[i] isa AbstractZero ? nothing : t[i], length(t))
-replacezero(::Nothing) = nothing
+replacezero(x) = x
+replacezero(::Nothing) = @warn "Use of 'nothing' to represent zero gradients is deprecated, use Zero() or DoesNotExist() from ChainRules"; return nothing
 replacezero(::AbstractZero) = nothing
+replacezero(t::Tuple) = ntuple(i -> replacezero(t[i]), length(t))
 
 function pullback(f, args...)
   y, back = _pullback(f, args...)
