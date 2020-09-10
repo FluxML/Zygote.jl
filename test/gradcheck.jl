@@ -1106,7 +1106,7 @@ end
         _, pb = Zygote.pullback(X -> pairwise(metric, X, Y; dims=2), X)
 
         # This is impressively inaccurate, but at least it doesn't produce a NaN.
-        @test only(Δ_fd) ≈ only(pb(Δ)) atol=1e-3 rtol=1e-3
+        @test first(Δ_fd) ≈ first(pb(Δ)) atol=1e-3 rtol=1e-3
       end 
     end
 
