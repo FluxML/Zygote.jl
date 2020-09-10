@@ -28,7 +28,7 @@ function gradcheck(f, xs...)
   return all(isapprox.(grad_zygote, grad_finite_difference; rtol = 1e-5, atol = 1e-5))
 end
 
-gradtest(f, xs::AbstractArray...) = gradcheck((xs...) -> sum((f(xs...))), xs...)
+gradtest(f, xs::AbstractArray...) = gradcheck((xs...) -> sum(sin.(f(xs...))), xs...)
 gradtest(f, dims...) = gradtest(f, rand.(Float64, dims)...)
 
 # utilities for using gradcheck with complex matrices
