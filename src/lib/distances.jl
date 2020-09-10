@@ -26,8 +26,17 @@ end
 
 ∇pairwise(s, x, y, f) =
   function(Δ)
+    # println("In SqEuclidean")
+    # display(Δ)
+    # println()
     x̄ = 2 .* (x * Diagonal(vec(sum(Δ; dims=2))) .- y * transpose(Δ))
     ȳ = 2 .* (y * Diagonal(vec(sum(Δ; dims=1))) .- x * Δ)
+    # println("x̄")
+    # display(x̄)
+    # println()
+    # println("ȳ")
+    # display(ȳ)
+    # println()
     return (nothing, f(x̄), f(ȳ))
   end
 
@@ -47,10 +56,10 @@ end
   end
 
 @adjoint function (::Euclidean)(x::AbstractVector, y::AbstractVector)
-  D = x.-y
+  D = x .- y
   δ = sqrt(sum(abs2, D))
   function euclidean(Δ::Real)
-    x̄ = (Δ / δ) .* D
+    x̄ = (Δ / (δ + eps(typeof(δ)))) .* D
     return x̄, -x̄
   end
   return δ, euclidean
@@ -59,26 +68,31 @@ end
 @adjoint function colwise(s::Euclidean, x::AbstractMatrix, y::AbstractMatrix)
   d = colwise(s, x, y)
   return d, function (Δ::AbstractVector)
-    x̄ = (Δ ./ d)' .* (x .- y)
+    x̄ = (Δ ./ (d .+ eps(eltype(d))))' .* (x .- y)
     return nothing, x̄, -x̄
   end
 end
 
 @adjoint function pairwise(::Euclidean, X::AbstractMatrix, Y::AbstractMatrix; dims=2)
-  D, back = pullback(
-    (X, Y) -> pairwise(SqEuclidean(), X, Y; dims = dims),
-    X,
-    Y,
-  )
+  D, back = pullback((X, Y) -> pairwise(SqEuclidean(), X, Y; dims=dims), X, Y)
   D .= sqrt.(D)
-  return D, Δ -> (nothing, back(Δ ./ (2 .* D))...)
+  # display(D)
+  # println()
+  function pairwise_pullback(Δ)
+    # display(Δ ./ (2 .* (D .+ eps(eltype(D)))))
+    # println()
+    # display(back(Δ ./ (2 .* (D .+ eps(eltype(D)))))[2])
+    # println()
+    return (nothing, back(Δ ./ (2 .* (D .+ 1000 * eps(eltype(D)))))...)
+  end
+  return D, pairwise_pullback
 end
 
 @adjoint function pairwise(::Euclidean, X::AbstractMatrix; dims=2)
   D, back = pullback(X -> pairwise(SqEuclidean(), X; dims = dims), X)
   D .= sqrt.(D)
   return D, function(Δ)
-    Δ = Δ ./ (2 .* D)
+    Δ = Δ ./ (2 .* D .+ eps(eltype(D)))
     Δ[diagind(Δ)] .= 0
     return (nothing, first(back(Δ)))
   end
