@@ -26,17 +26,8 @@ end
 
 ∇pairwise(s, x, y, f) =
   function(Δ)
-    # println("In SqEuclidean")
-    # display(Δ)
-    # println()
     x̄ = 2 .* (x * Diagonal(vec(sum(Δ; dims=2))) .- y * transpose(Δ))
     ȳ = 2 .* (y * Diagonal(vec(sum(Δ; dims=1))) .- x * Δ)
-    # println("x̄")
-    # display(x̄)
-    # println()
-    # println("ȳ")
-    # display(ȳ)
-    # println()
     return (nothing, f(x̄), f(ȳ))
   end
 
@@ -76,13 +67,7 @@ end
 @adjoint function pairwise(::Euclidean, X::AbstractMatrix, Y::AbstractMatrix; dims=2)
   D, back = pullback((X, Y) -> pairwise(SqEuclidean(), X, Y; dims=dims), X, Y)
   D .= sqrt.(D)
-  # display(D)
-  # println()
   function pairwise_pullback(Δ)
-    # display(Δ ./ (2 .* (D .+ eps(eltype(D)))))
-    # println()
-    # display(back(Δ ./ (2 .* (D .+ eps(eltype(D)))))[2])
-    # println()
     return (nothing, back(Δ ./ (2 .* (D .+ 1000 * eps(eltype(D)))))...)
   end
   return D, pairwise_pullback
