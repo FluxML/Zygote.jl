@@ -41,13 +41,14 @@ tailmemaybe(::Nothing) = nothing
 tailmemaybe(x::Tuple) = Base.tail(x)
 
 replacezero(x) = x
-replacezero(::AbstractZero) = Base.depwarn("Use of 'nothing' to represent zero gradients is deprecated, use Zero() or DoesNotExist() from ChainRules", :wrap_chainrules_output); nothing
+replacezero(::AbstractZero) = nothing
+replacezero(::Nothing) = @warn "Use of 'nothing' to represent zero gradients is deprecated, use Zero() or DoesNotExist() from ChainRules"; nothing
 replacezero(t::Tuple) = map(replacezero, t)
-#replacezero(t::Tuple{Vararg{Union{AbstractZero, Nothing}}}) = nothing
 
 function pullback(f, args...)
+  println("pullback called")
   y, back = _pullback(f, args...)
-  y, Δ -> replacezero(tailmemaybe(back(Δ)))
+  y, Δ -> tailmemaybe(replacezero(back(Δ)))
 end
 
 sensitivity(y::Number) = one(y)
