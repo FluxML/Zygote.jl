@@ -50,7 +50,7 @@ end
   D = x .- y
   δ = sqrt(sum(abs2, D))
   function euclidean(Δ::Real)
-    x̄ = (Δ / max(δ, eps(typeof(δ)))) .* D
+    x̄ = ifelse(iszero(δ), D, (Δ / δ) .* D)
     return x̄, -x̄
   end
   return δ, euclidean
