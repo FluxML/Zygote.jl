@@ -65,12 +65,17 @@ end
 end
 
 @adjoint function pairwise(::Euclidean, X::AbstractMatrix, Y::AbstractMatrix; dims=2)
-  D, back = pullback((X, Y) -> pairwise(SqEuclidean(), X, Y; dims=dims), X, Y)
-  D .= sqrt.(D)
-  function pairwise_pullback(Δ)
-    return (nothing, back(Δ ./ (2 .* max.(D, eps(eltype(D)))))...)
+
+  # Modify the forwards-pass slightly to ensure stability on the reverse.
+  function _pairwise_euclidean(X, Y)
+    δ = eps(promote_type(eltype(X), eltype(Y)))^2
+    return sqrt.(max.(pairwise(SqEuclidean(), X, Y; dims=dims), δ))
   end
-  return D, pairwise_pullback
+  D, back = pullback(_pairwise_euclidean, X, Y)
+
+  return D, function(Δ)
+    return (nothing, back(Δ)...)
+  end
 end
 
 @adjoint function pairwise(::Euclidean, X::AbstractMatrix; dims=2)
