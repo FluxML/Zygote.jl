@@ -3,6 +3,7 @@ using IRTools: IR, Variable, Pipe, xcall, var, prewalk, postwalk,
   insertafter!, finish, expand!, prune!, substitute!, substitute,
   block, block!, branch!, return!, stmt, meta
 
+# va = var args?
 @inline tuple_va(N, xs) = xs
 @inline tuple_va(N, x, xs...) = (x, tuple_va(N, xs...)...)
 @inline tuple_va(::Val{N}, ::Nothing) where N = ntuple(_ -> nothing, Val(N))
@@ -216,7 +217,7 @@ end
 branchfor(ir, (from,to)) =
   get(filter(br -> br.block == to, branches(block(ir, from))), 1, nothing)
 
-xaccum(ir) = nothing
+xaccum(ir) = Zero()
 xaccum(ir, x) = x
 xaccum(ir, xs...) = push!(ir, xcall(Zygote, :accum, xs...))
 
