@@ -50,7 +50,7 @@ end
   D = x .- y
   δ = sqrt(sum(abs2, D))
   function euclidean(Δ::Real)
-    x̄ = (Δ / (δ + eps(typeof(δ)))) .* D
+    x̄ = (Δ / max(δ, eps(typeof(δ)))) .* D
     return x̄, -x̄
   end
   return δ, euclidean
@@ -59,7 +59,7 @@ end
 @adjoint function colwise(s::Euclidean, x::AbstractMatrix, y::AbstractMatrix)
   d = colwise(s, x, y)
   return d, function (Δ::AbstractVector)
-    x̄ = (Δ ./ (d .+ eps(eltype(d))))' .* (x .- y)
+    x̄ = (Δ ./ max.(d, eps(eltype(d))))' .* (x .- y)
     return nothing, x̄, -x̄
   end
 end
@@ -68,7 +68,7 @@ end
   D, back = pullback((X, Y) -> pairwise(SqEuclidean(), X, Y; dims=dims), X, Y)
   D .= sqrt.(D)
   function pairwise_pullback(Δ)
-    return (nothing, back(Δ ./ (2 .* (D .+ 1000 * eps(eltype(D)))))...)
+    return (nothing, back(Δ ./ (2 .* max.(D, eps(eltype(D)))))...)
   end
   return D, pairwise_pullback
 end
@@ -77,7 +77,7 @@ end
   D, back = pullback(X -> pairwise(SqEuclidean(), X; dims = dims), X)
   D .= sqrt.(D)
   return D, function(Δ)
-    Δ = Δ ./ (2 .* D .+ eps(eltype(D)))
+    Δ = Δ ./ (2 .* max.(D, eps(eltype(D))))
     Δ[diagind(Δ)] .= 0
     return (nothing, first(back(Δ)))
   end
