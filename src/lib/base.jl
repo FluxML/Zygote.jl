@@ -30,6 +30,7 @@ end
 
 @adjoint function getindex(d::AbstractDict, k)
   d[k], function (Δ)
+    @show "in getindex", typeof(d)
     grad = grad_mut(__context__, d)
     grad[k] = accum(get(grad, k, nothing), Δ)
     return (grad, nothing)
@@ -38,10 +39,34 @@ end
 
 @adjoint! function setindex!(d::AbstractDict, v, k)
   setindex!(d, v, k), function (_)
+    @show "in setindex", typeof(d)
     Δ = get(grad_mut(__context__, d), k, nothing)
     delete!(grad_mut(__context__, d), k)
     (nothing, Δ, nothing)
   end
+end
+
+@adjoint function Base._oidd_nextind(a, i)
+  Base._oidd_nextind(a, i), Δ -> begin
+    @show a, i, Δ
+    (nothing, nothing)
+  end
+end
+@adjoint! function get(d::AbstractDict, k, default)
+  hk = Ref{Bool}()
+  val = if haskey(d, k)
+    hk[] = true
+    d[k]
+  else
+    hk[] = false
+    d[k] = default
+  end
+  function back(Δ)
+    @show Δ
+    Δ2 = setindex!(grad_mut(__context__, d), Δ, k)
+    (Δ2, nothing, nothing)
+  end
+  val, back
 end
 
 # Channels
