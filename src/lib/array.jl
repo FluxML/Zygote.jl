@@ -165,7 +165,7 @@ function unzip(tuples)
 end
 
 # Reverse iteration order when ∇map is applied to vector,
-# needed for stateful functions.
+# needed for stateful functions. 
 # See https://github.com/FluxML/Flux.jl/issues/1209
 # Should be generalized to abstract array, but reverse takes a dims keyword there
 _tryreverse(m, backs, Δ) = backs, Δ
@@ -184,7 +184,7 @@ for (mapfunc,∇mapfunc) in [(:map,:∇map),(:pmap,:∇pmap),(:vmap,:∇vmap)]
       ys, backs = unzip(ys_and_backs)
       ys, function (Δ)
         # Apply pullbacks in reverse order. Needed for correctness if `f` is stateful.
-        Δf_and_args_zipped = $mapfunc((f, δ) -> f(δ), _tryreverse($mapfunc, backs, Δ)...)
+        Δf_and_args_zipped = $mapfunc((f, δ) -> f(δ), _tryreverse($mapfunc, backs, Δ)...) 
         Δf_and_args = unzip(_tryreverse($mapfunc, Δf_and_args_zipped))
         Δf = reduce(accum, Δf_and_args[1])
         (Δf, Δf_and_args[2:end]...)
@@ -219,41 +219,6 @@ end
         dx[t] .= Δ
         (nothing, dx)
     end
-end
-
-# Iterators
-
-@adjoint enumerate(xs) = enumerate(xs), diys -> (map(last, diys),)
-
-@adjoint function Iterators.Filter(f, x)
-  b = map(f, x)
-  Iterators.Filter(f, x), dy -> begin
-    dx = similar(x, eltype(dy)) .= 0
-    dx[b] .= dy
-    (nothing, dx,)
-  end
-end
-
-_ndims(::Base.HasShape{d}) where {d} = d
-_ndims(x) = Base.IteratorSize(x) isa Base.HasShape ? _ndims(Base.IteratorSize(x)) : 1
-
-@adjoint function Iterators.product(xs...)
-  d = 1
-  Iterators.product(xs...), dy -> ntuple(length(xs)) do n
-    nd = _ndims(xs[n])
-    dims = ntuple(i -> i<d ? i : i+nd, ndims(dy)-nd)
-    d += nd
-    reshape(sum(y->y[n], dy; dims=dims), axes(xs[n]))
-  end
-end
-
-@adjoint function Iterators.Zip(xs)
-  back(dy::NamedTuple{(:is,)}) = tuple(dy.is)
-  back(dy::AbstractArray) = ntuple(length(xs)) do d
-    dx = map(y->y[d], dy)
-    length(dx) == length(xs[d]) ? dx : vcat(dx, falses(length(xs[d])-length(dx)))
-  end |> tuple
-  Iterators.Zip(xs), back
 end
 
 # Reductions
@@ -430,7 +395,6 @@ end
   Y = pinv(A)
   return Y, Δ->(-Y' * Δ * Y' + (I - A * Y) * Δ' * Y * Y' + Y' * Y * Δ' * (I - Y * A),)
 end
-
 # When `A` is guaranteed to be square, definitely use the simple expression for the adjoint.
 @adjoint function \(
   A::Union{
@@ -524,24 +488,20 @@ function _hermitian_back(Δ::LinearAlgebra.AbstractTriangular, uplo)
     return collect(uplo == 'U' ? ŪL̄' : ŪL̄)
   end
 end
-
 @adjoint function LinearAlgebra.Hermitian(A::AbstractMatrix, uplo=:U)
   H = Hermitian(A, uplo)
   back(Δ::AbstractMatrix) = (_hermitian_back(Δ, H.uplo), nothing)
   back(Δ::NamedTuple) = (_hermitian_back(Δ.data, H.uplo), nothing)
   return H, back
 end
-
 @adjoint convert(::Type{R}, A::LinearAlgebra.HermOrSym{T,S}) where {T,S,R<:Array} = convert(R, A),
   Δ -> (nothing, convert(S, Δ),)
 @adjoint Matrix(A::LinearAlgebra.HermOrSym{T,S}) where {T,S} = Matrix(A),
   Δ -> (convert(S, Δ),)
-
 @adjoint function cholesky(Σ::Real)
   C = cholesky(Σ)
   return C, Δ::NamedTuple->(Δ.factors[1, 1] / (2 * C.U[1, 1]),)
 end
-
 @adjoint function cholesky(Σ::Diagonal; check = true)
   C = cholesky(Σ, check = check)
   return C, Δ::NamedTuple -> begin
@@ -549,7 +509,6 @@ end
     return Diagonal(diag(Δ.factors) .* inv.(2 .* C.factors.diag)), nothing
   end
 end
-
 # Implementation due to Seeger, Matthias, et al. "Auto-differentiating linear algebra."
 @adjoint function cholesky(Σ::Union{StridedMatrix, Symmetric{<:Real, <:StridedMatrix}}; check = true)
   C = cholesky(Σ, check = check)
@@ -574,7 +533,6 @@ end
     return (Ā, C̄)
   end
 end
-
 # Matrix of pairwise difference quotients
 Base.@propagate_inbounds function _pairdiffquot(f, i, j, x, fx, dfx, d²fx = nothing)
   i == j && return dfx[i]
@@ -588,7 +546,6 @@ Base.@propagate_inbounds function _pairdiffquot(f, i, j, x, fx, dfx, d²fx = not
   Δfx = fx[i] - fx[j]
   return Δfx / Δx
 end
-
 Base.@propagate_inbounds function _pairdiffquotmat(f, n, x, fx, dfx, d²fx = nothing)
   Δfij = (i, j)->_pairdiffquot(f, i, j, x, fx, dfx, d²fx)
   return Δfij.(Base.OneTo(n), Base.OneTo(n)')
@@ -805,13 +762,11 @@ end
     return ((uplo=nothing, info=nothing, factors=Δ_factors),)
   end
 end
-
 @adjoint function logdet(C::Cholesky)
   return logdet(C), function(Δ)
     return ((uplo=nothing, info=nothing, factors=Diagonal(2 .* Δ ./ diag(C.factors))),)
   end
 end
-
 @adjoint function Matrix(::UniformScaling, i::Integer, j::Integer)
   return Matrix(I, i, j), Δ -> ((λ=tr(Δ),), nothing, nothing)
 end
@@ -830,14 +785,11 @@ end
 @adjoint function -(S::UniformScaling, A::AbstractMatrix)
   return S - A, Δ->((λ=tr(Δ),), -Δ)
 end
-
 @adjoint +(A::AbstractArray, B::AbstractArray) = A + B, Δ->(Δ, Δ)
 @adjoint -(A::AbstractArray, B::AbstractArray) = A - B, Δ->(Δ, -Δ)
 @adjoint -(A::AbstractArray) = -A, Δ->(-Δ,)
-
 # Abstract FFT
 # ===================
-
 # AbstractFFTs functions do not work with FillArrays, which are needed
 # for some functionality of Zygote. To make it work with FillArrays
 # as well, overload the relevant functions
@@ -847,7 +799,6 @@ AbstractFFTs.ifft(x::Fill, dims...) = AbstractFFTs.ifft(collect(x), dims...)
 AbstractFFTs.rfft(x::Fill, dims...) = AbstractFFTs.rfft(collect(x), dims...)
 AbstractFFTs.irfft(x::Fill, d, dims...) = AbstractFFTs.irfft(collect(x), d, dims...)
 AbstractFFTs.brfft(x::Fill, d, dims...) = AbstractFFTs.brfft(collect(x), d, dims...)
-
 # the adjoint jacobian of an FFT with respect to its input is the reverse FFT of the
 # gradient of its inputs, but with different normalization factor
 @adjoint function fft(xs)
@@ -855,21 +806,18 @@ AbstractFFTs.brfft(x::Fill, d, dims...) = AbstractFFTs.brfft(collect(x), d, dims
     return (AbstractFFTs.bfft(Δ),)
   end
 end
-
 @adjoint function *(P::AbstractFFTs.Plan, xs)
   return P * xs, function(Δ)
     N = prod(size(xs)[[P.region...]])
     return (nothing, N * (P \ Δ))
   end
 end
-
 @adjoint function \(P::AbstractFFTs.Plan, xs)
   return P \ xs, function(Δ)
     N = prod(size(Δ)[[P.region...]])
     return (nothing, (P * Δ)/N)
   end
 end
-
 # all of the plans normalize their inverse, while we need the unnormalized one.
 @adjoint function ifft(xs)
   return AbstractFFTs.ifft(xs), function(Δ)
@@ -877,26 +825,21 @@ end
     return (AbstractFFTs.fft(Δ)/N,)
   end
 end
-
 @adjoint function bfft(xs)
   return AbstractFFTs.bfft(xs), function(Δ)
     return (AbstractFFTs.fft(Δ),)
   end
 end
-
 @adjoint function fftshift(x)
     return fftshift(x), function(Δ)
         return (ifftshift(Δ),)
     end
 end
-
 @adjoint function ifftshift(x)
     return ifftshift(x), function(Δ)
         return (fftshift(Δ),)
     end
 end
-
-
 # to actually use rfft, one needs to insure that everything
 # that happens in the Fourier domain could've been done in
 # the space domain with real numbers. This means enforcing
