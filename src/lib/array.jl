@@ -395,6 +395,7 @@ end
   Y = pinv(A)
   return Y, Δ->(-Y' * Δ * Y' + (I - A * Y) * Δ' * Y * Y' + Y' * Y * Δ' * (I - Y * A),)
 end
+
 # When `A` is guaranteed to be square, definitely use the simple expression for the adjoint.
 @adjoint function \(
   A::Union{
@@ -488,20 +489,25 @@ function _hermitian_back(Δ::LinearAlgebra.AbstractTriangular, uplo)
     return collect(uplo == 'U' ? ŪL̄' : ŪL̄)
   end
 end
+
 @adjoint function LinearAlgebra.Hermitian(A::AbstractMatrix, uplo=:U)
   H = Hermitian(A, uplo)
   back(Δ::AbstractMatrix) = (_hermitian_back(Δ, H.uplo), nothing)
   back(Δ::NamedTuple) = (_hermitian_back(Δ.data, H.uplo), nothing)
   return H, back
 end
+
 @adjoint convert(::Type{R}, A::LinearAlgebra.HermOrSym{T,S}) where {T,S,R<:Array} = convert(R, A),
   Δ -> (nothing, convert(S, Δ),)
+
 @adjoint Matrix(A::LinearAlgebra.HermOrSym{T,S}) where {T,S} = Matrix(A),
   Δ -> (convert(S, Δ),)
+
 @adjoint function cholesky(Σ::Real)
   C = cholesky(Σ)
   return C, Δ::NamedTuple->(Δ.factors[1, 1] / (2 * C.U[1, 1]),)
 end
+
 @adjoint function cholesky(Σ::Diagonal; check = true)
   C = cholesky(Σ, check = check)
   return C, Δ::NamedTuple -> begin
@@ -509,6 +515,7 @@ end
     return Diagonal(diag(Δ.factors) .* inv.(2 .* C.factors.diag)), nothing
   end
 end
+
 # Implementation due to Seeger, Matthias, et al. "Auto-differentiating linear algebra."
 @adjoint function cholesky(Σ::Union{StridedMatrix, Symmetric{<:Real, <:StridedMatrix}}; check = true)
   C = cholesky(Σ, check = check)
@@ -533,6 +540,7 @@ end
     return (Ā, C̄)
   end
 end
+
 # Matrix of pairwise difference quotients
 Base.@propagate_inbounds function _pairdiffquot(f, i, j, x, fx, dfx, d²fx = nothing)
   i == j && return dfx[i]
@@ -546,6 +554,7 @@ Base.@propagate_inbounds function _pairdiffquot(f, i, j, x, fx, dfx, d²fx = not
   Δfx = fx[i] - fx[j]
   return Δfx / Δx
 end
+
 Base.@propagate_inbounds function _pairdiffquotmat(f, n, x, fx, dfx, d²fx = nothing)
   Δfij = (i, j)->_pairdiffquot(f, i, j, x, fx, dfx, d²fx)
   return Δfij.(Base.OneTo(n), Base.OneTo(n)')
