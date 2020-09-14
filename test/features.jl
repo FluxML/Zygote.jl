@@ -288,7 +288,7 @@ global_param = 3
   cx = Zygote.Context()
   y, back = Zygote._pullback(cx, x -> x*global_param, 2)
   @test y == 6
-  @test back(1) == (nothing, 3)
+  @test back(1) == (Zero(), 3) # this is not the public API, so Zero() allowed
   Zygote.cache(cx)[GlobalRef(Main, :global_param)] == 2
 end
 

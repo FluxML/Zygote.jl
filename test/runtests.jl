@@ -1,3 +1,4 @@
+using ChainRules: Zero
 using Zygote, Test
 using Zygote: gradient
 using CUDA: has_cuda
