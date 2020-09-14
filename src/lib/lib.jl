@@ -30,13 +30,13 @@ end
 
 @adjoint deepcopy(x) = deepcopy(x), ȳ -> (ȳ,)
 
-@adjoint (::Type{V})(x...) where V<:Val = V(x...), _ -> nothing
+@adjoint (::Type{V})(x...) where V<:Val = V(x...), _ -> DoesNotExist()
 
 @adjoint ifelse(cond::Bool, t, f) =
   ifelse(cond, t, f),
-  Δ -> cond ? (nothing, Δ, zero(Δ)) : (nothing, zero(Δ), Δ)
+  Δ -> cond ? (DoesNotExist(), Δ, zero(Δ)) : (DoesNotExist(), zero(Δ), Δ)
 
-@adjoint Base.typeassert(x, T) = Base.typeassert(x, T), Δ -> (Δ, nothing)
+@adjoint Base.typeassert(x, T) = Base.typeassert(x, T), Δ -> (Δ, DoesNotExist())
 
 @generated function accum_param(cx::Context, x, Δ)
   isbitstype(x) && return :(Δ)
@@ -91,8 +91,8 @@ using Base: tail
 @adjoint function literal_getindex(xs::NTuple{N,Any}, ::Val{i}) where {N,i}
   val = xs[i]
   function back(Δ)
-    accum_param(__context__, val, Δ) === nothing && return
-    return ntuple(j -> i == j ? Δ : nothing, Val(N)), nothing
+    accum_param(__context__, val, Δ) === nothing && return #  TODO: revisit
+    return ntuple(j -> i == j ? Δ : Zero(), Val(N)), DoesNotExist()
   end
   val, back
 end
@@ -101,17 +101,17 @@ end
   val = xs[i]
   function back(Δ)
     accum_param(__context__, val, Δ) === nothing && return
-    return ntuple(j -> i == j ? Δ : nothing, Val(N)), nothing
+    return ntuple(j -> i == j ? Δ : Zero(), Val(N)), DoesNotExist()
   end
   return val, back
 end
 
 @adjoint getindex(xs::NTuple{N,Any}, r::AbstractUnitRange) where N =
-  (xs[r], Δ -> (ntuple(j -> j in r ? Δ[findfirst(isequal(j), r)] : nothing, Val(N)), nothing))
+  (xs[r], Δ -> (ntuple(j -> j in r ? Δ[findfirst(isequal(j), r)] : Zero(), Val(N)), DoesNotExist()))
 
 function _pullback(cx::Context, ::typeof(literal_indexed_iterate), xs::Tuple, ::Val{i}) where i
   y, b = _pullback(cx, literal_getindex, xs, Val(i))
-  back(::Nothing) = nothing # TODO: change this to Zero()
+  back(::Nothing) = Zero()
   back(x::AbstractZero) = x
   back(ȳ) = b(ȳ[1])
   (y, i+1), back
@@ -119,28 +119,28 @@ end
 
 function _pullback(cx::Context, ::typeof(literal_indexed_iterate), xs::Tuple, ::Val{i}, st) where i
   y, b = _pullback(cx, literal_getindex, xs, Val(i))
-  back(::Nothing) = nothing # TODO: change this to Zero()
+  back(::Nothing) = Zero()
   back(x::AbstractZero) = x
-  back(ȳ) = (b(ȳ[1])..., nothing) # TODO: change this to Zero()
+  back(ȳ) = (b(ȳ[1])..., Zero())
   (y, i+1), back
 end
 
 # Needed for iteration lowering
 @adjoint Core.getfield(xs::NTuple{N,Any}, i::Integer) where N =
-  (xs[i], Δ -> (ntuple(j -> i == j ? Δ : nothing, Val(N)), nothing))
+  (xs[i], Δ -> (ntuple(j -> i == j ? Δ : Zero(), Val(N)), DoesNotExist()))
 
 @adjoint Core.getfield(xs::NamedTuple{K,<:NTuple{N,Any}}, i::Integer) where {K,N} =
-  (xs[i], Δ -> (NamedTuple{K}(ntuple(j -> i == j ? Δ : nothing, Val(N))), nothing))
+  (xs[i], Δ -> (NamedTuple{K}(ntuple(j -> i == j ? Δ : Zero(), Val(N))), DoesNotExist()))
 
 @adjoint function Base.first(xs::Tuple)
-  drest = map(_->nothing, tail(xs))
+  drest = map(_->Zero(), tail(xs))
   first(xs), Δ -> ((Δ, drest...),)
 end
 
-@adjoint Base.tail(xs::Tuple) = tail(xs), x̄s -> ((nothing, x̄s...),)
+@adjoint Base.tail(xs::Tuple) = tail(xs), x̄s -> ((Zero(), x̄s...),)
 
 _empty(x) = length(x)
-_empty(x::Union{Tuple,NamedTuple}) = map(_->nothing, x)
+_empty(x::Union{Tuple,NamedTuple}) = map(_->nothing, x) # TODO: try this
 
 _unapply(t::Integer, xs) = xs[1:t], xs[t+1:end]
 _unapply(t, xs) = first(xs), tail(xs)
@@ -167,11 +167,7 @@ unapply(t, xs) = _unapply(t, xs)[1]
     if Δ isa AbstractZero
       return Δ
     elseif Δ === nothing
-      #Core.println("")
-      #Core.println("===========================")
       Core.println("hit 'nothing' in Core._apply")
-      #Core.println("===========================")
-      #Core.println("")
       return Zero()
     else
       (first(Δ), unapply(st, Base.tail(Δ))...)
@@ -201,17 +197,16 @@ function deref!(x::Ref)
   return d
 end
 
-# TODO: change this
-@generated nt_nothing(x) = Expr(:tuple, [:($f=nothing) for f in fieldnames(x)]...)
+@generated nt_nothing(x) = Expr(:tuple, [:($f=Zero()) for f in fieldnames(x)]...)
 
 @generated pair(::Val{k}, v) where k = :($k = v,)
 
 @adjoint function literal_getproperty(x, ::Val{f}) where f
   val = getproperty(x, f)
   function back(Δ)
-    accum_param(__context__, val, Δ) === nothing && return
+    accum_param(__context__, val, Δ) === nothing && return # TODO :revisit
     if isimmutable(x)
-      ((;nt_nothing(x)...,pair(Val(f), Δ)...), nothing)
+        ((;nt_nothing(x)...,pair(Val(f), Δ)...), DoesNotExist())
     else
       dx = grad_mut(__context__, x)
       dx[] = (;dx[]...,pair(Val(f),accum(getfield(dx[], f), Δ))...)
