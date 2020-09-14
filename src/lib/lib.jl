@@ -111,16 +111,17 @@ end
 
 function _pullback(cx::Context, ::typeof(literal_indexed_iterate), xs::Tuple, ::Val{i}) where i
   y, b = _pullback(cx, literal_getindex, xs, Val(i))
-  back(::Nothing) = nothing
+  back(::Nothing) = nothing # TODO: change this to Zero()
+  back(x::AbstractZero) = x
   back(ȳ) = b(ȳ[1])
   (y, i+1), back
 end
 
 function _pullback(cx::Context, ::typeof(literal_indexed_iterate), xs::Tuple, ::Val{i}, st) where i
   y, b = _pullback(cx, literal_getindex, xs, Val(i))
-  back(::Nothing) = nothing
+  back(::Nothing) = nothing # TODO: change this to Zero()
   back(x::AbstractZero) = x
-  back(ȳ) = (b(ȳ[1])..., nothing)
+  back(ȳ) = (b(ȳ[1])..., nothing) # TODO: change this to Zero()
   (y, i+1), back
 end
 
@@ -196,6 +197,7 @@ function deref!(x::Ref)
   return d
 end
 
+# TODO: change this
 @generated nt_nothing(x) = Expr(:tuple, [:($f=nothing) for f in fieldnames(x)]...)
 
 @generated pair(::Val{k}, v) where k = :($k = v,)
