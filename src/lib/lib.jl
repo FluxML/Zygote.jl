@@ -2,7 +2,7 @@ using Base: RefValue
 
 # Interfaces
 
-accum() = nothing
+accum() = Zero()
 accum(x) = x
 
 accum(x, y) =
@@ -167,7 +167,11 @@ unapply(t, xs) = _unapply(t, xs)[1]
     if Δ isa AbstractZero
       return Δ
     elseif Δ === nothing
-      println("hit 'nothing' in Core._apply")
+      #Core.println("")
+      #Core.println("===========================")
+      Core.println("hit 'nothing' in Core._apply")
+      #Core.println("===========================")
+      #Core.println("")
       return Zero()
     else
       (first(Δ), unapply(st, Base.tail(Δ))...)

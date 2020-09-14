@@ -36,8 +36,8 @@ using CUDA: has_cuda
     include("gradcheck.jl")
   end
 
-  println("NWARN", Zygote.NWARN)
-  println("NWARN_ZB", Zygote.NWARNZB)
+  println("NWARN ", Zygote.NWARN)
+  println("NWARNZB ", Zygote.NWARNZB)
 end
 
 #@testset "Complex" begin
