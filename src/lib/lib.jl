@@ -16,7 +16,7 @@ accum(x::Tuple, y::Tuple) = accum.(x, y)
 accum(x::AbstractArray, y::AbstractArray) = accum.(x, y)
 
 @generated function accum(x::NamedTuple, y::NamedTuple)
-  grad(x) = x in fieldnames(y) ? :(y.$x) : :nothing
+  grad(x) = x in fieldnames(y) ? :(y.$x) : :nothing # is this cond ever true? if both x, y are NamedTuples?
   Expr(:tuple, [:($f=accum(x.$f, $(grad(f)))) for f in fieldnames(x)]...)
 end
 
@@ -78,7 +78,7 @@ end
     gs = cache(__context__)
     x̄ = accum(get(gs, ref, nothing), x̄)
     gs[ref] = nothing
-    return (nothing, x̄)
+    return (DoesNotExist(), x̄)
   end
 end
 
@@ -140,7 +140,7 @@ end
 @adjoint Base.tail(xs::Tuple) = tail(xs), x̄s -> ((Zero(), x̄s...),)
 
 _empty(x) = length(x)
-_empty(x::Union{Tuple,NamedTuple}) = map(_->nothing, x) # TODO: try this
+_empty(x::Union{Tuple,NamedTuple}) = map(_->Zero(), x)
 
 _unapply(t::Integer, xs) = xs[1:t], xs[t+1:end]
 _unapply(t, xs) = first(xs), tail(xs)
@@ -181,8 +181,14 @@ if VERSION >= v"1.4.0-DEV.304"
     st = map(_empty, args)
     y, function (Δ)
       Δ = back(Δ)
-      Δ === nothing ? nothing :
-        (nothing, first(Δ), unapply(st, Base.tail(Δ))...)
+      if Δ isa AbstractZero
+        return Δ
+      elseif Δ === nothing
+        Core.println("hit 'nothing' in Core._apply")
+        return Zero()
+      else
+        (DoesNotExist(), first(Δ), unapply(st, Base.tail(Δ))...)
+      end
     end
   end
 end
@@ -244,8 +250,8 @@ end
   g = grad_mut(__context__, x)
   y, function (_)
     Δ = getfield(g[], f)
-    g[] = (;g[]...,pair(Val(f),nothing)...)
-    (nothing, nothing, Δ)
+    g[] = (;g[]...,pair(Val(f),nothing)...) # TODO: not sure about this
+    (DoesNotExist(), DoesNotExist(), Δ)
   end
 end
 
