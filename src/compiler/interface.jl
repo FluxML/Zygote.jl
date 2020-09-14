@@ -42,7 +42,7 @@ tailmemaybe(x::Tuple) = Base.tail(x)
 
 replacezero(x) = x
 replacezero(::AbstractZero) = nothing
-replacezero(::Nothing) = @warn "Use of 'nothing' to represent zero gradients is deprecated, use Zero() or DoesNotExist() from ChainRules"; nothing
+replacezero(::Nothing) = (@warn "Use of 'nothing' to represent zero gradients is deprecated, use Zero() or DoesNotExist() from ChainRules"; global NWARN += 1; nothing)
 replacezero(t::Tuple) = map(replacezero, t)
 
 function pullback(f, args...)

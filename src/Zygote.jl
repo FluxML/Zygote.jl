@@ -15,6 +15,9 @@ using LoopVectorization: vmap
 
 export Params, gradient, pullback, pushforward, @code_adjoint
 
+global NWARN = 0
+global NWARNZB= 0
+
 include("tools/idset.jl")
 include("tools/buffer.jl")
 include("tools/builtins.jl")

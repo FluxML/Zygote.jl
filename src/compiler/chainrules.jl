@@ -77,7 +77,7 @@ end
 @inline (s::ZBack)(dy) = wrap_chainrules_output(s.back(wrap_chainrules_input(dy)))
 # `nothing->nothing` can be deleted after https://github.com/FluxML/Zygote.jl/issues/603
 # though it might be worth keeping as a performance optimization (benchmarking pending)
-@inline (s::ZBack)(::Nothing) = (@warn "ZBack called with `nothing`"; Zero())
+@inline (s::ZBack)(::Nothing) = (@warn "ZBack called with `nothing`"; global NWARNZB += 1; Zero())
 
 """
     chain_rrule(f, args...)

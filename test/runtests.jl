@@ -35,6 +35,9 @@ using CUDA: has_cuda
   @testset "Gradients" begin
     include("gradcheck.jl")
   end
+
+  println("NWARN", Zygote.NWARN)
+  println("NWARN_ZB", Zygote.NWARNZB)
 end
 
 #@testset "Complex" begin
