@@ -58,8 +58,8 @@ grad_mut(ch::Channel) = Channel(ch.sz_max)
 @adjoint! function put!(ch::Channel, x)
   put!(ch, x), function (ȳ)
     x̄ = grad_mut(__context__, ch)
-    x̄ = isready(x̄) ? take!(x̄) : x̄
-    (nothing, accum(x̄, ȳ), nothing)
+    dx = isready(x̄) ? take!(x̄) : x̄
+    (nothing, accum(dx, ȳ), nothing)
   end
 end
 
@@ -102,17 +102,18 @@ end
   Base.sync_end(refs), _ -> foreach(t -> runadjoint(__context__, t), refs)
 end
 
+# Need to hold onto the references here
 @adjoint! function Base.sync_end(ch::Channel)
-  c = grad_mut(__context__, ch)
-  b = grad_mut(c)
+  ch_copy = grad_mut(__context__, ch)
+  dch = grad_mut(ch_copy)
   while !isempty(ch)
     i = take!(ch)
-    put!(c, i)
-    put!(b, i)
+    put!(ch_copy, i)
+    put!(dch, i)
   end
-  Base.sync_end(c), _ -> begin
-    while !isempty(b)
-      t = take!(b)
+  Base.sync_end(ch_copy), _ -> begin
+    while !isempty(dch)
+      t = take!(dch)
       runadjoint(__context__, t)
     end
   end
