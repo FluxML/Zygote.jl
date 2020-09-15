@@ -17,14 +17,14 @@ function gradm(ex)
     (length(name.args) == 1 ? (esc(gensym()), esc(name.args[1])) : esc.(name.args)) :
     (esc(gensym()), :(Core.Typeof($(esc(name)))))
   kT = :(Core.kwftype($T))
-  Ts == nothing && (Ts = [])
+  Ts === nothing && (Ts = [])
   args = named.(args)
   argnames = Any[typeless(arg) for arg in args]
   !isempty(args) && isvararg(args[end]) && (argnames[end] = :($(argnames[end])...,))
   args = esc.(args)
   argnames = esc.(argnames)
   Ts = esc.(Ts)
-  fargs = kw == nothing ? [:($f::$T), args...] : [kw, :($f::$T), args...]
+  fargs = kw === nothing ? [:($f::$T), args...] : [kw, :($f::$T), args...]
   dropg  = isclosure ? identity : drop(1)
   dropkw = isclosure ?  drop(2) : drop(3)
   adj = @q @inline Zygote.Forward.tangent($(fargs...)) where $(Ts...) = $(esc(body))
