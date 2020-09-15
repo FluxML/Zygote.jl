@@ -395,5 +395,5 @@ end
   math = PyCall.pyimport("math")
   pysin(x) = math.sin(x)
   Zygote.@adjoint pysin(x) = math.sin(x), (δ) -> (δ * math.cos(x), )
-  @test Zygote.gradient(math.sin, 1.5) == Zygote.gradient(sin, 1.5)
+  @test Zygote.gradient(pysin, 1.5) == Zygote.gradient(sin, 1.5)
 end
