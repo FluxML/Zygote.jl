@@ -115,7 +115,15 @@ end
 @adjoint function getindex(xs::NTuple{N,Any}, r::AbstractVector) where N
   val = xs[r]
   function back(Δ)
-    (ntuple(x -> x in r ? count(isequal(x), r) * Δ[findfirst(isequal(x), r)] : nothing, Val(N)), nothing)
+    dxs = ntuple(Val(length(xs))) do x
+      total = zero(eltype(Δ))
+      for r_i in eachindex(r)
+        r[r_i] === x || continue
+        total += Δ[r_i]
+      end
+      return total
+    end
+    return (dxs, nothing)
   end
   val, back
 end
