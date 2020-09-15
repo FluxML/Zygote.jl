@@ -111,7 +111,7 @@ function jacobian(f,x)
     n  = length(x)
     J  = Matrix{eltype(y)}(undef,k,n)
     e_i = fill!(similar(x), 0)
-    for i = 1:k
+    @inbounds for i = 1:k
         e_i[i] = oneunit(eltype(x))
         J[i,:] = back(e_i)[1]
         e_i[i] = zero(eltype(x))
