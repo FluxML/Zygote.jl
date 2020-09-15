@@ -218,7 +218,7 @@ end[1] == 1
   return x*5
 end[1] == 5
 
-@test gradient(x -> one(eltype(x)), rand(10))[1] == nothing
+@test gradient(x -> one(eltype(x)), rand(10))[1] === nothing
 
 # Thre-way control flow merge
 @test gradient(1) do x
