@@ -116,10 +116,10 @@ end
   val = xs[r]
   function back(Δ)
     dxs = ntuple(Val(length(xs))) do x
-      total = zero(eltype(Δ))
+      total = nothing
       for r_i in eachindex(r)
         r[r_i] === x || continue
-        total += Δ[r_i]
+        total = accum(total, Δ[r_i])
       end
       return total
     end
