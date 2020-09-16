@@ -16,7 +16,7 @@ accum(x::Tuple, y::Tuple) = accum.(x, y)
 accum(x::AbstractArray, y::AbstractArray) = accum.(x, y)
 
 @generated function accum(x::NamedTuple, y::NamedTuple)
-  grad(x) = x in fieldnames(y) ? :(y.$x) : :nothing # is this cond ever true? if both x, y are NamedTuples?
+  grad(fx) = fx in fieldnames(y) ? :(y.$fx) : :(Zero())
   Expr(:tuple, [:($f=accum(x.$f, $(grad(f)))) for f in fieldnames(x)]...)
 end
 
