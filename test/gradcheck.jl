@@ -141,6 +141,10 @@ end
   @test gradtest(X -> sum(x -> x^2, X), randn(10))
   @test gradtest(X -> sum(sum(x -> x^2, X; dims=1)), randn(10)) # issue #681
 
+  # Non-differentiable sum of booleans
+  @test gradient(sum, [true, false, true]) == (nothing,)
+  @test gradient(x->sum(x .== 0.0), [1.2, 0.2, 0.0, -1.1, 100.0]) == (nothing,)
+
   # https://github.com/FluxML/Zygote.jl/issues/314
   @test gradient((x,y) -> sum(yi -> yi*x, y), 1, [1,1]) == (2, [1, 1])
   @test gradient((x,y) -> prod(yi -> yi*x, y), 1, [1,1]) == (2, [1, 1])
@@ -1107,7 +1111,7 @@ end
 
         # This is impressively inaccurate, but at least it doesn't produce a NaN.
         @test first(Δ_fd) ≈ first(pb(Δ)) atol=1e-3 rtol=1e-3
-      end 
+      end
     end
 
     @testset "binary pairwise - X and Y close" begin
@@ -1565,11 +1569,11 @@ end
 @testset "@nograd" begin
   @test gradient(x->eachindex([10,20,30])[1], 11) == (nothing,)
 
-  #These are defined in ChainRules, we test them here to check we are handling them right 
+  #These are defined in ChainRules, we test them here to check we are handling them right
   @test gradient(x -> findfirst(ismissing, x), [1, missing]) == (nothing,)
   @test gradient(x -> findlast(ismissing, x), [1, missing]) == (nothing,)
   @test gradient(x -> findall(ismissing, x)[1], [1, missing]) == (nothing,)
-  
+
 
   @test gradient(x -> Zygote.ignore(() -> x*x), 1) == (nothing,)
   @test gradient(x -> Zygote.@ignore(x*x), 1) == (nothing,)

@@ -165,7 +165,7 @@ function unzip(tuples)
 end
 
 # Reverse iteration order when ∇map is applied to vector,
-# needed for stateful functions. 
+# needed for stateful functions.
 # See https://github.com/FluxML/Flux.jl/issues/1209
 # Should be generalized to abstract array, but reverse takes a dims keyword there
 _tryreverse(m, backs, Δ) = backs, Δ
@@ -184,7 +184,7 @@ for (mapfunc,∇mapfunc) in [(:map,:∇map),(:pmap,:∇pmap),(:vmap,:∇vmap)]
       ys, backs = unzip(ys_and_backs)
       ys, function (Δ)
         # Apply pullbacks in reverse order. Needed for correctness if `f` is stateful.
-        Δf_and_args_zipped = $mapfunc((f, δ) -> f(δ), _tryreverse($mapfunc, backs, Δ)...) 
+        Δf_and_args_zipped = $mapfunc((f, δ) -> f(δ), _tryreverse($mapfunc, backs, Δ)...)
         Δf_and_args = unzip(_tryreverse($mapfunc, Δf_and_args_zipped))
         Δf = reduce(accum, Δf_and_args[1])
         (Δf, Δf_and_args[2:end]...)
@@ -222,13 +222,16 @@ end
 end
 
 # Reductions
-
 @adjoint function sum(xs::AbstractArray; dims = :)
   if dims === (:)
     sum(xs), Δ -> (Fill(Δ, size(xs)),)
   else
     sum(xs, dims = dims), Δ -> (similar(xs) .= Δ,)
   end
+end
+
+@adjoint function sum(xs::AbstractArray{Bool}; dims = :)
+  sum(xs, dims = dims), Δ -> (nothing,)
 end
 
 _normalize_kws(kws::NamedTuple) = kws
