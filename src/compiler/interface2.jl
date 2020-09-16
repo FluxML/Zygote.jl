@@ -41,7 +41,7 @@ end
     rethrow(CompileError(T,e))
   end
   if g == nothing
-    Δ <: AbstractZero && return :(DoesNotExist())
+    Δ <: AbstractZero && return :(Δ)
     if Δ == Nothing
         Core.println("hit 'nothing' in (j::Pullback{T})(Δ)")
         return :(DoesNotExist())
