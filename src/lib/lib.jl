@@ -292,7 +292,7 @@ end
 @generated function (back::Jnew{T,G,true})(Δ::Union{NamedTuple,Nothing,AbstractZero,RefValue}) where {T,G}
   if !T.mutable
       Δ == Nothing && return :(Zero())
-      Δ <: AbstractZero && return :(Zero())
+      Δ <: AbstractZero && return :Δ
   end
   Δ = G == Nothing ? :Δ : :(back.g)
   quote
