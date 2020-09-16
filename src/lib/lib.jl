@@ -6,8 +6,8 @@ accum() = Zero()
 accum(x) = x
 
 accum(x, y) =
-  x === nothing ? y :
-  y === nothing ? x :
+  x isa Union{Nothing, AbstractZero} ? y :
+  y isa Union{Nothing, AbstractZero} ? x :
   x + y
 
 accum(x, y, zs...) = accum(accum(x, y), zs...)

@@ -47,7 +47,6 @@ replacezero(nt::NamedTuple) = map(replacezero, nt)
 replacezero(t::Tuple) = map(replacezero, t)
 
 function pullback(f, args...)
-  println("pullback called")
   y, back = _pullback(f, args...)
   y, Δ -> tailmemaybe(replacezero(back(Δ)))
 end
