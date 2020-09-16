@@ -57,7 +57,7 @@ unbroadcast(x::Number, x̄) = accum_sum(x̄)
 unbroadcast(x::Tuple{<:Any}, x̄) = (accum_sum(x̄),)
 unbroadcast(x::Base.RefValue, x̄) = (x=accum_sum(x̄),)
 
-unbroadcast(x::AbstractArray, x̄::Nothing) = nothing
+unbroadcast(x::AbstractArray, x̄::Union{Nothing,Array{Nothing}}) = nothing
 
 # Split Reverse Mode
 # ==================
