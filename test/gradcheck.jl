@@ -1600,6 +1600,9 @@ end
   @test gradient(x -> sum(Matrix(x[1]*I, (2, 2))), [1.0]) == ([2.0],)
   @test gradient(x -> sum(Matrix{Float64}(x[1]*I, 2, 2)), [1.0]) == ([2.0],)
   @test gradient(x -> sum(Matrix{Float64}(x[1]*I, (2, 2))), [1.0]) == ([2.0],)
+
+  # Check we haven't broken the forward pass:
+  @test first(Zygote.pullback(x->Matrix(x*I, 2,2), 8.0)) == Matrix(8.0*I, 2,2)
 end
 
 @testset "random" begin

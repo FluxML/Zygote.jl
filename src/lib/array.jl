@@ -780,17 +780,17 @@ end
   end
 end
 
-@adjoint function Matrix(::UniformScaling, i::Integer, j::Integer)
-  return Matrix(I, i, j), Δ -> ((λ=tr(Δ),), nothing, nothing)
+@adjoint function Matrix(S::UniformScaling, i::Integer, j::Integer)
+  return Matrix(S, i, j), Δ -> ((λ=tr(Δ),), nothing, nothing)
 end
-@adjoint function Matrix(::UniformScaling, ij::NTuple{2, Integer})
-  return Matrix(I, ij), Δ -> ((λ=tr(Δ),), nothing)
+@adjoint function Matrix(S::UniformScaling, ij::NTuple{2, Integer})
+  return Matrix(S, ij), Δ -> ((λ=tr(Δ),), nothing)
 end
-@adjoint function Matrix{T}(::UniformScaling, i::Integer, j::Integer) where {T}
-  return Matrix{T}(I, i, j), Δ -> ((λ=tr(Δ),), nothing, nothing)
+@adjoint function Matrix{T}(S::UniformScaling, i::Integer, j::Integer) where {T}
+  return Matrix{T}(S, i, j), Δ -> ((λ=tr(Δ),), nothing, nothing)
 end
-@adjoint function Matrix{T}(::UniformScaling, ij::NTuple{2, Integer}) where {T}
-  return Matrix{T}(I, ij), Δ -> ((λ=tr(Δ),), nothing)
+@adjoint function Matrix{T}(S::UniformScaling, ij::NTuple{2, Integer}) where {T}
+  return Matrix{T}(S, ij), Δ -> ((λ=tr(Δ),), nothing)
 end
 @adjoint function +(A::AbstractMatrix, S::UniformScaling)
   return A + S, Δ->(Δ, (λ=tr(Δ),))
