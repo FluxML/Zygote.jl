@@ -116,7 +116,7 @@ function jacobian(f,x)
         J[i,:] = back(e_i)[1]
         e_i[i] = zero(eltype(x))
     end
-    J
+    (J,)
 end
 
 """
