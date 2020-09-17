@@ -128,7 +128,7 @@ _broadcast(f::F, x...) where F = materialize(broadcasted(f, x...))
 
 _get(x::Tuple, i) = x[i]
 _get(::Nothing, i) = nothing
-collapse_nothings(xs::Union{Vector{Nothing},Array{Nothing}}) = nothing
+collapse_nothings(xs::AbstractArray{Nothing}) = nothing
 collapse_nothings(xs) = xs
 
 @adjoint function broadcasted(::AbstractArrayStyle, f, args...)
