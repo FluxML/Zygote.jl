@@ -57,7 +57,7 @@ unbroadcast(x::Number, x̄) = accum_sum(x̄)
 unbroadcast(x::Tuple{<:Any}, x̄) = (accum_sum(x̄),)
 unbroadcast(x::Base.RefValue, x̄) = (x=accum_sum(x̄),)
 
-unbroadcast(x::AbstractArray, x̄::Union{Nothing,Array{Nothing}}) = nothing
+unbroadcast(x::AbstractArray, x̄::Nothing) = nothing
 
 # Split Reverse Mode
 # ==================
@@ -128,7 +128,7 @@ _broadcast(f::F, x...) where F = materialize(broadcasted(f, x...))
 
 _get(x::Tuple, i) = x[i]
 _get(::Nothing, i) = nothing
-collapse_nothings(xs::Vector{Nothing}) = nothing
+collapse_nothings(xs::Union{Vector{Nothing},Array{Nothing}}) = nothing
 collapse_nothings(xs) = xs
 
 @adjoint function broadcasted(::AbstractArrayStyle, f, args...)

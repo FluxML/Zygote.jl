@@ -174,6 +174,11 @@ end
 @test gradient(det, 2.0)[1] == 1
 @test gradient(logdet, 2.0)[1] == 0.5
 
+
+@test gradient(x -> sum(x .== 0.5), rand(3, 3))[1] === nothing
+x1 = rand(3, 3)
+@test gradient(x -> sum(x .* (x .== maximum(x, dims=1))), x1)[1] == (x1 .== maximum(x1, dims=1))
+
 @testset "getindex" begin
   @test gradtest(x -> x[:, 2, :], (3, 4, 5))
   @test gradtest(x -> x[1:2, 3:4], (3, 4))
