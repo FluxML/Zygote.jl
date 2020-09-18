@@ -20,9 +20,9 @@ using CUDA: has_cuda
     include("features.jl")
   end
 
-  #@testset "Forward" begin
-  #  include("forward/forward.jl")
-  #end
+  @testset "Forward" begin
+    include("forward/forward.jl")
+  end
 
   @testset "Data Structures" begin
     include("structures.jl")
@@ -36,22 +36,22 @@ using CUDA: has_cuda
     include("gradcheck.jl")
   end
 
+  @testset "Complex" begin
+    include("complex.jl")
+  end
+
+  @testset "Compiler" begin
+    include("compiler.jl")
+  end
+
+  if has_cuda()
+    @testset "CUDA tests" begin
+      include("cuda.jl")
+    end
+  else
+    @warn "CUDA not found - Skipping CUDA Tests"
+  end
+
   println("NWARN ", Zygote.NWARN)
   println("NWARNZB ", Zygote.NWARNZB)
 end
-
-#@testset "Complex" begin
-#  include("complex.jl")
-#end
-#
-#@testset "Compiler" begin
-#  include("compiler.jl")
-#end
-#
-#if has_cuda()
-#  @testset "CUDA tests" begin
-#    include("cuda.jl")
-#  end
-#else
-#  @warn "CUDA not found - Skipping CUDA Tests"
-#end

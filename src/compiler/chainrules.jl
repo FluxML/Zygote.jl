@@ -99,6 +99,6 @@ As per [`chain_rrule`](@ref) but with support for kwargs.
 """
 @inline function chain_rrule_kw(kwf, kwargs, f, args...)
   y, back = rrule(f, args...; kwargs...)
-  kw_zpullback(dy) = (DoesNotExist(), DoesNotExist(), ZBack(back)(dy)...)  # first two nothings are for kwfunc and kwargs
+  kw_zpullback(dy) = (DoesNotExist(), DoesNotExist(), ZBack(back)(dy)...)  # first two DoesNotExist()s are for kwfunc and kwargs
   return y, kw_zpullback
 end
