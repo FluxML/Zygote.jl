@@ -51,7 +51,4 @@ using CUDA: has_cuda
   else
     @warn "CUDA not found - Skipping CUDA Tests"
   end
-
-  println("NWARN ", Zygote.NWARN)
-  println("NWARNZB ", Zygote.NWARNZB)
 end

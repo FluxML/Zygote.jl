@@ -4,7 +4,8 @@ using LinearAlgebra, Statistics
 using LinearAlgebra: copytri!, AbstractTriangular
 using ArrayLayouts: MemoryLayout, AbstractColumnMajor
 
-import ZygoteRules: @adjoint, @adjoint!, AContext, adjoint, _pullback, pullback, literal_getproperty
+import ZygoteRules: @adjoint, @adjoint!, AContext, adjoint, _pullback, pullback
+import ZygoteRules: literal_getproperty, zeros2nothings
 
 using ChainRules: ChainRules, rrule, unthunk, AbstractZero, Zero, DoesNotExist
 using IRTools
@@ -14,9 +15,6 @@ using MacroTools: @forward
 using LoopVectorization: vmap
 
 export Params, gradient, pullback, pushforward, @code_adjoint
-
-global NWARN = 0
-global NWARNZB= 0
 
 include("tools/idset.jl")
 include("tools/buffer.jl")
