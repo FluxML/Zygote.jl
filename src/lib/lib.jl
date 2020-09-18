@@ -203,7 +203,7 @@ function deref!(x::Ref)
   return d
 end
 
-@generated nt_nothing(x) = Expr(:tuple, [:($f=Zero()) for f in fieldnames(x)]...)
+@generated nt_nothing(x) = Expr(:tuple, [:($f=nothing) for f in fieldnames(x)]...)
 
 @generated pair(::Val{k}, v) where k = :($k = v,)
 
@@ -298,7 +298,7 @@ end
   quote
     x̄ = $Δ
     $(G == Nothing || :($Δ = nt_nothing($Δ)))
-    (nothing, ($(map(f -> :(x̄.$f), fieldnames(T))...),)) # TODO: changing this breaks many things. need to revisit
+    (nothing, ($(map(f -> :(x̄.$f), fieldnames(T))...),))
   end
 end
 
