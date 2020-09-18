@@ -42,10 +42,7 @@ end
   end
   if g == nothing
     Δ <: AbstractZero && return :(Δ)
-    if Δ == Nothing
-        Core.println("hit 'nothing' in (j::Pullback{T})(Δ)")
-        return :(DoesNotExist())
-    end
+    Δ == Nothing && return :(DoesNotExist())
     return :(error("Non-differentiable function $(repr(j.t[1]))"))
   end
   meta, _, back = g
