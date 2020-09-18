@@ -30,13 +30,13 @@ end
 
 @adjoint deepcopy(x) = deepcopy(x), ȳ -> (ȳ,)
 
-@adjoint (::Type{V})(x...) where V<:Val = V(x...), _ -> DoesNotExist()
+@adjoint (::Type{V})(x...) where V<:Val = V(x...), _ -> nothing
 
 @adjoint ifelse(cond::Bool, t, f) =
   ifelse(cond, t, f),
-  Δ -> cond ? (DoesNotExist(), Δ, zero(Δ)) : (DoesNotExist(), zero(Δ), Δ)
+  Δ -> cond ? (nothing, Δ, zero(Δ)) : (nothing, zero(Δ), Δ)
 
-@adjoint Base.typeassert(x, T) = Base.typeassert(x, T), Δ -> (Δ, DoesNotExist())
+@adjoint Base.typeassert(x, T) = Base.typeassert(x, T), Δ -> (Δ, nothing)
 
 @generated function accum_param(cx::Context, x, Δ)
   isbitstype(x) && return :(Δ)
@@ -78,7 +78,7 @@ end
     gs = cache(__context__)
     x̄ = accum(get(gs, ref, nothing), x̄)
     gs[ref] = nothing
-    return (DoesNotExist(), x̄)
+    return (nothing, x̄)
   end
 end
 
@@ -91,8 +91,8 @@ using Base: tail
 @adjoint function literal_getindex(xs::NTuple{N,Any}, ::Val{i}) where {N,i}
   val = xs[i]
   function back(Δ)
-    accum_param(__context__, val, Δ) === nothing && return #  TODO: revisit
-    return ntuple(j -> i == j ? Δ : Zero(), Val(N)), DoesNotExist()
+    accum_param(__context__, val, Δ) === nothing && return
+    return ntuple(j -> i == j ? Δ : nothing, Val(N)), nothing
   end
   val, back
 end
@@ -101,13 +101,13 @@ end
   val = xs[i]
   function back(Δ)
     accum_param(__context__, val, Δ) === nothing && return
-    return ntuple(j -> i == j ? Δ : Zero(), Val(N)), DoesNotExist()
+    return ntuple(j -> i == j ? Δ : nothing, Val(N)), nothing
   end
   return val, back
 end
 
 @adjoint getindex(xs::NTuple{N,Any}, r::AbstractUnitRange) where N =
-  (xs[r], Δ -> (ntuple(j -> j in r ? Δ[findfirst(isequal(j), r)] : Zero(), Val(N)), DoesNotExist()))
+  (xs[r], Δ -> (ntuple(j -> j in r ? Δ[findfirst(isequal(j), r)] : nothing, Val(N)), nothing))
 
 function _pullback(cx::Context, ::typeof(literal_indexed_iterate), xs::Tuple, ::Val{i}) where i
   y, b = _pullback(cx, literal_getindex, xs, Val(i))
@@ -127,17 +127,17 @@ end
 
 # Needed for iteration lowering
 @adjoint Core.getfield(xs::NTuple{N,Any}, i::Integer) where N =
-  (xs[i], Δ -> (ntuple(j -> i == j ? Δ : Zero(), Val(N)), DoesNotExist()))
+  (xs[i], Δ -> (ntuple(j -> i == j ? Δ : nothing, Val(N)), nothing))
 
 @adjoint Core.getfield(xs::NamedTuple{K,<:NTuple{N,Any}}, i::Integer) where {K,N} =
-  (xs[i], Δ -> (NamedTuple{K}(ntuple(j -> i == j ? Δ : Zero(), Val(N))), DoesNotExist()))
+  (xs[i], Δ -> (NamedTuple{K}(ntuple(j -> i == j ? Δ : nothing, Val(N))), nothing))
 
 @adjoint function Base.first(xs::Tuple)
-  drest = map(_->Zero(), tail(xs))
+  drest = map(_->nothing, tail(xs))
   first(xs), Δ -> ((Δ, drest...),)
 end
 
-@adjoint Base.tail(xs::Tuple) = tail(xs), x̄s -> ((Zero(), x̄s...),)
+@adjoint Base.tail(xs::Tuple) = tail(xs), x̄s -> ((nothing, x̄s...),)
 
 _empty(x) = length(x)
 _empty(x::Union{Tuple,NamedTuple}) = map(_->Zero(), x)
@@ -187,7 +187,7 @@ if VERSION >= v"1.4.0-DEV.304"
         Core.println("hit 'nothing' in Core._apply")
         return Zero()
       else
-        (DoesNotExist(), first(Δ), unapply(st, Base.tail(Δ))...)
+        (nothing, first(Δ), unapply(st, Base.tail(Δ))...)
       end
     end
   end
@@ -210,9 +210,9 @@ end
 @adjoint function literal_getproperty(x, ::Val{f}) where f
   val = getproperty(x, f)
   function back(Δ)
-    accum_param(__context__, val, Δ) === nothing && return # TODO :revisit
+    accum_param(__context__, val, Δ) === nothing && return
     if isimmutable(x)
-        ((;nt_nothing(x)...,pair(Val(f), Δ)...), DoesNotExist())
+        ((;nt_nothing(x)...,pair(Val(f), Δ)...), nothing)
     else
       dx = grad_mut(__context__, x)
       dx[] = (;dx[]...,pair(Val(f),accum(getfield(dx[], f), Δ))...)
@@ -250,8 +250,8 @@ end
   g = grad_mut(__context__, x)
   y, function (_)
     Δ = getfield(g[], f)
-    g[] = (;g[]...,pair(Val(f),nothing)...) # TODO: not sure about this
-    (DoesNotExist(), DoesNotExist(), Δ)
+    g[] = (;g[]...,pair(Val(f),nothing)...)
+    (nothing, nothing, Δ)
   end
 end
 
