@@ -140,7 +140,7 @@ end
 @adjoint Base.tail(xs::Tuple) = tail(xs), x̄s -> ((nothing, x̄s...),)
 
 _empty(x) = length(x)
-_empty(x::Union{Tuple,NamedTuple}) = map(_->Zero(), x)
+_empty(x::Union{Tuple,NamedTuple}) = map(_->nothing, x)
 
 _unapply(t::Integer, xs) = xs[1:t], xs[t+1:end]
 _unapply(t, xs) = first(xs), tail(xs)
@@ -165,10 +165,9 @@ unapply(t, xs) = _unapply(t, xs)[1]
   y, function (Δ)
     Δ = back(Δ)
     if Δ isa AbstractZero
-      return Δ
+      return nothing
     elseif Δ === nothing
-      Core.println("hit 'nothing' in Core._apply")
-      return Zero()
+      return nothing
     else
       (first(Δ), unapply(st, Base.tail(Δ))...)
     end
@@ -182,10 +181,9 @@ if VERSION >= v"1.4.0-DEV.304"
     y, function (Δ)
       Δ = back(Δ)
       if Δ isa AbstractZero
-        return Δ
+        return nothing
       elseif Δ === nothing
-        Core.println("hit 'nothing' in Core._apply")
-        return Zero()
+        return nothing
       else
         (nothing, first(Δ), unapply(st, Base.tail(Δ))...)
       end
