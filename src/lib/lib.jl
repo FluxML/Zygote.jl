@@ -255,7 +255,7 @@ end
   end
 end
 
-struct Jnew{T,G,splat}
+struct Jnew{T,G,splat} # T is the primal type, G is the gradient type
   g::G
 end
 
@@ -273,8 +273,16 @@ end
   x, Jnew{T,typeof(g),true}(g)
 end
 
+const allowed_gradient_T = Union{
+    NamedTuple,
+    Nothing,
+    AbstractZero,
+    RefValue,
+    ChainRules.Composite{Any, T} where T<:Union{Tuple, NamedTuple}
+    }
+
 # TODO captured mutables + multiple calls to `back`
-@generated function (back::Jnew{T,G,false})(Δ::Union{NamedTuple,Nothing,AbstractZero,RefValue}) where {T,G}
+@generated function (back::Jnew{T,G,false})(Δ::allowed_gradient_T) where {T,G}
   if !T.mutable
       Δ == Nothing && return :(Zero())
       Δ <: AbstractZero && return :(Zero())
@@ -289,7 +297,7 @@ end
   end
 end
 
-@generated function (back::Jnew{T,G,true})(Δ::Union{NamedTuple,Nothing,AbstractZero,RefValue}) where {T,G}
+@generated function (back::Jnew{T,G,true})(Δ::allowed_gradient_T) where {T,G}
   if !T.mutable
       Δ == Nothing && return :(Zero())
       Δ <: AbstractZero && return :Δ

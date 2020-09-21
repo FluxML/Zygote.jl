@@ -43,15 +43,15 @@ Convert `x` from the differentials types ChainRules uses to the format Zygote us
 # Zygote convention: even if many AbstractZero partials (i.e. multi-input function), make just 1 nothing.
 @inline wrap_chainrules_output(x::Tuple{Vararg{ChainRules.AbstractZero}}) = Zero()
 @inline wrap_chainrules_output(x::ChainRules.AbstractZero) = x
-for T_outer in (:Tuple, :NamedTuple)
-  # we create separate methods rather than using a `Union` + an `if` so that we avoid a
-  # branch that changes output type, because nested AD on that kinda thing makes Zygote less
-  # than happy.
-  @eval @inline function wrap_chainrules_output(x::ChainRules.Composite{P, T}) where {P, T<:$T_outer}
-    xp = map(wrap_chainrules_output, x)
-    convert($T_outer, xp)
-  end
-end
+#for T_outer in (:Tuple, :NamedTuple)
+#  # we create separate methods rather than using a `Union` + an `if` so that we avoid a
+#  # branch that changes output type, because nested AD on that kinda thing makes Zygote less
+#  # than happy.
+#  @eval @inline function wrap_chainrules_output(x::ChainRules.Composite{P, T}) where {P, T<:$T_outer}
+#    xp = map(wrap_chainrules_output, x)
+#    convert($T_outer, xp)
+#  end
+#end
 
 """
     wrap_chainrules_input(x)
