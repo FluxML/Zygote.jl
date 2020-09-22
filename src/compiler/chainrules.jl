@@ -99,6 +99,14 @@ As per [`chain_rrule`](@ref) but with support for kwargs.
 """
 @inline function chain_rrule_kw(kwf, kwargs, f, args...)
   y, back = rrule(f, args...; kwargs...)
-  kw_zpullback(dy) = (nothing, nothing, ZBack(back)(dy)...)  # first two nothings are for kwfunc and kwargs
+  function kw_zpullback(dy)
+    dxs = ZBack(back)(dy)
+    if dxs === nothing  # if dxs is nothing, then all partiaols are nothing
+      # Zygote convention is a single nothing no mather how partials, if all are nothing
+      return nothing
+    else
+      return (nothing, nothing, dxs...)  # first two nothings are for kwfunc and kwargs
+    end
+  end
   return y, kw_zpullback
 end
