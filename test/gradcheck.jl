@@ -1084,7 +1084,8 @@ end
     end
 
     @testset "binary colwise" begin
-      X, Y = randn(rng, D, P), randn(rng, D, P)
+      X = randn(D, P)
+      Y = randn(D, P)
       @test gradtest(X -> colwise(metric, X, Y), X)
       @test gradtest(Y -> colwise(metric, X, Y), Y)
       @test gradtest(X -> colwise(metric, X, X), X)
@@ -1106,8 +1107,8 @@ end
         _, pb = Zygote.pullback(X -> pairwise(metric, X, Y; dims=2), X)
 
         # This is impressively inaccurate, but at least it doesn't produce a NaN.
-        @test first(Δ_fd) ≈ first(pb(Δ)) atol=1e-3 rtol=1e-3
-      end 
+        @test first(Δ_fd) ≈ first(pb(Δ)) atol=1e-9 rtol=1e-9
+      end
     end
 
     @testset "binary pairwise - X and Y close" begin
@@ -1124,8 +1125,40 @@ end
     end
 
     @testset "unary pairwise" begin
-      @test gradtest(X->pairwise(metric, X; dims=2), randn(rng, D, P))
-      @test gradtest(Xt->pairwise(metric, Xt; dims=1), randn(rng, P, D))
+
+      X = randn(D, P)
+      Xt = randn(P, D)
+      @test gradtest(X->pairwise(metric, X; dims=2), X)
+      @test gradtest(Xt->pairwise(metric, Xt; dims=1), Xt)
+
+      @testset "X contains duplicates" begin
+        # Zygote's gradtest isn't sufficiently accurate to assess this, so we use
+        # FiniteDifferences.jl instead.
+        Y = hcat(X, X)
+
+        Δ = randn(size(Y, 2), size(Y, 2))
+        Δ_fd = FiniteDifferences.j′vp(
+          central_fdm(5, 1), X -> pairwise(metric, X; dims=2), Δ, Y,
+        )
+        _, pb = Zygote.pullback(X -> pairwise(metric, X; dims=2), Y)
+
+        # This is impressively inaccurate, but at least it doesn't produce a NaN.
+        @test first(Δ_fd) ≈ first(pb(Δ)) atol=1e-9 rtol=1e-9
+      end
+      @testset "Xt contains duplicates" begin
+        # Zygote's gradtest isn't sufficiently accurate to assess this, so we use
+        # FiniteDifferences.jl instead.
+        Y = vcat(Xt, Xt)
+
+        Δ = randn(size(Y, 1), size(Y, 1))
+        Δ_fd = FiniteDifferences.j′vp(
+          central_fdm(5, 1), X -> pairwise(metric, X; dims=1), Δ, Y,
+        )
+        _, pb = Zygote.pullback(X -> pairwise(metric, X; dims=1), Y)
+
+        # This is impressively inaccurate, but at least it doesn't produce a NaN.
+        @test first(Δ_fd) ≈ first(pb(Δ)) atol=1e-9 rtol=1e-9
+      end
     end
   end
 end
