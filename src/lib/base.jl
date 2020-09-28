@@ -127,5 +127,5 @@ end
 end
 
 @adjoint function Base.Iterators.Zip(is)
-  Base.Iterators.Zip(is), Δ -> (Δ,)
+  Base.Iterators.Zip(is), Δ -> (unzip(Δ),)
 end
