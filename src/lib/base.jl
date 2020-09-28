@@ -125,3 +125,7 @@ end
     end
     return getfield(p, i), pair_getfield
 end
+
+@adjoint function Base.Iterators.Zip(is)
+  Base.Iterators.Zip(is), Δ -> (Δ,)
+end
