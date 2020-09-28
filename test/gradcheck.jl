@@ -209,6 +209,11 @@ end
   @test back([nothing]) == ([nothing for _ in 1:3], nothing)
 end
 
+@testset "Zip" begin
+  f(xs, ys) = sum([x * y for (x, y) in zip(xs, ys)])
+  @test gradtest(f, 3 .* ones(3), 2 .* ones(3))
+end
+
 @testset "view" begin
   @test gradtest(x -> view(x,:,2,:), (3,4,5))
   @test gradtest(x -> view(x,1:2,3:4), (3,4))
