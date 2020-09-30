@@ -278,8 +278,8 @@ const allowed_gradient_T = Union{
     Nothing,
     AbstractZero,
     RefValue,
-    ChainRules.Composite{Any, T} where T<:Union{Tuple, NamedTuple}
-    }
+    ChainRules.Composite{Any, T} where T<:Union{Tuple, NamedTuple} # TODO implement in the functions
+}
 
 # TODO captured mutables + multiple calls to `back`
 @generated function (back::Jnew{T,G,false})(Δ::allowed_gradient_T) where {T,G}
