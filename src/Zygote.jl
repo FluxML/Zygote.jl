@@ -5,7 +5,7 @@ using LinearAlgebra: copytri!, AbstractTriangular
 using ArrayLayouts: MemoryLayout, AbstractColumnMajor
 
 import ZygoteRules: @adjoint, @adjoint!, AContext, adjoint, _pullback, pullback
-import ZygoteRules: literal_getproperty, diff2generic
+import ZygoteRules: literal_getproperty, differential2legacy, legacy2differential
 
 using ChainRules: ChainRules, rrule, unthunk, AbstractZero, Zero, DoesNotExist
 using IRTools
