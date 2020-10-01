@@ -163,10 +163,8 @@ unapply(t, xs) = _unapply(t, xs)[1]
   y, back = Core._apply(_pullback, (__context__, f), args...)
   st = map(_empty, args)
   y, function (Δ)
-    Δ = back(Δ)
-    if Δ isa AbstractZero
-      return nothing
-    elseif Δ === nothing
+    Δ = differential2legacy(back(legacy2differential(Δ)))
+    if Δ === nothing
       return nothing
     else
       (first(Δ), unapply(st, Base.tail(Δ))...)
@@ -180,7 +178,7 @@ if VERSION >= v"1.4.0-DEV.304"
     st = map(_empty, args)
     y, function (Δ)
       Δ = back(Δ)
-      if Δ isa AbstractZero
+      if Δ isa AbstractZero # TODO edit as above
         return nothing
       elseif Δ === nothing
         return nothing

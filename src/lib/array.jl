@@ -165,7 +165,7 @@ function unzip(tuples)
 end
 
 # Reverse iteration order when ∇map is applied to vector,
-# needed for stateful functions. 
+# needed for stateful functions.
 # See https://github.com/FluxML/Flux.jl/issues/1209
 # Should be generalized to abstract array, but reverse takes a dims keyword there
 _tryreverse(m, backs, Δ) = backs, Δ
@@ -179,12 +179,12 @@ for (mapfunc,∇mapfunc) in [(:map,:∇map),(:pmap,:∇pmap),(:vmap,:∇vmap)]
   @eval function $∇mapfunc(cx, f, args...)
     ys_and_backs = $mapfunc((args...) -> _pullback(cx, f, args...), args...)
     if isempty(ys_and_backs)
-      ys_and_backs, _ -> nothing
+      ys_and_backs, _ -> DoesNotExist()
     else
       ys, backs = unzip(ys_and_backs)
       ys, function (Δ)
         # Apply pullbacks in reverse order. Needed for correctness if `f` is stateful.
-        Δf_and_args_zipped = $mapfunc((f, δ) -> f(δ), _tryreverse($mapfunc, backs, Δ)...) 
+        Δf_and_args_zipped = $mapfunc((f, δ) -> f(δ), _tryreverse($mapfunc, backs, Δ)...)
         Δf_and_args = unzip(_tryreverse($mapfunc, Δf_and_args_zipped))
         Δf = reduce(accum, Δf_and_args[1])
         (Δf, Δf_and_args[2:end]...)
@@ -201,7 +201,7 @@ function _pullback(cx::AContext, ::typeof(collect), g::Base.Generator)
   y, back = ∇map(cx, g.f, g.iter)
   y, function (ȳ)
     f̄, x̄ = back(ȳ)
-    (nothing, (f = f̄, iter = x̄),)
+    (DoesNotExist(), (f = f̄, iter = x̄),)
   end
 end
 
@@ -238,7 +238,7 @@ function _pullback(cx::AContext, kwtype, kws, ::typeof(sum), f, xs::AbstractArra
   norm_kws = _normalize_kws(kws)
   @assert !haskey(norm_kws, :init) # TODO add init support (julia 1.6)
   y, back = pullback(cx, (f, xs) -> sum(f.(xs); norm_kws...), f, xs)
-  y, ȳ -> (nothing, nothing, nothing, back(ȳ)...)
+  y, ȳ -> (DoesNotExist(), DoesNotExist(), DoesNotExist(), back(ȳ)...)
 end
 
 @adjoint function sum(::typeof(abs2), X::AbstractArray; dims = :)
@@ -252,7 +252,7 @@ end
 
 function _pullback(cx::AContext, ::typeof(prod), f, xs::AbstractArray)
   y, back = pullback(cx, ((f, xs) -> prod(f.(xs))), f, xs)
-  y, ȳ -> (nothing, back(ȳ)...)
+  y, ȳ -> (DoesNotExist(), back(ȳ)...)
 end
 
 @adjoint function maximum(xs::AbstractArray; dims = :)
