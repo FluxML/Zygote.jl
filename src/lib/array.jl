@@ -184,7 +184,10 @@ for (mapfunc,∇mapfunc) in [(:map,:∇map),(:pmap,:∇pmap),(:vmap,:∇vmap)]
       ys, backs = unzip(ys_and_backs)
       ys, function (Δ)
         # Apply pullbacks in reverse order. Needed for correctness if `f` is stateful.
-        Δf_and_args_zipped = $mapfunc((f, δ) -> f(δ), _tryreverse($mapfunc, backs, Δ)...)
+        Δf_and_args_zipped = $mapfunc(
+          (f, δ) -> differential2legacy(f(legacy2differential(δ))),
+          _tryreverse($mapfunc, backs, Δ)...
+        )
         Δf_and_args = unzip(_tryreverse($mapfunc, Δf_and_args_zipped))
         Δf = reduce(accum, Δf_and_args[1])
         (Δf, Δf_and_args[2:end]...)
@@ -200,7 +203,7 @@ end
 function _pullback(cx::AContext, ::typeof(collect), g::Base.Generator)
   y, back = ∇map(cx, g.f, g.iter)
   y, function (ȳ)
-    f̄, x̄ = back(ȳ)
+    f̄, x̄ = legacy2differential(back(differential2legacy(ȳ)))
     (DoesNotExist(), (f = f̄, iter = x̄),)
   end
 end
