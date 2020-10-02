@@ -199,8 +199,6 @@ end
 
 @generated nt_nothing(x) = Expr(:tuple, [:($f=nothing) for f in fieldnames(x)]...)
 
-@generated nt_zero(x) = Expr(:tuple, [:($f=Zero()) for f in fieldnames(x)]...)
-
 @generated pair(::Val{k}, v) where k = :($k = v,)
 
 @adjoint function literal_getproperty(x, ::Val{f}) where f
@@ -272,29 +270,27 @@ end
 # TODO captured mutables + multiple calls to `back`
 @generated function (back::Jnew{T,G,false})(Δ::Union{NamedTuple,Nothing,AbstractZero,RefValue}) where {T,G}
   if !T.mutable
-      Δ == Nothing && return :(Zero()) # TODO: why does this still happen?
-      Δ <: AbstractZero && return :(Zero())
+    Δ == Nothing && return :nothing
   end
   Δ = G == Nothing ? :Δ :
       Δ <: RefValue ? :(back.g[]) :
       :(accum(back.g[], Δ))
   quote
     x̄ = $Δ
-    $(G == Nothing || :(back.g[] = nt_zero($Δ)))
-    (DoesNotExist(), $(map(f -> :(x̄.$f), fieldnames(T))...))
+    $(G == Nothing || :(back.g[] = nt_nothing($Δ)))
+    (nothing, $(map(f -> :(x̄.$f), fieldnames(T))...))
   end
 end
 
 @generated function (back::Jnew{T,G,true})(Δ::Union{NamedTuple,Nothing,AbstractZero,RefValue}) where {T,G}
   if !T.mutable
-      Δ == Nothing && return :(Zero()) # TODO: why does this still happen?
-      Δ <: AbstractZero && return :Δ
+      Δ == Nothing && return :nothing
   end
   Δ = G == Nothing ? :Δ : :(back.g)
   quote
     x̄ = $Δ
-    $(G == Nothing || :($Δ = nt_zero($Δ)))
-    (DoesNotExist(), ($(map(f -> :(x̄.$f), fieldnames(T))...),))
+    $(G == Nothing || :($Δ = nt_nothing($Δ)))
+    (nothing, ($(map(f -> :(x̄.$f), fieldnames(T))...),))
   end
 end
 
