@@ -2,12 +2,12 @@ using Base: RefValue
 
 # Interfaces
 
-accum() = Zero()
+accum() = nothing
 accum(x) = x
 
 accum(x, y) =
-  x isa Union{Nothing, AbstractZero} ? y :
-  y isa Union{Nothing, AbstractZero} ? x :
+  x === nothing ? y :
+  y === nothing ? x :
   x + y
 
 accum(x, y, zs...) = accum(accum(x, y), zs...)
