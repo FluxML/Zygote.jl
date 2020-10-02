@@ -179,7 +179,7 @@ for (mapfunc,∇mapfunc) in [(:map,:∇map),(:pmap,:∇pmap),(:vmap,:∇vmap)]
   @eval function $∇mapfunc(cx, f, args...)
     ys_and_backs = $mapfunc((args...) -> _pullback(cx, f, args...), args...)
     if isempty(ys_and_backs)
-      ys_and_backs, _ -> DoesNotExist()
+      ys_and_backs, _ -> nothing
     else
       ys, backs = unzip(ys_and_backs)
       ys, function (Δ)
