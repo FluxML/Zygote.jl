@@ -111,7 +111,7 @@ end
 
 function _pullback(cx::Context, ::typeof(literal_indexed_iterate), xs::Tuple, ::Val{i}) where i
   y, b = _pullback(cx, literal_getindex, xs, Val(i))
-  back(::Nothing) = (difftype_error(); return Zero())
+  back(::Nothing) = (legacytype_error(); return Zero())
   back(x::AbstractZero) = x
   back(ȳ) = b(ȳ[1])
   (y, i+1), back
@@ -119,7 +119,7 @@ end
 
 function _pullback(cx::Context, ::typeof(literal_indexed_iterate), xs::Tuple, ::Val{i}, st) where i
   y, b = _pullback(cx, literal_getindex, xs, Val(i))
-  back(::Nothing) = (difftype_error(); return Zero())
+  back(::Nothing) = (legacytype_error(); return Zero())
   back(x::AbstractZero) = x
   back(ȳ) = (b(ȳ[1])..., Zero())
   (y, i+1), back

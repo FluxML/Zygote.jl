@@ -42,7 +42,7 @@ end
   end
   if g == nothing
     Δ <: AbstractZero && return :(Δ)
-    Δ == Nothing && (difftype_error(); return DoesNotExist())
+    Δ == Nothing && (legacytype_error(); return DoesNotExist())
     return :(error("Non-differentiable function $(repr(j.t[1]))"))
   end
   meta, _, back = g
