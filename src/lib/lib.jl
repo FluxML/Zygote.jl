@@ -111,7 +111,7 @@ end
 
 function _pullback(cx::Context, ::typeof(literal_indexed_iterate), xs::Tuple, ::Val{i}) where i
   y, b = _pullback(cx, literal_getindex, xs, Val(i))
-  back(::Nothing) = Zero()
+  back(::Nothing) = (difftype_error(); return Zero())
   back(x::AbstractZero) = x
   back(ȳ) = b(ȳ[1])
   (y, i+1), back
@@ -119,7 +119,7 @@ end
 
 function _pullback(cx::Context, ::typeof(literal_indexed_iterate), xs::Tuple, ::Val{i}, st) where i
   y, b = _pullback(cx, literal_getindex, xs, Val(i))
-  back(::Nothing) = Zero()
+  back(::Nothing) = (difftype_error(); return Zero())
   back(x::AbstractZero) = x
   back(ȳ) = (b(ȳ[1])..., Zero())
   (y, i+1), back
@@ -177,10 +177,8 @@ if VERSION >= v"1.4.0-DEV.304"
     y, back = Core._apply(_pullback, (__context__, f), args...)
     st = map(_empty, args)
     y, function (Δ)
-      Δ = back(Δ)
-      if Δ isa AbstractZero # TODO edit as above
-        return nothing
-      elseif Δ === nothing
+      Δ = differential2legacy(back(legacy2differential(Δ)))
+      if Δ === nothing
         return nothing
       else
         (nothing, first(Δ), unapply(st, Base.tail(Δ))...)
@@ -274,7 +272,7 @@ end
 # TODO captured mutables + multiple calls to `back`
 @generated function (back::Jnew{T,G,false})(Δ::Union{NamedTuple,Nothing,AbstractZero,RefValue}) where {T,G}
   if !T.mutable
-      Δ == Nothing && return :(Zero())
+      Δ == Nothing && return :(Zero()) # TODO: why does this still happen?
       Δ <: AbstractZero && return :(Zero())
   end
   Δ = G == Nothing ? :Δ :
@@ -289,7 +287,7 @@ end
 
 @generated function (back::Jnew{T,G,true})(Δ::Union{NamedTuple,Nothing,AbstractZero,RefValue}) where {T,G}
   if !T.mutable
-      Δ == Nothing && return :(Zero())
+      Δ == Nothing && return :(Zero()) # TODO: why does this still happen?
       Δ <: AbstractZero && return :Δ
   end
   Δ = G == Nothing ? :Δ : :(back.g)

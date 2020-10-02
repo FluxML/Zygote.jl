@@ -42,7 +42,7 @@ tailmemaybe(x::Tuple) = Base.tail(x)
 
 function pullback(f, args...)
   y, back = _pullback(f, args...)
-  y, Δ -> tailmemaybe(differential2legacy(back(Δ)))
+  y, Δ -> tailmemaybe(differential2legacy(back(legacy2differential(Δ))))
 end
 
 sensitivity(y::Number) = one(y)

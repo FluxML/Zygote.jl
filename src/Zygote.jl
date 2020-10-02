@@ -6,6 +6,7 @@ using ArrayLayouts: MemoryLayout, AbstractColumnMajor
 
 import ZygoteRules: @adjoint, @adjoint!, AContext, adjoint, _pullback, pullback
 import ZygoteRules: literal_getproperty, differential2legacy, legacy2differential
+import ZygoteRules: difftype_error
 
 using ChainRules: ChainRules, rrule, unthunk, AbstractZero, Zero, DoesNotExist
 using IRTools
