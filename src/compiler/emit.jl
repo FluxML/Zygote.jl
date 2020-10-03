@@ -96,7 +96,7 @@ end
 varargs(m::Method, n) = m.isva ? n - m.nargs + 1 : nothing
 
 function _lookup_grad(T)
-  (m = meta(T)) == nothing && return
+  (m = meta(T)) === nothing && return
   va = varargs(m.method, length(T.parameters))
   forw, back = stacks!(Adjoint(IR(m), varargs = va, normalise = false), T)
   m, forw, back
