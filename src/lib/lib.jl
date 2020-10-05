@@ -53,7 +53,7 @@ end
 function accum_global(cx::Context, ref, x̄)
   (x̄ === nothing || isconst(ref.mod, ref.name)) && return
   gs = cache(cx)
-  gs[ref] = accum(get(gs, ref, nothing), x̄)
+  gs[ref] = accum(get(gs, ref, Zero()), x̄)
   return
 end
 
@@ -199,6 +199,8 @@ end
 
 @generated nt_nothing(x) = Expr(:tuple, [:($f=nothing) for f in fieldnames(x)]...)
 
+@generated nt_zero(x) = Expr(:tuple, [:($f=Zero()) for f in fieldnames(x)]...)
+
 @generated pair(::Val{k}, v) where k = :($k = v,)
 
 @adjoint function literal_getproperty(x, ::Val{f}) where f
@@ -255,42 +257,54 @@ end
 
 Jnew{T}(g) where T = Jnew{T,typeof(g)}(g)
 
-@adjoint! function __new__(T, args...)
+function _pullback(__context__::AContext, ::typeof(__new__), T, args...)
   x = __new__(T, args...)
-  g = !T.mutable || fieldcount(T) == 0 ? nothing : grad_mut(__context__, x)
-  x, Jnew{T,typeof(g),false}(g)
+  g = !T.mutable || fieldcount(T) == 0 ? Zero() : grad_mut(__context__, x)
+  return x, Jnew{T,typeof(g),false}(g)
 end
 
-@adjoint! function __splatnew__(T, args)
+function _pullback(__context__::AContext, ::typeof(__splatnew__), T, args)
   x = __splatnew__(T, args)
-  g = !T.mutable || fieldcount(T) == 0 ? nothing : grad_mut(__context__, x)
-  x, Jnew{T,typeof(g),true}(g)
+  g = !T.mutable || fieldcount(T) == 0 ? Zero() : grad_mut(__context__, x)
+  return x, Jnew{T,typeof(g),true}(g)
 end
 
 # TODO captured mutables + multiple calls to `back`
 @generated function (back::Jnew{T,G,false})(Δ::Union{NamedTuple,Nothing,AbstractZero,RefValue}) where {T,G}
+  Δ == Nothing && legacytype_error()
   if !T.mutable
-    Δ == Nothing && return :nothing
+    Δ <: AbstractZero && return :Δ
   end
-  Δ = G == Nothing ? :Δ :
-      Δ <: RefValue ? :(back.g[]) :
-      :(accum(back.g[], Δ))
+  Δ_expr = if G <: AbstractZero
+    :Δ
+  elseif Δ <: RefValue
+    :(back.g[]) # TODO: is this right? Why don't we need to accum? 
+  else
+    :(accum(back.g[], Δ))
+  end
   quote
-    x̄ = $Δ
-    $(G == Nothing || :(back.g[] = nt_nothing($Δ)))
-    (nothing, $(map(f -> :(x̄.$f), fieldnames(T))...))
+    x̄ = $Δ_expr
+    $(G <: AbstractZero || :(back.g[] = nt_zero($Δ_expr)))
+    ret = (DoesNotExist(), $(map(f -> :(x̄.$f), fieldnames(T))...))
+    return ZygoteRules.gradtuple1(ret)
   end
 end
 
 @generated function (back::Jnew{T,G,true})(Δ::Union{NamedTuple,Nothing,AbstractZero,RefValue}) where {T,G}
+  Δ == Nothing && legacytype_error()
   if !T.mutable
-      Δ == Nothing && return :nothing
+    Δ <: AbstractZero && return :Δ
   end
-  Δ = G == Nothing ? :Δ : :(back.g)
+  Δ_expr = G <: AbstractZero ? :Δ : :(back.g)
+  x̄_expr = if G <: AbstractZero
+    :(x̄ = nt_zero($Δ_expr))
+  else
+    :(x̄ = $Δ_expr)
+  end
   quote
-    x̄ = $Δ
-    $(G == Nothing || :($Δ = nt_nothing($Δ)))
-    (nothing, ($(map(f -> :(x̄.$f), fieldnames(T))...),))
+    $x̄_expr
+    ret = (DoesNotExist(), ($(map(f -> :(x̄.$f), fieldnames(T))...),))
+    return ZygoteRules.gradtuple1(ret)
   end
 end
 
