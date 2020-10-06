@@ -147,6 +147,7 @@ end
 
   @test gradtest(x -> prod(x, dims = (2, 3)), (3,4,5))
   @test gradtest(x -> prod(x), (3,4))
+  @test gradtest(X -> prod(x -> x^2, X), randn(10))
   @test gradient(x -> prod(x), (1,2,3))[1] == (6,3,2)
 
   @test gradtest(x -> cumsum(x, dims=2), (3,4,5))
