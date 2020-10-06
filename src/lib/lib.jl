@@ -257,16 +257,16 @@ end
 
 Jnew{T}(g) where T = Jnew{T,typeof(g)}(g)
 
-function _pullback(__context__::AContext, ::typeof(__new__), T, args...)
+function _pullback(__context__::AContext, ::typeof(__new__), ::Type{T}, args...) where T
   x = __new__(T, args...)
   g = !T.mutable || fieldcount(T) == 0 ? Zero() : grad_mut(__context__, x)
-  return x, Jnew{T,typeof(g),false}(g)
+  return x, Δ -> ZygoteRules.gradtuple1(Jnew{T,typeof(g),false}(g)(Δ))
 end
 
-function _pullback(__context__::AContext, ::typeof(__splatnew__), T, args)
+function _pullback(__context__::AContext, ::typeof(__splatnew__), ::Type{T}, args) where T
   x = __splatnew__(T, args)
   g = !T.mutable || fieldcount(T) == 0 ? Zero() : grad_mut(__context__, x)
-  return x, Jnew{T,typeof(g),true}(g)
+  return x,  Δ -> ZygoteRules.gradtuple1(Jnew{T,typeof(g),true}(g)(Δ))
 end
 
 # TODO captured mutables + multiple calls to `back`
@@ -285,26 +285,22 @@ end
   quote
     x̄ = $Δ_expr
     $(G <: AbstractZero || :(back.g[] = nt_zero($Δ_expr)))
-    ret = (DoesNotExist(), $(map(f -> :(x̄.$f), fieldnames(T))...))
-    return ZygoteRules.gradtuple1(ret)
+    return (DoesNotExist(), $(map(f -> :(x̄.$f), fieldnames(T))...))
   end
 end
 
 @generated function (back::Jnew{T,G,true})(Δ::Union{NamedTuple,Nothing,AbstractZero,RefValue}) where {T,G}
-  Δ == Nothing && legacytype_error()
-  if !T.mutable
-    Δ <: AbstractZero && return :Δ
-  end
-  Δ_expr = G <: AbstractZero ? :Δ : :(back.g)
-  x̄_expr = if G <: AbstractZero
-    :(x̄ = nt_zero($Δ_expr))
-  else
-    :(x̄ = $Δ_expr)
-  end
-  quote
-    $x̄_expr
-    ret = (DoesNotExist(), ($(map(f -> :(x̄.$f), fieldnames(T))...),))
-    return ZygoteRules.gradtuple1(ret)
+  !T.mutable && Δ <: AbstractZero && return :Δ
+  if G <: AbstractZero
+    quote
+      (DoesNotExist(), ($(map(f -> :(Δ.$f), fieldnames(T))...),))
+    end
+  else # TODO is this dead code? back is an (immutable) struct
+    quote
+      x̄ = back.g
+      back.g = nt_zero(back.g)
+      (DoesNotExist(), ($(map(f -> :(x̄.$f), fieldnames(T))...),))
+    end
   end
 end
 
