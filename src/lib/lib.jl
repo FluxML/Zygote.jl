@@ -77,7 +77,7 @@ end
   global_set(ref, x), function (x̄)
     gs = cache(__context__)
     x̄ = accum(get(gs, ref, nothing), x̄)
-    gs[ref] = nothing
+    gs[ref] = Zero() # this is a side effect so escapes legacy2differential transform
     return (nothing, x̄)
   end
 end
@@ -230,7 +230,7 @@ _pullback(cx::Context, ::typeof(literal_getindex), x::NamedTuple, ::Val{f}) wher
 _pullback(cx::Context, ::typeof(literal_getproperty), x::Tuple, ::Val{f}) where f =
   _pullback(cx, literal_getindex, x, Val(f))
 
-grad_mut(x) = Ref{Any}(nt_nothing(x))
+grad_mut(x) = Ref{Any}(nt_zero(x))
 
 function grad_mut(cx::Context, x)
   ch = cache(cx)
@@ -245,8 +245,8 @@ end
   y = setfield!(x, f, val)
   g = grad_mut(__context__, x)
   y, function (_)
-    Δ = getfield(g[], f)
-    g[] = (;g[]...,pair(Val(f),nothing)...)
+    Δ = differential2legacy(getfield(g[], f))
+    g[] = (;g[]...,pair(Val(f),Zero())...)
     (nothing, nothing, Δ)
   end
 end
