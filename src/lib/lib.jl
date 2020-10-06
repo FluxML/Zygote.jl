@@ -163,7 +163,7 @@ unapply(t, xs) = _unapply(t, xs)[1]
   y, back = Core._apply(_pullback, (__context__, f), args...)
   st = map(_empty, args)
   y, function (Δ)
-    Δ = differential2legacy(back(legacy2differential(Δ))) # the remaining warnings stacktrace mentions this line
+    Δ = differential2legacy(back(legacy2differential(Δ)))
     if Δ === nothing
       return nothing
     else
