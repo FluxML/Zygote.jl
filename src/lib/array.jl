@@ -240,8 +240,8 @@ _normalize_kws(kws) = NamedTuple()
 function _pullback(cx::AContext, kwtype, kws, ::typeof(sum), f, xs::AbstractArray)
   norm_kws = _normalize_kws(kws)
   @assert !haskey(norm_kws, :init) # TODO add init support (julia 1.6)
-  y, back = pullback(cx, (f, xs) -> sum(f.(xs); norm_kws...), f, xs)
-  y, ȳ -> (DoesNotExist(), DoesNotExist(), DoesNotExist(), back(ȳ)...)
+  y, back = _pullback(cx, (f, xs) -> sum(f.(xs); norm_kws...), f, xs)
+  y, ȳ -> (DoesNotExist(), DoesNotExist(), back(ȳ)...)
 end
 
 @adjoint function sum(::typeof(abs2), X::AbstractArray; dims = :)
@@ -254,8 +254,7 @@ end
 end
 
 function _pullback(cx::AContext, ::typeof(prod), f, xs::AbstractArray)
-  y, back = pullback(cx, ((f, xs) -> prod(f.(xs))), f, xs)
-  y, ȳ -> (DoesNotExist(), back(ȳ)...)
+  _pullback(cx, ((f, xs) -> prod(f.(xs))), f, xs)
 end
 
 @adjoint function maximum(xs::AbstractArray; dims = :)
