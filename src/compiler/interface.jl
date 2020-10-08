@@ -174,7 +174,7 @@ function pullback(f, ps::Params)
     for p in ps
       cache(cx)[p] = nothing
     end
-    back(Δ)
+    differential2legacy(back(legacy2differential(Δ)))
     Grads(cx.cache, ps) # TODO make a copy
   end
 end
