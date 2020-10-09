@@ -174,7 +174,7 @@ function pullback(f, ps::Params)
     for p in ps
       cache(cx)[p] = nothing
     end
-    differential2legacy(back(legacy2differential(Δ)))
+    differential2legacy(back(legacy2differential(Δ))) # has non-local effects via accum (?)
     Grads(cx.cache, ps) # TODO make a copy
   end
 end

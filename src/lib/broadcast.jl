@@ -133,7 +133,7 @@ collapse_nothings(xs) = xs
 
 @adjoint function broadcasted(::AbstractArrayStyle, f, args...)
   len = inclen(args)
-  y∂b = _broadcast((x...) -> _pullback(__context__, f, x...), args...) # TODO: check underscore
+  y∂b = _broadcast((x...) -> _pullback(__context__, f, x...), args...)
   y = map(x -> x[1], y∂b)
   ∂b = map(x -> x[2], y∂b)
   y, function (ȳ)
@@ -145,7 +145,7 @@ end
 
 @adjoint function broadcasted(::AbstractArrayStyle{0}, f, args...)
   len = inclen(args)
-  y, ∂b = _broadcast((x...) -> _pullback(__context__, f, x...), args...) # TODO: check underscore
+  y, ∂b = _broadcast((x...) -> _pullback(__context__, f, x...), args...)
   y, function (ȳ)
     dxs = differential2legacy(∂b(legacy2differential(ȳ)))
     (nothing, dxs...)
@@ -162,7 +162,7 @@ end
 # end
 
 @adjoint! function (b::typeof(broadcast))(f, args...)
-  _pb = _pullback(__context__, broadcasted, f, args...) # TODO: check underscore
+  _pb = _pullback(__context__, broadcasted, f, args...)
   Δ -> differential2legacy(_pb(legacy2differential(Δ)))
 end
 # Forward Mode (mainly necessary for CUDA)

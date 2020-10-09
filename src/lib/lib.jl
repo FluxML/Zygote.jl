@@ -260,13 +260,13 @@ Jnew{T}(g) where T = Jnew{T,typeof(g)}(g)
 function _pullback(__context__::AContext, ::typeof(__new__), ::Type{T}, args...) where T
   x = __new__(T, args...)
   g = !T.mutable || fieldcount(T) == 0 ? Zero() : grad_mut(__context__, x)
-  return x, Δ -> ZygoteRules.gradtuple1(Jnew{T,typeof(g),false}(g)(Δ))
+  return x, Δ -> gradtuple1(Jnew{T,typeof(g),false}(g)(Δ))
 end
 
 function _pullback(__context__::AContext, ::typeof(__splatnew__), ::Type{T}, args) where T
   x = __splatnew__(T, args)
   g = !T.mutable || fieldcount(T) == 0 ? Zero() : grad_mut(__context__, x)
-  return x,  Δ -> ZygoteRules.gradtuple1(Jnew{T,typeof(g),true}(g)(Δ))
+  return x,  Δ -> gradtuple1(Jnew{T,typeof(g),true}(g)(Δ))
 end
 
 const allowed_gradient_T = Union{
