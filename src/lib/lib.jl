@@ -269,14 +269,6 @@ function _pullback(__context__::AContext, ::typeof(__splatnew__), ::Type{T}, arg
   return x,  Δ -> ZygoteRules.gradtuple1(Jnew{T,typeof(g),true}(g)(Δ))
 end
 
-const allowed_gradient_T = Union{
-    NamedTuple,
-    Nothing,
-    AbstractZero,
-    RefValue,
-    ChainRules.Composite{Any, T} where T<:Union{Tuple, NamedTuple} # TODO implement in the functions
-}
-
 # TODO captured mutables + multiple calls to `back`
 @generated function (back::Jnew{T,G,false})(Δ::Union{NamedTuple,Nothing,AbstractZero,RefValue}) where {T,G}
   Δ == Nothing && legacytype_warn()
