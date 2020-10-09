@@ -271,7 +271,7 @@ end
 
 # TODO captured mutables + multiple calls to `back`
 @generated function (back::Jnew{T,G,false})(Δ::Union{NamedTuple,Nothing,AbstractZero,RefValue}) where {T,G}
-  Δ == Nothing && legacytype_warn()
+  Δ <: Union{Nothing, NamedTuple} && legacytype_warn()
   if !T.mutable
     Δ <: AbstractZero && return :Δ
   end
@@ -290,6 +290,7 @@ end
 end
 
 @generated function (back::Jnew{T,G,true})(Δ::Union{NamedTuple,Nothing,AbstractZero,RefValue}) where {T,G}
+  Δ <: Union{Nothing, NamedTuple} && legacytype_warn()
   !T.mutable && Δ <: AbstractZero && return :Δ
   if G <: AbstractZero
     quote
