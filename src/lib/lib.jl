@@ -2,12 +2,12 @@ using Base: RefValue
 
 # Interfaces
 
-accum() = Zero()
+accum() = nothing
 accum(x) = x
 
 accum(x, y) =
-  x isa Union{Nothing, AbstractZero} ? y :
-  y isa Union{Nothing, AbstractZero} ? x :
+  x === nothing ? y :
+  y === nothing ? x :
   x + y
 
 accum(x, y, zs...) = accum(accum(x, y), zs...)
@@ -53,7 +53,7 @@ end
 function accum_global(cx::Context, ref, x̄)
   (x̄ === nothing || isconst(ref.mod, ref.name)) && return
   gs = cache(cx)
-  gs[ref] = accum(get(gs, ref, nothing), x̄)
+  gs[ref] = accum(get(gs, ref, Zero()), x̄)
   return
 end
 
@@ -77,7 +77,7 @@ end
   global_set(ref, x), function (x̄)
     gs = cache(__context__)
     x̄ = accum(get(gs, ref, nothing), x̄)
-    gs[ref] = nothing
+    gs[ref] = Zero() # this is a side effect so escapes legacy2differential transform
     return (nothing, x̄)
   end
 end
@@ -111,7 +111,7 @@ end
 
 function _pullback(cx::Context, ::typeof(literal_indexed_iterate), xs::Tuple, ::Val{i}) where i
   y, b = _pullback(cx, literal_getindex, xs, Val(i))
-  back(::Nothing) = Zero()
+  back(::Nothing) = (legacytype_warn(); return Zero())
   back(x::AbstractZero) = x
   back(ȳ) = b(ȳ[1])
   (y, i+1), back
@@ -119,7 +119,7 @@ end
 
 function _pullback(cx::Context, ::typeof(literal_indexed_iterate), xs::Tuple, ::Val{i}, st) where i
   y, b = _pullback(cx, literal_getindex, xs, Val(i))
-  back(::Nothing) = Zero()
+  back(::Nothing) = (legacytype_warn(); return Zero())
   back(x::AbstractZero) = x
   back(ȳ) = (b(ȳ[1])..., Zero())
   (y, i+1), back
@@ -163,10 +163,8 @@ unapply(t, xs) = _unapply(t, xs)[1]
   y, back = Core._apply(_pullback, (__context__, f), args...)
   st = map(_empty, args)
   y, function (Δ)
-    Δ = back(Δ)
-    if Δ isa AbstractZero
-      return nothing
-    elseif Δ === nothing
+    Δ = differential2legacy(back(legacy2differential(Δ)))
+    if Δ === nothing
       return nothing
     else
       (first(Δ), unapply(st, Base.tail(Δ))...)
@@ -179,10 +177,8 @@ if VERSION >= v"1.4.0-DEV.304"
     y, back = Core._apply(_pullback, (__context__, f), args...)
     st = map(_empty, args)
     y, function (Δ)
-      Δ = back(Δ)
-      if Δ isa AbstractZero
-        return nothing
-      elseif Δ === nothing
+      Δ = differential2legacy(back(legacy2differential(Δ)))
+      if Δ === nothing
         return nothing
       else
         (nothing, first(Δ), unapply(st, Base.tail(Δ))...)
@@ -234,7 +230,7 @@ _pullback(cx::Context, ::typeof(literal_getindex), x::NamedTuple, ::Val{f}) wher
 _pullback(cx::Context, ::typeof(literal_getproperty), x::Tuple, ::Val{f}) where f =
   _pullback(cx, literal_getindex, x, Val(f))
 
-grad_mut(x) = Ref{Any}(nt_nothing(x))
+grad_mut(x) = Ref{Any}(nt_zero(x))
 
 function grad_mut(cx::Context, x)
   ch = cache(cx)
@@ -249,28 +245,28 @@ end
   y = setfield!(x, f, val)
   g = grad_mut(__context__, x)
   y, function (_)
-    Δ = getfield(g[], f)
-    g[] = (;g[]...,pair(Val(f),nothing)...)
+    Δ = differential2legacy(getfield(g[], f))
+    g[] = (;g[]...,pair(Val(f),Zero())...)
     (nothing, nothing, Δ)
   end
 end
 
-struct Jnew{T,G,splat} # T is the primal type, G is the gradient type
+struct Jnew{T,G,splat} # T is the primal type, G is the gradient type
   g::G
 end
 
 Jnew{T}(g) where T = Jnew{T,typeof(g)}(g)
 
-@adjoint! function __new__(T, args...)
+function _pullback(__context__::AContext, ::typeof(__new__), ::Type{T}, args...) where T
   x = __new__(T, args...)
-  g = !T.mutable || fieldcount(T) == 0 ? nothing : grad_mut(__context__, x)
-  x, Jnew{T,typeof(g),false}(g)
+  g = !T.mutable || fieldcount(T) == 0 ? Zero() : grad_mut(__context__, x)
+  return x, Δ -> ZygoteRules.gradtuple1(Jnew{T,typeof(g),false}(g)(Δ))
 end
 
-@adjoint! function __splatnew__(T, args)
+function _pullback(__context__::AContext, ::typeof(__splatnew__), ::Type{T}, args) where T
   x = __splatnew__(T, args)
-  g = !T.mutable || fieldcount(T) == 0 ? nothing : grad_mut(__context__, x)
-  x, Jnew{T,typeof(g),true}(g)
+  g = !T.mutable || fieldcount(T) == 0 ? Zero() : grad_mut(__context__, x)
+  return x,  Δ -> ZygoteRules.gradtuple1(Jnew{T,typeof(g),true}(g)(Δ))
 end
 
 const allowed_gradient_T = Union{
@@ -282,31 +278,37 @@ const allowed_gradient_T = Union{
 }
 
 # TODO captured mutables + multiple calls to `back`
-@generated function (back::Jnew{T,G,false})(Δ::allowed_gradient_T) where {T,G}
+@generated function (back::Jnew{T,G,false})(Δ::Union{NamedTuple,Nothing,AbstractZero,RefValue}) where {T,G}
+  Δ == Nothing && legacytype_warn()
   if !T.mutable
-      Δ == Nothing && return :(Zero())
-      Δ <: AbstractZero && return :(Zero())
+    Δ <: AbstractZero && return :Δ
   end
-  Δ = G == Nothing ? :Δ :
-      Δ <: RefValue ? :(back.g[]) :
-      :(accum(back.g[], Δ))
+  Δ_expr = if G <: AbstractZero
+    :Δ
+  elseif Δ <: RefValue
+    :(back.g[]) # TODO: is this right? Why don't we need to accum? 
+  else
+    :(accum(back.g[], Δ))
+  end
   quote
-    x̄ = $Δ
-    $(G == Nothing || :(back.g[] = nt_zero($Δ)))
-    (DoesNotExist(), $(map(f -> :(x̄.$f), fieldnames(T))...))
+    x̄ = $Δ_expr
+    $(G <: AbstractZero || :(back.g[] = nt_zero($Δ_expr)))
+    return (DoesNotExist(), $(map(f -> :(x̄.$f), fieldnames(T))...))
   end
 end
 
-@generated function (back::Jnew{T,G,true})(Δ::allowed_gradient_T) where {T,G}
-  if !T.mutable
-      Δ == Nothing && return :(Zero())
-      Δ <: AbstractZero && return :Δ
-  end
-  Δ = G == Nothing ? :Δ : :(back.g)
-  quote
-    x̄ = $Δ
-    $(G == Nothing || :($Δ = nt_zero($Δ)))
-    (DoesNotExist(), ($(map(f -> :(x̄.$f), fieldnames(T))...),))
+@generated function (back::Jnew{T,G,true})(Δ::Union{NamedTuple,Nothing,AbstractZero,RefValue}) where {T,G}
+  !T.mutable && Δ <: AbstractZero && return :Δ
+  if G <: AbstractZero
+    quote
+      (DoesNotExist(), ($(map(f -> :(Δ.$f), fieldnames(T))...),))
+    end
+  else # TODO is this dead code? back is an (immutable) struct
+    quote
+      x̄ = back.g
+      back.g = nt_zero(back.g)
+      (DoesNotExist(), ($(map(f -> :(x̄.$f), fieldnames(T))...),))
+    end
   end
 end
 

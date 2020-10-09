@@ -12,7 +12,7 @@ using IRTools: IR, Variable, Pipe, xcall, var, prewalk, postwalk,
 iscall(x, m::Module, n::Symbol) = isexpr(x, :call) && x.args[1] == GlobalRef(m, n)
 
 gradindex(x, i) = x[i]
-gradindex(::Nothing, i) = DoesNotExist()
+gradindex(::Nothing, i) = (legacytype_warn(); return DoesNotExist())
 gradindex(x::AbstractZero, i) = x
 #gradindex(x::Composite, i) = x[i-1] # TODO: what is going on here?
 xgetindex(x, i...) = xcall(Base, :getindex, x, i...)

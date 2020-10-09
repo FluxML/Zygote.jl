@@ -77,7 +77,7 @@ end
 function runadjoint(cx, t, ȳ = nothing)
   t̄ = cache(cx)[t]
   f = t̄.code
-  t̄.code = () -> f(ȳ)
+  t̄.code = () -> differential2legacy(f(legacy2differential(ȳ)))
   @static if VERSION > v"1.3-"
     t̄.sticky = t.sticky
   end

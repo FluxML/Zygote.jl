@@ -43,15 +43,17 @@ Convert `x` from the differentials types ChainRules uses to the format Zygote us
 # Zygote convention: even if many AbstractZero partials (i.e. multi-input function), make just 1 nothing.
 @inline wrap_chainrules_output(x::Tuple{Vararg{ChainRules.AbstractZero}}) = Zero()
 @inline wrap_chainrules_output(x::ChainRules.AbstractZero) = x
-#for T_outer in (:Tuple, :NamedTuple)
-#  # we create separate methods rather than using a `Union` + an `if` so that we avoid a
-#  # branch that changes output type, because nested AD on that kinda thing makes Zygote less
-#  # than happy.
-#  @eval @inline function wrap_chainrules_output(x::ChainRules.Composite{P, T}) where {P, T<:$T_outer}
-#    xp = map(wrap_chainrules_output, x)
-#    convert($T_outer, xp)
-#  end
-#end
+#=
+for T_outer in (:Tuple, :NamedTuple)
+  # we create separate methods rather than using a `Union` + an `if` so that we avoid a
+  # branch that changes output type, because nested AD on that kinda thing makes Zygote less
+  # than happy.
+  @eval @inline function wrap_chainrules_output(x::ChainRules.Composite{P, T}) where {P, T<:$T_outer}
+    xp = map(wrap_chainrules_output, x)
+    convert($T_outer, xp)
+  end
+end
+=#
 
 """
     wrap_chainrules_input(x)
@@ -59,7 +61,7 @@ Convert `x` from the differentials types ChainRules uses to the format Zygote us
 Convert `x` from the format Zygote uses internally to differentials types ChainRules uses.
 """
 @inline wrap_chainrules_input(x) = x
-@inline wrap_chainrules_input(::Nothing) = ChainRules.Zero() # this line is redundant right?
+@inline wrap_chainrules_input(::Nothing) = ChainRules.Zero()
 @inline function wrap_chainrules_input(xs::Union{Tuple, NamedTuple})
   xp = map(wrap_chainrules_input, xs)
   ChainRules.Composite{Any, typeof(xp)}(xp)
@@ -77,7 +79,7 @@ end
 @inline (s::ZBack)(dy) = wrap_chainrules_output(s.back(wrap_chainrules_input(dy)))
 # `nothing->nothing` can be deleted after https://github.com/FluxML/Zygote.jl/issues/603
 # though it might be worth keeping as a performance optimization (benchmarking pending)
-@inline (s::ZBack)(::Nothing) = (@warn "ZBack called with `nothing`"; Zero())
+@inline (s::ZBack)(::Nothing) = (legacytype_warn(); return Zero())
 
 """
     chain_rrule(f, args...)
