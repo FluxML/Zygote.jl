@@ -3,14 +3,17 @@ using IRTools: IR, Variable, Pipe, xcall, var, prewalk, postwalk,
   insertafter!, finish, expand!, prune!, substitute!, substitute,
   block, block!, branch!, return!, stmt, meta
 
+# va = var args, replaces the last nothing/AbstractZero by N Zero()s
 @inline tuple_va(N, xs) = xs
 @inline tuple_va(N, x, xs...) = (x, tuple_va(N, xs...)...)
-@inline tuple_va(::Val{N}, ::Nothing) where N = ntuple(_ -> nothing, Val(N))
+@inline tuple_va(::Val{N}, ::Nothing) where N = ntuple(_ -> Zero(), Val(N))
+@inline tuple_va(::Val{N}, x::AbstractZero) where N = ntuple(_ -> x, Val(N))
 
 iscall(x, m::Module, n::Symbol) = isexpr(x, :call) && x.args[1] == GlobalRef(m, n)
 
 gradindex(x, i) = x[i]
-gradindex(::Nothing, i) = nothing
+gradindex(::Nothing, i) = (legacytype_warn(); return DoesNotExist())
+gradindex(x::AbstractZero, i) = x
 xgetindex(x, i...) = xcall(Base, :getindex, x, i...)
 xgradindex(x, i) = xcall(Zygote, :gradindex, x, i)
 
@@ -215,7 +218,7 @@ end
 branchfor(ir, (from,to)) =
   get(filter(br -> br.block == to, branches(block(ir, from))), 1, nothing)
 
-xaccum(ir) = nothing
+xaccum(ir) = Zero()
 xaccum(ir, x) = x
 xaccum(ir, xs...) = push!(ir, xcall(Zygote, :accum, xs...))
 

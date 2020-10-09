@@ -42,7 +42,7 @@ tailmemaybe(x::Tuple) = Base.tail(x)
 
 function pullback(f, args...)
   y, back = _pullback(f, args...)
-  y, Δ -> tailmemaybe(back(Δ))
+  y, Δ -> tailmemaybe(differential2legacy(back(legacy2differential(Δ))))
 end
 
 sensitivity(y::Number) = one(y)
@@ -174,7 +174,7 @@ function pullback(f, ps::Params)
     for p in ps
       cache(cx)[p] = nothing
     end
-    back(Δ)
+    differential2legacy(back(legacy2differential(Δ))) # has non-local effects via accum (?)
     Grads(cx.cache, ps) # TODO make a copy
   end
 end

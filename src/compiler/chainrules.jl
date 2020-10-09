@@ -41,8 +41,8 @@ Convert `x` from the differentials types ChainRules uses to the format Zygote us
 @inline wrap_chainrules_output(x) = unthunk(x)  # For now we are just not going to deal with thunks
 @inline wrap_chainrules_output(x::Tuple) = map(wrap_chainrules_output, x)
 # Zygote convention: even if many AbstractZero partials (i.e. multi-input function), make just 1 nothing.
-@inline wrap_chainrules_output(x::Tuple{Vararg{ChainRules.AbstractZero}}) = nothing
-@inline wrap_chainrules_output(x::ChainRules.AbstractZero) = nothing
+@inline wrap_chainrules_output(x::Tuple{Vararg{ChainRules.AbstractZero}}) = Zero()
+@inline wrap_chainrules_output(x::ChainRules.AbstractZero) = x
 for T_outer in (:Tuple, :NamedTuple)
   # we create separate methods rather than using a `Union` + an `if` so that we avoid a
   # branch that changes output type, because nested AD on that kinda thing makes Zygote less
@@ -77,7 +77,7 @@ end
 @inline (s::ZBack)(dy) = wrap_chainrules_output(s.back(wrap_chainrules_input(dy)))
 # `nothing->nothing` can be deleted after https://github.com/FluxML/Zygote.jl/issues/603
 # though it might be worth keeping as a performance optimization (benchmarking pending)
-@inline (s::ZBack)(::Nothing) = nothing
+@inline (s::ZBack)(::Nothing) = (legacytype_warn(); return Zero())
 
 """
     chain_rrule(f, args...)
@@ -99,6 +99,6 @@ As per [`chain_rrule`](@ref) but with support for kwargs.
 """
 @inline function chain_rrule_kw(kwf, kwargs, f, args...)
   y, back = rrule(f, args...; kwargs...)
-  kw_zpullback(dy) = (nothing, nothing, ZBack(back)(dy)...)  # first two nothings are for kwfunc and kwargs
+  kw_zpullback(dy) = (DoesNotExist(), DoesNotExist(), ZBack(back)(dy)...)  # first two DoesNotExist()s are for kwfunc and kwargs
   return y, kw_zpullback
 end

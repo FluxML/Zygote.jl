@@ -137,7 +137,7 @@ collapse_nothings(xs) = xs
   y = map(x -> x[1], y∂b)
   ∂b = map(x -> x[2], y∂b)
   y, function (ȳ)
-    dxs_zip = map((∂b, ȳ) -> ∂b(ȳ), ∂b, ȳ)
+    dxs_zip = map((∂b, ȳ) -> differential2legacy(∂b(legacy2differential(ȳ))), ∂b, ȳ)
     dxs = collapse_nothings.(ntuple(i -> map(x -> _get(x, i), dxs_zip), len))
     (nothing, accum_sum(dxs[1]), map(unbroadcast, args, Base.tail(dxs))...)
   end
@@ -147,7 +147,7 @@ end
   len = inclen(args)
   y, ∂b = _broadcast((x...) -> _pullback(__context__, f, x...), args...)
   y, function (ȳ)
-    dxs = ∂b(ȳ)
+    dxs = differential2legacy(∂b(legacy2differential(ȳ)))
     (nothing, dxs...)
   end
 end
@@ -161,8 +161,10 @@ end
 #   ∇map(__context__, f, x)
 # end
 
-@adjoint! (b::typeof(broadcast))(f, args...) = _pullback(__context__, broadcasted, f, args...)
-
+@adjoint! function (b::typeof(broadcast))(f, args...)
+  _pb = _pullback(__context__, broadcasted, f, args...)
+  Δ -> differential2legacy(_pb(legacy2differential(Δ)))
+end
 # Forward Mode (mainly necessary for CUDA)
 
 import ForwardDiff

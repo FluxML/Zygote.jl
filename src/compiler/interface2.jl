@@ -35,13 +35,14 @@ end
 end
 
 @generated function (j::Pullback{T})(Δ) where T
-  ignore_sig(T) && return :nothing
+  ignore_sig(T) && return :(DoesNotExist())
   g = try _lookup_grad(T)
   catch e
     rethrow(CompileError(T,e))
   end
-  if g == nothing
-    Δ == Nothing && return :nothing
+  if g == nothing  # No IR found
+    Δ <: AbstractZero && return :(Δ)
+    Δ == Nothing && (legacytype_warn(); return :(DoesNotExist()))
     return :(error("Non-differentiable function $(repr(j.t[1]))"))
   end
   meta, _, back = g
