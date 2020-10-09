@@ -4,10 +4,8 @@ using LinearAlgebra, Statistics
 using LinearAlgebra: copytri!, AbstractTriangular
 using ArrayLayouts: MemoryLayout, AbstractColumnMajor
 
-import ZygoteRules: @adjoint, @adjoint!, AContext, adjoint, _pullback, pullback
-import ZygoteRules: literal_getproperty, differential2legacy, legacy2differential
-import ZygoteRules: legacytype_warn
-import ZygoteRules
+import ZygoteRules: @adjoint, @adjoint!, AContext, adjoint, _pullback, pullback, literal_getproperty
+using ZygoteRules: differential2legacy, legacy2differential, legacytype_warn, gradtuple1
 
 using ChainRules: ChainRules, rrule, unthunk, AbstractZero, Zero, DoesNotExist
 using IRTools
