@@ -251,7 +251,7 @@ end
   end
 end
 
-struct Jnew{T,G,splat}
+struct Jnew{T,G,splat} # T is the primal type, G is the gradient type
   g::G
 end
 

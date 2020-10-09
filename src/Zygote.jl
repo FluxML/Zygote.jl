@@ -9,7 +9,7 @@ import ZygoteRules: literal_getproperty, differential2legacy, legacy2differentia
 import ZygoteRules: legacytype_warn
 import ZygoteRules
 
-using ChainRules: ChainRules, rrule, unthunk, AbstractZero, Zero, DoesNotExist
+using ChainRules: ChainRules, rrule, unthunk, AbstractZero, Zero, DoesNotExist, Composite
 using IRTools
 using MacroTools, Requires
 using MacroTools: @forward
