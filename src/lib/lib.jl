@@ -294,7 +294,7 @@ const allowed_gradient_T = Union{
   quote
     x̄ = $Δ_expr
     $(G <: AbstractZero || :(back.g[] = nt_zero($Δ_expr)))
-    return (DoesNotExist(), $(map(f -> :(x̄.$f), fieldnames(T))...))
+    (DoesNotExist(), Composite{Any}($(map(f -> :(x̄.$f), fieldnames(T))...)))
   end
 end
 
@@ -306,13 +306,13 @@ end
   end
   if G <: AbstractZero
     quote
-      (DoesNotExist(), ($(map(f -> :(Δ.$f), fieldnames(T))...),))
+      (DoesNotExist(), Composite{Any}($(map(f -> :(Δ.$f), fieldnames(T))...),))
     end
   else # TODO is this dead code? back is an (immutable) struct
     quote
       x̄ = back.g
       back.g = nt_zero(back.g)
-      (DoesNotExist(), ($(map(f -> :(x̄.$f), fieldnames(T))...),))
+      (DoesNotExist(), Composite{Any}($(map(f -> :(x̄.$f), fieldnames(T))...),))
     end
   end
 end
