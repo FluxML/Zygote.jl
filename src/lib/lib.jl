@@ -290,7 +290,10 @@ end
 end
 
 @generated function (back::Jnew{T,G,true})(Δ::Union{NamedTuple,Nothing,AbstractZero,RefValue}) where {T,G}
-  !T.mutable && Δ <: AbstractZero && return :Δ
+  Δ == Nothing && legacytype_warn()
+  if !T.mutable
+    Δ <: AbstractZero && return :Δ
+  end
   if G <: AbstractZero
     quote
       (DoesNotExist(), ($(map(f -> :(Δ.$f), fieldnames(T))...),))
