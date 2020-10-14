@@ -260,7 +260,7 @@ Jnew{T}(g) where T = Jnew{T,typeof(g)}(g)
 function _pullback(__context__::AContext, ::typeof(__new__), ::Type{T}, args...) where T
   x = __new__(T, args...)
   g = !T.mutable || fieldcount(T) == 0 ? Zero() : grad_mut(__context__, x)
-  return x, Δ -> gradtuple1(Jnew{T,typeof(g),false}(g)(Δ))
+  return x, Δ -> (ret = gradtuple1(Jnew{T,typeof(g),false}(g)(Δ)); println(ret); return ret)
 end
 
 function _pullback(__context__::AContext, ::typeof(__splatnew__), ::Type{T}, args) where T
@@ -294,7 +294,7 @@ const allowed_gradient_T = Union{
   quote
     x̄ = $Δ_expr
     $(G <: AbstractZero || :(back.g[] = nt_zero($Δ_expr)))
-    (DoesNotExist(), Composite{Any}($(map(f -> :(x̄.$f), fieldnames(T))...)))
+    return (DoesNotExist(), Composite{Any}($(map(fn -> :(x̄.$fn), fieldnames(T))...)))
   end
 end
 
@@ -306,13 +306,13 @@ end
   end
   if G <: AbstractZero
     quote
-      (DoesNotExist(), Composite{Any}($(map(f -> :(Δ.$f), fieldnames(T))...),))
+      return (DoesNotExist(), Composite{Any}($(map(fn -> :(Δ.$fn), fieldnames(T))...),))
     end
   else # TODO is this dead code? back is an (immutable) struct
     quote
       x̄ = back.g
       back.g = nt_zero(back.g)
-      (DoesNotExist(), Composite{Any}($(map(f -> :(x̄.$f), fieldnames(T))...),))
+      return (DoesNotExist(), Composite{Any}($(map(fn -> :(x̄.$fn), fieldnames(T))...),))
     end
   end
 end

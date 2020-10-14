@@ -14,7 +14,7 @@ iscall(x, m::Module, n::Symbol) = isexpr(x, :call) && x.args[1] == GlobalRef(m, 
 gradindex(x, i) = x[i]
 gradindex(::Nothing, i) = (legacytype_warn(); return DoesNotExist())
 gradindex(x::AbstractZero, i) = x
-#gradindex(x::Composite, i) = x[i-1] # TODO: what is going on here?
+#gradindex(x::Tuple, i) = 
 xgetindex(x, i...) = xcall(Base, :getindex, x, i...)
 xgradindex(x, i) = xcall(Zygote, :gradindex, x, i)
 
@@ -238,12 +238,10 @@ function adjoint(pr::Primal)
     for v in reverse(keys(b))
       ex = b[v].expr
       if haskey(pr.pullbacks, v)
-        g = push!(rb, stmt(Expr(:call, alpha(pr.pullbacks[v]), grad(v)),
-                           line = b[v].line))
+        g = push!(rb, stmt(Expr(:call, alpha(pr.pullbacks[v]), grad(v)), line = b[v].line))
         for (i, x) in enumerate(ex.args)
           x isa Variable || continue
-          grad(x, push!(rb, stmt(xgradindex(g, i),
-                                 line = b[v].line)))
+          grad(x, push!(rb, stmt(xgradindex(g, i), line = b[v].line)))
         end
       elseif ex isa Core.PiNode
         grads[ex.val] = grads[v]
