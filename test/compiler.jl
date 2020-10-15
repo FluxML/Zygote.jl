@@ -74,3 +74,16 @@ y, back = @test_inferred pullback(x->x[1], (5,:a))
 
 y, back = @test_inferred pullback(((a,b),) -> a, (5, 10))
 @test_inferred back(1)
+
+# testcase for issue #808
+function is_tuple_pullback_show(i)
+  param = getfield(i.sig, 1)
+  i.module == Zygote && param.name == :S && param.ub == Tuple
+end
+
+tuple_pullback_show_methods = filter(is_tuple_pullback_show, methods(Base.show).ms)
+@test length(tuple_pullback_show_methods) == 1
+buf = IOBuffer()
+Base.show(buf, tuple_pullback_show_methods[1])
+str_repr = String(take!(buf))
+@test occursin("<:(typeof(∂(λ)))) where S<:Tuple in Zygote", str_repr)
