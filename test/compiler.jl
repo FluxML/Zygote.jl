@@ -85,4 +85,4 @@ end
 buf = IOBuffer()
 Base.show(buf, methods(Base.show))
 str_repr = String(take!(buf))
-@test true
+@test !isempty(str_repr)
