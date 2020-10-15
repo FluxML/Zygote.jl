@@ -76,11 +76,6 @@ y, back = @test_inferred pullback(((a,b),) -> a, (5, 10))
 @test_inferred back(1)
 
 # testcase for issue #808
-function is_tuple_pullback_show(i)
-  param = getfield(i.sig, 1)
-  i.module == Zygote && param.name == :S && param.ub == Tuple
-end
-
 # testing that methods(Base.show) does not throw. Having something more specific would be too fragile
 buf = IOBuffer()
 Base.show(buf, methods(Base.show))
