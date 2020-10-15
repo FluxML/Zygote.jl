@@ -16,8 +16,6 @@ using Base.Broadcast
 using Base.Broadcast: Broadcasted, AbstractArrayStyle, broadcasted, materialize
 using NNlib
 
-@nograd Broadcast.combine_styles, Broadcast.result_style
-
 # There's a saying that debugging code is about twice as hard as writing it in
 # the first place. So if you're as clever as you can be when writing code, how
 # will you ever debug it?
@@ -130,7 +128,7 @@ _broadcast(f::F, x...) where F = materialize(broadcasted(f, x...))
 
 _get(x::Tuple, i) = x[i]
 _get(::Nothing, i) = nothing
-collapse_nothings(xs::Vector{Nothing}) = nothing
+collapse_nothings(xs::AbstractArray{Nothing}) = nothing
 collapse_nothings(xs) = xs
 
 @adjoint function broadcasted(::AbstractArrayStyle, f, args...)

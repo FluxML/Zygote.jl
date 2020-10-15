@@ -1,6 +1,3 @@
-@nograd readline, Base.gc_num, Base.time_ns, Base.print, Base.println, Base.show,
-  Core.show, Core.print, Core.println, string, repr, Threads.nthreads, Threads.threadid
-
 # Gradient of AD stacks
 
 grad_mut(::AbstractVector) = []
@@ -47,18 +44,17 @@ end
   end
 end
 
-@nograd haskey
-
 # Channels
 
-@nograd Channel, schedule
+@nograd Channel
 
 grad_mut(ch::Channel) = Channel(ch.sz_max)
 
 @adjoint! function put!(ch::Channel, x)
   put!(ch, x), function (ȳ)
-    x̄ = take!(grad_mut(__context__, ch))
-    (nothing, accum(x̄, ȳ), nothing)
+    x̄ = grad_mut(__context__, ch)
+    dx = isopen(x̄) ? take!(x̄) : nothing
+    (nothing, accum(dx, ȳ), nothing)
   end
 end
 
@@ -99,6 +95,23 @@ end
 
 @adjoint! function Base.sync_end(refs)
   Base.sync_end(refs), _ -> foreach(t -> runadjoint(__context__, t), refs)
+end
+
+# Need to hold onto the references here
+@adjoint! function Base.sync_end(ch::Channel)
+  ch_copy = grad_mut(__context__, ch)
+  dch = grad_mut(ch_copy)
+  while !isempty(ch)
+    i = take!(ch)
+    put!(ch_copy, i)
+    put!(dch, i)
+  end
+  Base.sync_end(ch_copy), _ -> begin
+    while !isempty(dch)
+      t = take!(dch)
+      runadjoint(__context__, t)
+    end
+  end
 end
 
 # Make @sync work

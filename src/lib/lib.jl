@@ -26,10 +26,7 @@ function accum(x::RefValue, y::RefValue)
 end
 
 # Core functions
-
-@nograd Core.apply_type, Core.typeof, nfields, fieldtype, Core.TypeVar, Core.UnionAll,
-  (==), (===), (<=), (>=), (<), (>), isempty, supertype, Base.typename,
-  eps, Meta.parse, Base.eval, sleep, isassigned
+@nograd eps, Base.eval, Core.TypeVar, Core.UnionAll
 
 @adjoint deepcopy(x) = deepcopy(x), ȳ -> (ȳ,)
 
@@ -111,6 +108,22 @@ end
 
 @adjoint getindex(xs::NTuple{N,Any}, r::AbstractUnitRange) where N =
   (xs[r], Δ -> (ntuple(j -> j in r ? Δ[findfirst(isequal(j), r)] : nothing, Val(N)), nothing))
+
+@adjoint function getindex(xs::NTuple{N,Any}, r::AbstractVector) where N
+  val = xs[r]
+  function back(Δ)
+    dxs = ntuple(Val(length(xs))) do x
+      total = nothing
+      for r_i in eachindex(r)
+        r[r_i] === x || continue
+        total = accum(total, Δ[r_i])
+      end
+      return total
+    end
+    return (dxs, nothing)
+  end
+  val, back
+end
 
 function _pullback(cx::Context, ::typeof(literal_indexed_iterate), xs::Tuple, ::Val{i}) where i
   y, b = _pullback(cx, literal_getindex, xs, Val(i))

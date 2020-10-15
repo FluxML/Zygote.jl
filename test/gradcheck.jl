@@ -5,6 +5,7 @@ using NNlib: conv, ∇conv_data, depthwiseconv, batched_mul
 using Base.Broadcast: broadcast_shape
 using LoopVectorization: vmap
 using Distributed: pmap
+using FiniteDifferences
 
 function ngradient(f, xs::AbstractArray...)
   grads = zero.(xs)
@@ -21,9 +22,11 @@ function ngradient(f, xs::AbstractArray...)
   return grads
 end
 
-gradcheck(f, xs...) =
-  all(isapprox.(ngradient(f, xs...),
-                gradient(f, xs...), rtol = 1e-5, atol = 1e-5))
+function gradcheck(f, xs...)
+  grad_zygote = gradient(f, xs...)
+  grad_finite_difference = ngradient(f, xs...)
+  return all(isapprox.(grad_zygote, grad_finite_difference; rtol = 1e-5, atol = 1e-5))
+end
 
 gradtest(f, xs::AbstractArray...) = gradcheck((xs...) -> sum(sin.(f(xs...))), xs...)
 gradtest(f, dims...) = gradtest(f, rand.(Float64, dims)...)
@@ -93,6 +96,24 @@ end
 @test gradtest((x, W, b) -> relu.(W*x .+ b), (5,3), (2,5), 2)
 @test gradtest((x, W, b) -> selu.(W*x .+ b), 5, (2,5), 2)
 @test gradtest((x, W, b) -> selu.(W*x .+ b), (5,3), (2,5), 2)
+@test gradtest((x, W, b) -> elu.(W*x .+ b, 2), 5, (2,5), 2)
+@test gradtest((x, W, b) -> elu.(W*x .+ b, 2), (5,3), (2,5), 2)
+
+# tests for https://github.com/FluxML/Zygote.jl/issues/758
+@test gradient(xs -> sum(selu.(xs)), [1_000, 10_000]) == ([1.0507009873554805, 1.0507009873554805],)
+@test gradient(x -> selu(x), 1_000) == (1.0507009873554805,)
+@test gradient(xs -> sum(elu.(xs, 2)), [1_000, 10_000]) == ([1., 1.],)
+@test gradient(x -> elu(x, 2), 1_000) == (1.,)
+@test gradient(x -> elu(x, 2), -1) == (2*exp(-1),)
+@test gradcheck(x->sum(selu.(x)),[100., 1_000.])
+@test gradcheck(x->sum(elu.(x, 3.5)),[100., 1_000.])
+@test gradcheck(x->sum(elu.(x, 3.5)),[1_000., 10_000.]) # for elu the tests are passing but for selu not, interesting
+# numerical instability even for the linear part of such function, see:
+# julia> ngradient(x->sum(selu.(x)),[1_000., 10_000.])
+# ([1.0506591796875, 1.0506591796875],)
+# julia> gradient(x->sum(selu.(x)),[1_000., 10_000.])
+# ([1.0507009873554805, 1.0507009873554805],)
+@test_broken gradcheck(x->sum(selu.(x)),[1_000., 10_000.])
 
 @test gradtest((x, W, b) -> tanh.(W*x .+ b), 5, (2,5), 2)
 @test gradtest((x, W, b) -> tanh.(W*x .+ b), (5,3), (2,5), 2)
@@ -119,6 +140,10 @@ end
   @test gradtest(x -> sum((i->x[i]).(1:length(x))), randn(10))
   @test gradtest(X -> sum(x -> x^2, X), randn(10))
   @test gradtest(X -> sum(sum(x -> x^2, X; dims=1)), randn(10)) # issue #681
+
+  # Non-differentiable sum of booleans
+  @test gradient(sum, [true, false, true]) == (nothing,)
+  @test gradient(x->sum(x .== 0.0), [1.2, 0.2, 0.0, -1.1, 100.0]) == (nothing,)
 
   # https://github.com/FluxML/Zygote.jl/issues/314
   @test gradient((x,y) -> sum(yi -> yi*x, y), 1, [1,1]) == (2, [1, 1])
@@ -318,6 +343,13 @@ for mapfunc in [map,pmap,vmap]
     end
     @test gradtest(foo, 3)
     @test gradient(v -> sum([x for x in v]), [1.1,2.2,3.3]) == ([1, 1, 1],)
+  end
+
+  @testset "Tuple adjoint" begin
+    x = randn(3)
+    _, pb = Zygote.pullback(x -> map(abs2, x), x)
+    Δy = randn(3)
+    @test first(pb((Δy..., ))) ≈ first(pb(Δy))
   end
 end
 
@@ -1036,10 +1068,11 @@ end
 end
 
 @testset "distances" begin
-  rng, P, Q, D = MersenneTwister(123456), 10, 9, 8
+  rng, P, Q, D = MersenneTwister(123456), 5, 4, 3
 
   for (f, metric) in ((euclidean, Euclidean()), (sqeuclidean, SqEuclidean()))
-    let
+
+    @testset "scalar input" begin
       x, y = randn(rng), randn(rng)
       @test gradtest(x -> f(x[1], y), [x])
       @test gradtest(x -> evaluate(metric, x[1], y), [x])
@@ -1047,30 +1080,43 @@ end
       @test gradtest(y -> evaluate(metric, x, y[1]), [y])
     end
 
-    let
+    @testset "vector input" begin
       x, y = randn(rng, D), randn(rng, D)
       @test gradtest(x -> f(x, y), x)
       @test gradtest(x -> evaluate(metric, x, y), x)
       @test gradtest(y -> f(x, y), y)
       @test gradtest(y -> evaluate(metric, x, y), y)
+      @test gradtest(x -> f(x, x), x)
     end
 
-    # Check binary colwise.
-    let
+    @testset "binary colwise" begin
       X, Y = randn(rng, D, P), randn(rng, D, P)
-      @test gradtest(X->colwise(metric, X, Y), X)
-      @test gradtest(Y->colwise(metric, X, Y), Y)
+      @test gradtest(X -> colwise(metric, X, Y), X)
+      @test gradtest(Y -> colwise(metric, X, Y), Y)
+      @test gradtest(X -> colwise(metric, X, X), X)
     end
 
-    # Check binary pairwise.
-    let
+    @testset "binary pairwise" begin
       X, Y = randn(rng, D, P), randn(rng, D, Q)
-      @test gradtest(X->pairwise(metric, X, Y; dims=2), X)
-      @test gradtest(Y->pairwise(metric, X, Y; dims=2), Y)
+      @test gradtest(X -> pairwise(metric, X, Y; dims=2), X)
+      @test gradtest(Y -> pairwise(metric, X, Y; dims=2), Y)
+
+      @testset "X == Y" begin
+        # Zygote's gradtest isn't sufficiently accurate to assess this, so we use
+        # FiniteDifferences.jl instead.
+        Y = copy(X)
+        Δ = randn(P, P)
+        Δ_fd = FiniteDifferences.j′vp(
+          central_fdm(5, 1), X -> pairwise(metric, X, Y; dims=2), Δ, X,
+        )
+        _, pb = Zygote.pullback(X -> pairwise(metric, X, Y; dims=2), X)
+
+        # This is impressively inaccurate, but at least it doesn't produce a NaN.
+        @test first(Δ_fd) ≈ first(pb(Δ)) atol=1e-3 rtol=1e-3
+      end
     end
 
-    # Check binary pairwise when X and Y are close.
-    let
+    @testset "binary pairwise - X and Y close" begin
       X = randn(rng, D, P)
       Y = X .+ 1e-10
       dist = pairwise(metric, X, Y; dims=2)
@@ -1083,9 +1129,10 @@ end
       @test gradtest(Yt->pairwise(metric, Xt, Yt; dims=1), Yt)
     end
 
-    # Check unary pairwise.
-    @test gradtest(X->pairwise(metric, X; dims=2), randn(rng, D, P))
-    @test gradtest(Xt->pairwise(metric, Xt; dims=1), randn(rng, P, D))
+    @testset "unary pairwise" begin
+      @test gradtest(X->pairwise(metric, X; dims=2), randn(rng, D, P))
+      @test gradtest(Xt->pairwise(metric, Xt; dims=1), randn(rng, P, D))
+    end
   end
 end
 
@@ -1293,6 +1340,11 @@ end
   @test gradcheck(x -> sum(sum(diag.((x,) .* a))), b)
   @test gradcheck(x -> sum(sum(diag.(Ref(x) .* a))), b)
   @test gradcheck(x -> sum(sum(diag.([x] .* a))), b)
+
+  # tests for https://github.com/FluxML/Zygote.jl/issues/724
+  x1 = rand(3, 3)
+  @test gradient(x -> sum(x .== 0.5), x1)[1] === nothing
+  @test gradient(x -> sum(x .* (x .== maximum(x, dims=1))), x1)[1] == (x1 .== maximum(x1, dims=1))
 end
 
 using Zygote: Buffer
@@ -1455,8 +1507,7 @@ end
 
   x = randn(Float64,16,16)
   @test typeof(gradient(x->sum(abs2,ifft(fft(x,1),1)),x)[1]) == Array{Complex{Float64},2}
-  # This errors: something is the wrong size
-  #@test typeof(gradient(x->sum(abs2,irfft(rfft(x,1),16,1)),x)[1]) == Array{Float64,2} 
+  @test typeof(gradient(x->sum(abs2,irfft(rfft(x,1),16,1)),x)[1]) == Array{Float64,2}
 
   x = randn(Float32,16)
   P = plan_fft(x)
@@ -1466,8 +1517,7 @@ end
 
   x = randn(Float32,16,16)
   @test typeof(gradient(x->sum(abs2,ifft(fft(x,1),1)),x)[1]) == Array{Complex{Float32},2}
-  # This errors: something is the wrong size
-  #@test typeof(gradient(x->sum(abs2,irfft(rfft(x,1),16,1)),x)[1]) == Array{Float32,2}
+  @test typeof(gradient(x->sum(abs2,irfft(rfft(x,1),16,1)),x)[1]) == Array{Float32,2}
 end
 
 @testset "FillArrays" begin
@@ -1524,9 +1574,14 @@ end
 end
 
 @testset "@nograd" begin
+  @test gradient(x->eachindex([10,20,30])[1], 11) == (nothing,)
+
+  #These are defined in ChainRules, we test them here to check we are handling them right
   @test gradient(x -> findfirst(ismissing, x), [1, missing]) == (nothing,)
   @test gradient(x -> findlast(ismissing, x), [1, missing]) == (nothing,)
   @test gradient(x -> findall(ismissing, x)[1], [1, missing]) == (nothing,)
+
+
   @test gradient(x -> Zygote.ignore(() -> x*x), 1) == (nothing,)
   @test gradient(x -> Zygote.@ignore(x*x), 1) == (nothing,)
   @test gradient(1) do x
@@ -1552,6 +1607,9 @@ end
   @test gradient(x -> sum(Matrix(x[1]*I, (2, 2))), [1.0]) == ([2.0],)
   @test gradient(x -> sum(Matrix{Float64}(x[1]*I, 2, 2)), [1.0]) == ([2.0],)
   @test gradient(x -> sum(Matrix{Float64}(x[1]*I, (2, 2))), [1.0]) == ([2.0],)
+
+  # Check we haven't broken the forward pass:
+  @test first(Zygote.pullback(x->Matrix(x*I, 2,2), 8.0)) == Matrix(8.0*I, 2,2)
 end
 
 @testset "random" begin

@@ -10,11 +10,19 @@ end
 function dselu(x)
   λ = oftype(x/1, 1.0507009873554804934193349852946)
   α = oftype(x/1, 1.6732632423543772848170429916717)
-  λ * ifelse(x > 0, 1, α * exp(x))
+  λ * ifelse(x > 0, one(x), α * exp(x))
 end
 
+@adjoint selu(x::Numeric) = selu(x), Δ -> (dselu(x) * Δ,)
 @adjoint function Base.Broadcast.broadcasted(::typeof(selu), x::Numeric)
   selu.(x), Δ -> (nothing, dselu.(x) .* Δ)
+end
+
+delu(x, α) = ifelse(x ≥ 0, one(x), α * exp(x))
+
+@adjoint elu(x::Numeric, α::Numeric) = elu(x, α), Δ -> (delu.(x, α) .* Δ, nothing)
+@adjoint function Base.Broadcast.broadcasted(::typeof(elu), x::Numeric, α::Numeric)
+  elu.(x, α), Δ -> (nothing, delu.(x, α) .* Δ, nothing)
 end
 
 @adjoint function σ(x::Real)

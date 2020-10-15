@@ -1,6 +1,6 @@
 name = "Zygote"
 uuid = "e88e6eb3-aa80-5325-afca-941959d7151f"
-version = "0.5.4"
+version = "0.5.8"
 
 [deps]
 AbstractFFTs = "621f4979-c628-5d54-868e-fcf4e3e8185c"
@@ -26,11 +26,11 @@ ZygoteRules = "700de1a5-db45-46bc-99cf-38207098b444"
 
 [compat]
 AbstractFFTs = "0.5"
-ArrayLayouts = "0.1, 0.2, 0.3"
-ChainRules = "0.7.0"
+ArrayLayouts = "0.1, 0.2, 0.3, 0.4"
+ChainRules = "0.7.16"
 DiffRules = "1.0"
-FillArrays = "0.8"
-ForwardDiff = "0"
+FillArrays = "0.8, 0.9"
+ForwardDiff = "0.10"
 IRTools = "0.4"
 LoopVectorization = "0.8.15"
 MacroTools = "0.5"
