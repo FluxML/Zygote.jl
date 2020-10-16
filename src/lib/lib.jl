@@ -111,7 +111,7 @@ end
 
 function _pullback(cx::Context, ::typeof(literal_indexed_iterate), xs::Tuple, ::Val{i}) where i
   y, b = _pullback(cx, literal_getindex, xs, Val(i))
-  back(::Nothing) = (legacytype_warn(); return Zero())
+  back(::Nothing) = (legacytype_warn(Nothing); return Zero())
   back(x::AbstractZero) = x
   back(ȳ) = b(ȳ[1])
   (y, i+1), back
@@ -119,7 +119,7 @@ end
 
 function _pullback(cx::Context, ::typeof(literal_indexed_iterate), xs::Tuple, ::Val{i}, st) where i
   y, b = _pullback(cx, literal_getindex, xs, Val(i))
-  back(::Nothing) = (legacytype_warn(); return Zero())
+  back(::Nothing) = (legacytype_warn(Nothing); return Zero())
   back(x::AbstractZero) = x
   back(ȳ) = (b(ȳ[1])..., Zero())
   (y, i+1), back
@@ -279,7 +279,7 @@ const allowed_gradient_T = Union{
 
 # TODO captured mutables + multiple calls to `back`
 @generated function (back::Jnew{T,G,false})(Δ::allowed_gradient_T) where {T,G}
-  Δ <: Union{Nothing, NamedTuple} && legacytype_warn()
+  Δ <: Union{Nothing, NamedTuple} && legacytype_warn(Δ)
   if !T.mutable
     Δ <: AbstractZero && return :Δ
   end
@@ -293,12 +293,12 @@ const allowed_gradient_T = Union{
   quote
     x̄ = $Δ_expr
     $(G <: AbstractZero || :(back.g[] = nt_zero($Δ_expr)))
-    return (DoesNotExist(), ($(map(fn -> :(x̄.$fn), fieldnames(T))...)))
+    return (DoesNotExist(), $(map(fn -> :(x̄.$fn), fieldnames(T))...))
   end
 end
 
 @generated function (back::Jnew{T,G,true})(Δ::allowed_gradient_T) where {T,G}
-  Δ == Union{Nothing, NamedTuple} && legacytype_warn()
+  Δ == Union{Nothing, NamedTuple} && legacytype_warn(Δ)
   if !T.mutable
     Δ <: AbstractZero && return :Δ
   end

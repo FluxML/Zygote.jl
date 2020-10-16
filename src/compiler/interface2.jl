@@ -42,7 +42,7 @@ end
   end
   if g == nothing  # No IR found
     Δ <: AbstractZero && return :(Δ)
-    Δ == Nothing && (legacytype_warn(); return :(DoesNotExist()))
+    Δ == Nothing && (legacytype_warn(Nothing); return :(DoesNotExist()))
     return :(error("Non-differentiable function $(repr(j.t[1]))"))
   end
   meta, _, back = g
