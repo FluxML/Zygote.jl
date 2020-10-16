@@ -755,7 +755,7 @@ end
     return ((uplo=nothing, info=nothing, factors=nothing),)
   end
 end
-@adjoint function literal_getproperty(C::Cholesky, ::Val{:info})
+@adjoint function literal_getproperty(C::Cholesky, ::Val{:info}) # TODO make sure these work by changing the @adjoint macro
   return literal_getproperty(C, Val(:info)), function(Δ)
     return ((uplo=nothing, info=nothing, factors=nothing),)
   end

@@ -203,7 +203,7 @@ end
 
 @generated pair(::Val{k}, v) where k = :($k = v,)
 
-@adjoint function literal_getproperty(x, ::Val{f}) where f
+@adjoint function literal_getproperty(x, ::Val{f}) where f # TODO rewrite as explicit pullback
   val = getproperty(x, f)
   function back(Δ)
     accum_param(__context__, val, Δ) === nothing && return
@@ -260,7 +260,7 @@ Jnew{T}(g) where T = Jnew{T,typeof(g)}(g)
 function _pullback(__context__::AContext, ::typeof(__new__), ::Type{T}, args...) where T
   x = __new__(T, args...)
   g = !T.mutable || fieldcount(T) == 0 ? Zero() : grad_mut(__context__, x)
-  return x, Δ -> (ret = gradtuple1(Jnew{T,typeof(g),false}(g)(Δ)); println(ret); return ret)
+  return x, Δ -> gradtuple1(Jnew{T,typeof(g),false}(g)(Δ))
 end
 
 function _pullback(__context__::AContext, ::typeof(__splatnew__), ::Type{T}, args) where T
@@ -280,7 +280,6 @@ const allowed_gradient_T = Union{
 # TODO captured mutables + multiple calls to `back`
 @generated function (back::Jnew{T,G,false})(Δ::allowed_gradient_T) where {T,G}
   Δ <: Union{Nothing, NamedTuple} && legacytype_warn()
-  Δ <: Composite && Core.println("Jnew{T,G,false}, Δ = ", Δ)
   if !T.mutable
     Δ <: AbstractZero && return :Δ
   end
@@ -294,25 +293,24 @@ const allowed_gradient_T = Union{
   quote
     x̄ = $Δ_expr
     $(G <: AbstractZero || :(back.g[] = nt_zero($Δ_expr)))
-    return (DoesNotExist(), Composite{Any}($(map(fn -> :(x̄.$fn), fieldnames(T))...)))
+    return (DoesNotExist(), ($(map(fn -> :(x̄.$fn), fieldnames(T))...)))
   end
 end
 
 @generated function (back::Jnew{T,G,true})(Δ::allowed_gradient_T) where {T,G}
   Δ == Union{Nothing, NamedTuple} && legacytype_warn()
-  Δ <: Composite && Core.println("Jnew{T,G,true}, Δ = ", Δ)
   if !T.mutable
     Δ <: AbstractZero && return :Δ
   end
   if G <: AbstractZero
     quote
-      return (DoesNotExist(), Composite{Any}($(map(fn -> :(Δ.$fn), fieldnames(T))...),))
+      return (DoesNotExist(), ($(map(fn -> :(Δ.$fn), fieldnames(T))...),))
     end
   else # TODO is this dead code? back is an (immutable) struct
     quote
       x̄ = back.g
       back.g = nt_zero(back.g)
-      return (DoesNotExist(), Composite{Any}($(map(fn -> :(x̄.$fn), fieldnames(T))...),))
+      return (DoesNotExist(), ($(map(fn -> :(x̄.$fn), fieldnames(T))...),))
     end
   end
 end
