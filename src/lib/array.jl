@@ -204,7 +204,7 @@ function _pullback(cx::AContext, ::typeof(collect), g::Base.Generator)
   y, back = ∇map(cx, g.f, g.iter)
   y, function (ȳ)
     f̄, x̄ = legacy2differential(back(differential2legacy(ȳ)))
-    (DoesNotExist(), (f = f̄, iter = x̄),)
+    (DoesNotExist(), Composite{Any}(f = f̄, iter = x̄),)
   end
 end
 
