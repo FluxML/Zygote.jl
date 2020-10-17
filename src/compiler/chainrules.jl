@@ -61,8 +61,9 @@ end
 Convert `x` from the format Zygote uses internally to differentials types ChainRules uses.
 """
 @inline wrap_chainrules_input(x) = x
-@inline wrap_chainrules_input(::Nothing) = ChainRules.Zero()
+@inline wrap_chainrules_input(::Nothing) = (legacytype_warn(Nothing); return ChainRules.Zero())
 @inline function wrap_chainrules_input(xs::Union{Tuple, NamedTuple})
+  legacytype_warn(typeof(xs))
   xp = map(wrap_chainrules_input, xs)
   ChainRules.Composite{Any, typeof(xp)}(xp)
 end
