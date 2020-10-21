@@ -230,7 +230,8 @@ _pullback(cx::Context, ::typeof(literal_getindex), x::NamedTuple, ::Val{f}) wher
 _pullback(cx::Context, ::typeof(literal_getproperty), x::Tuple, ::Val{f}) where f =
   _pullback(cx, literal_getindex, x, Val(f))
 
-grad_mut(x) = Ref{Any}(nt_zero(x))
+#grad_mut(x) = Ref{Any}(nt_zero(x)) # TODO
+grad_mut(x::T) where T = Ref{Any}(Composite{T}())
 
 function grad_mut(cx::Context, x)
   ch = cache(cx)
@@ -274,7 +275,7 @@ const allowed_gradient_T = Union{
   Nothing,
   AbstractZero,
   RefValue,
-  ChainRules.Composite{Any, T} where T<:Union{Tuple, NamedTuple}
+  ChainRules.Composite#{Any, T} where T<:Union{Tuple, NamedTuple} #TODO
 }
 
 # TODO captured mutables + multiple calls to `back`
