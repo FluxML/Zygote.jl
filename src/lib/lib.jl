@@ -140,7 +140,7 @@ end
 @adjoint Base.tail(xs::Tuple) = tail(xs), x̄s -> ((nothing, x̄s...),)
 
 _empty(x) = length(x)
-_empty(x::Union{Tuple,NamedTuple}) = map(_->nothing, x)
+_empty(x::Union{Tuple,NamedTuple}) = map(_->DoesNotExist(), x)
 
 _unapply(t::Integer, xs) = xs[1:t], xs[t+1:end]
 _unapply(t, xs) = first(xs), tail(xs)
@@ -159,29 +159,29 @@ end
 
 unapply(t, xs) = _unapply(t, xs)[1]
 
-@adjoint! function Core._apply(f, args...)
-  y, back = Core._apply(_pullback, (__context__, f), args...)
+function _pullback(__context__::AContext, ::typeof(Core._apply), f, args...)
+  y, _back = Core._apply(_pullback, (__context__, f), args...)
   st = map(_empty, args)
-  y, function (Δ)
-    Δ = differential2legacy(back(legacy2differential(Δ)))
-    if Δ === nothing
-      return nothing
+  y, function (ȳ)
+    Δ = _back(ȳ)
+    if Δ isa AbstractZero
+      return Δ
     else
-      (first(Δ), unapply(st, Base.tail(Δ))...)
+      gradtuple1((first(Δ), unapply(st, Base.tail(Δ))...))
     end
   end
 end
 
 if VERSION >= v"1.4.0-DEV.304"
-  @adjoint! function Core._apply_iterate(::typeof(iterate), f, args...)
-    y, back = Core._apply(_pullback, (__context__, f), args...)
+  function _pullback(__context__::AContext, ::typeof(Core._apply_iterate), f, args...)
+    y, _back = Core._apply(_pullback, (__context__, f), args...)
     st = map(_empty, args)
-    y, function (Δ)
-      Δ = differential2legacy(back(legacy2differential(Δ)))
-      if Δ === nothing
-        return nothing
+    y, function (ȳ)
+      Δ = _back(ȳ)
+      if Δ isa AbstractZero
+        return Δ
       else
-        (nothing, first(Δ), unapply(st, Base.tail(Δ))...)
+        gradtuple1((DoesNotExist(), first(Δ), unapply(st, Base.tail(Δ))...))
       end
     end
   end

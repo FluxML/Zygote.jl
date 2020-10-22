@@ -179,31 +179,34 @@ for (mapfunc,∇mapfunc) in [(:map,:∇map),(:pmap,:∇pmap),(:vmap,:∇vmap)]
   @eval function $∇mapfunc(cx, f, args...)
     ys_and_backs = $mapfunc((args...) -> _pullback(cx, f, args...), args...)
     if isempty(ys_and_backs)
-      ys_and_backs, _ -> nothing
+      return ys_and_backs, _ -> Zero()
     else
       ys, backs = unzip(ys_and_backs)
       ys, function (Δ)
         # Apply pullbacks in reverse order. Needed for correctness if `f` is stateful.
         Δf_and_args_zipped = $mapfunc(
-          (f, δ) -> differential2legacy(f(legacy2differential(δ))),
+          (f, δ) -> f(δ),
           _tryreverse($mapfunc, backs, Δ)...
         )
         Δf_and_args = unzip(_tryreverse($mapfunc, Δf_and_args_zipped))
         Δf = reduce(accum, Δf_and_args[1])
-        (Δf, Δf_and_args[2:end]...)
+        return (Δf, Δf_and_args[2:end]...)
       end
     end
   end
 
-  @eval @adjoint function $mapfunc(f, args::Union{AbstractArray,Tuple}...)
-    $∇mapfunc(__context__, f, args...)
+  @eval function _pullback(__context__::AContext, ::typeof($mapfunc), f, args::Union{AbstractArray,Tuple}...)
+    ys, _f_back = $∇mapfunc(__context__, f, args...)
+    _back(::Union{Nothing,AbstractZero}) = Zero()
+    _back(Δ) = gradtuple1(_f_back(Δ))
+    return ys, _back
   end
 end
 
 function _pullback(cx::AContext, ::typeof(collect), g::Base.Generator)
-  y, back = ∇map(cx, g.f, g.iter)
+  y, _back = ∇map(cx, g.f, g.iter)
   y, function (ȳ)
-    f̄, x̄ = legacy2differential(back(differential2legacy(ȳ)))
+    f̄, x̄ = _back(ȳ)
     (DoesNotExist(), Composite{typeof(g)}(f = f̄, iter = x̄),)
   end
 end

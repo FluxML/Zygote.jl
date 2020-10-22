@@ -35,7 +35,7 @@ accum_sum(xs; dims = :) = reduce(accum, xs, dims = dims)
 
 # Work around reducedim_init issue
 # https://github.com/JuliaLang/julia/issues/31427
-accum_sum(xs::Nothing; dims = :) = nothing
+accum_sum(xs::Nothing; dims = :) = nothing # TODO solve this thing!
 accum_sum(xs::AbstractArray{Nothing}; dims = :) = nothing
 accum_sum(xs::AbstractArray{<:Number}; dims = :) = sum(xs, dims = dims)
 accum_sum(xs::AbstractArray{<:AbstractArray{<:Number}}; dims = :) = sum(xs, dims = dims)
@@ -127,29 +127,32 @@ end
 _broadcast(f::F, x...) where F = materialize(broadcasted(f, x...))
 
 _get(x::Tuple, i) = x[i]
-_get(::Nothing, i) = nothing
-collapse_nothings(xs::Vector{Nothing}) = nothing
-collapse_nothings(xs) = xs
+_get(x::AbstractZero, i) = x
+collapse_zeros(xs::Vector{<:AbstractZero}) = DoesNotExist()
+collapse_zeros(xs) = xs
 
-@adjoint function broadcasted(::AbstractArrayStyle, f, args...)
+function _pullback(__context__::AContext, ::typeof(broadcasted), ::AbstractArrayStyle, f, args...)
   len = inclen(args)
   y∂b = _broadcast((x...) -> _pullback(__context__, f, x...), args...)
   y = map(x -> x[1], y∂b)
   ∂b = map(x -> x[2], y∂b)
-  y, function (ȳ)
-    dxs_zip = map((∂b, ȳ) -> differential2legacy(∂b(legacy2differential(ȳ))), ∂b, ȳ)
-    dxs = collapse_nothings.(ntuple(i -> map(x -> _get(x, i), dxs_zip), len))
-    (nothing, accum_sum(dxs[1]), map(unbroadcast, args, Base.tail(dxs))...)
+  _back(::Union{Nothing,AbstractZero}) = Zero()
+  function _back(ȳ)
+    dxs_zip = map((∂b, ȳ) -> ∂b(ȳ), ∂b, ȳ)
+    dxs = collapse_zeros.(ntuple(i -> map(x -> _get(x, i), dxs_zip), len))
+    return gradtuple1((DoesNotExist(), accum_sum(dxs[1]), map(unbroadcast, args, Base.tail(dxs))...)) # TODO: accum_sum makes a nothing, as does unbroadcast
   end
+  return y, _back
 end
 
-@adjoint function broadcasted(::AbstractArrayStyle{0}, f, args...)
-  len = inclen(args)
+function _pullback(__context__::AContext, ::typeof(broadcasted), ::AbstractArrayStyle{0}, f, args...)
   y, ∂b = _broadcast((x...) -> _pullback(__context__, f, x...), args...)
-  y, function (ȳ)
-    dxs = differential2legacy(∂b(legacy2differential(ȳ)))
-    (nothing, dxs...)
+  _back(::Union{Nothing,AbstractZero}) = Zero()
+  function _back(ȳ)
+    dxs = ∂b(ȳ)
+    return gradtuple1((DoesNotExist(), dxs...))
   end
+  return y, _back
 end
 
 # Use the `map` adjoint in this special case, which is the same but applies
@@ -162,9 +165,10 @@ end
 # end
 
 @adjoint! function (b::typeof(broadcast))(f, args...)
-  _pb = _pullback(__context__, broadcasted, f, args...)
-  Δ -> differential2legacy(_pb(legacy2differential(Δ)))
+  y, _back = _pullback(__context__, broadcasted, f, args...)
+  y, Δ -> differential2legacy(_back(legacy2differential(Δ, typeof(y))))
 end
+
 # Forward Mode (mainly necessary for CUDA)
 
 import ForwardDiff
@@ -190,7 +194,7 @@ end
   out = dual_function(f).(args...)
   eltype(out) <: Dual || return (out, _ -> nothing)
   y = map(x -> x.value, out)
-  _back(ȳ, i) = unbroadcast(args[i], ((a, b) -> a*b.partials[i]).(ȳ, out))
+  _back(ȳ, i) = unbroadcast(args[i], ((a, b) -> a*b.partials[i]).(ȳ, out)) # TODO: unbroadcast returns nothing
   back(ȳ) = ntuple(i -> _back(ȳ, i), N)
   return y, back
 end
