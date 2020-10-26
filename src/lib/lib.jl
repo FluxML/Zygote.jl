@@ -42,16 +42,17 @@ end
   isbitstype(x) && return :(Δ)
   quote
     if haskey(cache(cx), x)
-      cache(cx)[x] = accum(cache(cx)[x],Δ)
-      return
+      cache(cx)[x] = accum(cache(cx)[x], Δ)
+      return Zero()  # we have already accumulated it into the cache so nothing left to accumulate
     else
-      return Δ
+      return Δ  # we are not accumulating it into the cache so it must be accumulated later
     end
   end
 end
 
 function accum_global(cx::Context, ref, x̄)
-  (x̄ === nothing || isconst(ref.mod, ref.name)) && return
+  x̄ isa Nothing && legacytype_warn(Nothing)
+  (x̄ isa AbstractZero || isconst(ref.mod, ref.name)) && return x̄
   gs = cache(cx)
   gs[ref] = accum(get(gs, ref, Zero()), x̄)
   return
@@ -59,13 +60,21 @@ end
 
 unwrap(x) = x
 
-@adjoint unwrap(x) = unwrap(x), x̄ -> (accum_param(__context__, x, x̄),)
+function _pullback(__context__::AContext, ::typeof(unwrap), x)
+  _back(::Union{Nothing,AbstractZero}) = Zero()
+  _back(x̄) = gradtuple1(accum_param(__context__, x, x̄))
+   return unwrap(x), _back
+end
 
 unwrap(ref, x) = x
 
-@adjoint unwrap(ref, x) = unwrap(x), function (x̄)
-  accum_global(__context__, ref, x̄)
-  (accum_param(__context__, x, x̄),)
+function _pullback(__context__::AContext, ::typeof(unwrap), ref, x)
+    _back(::Union{Nothing,AbstractZero}) = Zero()
+    function _back(x̄)
+        accum_global(__context__, ref, x̄)
+        return gradtuple1((accum_param(__context__, x, x̄),))
+    end
+    return unwrap(x), _back
 end
 
 function global_set(ref, val)
@@ -91,7 +100,7 @@ using Base: tail
 @adjoint function literal_getindex(xs::NTuple{N,Any}, ::Val{i}) where {N,i}
   val = xs[i]
   function back(Δ)
-    accum_param(__context__, val, Δ) === nothing && return
+    accum_param(__context__, val, Δ) isa AbstractZero && return
     return ntuple(j -> i == j ? Δ : nothing, Val(N)), nothing
   end
   val, back
@@ -100,7 +109,7 @@ end
 @adjoint function getindex(xs::NTuple{N,Any}, i::Integer) where N
   val = xs[i]
   function back(Δ)
-    accum_param(__context__, val, Δ) === nothing && return
+    accum_param(__context__, val, Δ) isa AbstractZero && return
     return ntuple(j -> i == j ? Δ : nothing, Val(N)), nothing
   end
   return val, back
@@ -206,7 +215,7 @@ end
 @adjoint function literal_getproperty(x, ::Val{f}) where f # TODO rewrite as explicit pullback
   val = getproperty(x, f)
   function back(Δ)
-    accum_param(__context__, val, Δ) === nothing && return
+    accum_param(__context__, val, Δ) isa AbstractZero && return
     if isimmutable(x)
       ((;nt_nothing(x)...,pair(Val(f), Δ)...), nothing)
     else
@@ -242,7 +251,7 @@ function grad_mut(cx::Context, x)
   end
 end
 
-@adjoint! function setfield!(x, f, val)
+@adjoint! function setfield!(x, f, val) # TODO change to _pullback
   y = setfield!(x, f, val)
   g = grad_mut(__context__, x)
   y, function (_)

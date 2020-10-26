@@ -35,8 +35,8 @@ accum_sum(xs; dims = :) = reduce(accum, xs, dims = dims)
 
 # Work around reducedim_init issue
 # https://github.com/JuliaLang/julia/issues/31427
-accum_sum(xs::Nothing; dims = :) = nothing # TODO solve this thing!
-accum_sum(xs::AbstractArray{Nothing}; dims = :) = nothing
+accum_sum(xs::AbstractZero; dims = :) = xs
+accum_sum(xs::AbstractArray{<:AbstractZero}; dims = :) = Zero()
 accum_sum(xs::AbstractArray{<:Number}; dims = :) = sum(xs, dims = dims)
 accum_sum(xs::AbstractArray{<:AbstractArray{<:Number}}; dims = :) = sum(xs, dims = dims)
 accum_sum(xs::Number; dims = :) = xs
@@ -57,7 +57,7 @@ unbroadcast(x::Number, x̄) = accum_sum(x̄)
 unbroadcast(x::Tuple{<:Any}, x̄) = (accum_sum(x̄),)
 unbroadcast(x::Base.RefValue, x̄) = (x=accum_sum(x̄),)
 
-unbroadcast(x::AbstractArray, x̄::Nothing) = nothing
+unbroadcast(x::AbstractArray, x̄::AbstractZero) = x̄
 
 # Split Reverse Mode
 # ==================
@@ -68,18 +68,29 @@ unbroadcast(x::AbstractArray, x̄::Nothing) = nothing
 
 Numeric{T<:Number} = Union{T,AbstractArray{<:T}}
 
-@adjoint broadcasted(::typeof(+), xs::Numeric...) =
-  broadcast(+, xs...), ȳ -> (nothing, map(x -> unbroadcast(x, ȳ), xs)...)
+function _pullback(__context__::AContext, ::typeof(broadcasted), ::typeof(+), xs::Numeric...)
+  _back(::Union{Nothing,AbstractZero}) = Zero()
+  _back(Δ) = gradtuple1((DoesNotExist(), map(x -> unbroadcast(x, Δ), xs)...))
+  return broadcast(+, xs...), _back
+end
 
-@adjoint broadcasted(::typeof(-), x::Numeric, y::Numeric) = x .- y,
-  Δ -> (nothing, unbroadcast(x, Δ), -unbroadcast(y, Δ))
+function _pullback(__context__::AContext, ::typeof(broadcasted), ::typeof(-), x::Numeric, y::Numeric)
+  _back(::Union{Nothing,AbstractZero}) = Zero()
+  _back(Δ) = gradtuple1((DoesNotExist(), unbroadcast(x, Δ), -unbroadcast(y, Δ)))
+  return x .- y, _back
+end
 
-@adjoint broadcasted(::typeof(*), x::Numeric, y::Numeric) = x.*y,
-  z̄ -> (nothing, unbroadcast(x, z̄ .* conj.(y)), unbroadcast(y, z̄ .* conj.(x)))
+function _pullback(__context__::AContext, ::typeof(broadcasted), ::typeof(*), x::Numeric, y::Numeric)
+  _back(::Union{Nothing,AbstractZero}) = Zero()
+  _back(Δ) = gradtuple1((DoesNotExist(), unbroadcast(x, Δ .* conj.(y)), unbroadcast(y, Δ .* conj.(x))))
+  x.*y, _back
+end
 
-@adjoint function broadcasted(::typeof(/), x::Numeric, y::Numeric)
+function _pullback(__context__::AContext, ::typeof(broadcasted), ::typeof(/), x::Numeric, y::Numeric)
   res = x ./ y
-  res, Δ -> (nothing, unbroadcast(x, Δ ./ conj.(y)), unbroadcast(y, -Δ .* conj.(res ./ y)))
+  _back(::Union{Nothing,AbstractZero}) = Zero()
+  _back(Δ) = gradtuple1((DoesNotExist(), unbroadcast(x, Δ ./ conj.(y)), unbroadcast(y, -Δ .* conj.(res ./ y))))
+  res, _back
 end
 
 @adjoint function broadcasted(::typeof(Base.literal_pow), ::typeof(^), x::Numeric, exp::Val{p}) where p
@@ -140,7 +151,7 @@ function _pullback(__context__::AContext, ::typeof(broadcasted), ::AbstractArray
   function _back(ȳ)
     dxs_zip = map((∂b, ȳ) -> ∂b(ȳ), ∂b, ȳ)
     dxs = collapse_zeros.(ntuple(i -> map(x -> _get(x, i), dxs_zip), len))
-    return gradtuple1((DoesNotExist(), accum_sum(dxs[1]), map(unbroadcast, args, Base.tail(dxs))...)) # TODO: accum_sum makes a nothing, as does unbroadcast
+    return gradtuple1((DoesNotExist(), accum_sum(dxs[1]), map(unbroadcast, args, Base.tail(dxs))...))
   end
   return y, _back
 end
@@ -194,7 +205,9 @@ end
   out = dual_function(f).(args...)
   eltype(out) <: Dual || return (out, _ -> nothing)
   y = map(x -> x.value, out)
-  _back(ȳ, i) = unbroadcast(args[i], ((a, b) -> a*b.partials[i]).(ȳ, out)) # TODO: unbroadcast returns nothing
+  _back(ȳ, i) = differential2legacy( # unbroadcast returns differential types
+    unbroadcast(args[i], ((a, b) -> a*b.partials[i]).(ȳ, out))
+  )
   back(ȳ) = ntuple(i -> _back(ȳ, i), N)
   return y, back
 end
