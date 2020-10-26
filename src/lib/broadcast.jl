@@ -70,26 +70,26 @@ Numeric{T<:Number} = Union{T,AbstractArray{<:T}}
 
 function _pullback(__context__::AContext, ::typeof(broadcasted), ::typeof(+), xs::Numeric...)
   _back(::Union{Nothing,AbstractZero}) = Zero()
-  _back(Δ) = gradtuple1((DoesNotExist(), map(x -> unbroadcast(x, Δ), xs)...))
+  _back(Δ) = (DoesNotExist(), DoesNotExist(), map(x -> unbroadcast(x, Δ), xs)...)
   return broadcast(+, xs...), _back
 end
 
 function _pullback(__context__::AContext, ::typeof(broadcasted), ::typeof(-), x::Numeric, y::Numeric)
   _back(::Union{Nothing,AbstractZero}) = Zero()
-  _back(Δ) = gradtuple1((DoesNotExist(), unbroadcast(x, Δ), -unbroadcast(y, Δ)))
+  _back(Δ) = (DoesNotExist(), DoesNotExist(), unbroadcast(x, Δ), -unbroadcast(y, Δ))
   return x .- y, _back
 end
 
 function _pullback(__context__::AContext, ::typeof(broadcasted), ::typeof(*), x::Numeric, y::Numeric)
   _back(::Union{Nothing,AbstractZero}) = Zero()
-  _back(Δ) = gradtuple1((DoesNotExist(), unbroadcast(x, Δ .* conj.(y)), unbroadcast(y, Δ .* conj.(x))))
+  _back(Δ) = (DoesNotExist(), DoesNotExist(), unbroadcast(x, Δ .* conj.(y)), unbroadcast(y, Δ .* conj.(x)))
   x.*y, _back
 end
 
 function _pullback(__context__::AContext, ::typeof(broadcasted), ::typeof(/), x::Numeric, y::Numeric)
   res = x ./ y
   _back(::Union{Nothing,AbstractZero}) = Zero()
-  _back(Δ) = gradtuple1((DoesNotExist(), unbroadcast(x, Δ ./ conj.(y)), unbroadcast(y, -Δ .* conj.(res ./ y))))
+  _back(Δ) = (DoesNotExist(), DoesNotExist(), unbroadcast(x, Δ ./ conj.(y)), unbroadcast(y, -Δ .* conj.(res ./ y)))
   res, _back
 end
 
@@ -151,7 +151,7 @@ function _pullback(__context__::AContext, ::typeof(broadcasted), ::AbstractArray
   function _back(ȳ)
     dxs_zip = map((∂b, ȳ) -> ∂b(ȳ), ∂b, ȳ)
     dxs = collapse_zeros.(ntuple(i -> map(x -> _get(x, i), dxs_zip), len))
-    return gradtuple1((DoesNotExist(), accum_sum(dxs[1]), map(unbroadcast, args, Base.tail(dxs))...))
+    return (DoesNotExist(), DoesNotExist(), accum_sum(dxs[1]), map(unbroadcast, args, Base.tail(dxs))...)
   end
   return y, _back
 end
@@ -161,7 +161,7 @@ function _pullback(__context__::AContext, ::typeof(broadcasted), ::AbstractArray
   _back(::Union{Nothing,AbstractZero}) = Zero()
   function _back(ȳ)
     dxs = ∂b(ȳ)
-    return gradtuple1((DoesNotExist(), dxs...))
+    return (DoesNotExist(), DoesNotExist(), dxs...)
   end
   return y, _back
 end

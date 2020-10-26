@@ -176,7 +176,7 @@ function _pullback(__context__::AContext, ::typeof(Core._apply), f, args...)
     if Δ isa AbstractZero
       return Δ
     else
-      gradtuple1((first(Δ), unapply(st, Base.tail(Δ))...))
+      return (DoesNotExist(), first(Δ), unapply(st, Base.tail(Δ))...)
     end
   end
 end
@@ -190,7 +190,7 @@ if VERSION >= v"1.4.0-DEV.304"
       if Δ isa AbstractZero
         return Δ
       else
-        gradtuple1((DoesNotExist(), first(Δ), unapply(st, Base.tail(Δ))...))
+        return (DoesNotExist(), DoesNotExist(), first(Δ), unapply(st, Base.tail(Δ))...)
       end
     end
   end

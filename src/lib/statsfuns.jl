@@ -11,7 +11,7 @@ end
 function _pullback(__context__::AContext, ::typeof(broadcasted), ::typeof(xlogx), x::Numeric)
     result, dx = ∇xlogx(x)
     _back(::Union{Nothing,AbstractZero}) = Zero()
-    _back(Δ) = gradtuple1((DoesNotExist(), unbroadcast(x, Δ .* dx)))
+    _back(Δ) = (DoesNotExist(), DoesNotExist(), unbroadcast(x, Δ .* dx))
     return result, _back
 end
 function ∇xlogx(x::Numeric)
@@ -38,7 +38,7 @@ end
 function _pullback(__context__::AContext, ::typeof(broadcasted), ::typeof(log1pexp), x::Numeric)
     dx = ∂log1pexp.(x)
     _back(::Union{Nothing,AbstractZero}) = Zero()
-    _back(Δ) = gradtuple1((DoesNotExist(), unbroadcast(x, Δ .* dx)))
+    _back(Δ) = (DoesNotExist(), DoesNotExist(), unbroadcast(x, Δ .* dx))
     return log1pexp.(x), _back
 end
 ∂log1pexp(x::Real)    = x < 18.0 ? logistic(x) : x < 33.3 ? one(x) - exp(-x) : oftype(exp(x), 1)
@@ -57,7 +57,7 @@ end
 function _pullback(__context__::AContext, ::typeof(broadcasted), ::typeof(xlogy), x::Numeric, y::Numeric)
     result, dx, dy = ∇xlogy(x, y)
     _back(::Union{Nothing,AbstractZero}) = Zero()
-    _back(Δ) = gradtuple1((DoesNotExist(), unbroadcast(x, Δ .* dx), unbroadcast(y, Δ .* dy)))
+    _back(Δ) = (DoesNotExist(), DoesNotExist(), unbroadcast(x, Δ .* dx), unbroadcast(y, Δ .* dy))
     return result, _back
 end
 function ∇xlogy(x::Numeric, y::Numeric)
@@ -76,7 +76,7 @@ end
 function _pullback(__context__::AContext, ::typeof(broadcasted), ::typeof(logaddexp), x::Numeric, y::Numeric)
     result, dx, dy = ∇logaddexp(x, y)
     _back(::Union{Nothing,AbstractZero}) = Zero()
-    _back(Δ) = gradtuple1((DoesNotExist(), unbroadcast(x, Δ .* dx), unbroadcast(y, Δ .* dy)))
+    _back(Δ) = (DoesNotExist(), DoesNotExist(), unbroadcast(x, Δ .* dx), unbroadcast(y, Δ .* dy))
     return result, _back
 end
 function ∇logaddexp(x::Numeric, y::Numeric)
@@ -94,7 +94,7 @@ end
 function _pullback(__context__::AContext, ::typeof(broadcasted), ::typeof(logsubexp), x::Numeric, y::Numeric)
     result, dx, dy = ∇logsubexp(x, y)
     _back(::Union{Nothing,AbstractZero}) = Zero()
-    _back(Δ) = gradtuple1((DoesNotExist(), unbroadcast(x, Δ .* dx), unbroadcast(y, Δ .* dy)))
+    _back(Δ) = (DoesNotExist(), DoesNotExist(), unbroadcast(x, Δ .* dx), unbroadcast(y, Δ .* dy))
     return result, _back
 end
 function ∇logsubexp(x::Numeric, y::Numeric)
