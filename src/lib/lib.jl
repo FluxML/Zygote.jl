@@ -206,26 +206,25 @@ function deref!(x::Ref)
   return d
 end
 
-@generated nt_nothing(x) = Expr(:tuple, [:($f=nothing) for f in fieldnames(x)]...)
-
 @generated nt_zero(x) = Expr(:tuple, [:($f=Zero()) for f in fieldnames(x)]...)
 
 @generated pair(::Val{k}, v) where k = :($k = v,)
 
-@adjoint function literal_getproperty(x, ::Val{f}) where f # TODO rewrite as explicit pullback
-  val = getproperty(x, f)
-  function back(Δ)
-    accum_param(__context__, val, Δ) isa AbstractZero && return
-    if isimmutable(x)
-      ((;nt_nothing(x)...,pair(Val(f), Δ)...), nothing)
-    else
-      dx = grad_mut(__context__, x)
-      dx[] = (;dx[]...,pair(Val(f),accum(getfield(dx[], f), Δ))...)
-      return (dx,nothing)
+function _pullback(__context__::AContext, ::typeof(literal_getproperty), x, ::Val{f}) where f
+    val = getproperty(x, f)
+    _back(::Union{Nothing,AbstractZero}) = Zero()
+    function _back(Δ)
+      accum_param(__context__, val, Δ) isa AbstractZero && return Zero()
+      if isimmutable(x)
+        return (DoesNotExist(), Composite{typeof(x)}(;f => Δ), DoesNotExist())
+      else
+        dx = grad_mut(__context__, x)
+        dx[] += Composite{typeof(x)}(;f => Δ) # is += the right thing to do? (a=1, b=2, :a=>3) gives (a = 3, b = 2)
+        return (DoesNotExist(), dx, DoesNotExist())
+      end
     end
+    unwrap(val), _back
   end
-  unwrap(val), back
-end
 
 _pullback(cx::Context, ::typeof(getproperty), x, f::Symbol) =
   _pullback(cx, literal_getproperty, x, Val(f))
@@ -239,7 +238,6 @@ _pullback(cx::Context, ::typeof(literal_getindex), x::NamedTuple, ::Val{f}) wher
 _pullback(cx::Context, ::typeof(literal_getproperty), x::Tuple, ::Val{f}) where f =
   _pullback(cx, literal_getindex, x, Val(f))
 
-#grad_mut(x) = Ref{Any}(nt_zero(x)) # TODO
 grad_mut(x::T) where T = Ref{Any}(Composite{T}())
 
 function grad_mut(cx::Context, x)
@@ -251,13 +249,13 @@ function grad_mut(cx::Context, x)
   end
 end
 
-@adjoint! function setfield!(x, f, val) # TODO change to _pullback
+function _pullback(__context__::AContext, ::typeof(setfield!), x, f, val)
   y = setfield!(x, f, val)
   g = grad_mut(__context__, x)
-  y, function (_)
-    Δ = differential2legacy(getfield(g[], f))
-    g[] = (;g[]...,pair(Val(f),Zero())...)
-    (nothing, nothing, Δ)
+  y, function _back(_)
+    Δ = getproperty(g[], f)
+    g[] += Composite{typeof(x)}(;f => -Δ) # i.e. g[].f = Zero(), but that is not implemented
+    return (DoesNotExist(), DoesNotExist(), DoesNotExist(), Δ)
   end
 end
 
@@ -284,7 +282,7 @@ const allowed_gradient_T = Union{
   Nothing,
   AbstractZero,
   RefValue,
-  ChainRules.Composite#{Any, T} where T<:Union{Tuple, NamedTuple} #TODO
+  ChainRules.Composite
 }
 
 # TODO captured mutables + multiple calls to `back`
@@ -296,7 +294,7 @@ const allowed_gradient_T = Union{
   Δ_expr = if G <: AbstractZero
     :Δ
   elseif Δ <: RefValue
-    :(back.g[]) # TODO: is this right? Why don't we need to accum? 
+    :(back.g[]) # TODO: is this right? Why don't we need to accum?
   else
     :(accum(back.g[], Δ))
   end

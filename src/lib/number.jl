@@ -18,8 +18,6 @@ end
 
 # Complex Numbers
 
-@adjoint (T::Type{<:Complex})(re, im) = T(re, im), c̄ -> (nothing, real(c̄), imag(c̄))
-
 # we define these here because ChainRules.jl only defines them for x::Union{Real,Complex}
 
 @adjoint abs2(x::Number) = abs2(x), Δ -> (real(Δ)*(x + x),)

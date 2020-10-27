@@ -53,7 +53,7 @@ grad_mut(ch::Channel) = Channel(ch.sz_max)
 @adjoint! function put!(ch::Channel, x)
   put!(ch, x), function (ȳ)
     x̄ = take!(grad_mut(__context__, ch))
-    (nothing, accum(x̄, ȳ), nothing)
+    return (nothing, accum(x̄, ȳ))
   end
 end
 
@@ -64,14 +64,14 @@ end
   end
 end
 
-@adjoint! function Task(f)
+function _pullback(__context__::AContext, ::Type{<:Task}, f)
   t = Task(f)
   t.code = function ()
-    y, back = _pullback(__context__, f)
-    cache(__context__)[t] = Task(back)
+    y, _back = _pullback(__context__, f)
+    cache(__context__)[t] = Task(_back)
     return y
   end
-  t, _ -> fetch(cache(__context__)[t])
+  return t, _ -> (DoesNotExist(), fetch(cache(__context__)[t]))
 end
 
 function runadjoint(cx, t, ȳ = DoesNotExist())
