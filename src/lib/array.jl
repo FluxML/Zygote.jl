@@ -465,7 +465,7 @@ end
   Y, back = Zygote.pullback((U, B)->U \ (U' \ B), A.U, B)
   return Y, function(Ȳ)
     Ā_factors, B̄ = back(Ȳ)
-    return ((uplo=nothing, status=nothing, factors=Ā_factors), B̄)
+    return ((factors=Ā_factors, uplo=nothing, info=nothing), B̄)
   end
 end
 
@@ -522,7 +522,7 @@ end
   C = cholesky(Σ, check = check)
   return C, Δ::NamedTuple -> begin
     issuccess(C) || throw(PosDefException(C.info))
-    return Diagonal(diag(Δ.factors) .* inv.(2 .* C.factors.diag)), nothing
+    return (Diagonal(diag(Δ.factors) .* inv.(2 .* C.factors.diag)),)
   end
 end
 
@@ -761,30 +761,30 @@ end
 # Various sensitivities for `literal_getproperty`, depending on the 2nd argument.
 @adjoint function literal_getproperty(C::Cholesky, ::Val{:uplo})
   return literal_getproperty(C, Val(:uplo)), function(Δ)
-    return ((uplo=nothing, info=nothing, factors=nothing),)
+    return ((factors=nothing, uplo=nothing, info=nothing), nothing)
   end
 end
 @adjoint function literal_getproperty(C::Cholesky, ::Val{:info}) # TODO make sure these work by changing the @adjoint macro
   return literal_getproperty(C, Val(:info)), function(Δ)
-    return ((uplo=nothing, info=nothing, factors=nothing),)
+    return ((factors=nothing, uplo=nothing, info=nothing), nothing)
   end
 end
 @adjoint function literal_getproperty(C::Cholesky, ::Val{:U})
   return literal_getproperty(C, Val(:U)), function(Δ)
     Δ_factors = C.uplo == 'U' ? UpperTriangular(Δ) : LowerTriangular(copy(Δ'))
-    return ((uplo=nothing, info=nothing, factors=Δ_factors),)
+    return ((factors=Δ_factors, uplo=nothing, info=nothing), nothing)
   end
 end
 @adjoint function literal_getproperty(C::Cholesky, ::Val{:L})
   return literal_getproperty(C, Val(:L)), function(Δ)
     Δ_factors = C.uplo == 'L' ? LowerTriangular(Δ) : UpperTriangular(copy(Δ'))
-    return ((uplo=nothing, info=nothing, factors=Δ_factors),)
+    return ((factors=Δ_factors, uplo=nothing, info=nothing), nothing)
   end
 end
 
 @adjoint function logdet(C::Cholesky)
   return logdet(C), function(Δ)
-    return ((uplo=nothing, info=nothing, factors=Diagonal(2 .* Δ ./ diag(C.factors))),)
+    return ((factors=Diagonal(2 .* Δ ./ diag(C.factors)), uplo=nothing, info=nothing),)
   end
 end
 
