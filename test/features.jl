@@ -230,12 +230,14 @@ end[1] == 5
   x
 end[1] == 2
 
-# Gradient of closure
-grad_closure(x) = 2x
+# test using call overload form of `@adjoint`
+grad_callover(x) = 2x
 
-Zygote.@adjoint (f::typeof(grad_closure))(x) = f(x), Δ -> (1, 2)
+# Equivelent to:
+# Zygote.@adjoint grad_callover(x) = grad_callover(x), Δ -> (2Δ,)
+Zygote.@adjoint (f::typeof(grad_callover))(x) = f(x), Δ -> (1, 2Δ,) # set the gradient wrong so that it is tested
 
-@test gradient((f, x) -> f(x), grad_closure, 5) == (1, 2)
+@test gradient((f, x) -> f(x), grad_callover, 5) == (1, 2)
 
 invokable(x) = 2x
 invokable(x::Integer) = 3x
