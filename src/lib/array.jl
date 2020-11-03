@@ -203,8 +203,9 @@ for (mapfunc,∇mapfunc) in [(:map,:∇map),(:pmap,:∇pmap),(:vmap,:∇vmap)]
 
   @eval function _pullback(__context__::AContext, ::typeof($mapfunc), f, args::Union{AbstractArray,Tuple}...)
     ys, _f_back = $∇mapfunc(__context__, f, args...)
-    _back(::Union{Nothing,AbstractZero}) = Zero()
-    _back(Δ) = gradtuple1(_f_back(Δ))
+    _back(::Nothing) = (legacytype_warn(Nothing); return Zero())
+    _back(x::AbstractZero) = x
+    _back(Δ) = diffgradtuple1(_f_back(Δ))
     return ys, _back
   end
 end

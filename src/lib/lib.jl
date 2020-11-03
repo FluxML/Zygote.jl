@@ -61,20 +61,22 @@ end
 unwrap(x) = x
 
 function _pullback(__context__::AContext, ::typeof(unwrap), x)
-  _back(::Union{Nothing,AbstractZero}) = Zero()
-  _back(x̄) = gradtuple1(accum_param(__context__, x, x̄))
-   return unwrap(x), _back
+  _back(::Nothing) = (legacytype_warn(Nothing); return Zero())
+  _back(x::AbstractZero) = x
+  _back(x̄) = diffgradtuple1(accum_param(__context__, x, x̄))
+  return unwrap(x), _back
 end
 
 unwrap(ref, x) = x
 
 function _pullback(__context__::AContext, ::typeof(unwrap), ref, x)
-    _back(::Union{Nothing,AbstractZero}) = Zero()
-    function _back(x̄)
-        accum_global(__context__, ref, x̄)
-        return gradtuple1((accum_param(__context__, x, x̄),))
-    end
-    return unwrap(x), _back
+  _back(::Nothing) = (legacytype_warn(Nothing); return Zero())
+  _back(x::AbstractZero) = x
+  function _back(x̄)
+    accum_global(__context__, ref, x̄)
+    return diffgradtuple1((accum_param(__context__, x, x̄),))
+  end
+  return unwrap(x), _back
 end
 
 function global_set(ref, val)
@@ -268,13 +270,19 @@ Jnew{T}(g) where T = Jnew{T,typeof(g)}(g)
 function _pullback(__context__::AContext, ::typeof(__new__), ::Type{T}, args...) where T
   x = __new__(T, args...)
   g = !T.mutable || fieldcount(T) == 0 ? Zero() : grad_mut(__context__, x)
-  return x, Δ -> gradtuple1(Jnew{T,typeof(g),false}(g)(Δ))
+  _back(::Nothing) = (legacytype_warn(Nothing); return Zero())
+  _back(x::AbstractZero) = x
+  _back(Δ) = diffgradtuple1(Jnew{T,typeof(g),false}(g)(Δ))
+  return x, _back
 end
 
 function _pullback(__context__::AContext, ::typeof(__splatnew__), ::Type{T}, args) where T
   x = __splatnew__(T, args)
   g = !T.mutable || fieldcount(T) == 0 ? Zero() : grad_mut(__context__, x)
-  return x,  Δ -> gradtuple1(Jnew{T,typeof(g),true}(g)(Δ))
+  _back(::Nothing) = (legacytype_warn(Nothing); return Zero())
+  _back(x::AbstractZero) = x
+  _back(Δ) = diffgradtuple1(Jnew{T,typeof(g),true}(g)(Δ))
+  return x, _back
 end
 
 const allowed_gradient_T = Union{
