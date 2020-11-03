@@ -178,7 +178,9 @@ function _pullback(__context__::AContext, ::typeof(Core._apply), f, args...)
     if Δ isa AbstractZero
       return Δ
     else
-      return (DoesNotExist(), first(Δ), unapply(st, Base.tail(Δ))...)
+      tuple_grads = unapply(st, Base.tail(Δ))
+      composite_grads = ((Composite{typeof(tg), typeof(tg)}(tg) for tg in tuple_grads)...,)
+      return (DoesNotExist(), first(Δ), composite_grads...)
     end
   end
 end
@@ -192,7 +194,9 @@ if VERSION >= v"1.4.0-DEV.304"
       if Δ isa AbstractZero
         return Δ
       else
-        return (DoesNotExist(), DoesNotExist(), first(Δ), unapply(st, Base.tail(Δ))...)
+        tuple_grads = unapply(st, Base.tail(Δ))
+        composite_grads = ((Composite{typeof(tg), typeof(tg)}(tg) for tg in tuple_grads)...,)
+        return (DoesNotExist(), DoesNotExist(), first(Δ), composite_grads...)
       end
     end
   end
