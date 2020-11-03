@@ -6,7 +6,14 @@
   Δ -> (nothing, Δ * conj(p * Base.literal_pow(^,x,Val(p-1))), nothing)
 
 @adjoint Base.convert(T::Type{<:Real}, x::Real) = convert(T, x), ȳ -> (nothing, ȳ)
-@adjoint (T::Type{<:Real})(x::Real) = T(x), ȳ -> (nothing, ȳ)
+
+function _pullback(__context__::AContext, ::Type{T}, x::Real) where T<:Real
+  _back(::Union{Nothing,AbstractZero}) = Zero()
+  # Nonsense follows:
+  # extra DoesNotExist at the start because this is a `:new` not a `:call`
+  _back(Δ) = (DoesNotExist(), DoesNotExist(), Δ)
+  return T(x), _back
+end
 
 for T in Base.uniontypes(Core.BuiltinInts)
     @adjoint (::Type{T})(x::Core.BuiltinInts) = T(x), Δ -> (Δ,)
