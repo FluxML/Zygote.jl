@@ -68,10 +68,10 @@ function _pullback(__context__::AContext, ::Type{<:Task}, f)
   t = Task(f)
   t.code = function ()
     y, _back = _pullback(__context__, f)
-    cache(__context__)[t] = Task(_back)
+    cache(__context__)[t] = Task(_back)  # when `fetch`ed, this returns a tuple: (f̄,)
     return y
   end
-  return t, _ -> (DoesNotExist(), fetch(cache(__context__)[t]))
+  return t, _ -> (DoesNotExist(), first(fetch(cache(__context__)[t])))
 end
 
 function runadjoint(cx, t, ȳ = DoesNotExist())
