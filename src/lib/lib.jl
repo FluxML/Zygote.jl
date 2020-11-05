@@ -179,7 +179,10 @@ function _pullback(__context__::AContext, ::typeof(Core._apply), f, args...)
       return Δ
     else
       tuple_grads = unapply(st, Base.tail(Δ))
-      composite_grads = ((Composite{typeof(tg), typeof(tg)}(tg) for tg in tuple_grads)...,)
+      composite_grads = ntuple(
+        i -> Composite{typeof(tuple_grads[i]), typeof(tuple_grads[i])}(tuple_grads[i]),
+        length(tuple_grads)
+      )
       return (DoesNotExist(), first(Δ), composite_grads...)
     end
   end
@@ -195,7 +198,10 @@ if VERSION >= v"1.4.0-DEV.304"
         return Δ
       else
         tuple_grads = unapply(st, Base.tail(Δ))
-        composite_grads = ((Composite{typeof(tg), typeof(tg)}(tg) for tg in tuple_grads)...,)
+        composite_grads = ntuple(
+          i -> Composite{typeof(tuple_grads[i]), typeof(tuple_grads[i])}(tuple_grads[i]),
+          length(tuple_grads)
+        )
         return (DoesNotExist(), DoesNotExist(), first(Δ), composite_grads...)
       end
     end
