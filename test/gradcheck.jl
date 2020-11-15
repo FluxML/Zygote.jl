@@ -141,6 +141,10 @@ end
   @test gradtest(X -> sum(x -> x^2, X), randn(10))
   @test gradtest(X -> sum(sum(x -> x^2, X; dims=1)), randn(10)) # issue #681
 
+  # Non-differentiable sum of booleans
+  @test gradient(sum, [true, false, true]) == (nothing,)
+  @test gradient(x->sum(x .== 0.0), [1.2, 0.2, 0.0, -1.1, 100.0]) == (nothing,)
+
   # https://github.com/FluxML/Zygote.jl/issues/314
   @test gradient((x,y) -> sum(yi -> yi*x, y), 1, [1,1]) == (2, [1, 1])
   @test gradient((x,y) -> prod(yi -> yi*x, y), 1, [1,1]) == (2, [1, 1])
@@ -1367,6 +1371,11 @@ end
   @test gradcheck(x -> sum(sum(diag.((x,) .* a))), b)
   @test gradcheck(x -> sum(sum(diag.(Ref(x) .* a))), b)
   @test gradcheck(x -> sum(sum(diag.([x] .* a))), b)
+
+  # tests for https://github.com/FluxML/Zygote.jl/issues/724
+  x1 = rand(3, 3)
+  @test gradient(x -> sum(x .== 0.5), x1)[1] === nothing
+  @test gradient(x -> sum(x .* (x .== maximum(x, dims=1))), x1)[1] == (x1 .== maximum(x1, dims=1))
 end
 
 using Zygote: Buffer
@@ -1598,11 +1607,11 @@ end
 @testset "@nograd" begin
   @test gradient(x->eachindex([10,20,30])[1], 11) == (nothing,)
 
-  #These are defined in ChainRules, we test them here to check we are handling them right 
+  #These are defined in ChainRules, we test them here to check we are handling them right
   @test gradient(x -> findfirst(ismissing, x), [1, missing]) == (nothing,)
   @test gradient(x -> findlast(ismissing, x), [1, missing]) == (nothing,)
   @test gradient(x -> findall(ismissing, x)[1], [1, missing]) == (nothing,)
-  
+
 
   @test gradient(x -> Zygote.ignore(() -> x*x), 1) == (nothing,)
   @test gradient(x -> Zygote.@ignore(x*x), 1) == (nothing,)
@@ -1629,6 +1638,9 @@ end
   @test gradient(x -> sum(Matrix(x[1]*I, (2, 2))), [1.0]) == ([2.0],)
   @test gradient(x -> sum(Matrix{Float64}(x[1]*I, 2, 2)), [1.0]) == ([2.0],)
   @test gradient(x -> sum(Matrix{Float64}(x[1]*I, (2, 2))), [1.0]) == ([2.0],)
+
+  # Check we haven't broken the forward pass:
+  @test first(Zygote.pullback(x->Matrix(x*I, 2,2), 8.0)) == Matrix(8.0*I, 2,2)
 end
 
 @testset "random" begin

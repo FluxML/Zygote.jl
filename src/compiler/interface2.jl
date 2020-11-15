@@ -4,7 +4,7 @@ using IRTools.Inner: argnames!, update!
 ignore_sig(T) = all(T -> T <: Type, T.parameters)
 
 function edge!(m::IRTools.Meta, edge::Core.MethodInstance)
-  m.code.edges == nothing && (m.code.edges = Core.MethodInstance[])
+  m.code.edges === nothing && (m.code.edges = Core.MethodInstance[])
   push!(m.code.edges, edge)
   return
 end
@@ -40,7 +40,7 @@ end
   catch e
     rethrow(CompileError(T,e))
   end
-  if g == nothing
+  if g === nothing
     Δ == Nothing && return :nothing
     return :(error("Non-differentiable function $(repr(j.t[1]))"))
   end
