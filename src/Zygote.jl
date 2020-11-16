@@ -2,7 +2,6 @@ module Zygote
 
 using LinearAlgebra, Statistics
 using LinearAlgebra: copytri!, AbstractTriangular
-using ArrayLayouts: MemoryLayout, AbstractColumnMajor
 
 import ZygoteRules: @adjoint, @adjoint!, AContext, adjoint, _pullback, pullback, literal_getproperty
 
@@ -35,7 +34,6 @@ include("lib/base.jl")
 include("lib/array.jl")
 include("lib/buffer.jl")
 include("lib/broadcast.jl")
-include("lib/nnlib.jl")
 include("lib/forward.jl")
 include("lib/utils.jl")
 include("lib/range.jl")
