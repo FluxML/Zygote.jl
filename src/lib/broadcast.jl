@@ -177,7 +177,7 @@ end
 
 @adjoint! function (b::typeof(broadcast))(f, args...)
   y, _back = _pullback(__context__, broadcasted, f, args...)
-  y, Δ -> differential2legacy(_back(legacy2differential(Δ, typeof(y))))
+  y, Δ -> differential2legacy(_back(legacy2differential(Δ, y)))
 end
 
 # Forward Mode (mainly necessary for CUDA)

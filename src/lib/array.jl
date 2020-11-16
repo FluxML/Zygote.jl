@@ -10,7 +10,7 @@ using Distributed: pmap
 
 @nograd ones, zeros, Base.OneTo, Colon(), one, zero
 
-@adjoint Base.vect(xs...) = Base.vect(xs...), Δ -> (Δ...,) # TODO: need to find a way to deal with arrays in legacy2differential
+@adjoint Base.vect(xs...) = Base.vect(xs...), Δ -> (Δ...,)
 
 # function _pullback(__context__::AContext, ::typeof(Base.vect), xs...)
 #   _back(::Union{Nothing,AbstractZero}) = Zero()
