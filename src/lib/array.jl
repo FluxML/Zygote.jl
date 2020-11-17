@@ -317,10 +317,7 @@ end
 # LinAlg
 # ======
 
-@adjoint function(A::AbstractMatrix * B::AbstractMatrix)
-  return A * B, Δ::AbstractMatrix->(Δ * B', A' * Δ)
-end
-
+# TODO: remove these once https://github.com/JuliaDiff/ChainRules.jl/pull/305 is merged
 @adjoint function(A::AbstractMatrix * x::AbstractVector)
   return A * x, Δ::AbstractVector->(Δ * x', A' * Δ)
 end
