@@ -69,26 +69,30 @@ unbroadcast(x::AbstractArray, x̄::AbstractZero) = x̄
 Numeric{T<:Number} = Union{T,AbstractArray{<:T}}
 
 function _pullback(__context__::AContext, ::typeof(broadcasted), ::typeof(+), xs::Numeric...)
-  _back(::Union{Nothing,AbstractZero}) = Zero()
+  _back(::Nothing) = (legacytype_warn(Nothing); return Zero())
+  _back(x::AbstractZero) = x
   _back(Δ) = (DoesNotExist(), DoesNotExist(), map(x -> unbroadcast(x, Δ), xs)...)
   return broadcast(+, xs...), _back
 end
 
 function _pullback(__context__::AContext, ::typeof(broadcasted), ::typeof(-), x::Numeric, y::Numeric)
-  _back(::Union{Nothing,AbstractZero}) = Zero()
+  _back(::Nothing) = (legacytype_warn(Nothing); return Zero())
+  _back(x::AbstractZero) = x
   _back(Δ) = (DoesNotExist(), DoesNotExist(), unbroadcast(x, Δ), -unbroadcast(y, Δ))
   return x .- y, _back
 end
 
 function _pullback(__context__::AContext, ::typeof(broadcasted), ::typeof(*), x::Numeric, y::Numeric)
-  _back(::Union{Nothing,AbstractZero}) = Zero()
+  _back(::Nothing) = (legacytype_warn(Nothing); return Zero())
+  _back(x::AbstractZero) = x
   _back(Δ) = (DoesNotExist(), DoesNotExist(), unbroadcast(x, Δ .* conj.(y)), unbroadcast(y, Δ .* conj.(x)))
   x.*y, _back
 end
 
 function _pullback(__context__::AContext, ::typeof(broadcasted), ::typeof(/), x::Numeric, y::Numeric)
   res = x ./ y
-  _back(::Union{Nothing,AbstractZero}) = Zero()
+  _back(::Nothing) = (legacytype_warn(Nothing); return Zero())
+  _back(x::AbstractZero) = x
   _back(Δ) = (DoesNotExist(), DoesNotExist(), unbroadcast(x, Δ ./ conj.(y)), unbroadcast(y, -Δ .* conj.(res ./ y)))
   res, _back
 end
@@ -147,7 +151,8 @@ function _pullback(__context__::AContext, ::typeof(broadcasted), ::AbstractArray
   y∂b = _broadcast((x...) -> _pullback(__context__, f, x...), args...)
   y = map(x -> x[1], y∂b)
   ∂b = map(x -> x[2], y∂b)
-  _back(::Union{Nothing,AbstractZero}) = Zero()
+  _back(::Nothing) = (legacytype_warn(Nothing); return Zero())
+  _back(x::AbstractZero) = x
   function _back(ȳ)
     dxs_zip = map((∂b, ȳ) -> ∂b(ȳ), ∂b, ȳ)
     dxs = collapse_zeros.(ntuple(i -> map(x -> _get(x, i), dxs_zip), len))
@@ -158,7 +163,8 @@ end
 
 function _pullback(__context__::AContext, ::typeof(broadcasted), ::AbstractArrayStyle{0}, f, args...)
   y, ∂b = _broadcast((x...) -> _pullback(__context__, f, x...), args...)
-  _back(::Union{Nothing,AbstractZero}) = Zero()
+  _back(::Nothing) = (legacytype_warn(Nothing); return Zero())
+  _back(x::AbstractZero) = x
   function _back(ȳ)
     dxs = ∂b(ȳ)
     return (DoesNotExist(), DoesNotExist(), dxs...)

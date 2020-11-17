@@ -224,7 +224,8 @@ end
 
 function _pullback(__context__::AContext, ::typeof(literal_getproperty), x, ::Val{f}) where f
     val = getproperty(x, f)
-    _back(::Union{Nothing,AbstractZero}) = Zero()
+    _back(::Nothing) = (legacytype_warn(Nothing); return Zero())
+    _back(x::AbstractZero) = x
     function _back(Δ)
       accum_param(__context__, val, Δ) isa AbstractZero && return Zero()
       if isimmutable(x)

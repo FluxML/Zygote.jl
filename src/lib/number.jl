@@ -8,7 +8,8 @@
 @adjoint Base.convert(T::Type{<:Real}, x::Real) = convert(T, x), ȳ -> (nothing, ȳ)
 
 function _pullback(__context__::AContext, ::Type{T}, x::Real) where T<:Real
-  _back(::Union{Nothing,AbstractZero}) = Zero()
+  _back(::Nothing) = (legacytype_warn(Nothing); return Zero())
+  _back(x::AbstractZero) = x
   # Nonsense follows:
   # extra DoesNotExist at the start because this is a `:new` not a `:call`
   _back(Δ) = (DoesNotExist(), DoesNotExist(), Δ)

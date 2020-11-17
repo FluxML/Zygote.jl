@@ -10,7 +10,8 @@ using Base.Broadcast: broadcasted
 end
 function _pullback(__context__::AContext, ::typeof(broadcasted), ::typeof(xlogx), x::Numeric)
     result, dx = ∇xlogx(x)
-    _back(::Union{Nothing,AbstractZero}) = Zero()
+    _back(::Nothing) = (legacytype_warn(Nothing); return Zero())
+    _back(x::AbstractZero) = x
     _back(Δ) = (DoesNotExist(), DoesNotExist(), unbroadcast(x, Δ .* dx))
     return result, _back
 end
@@ -37,7 +38,8 @@ end
 end
 function _pullback(__context__::AContext, ::typeof(broadcasted), ::typeof(log1pexp), x::Numeric)
     dx = ∂log1pexp.(x)
-    _back(::Union{Nothing,AbstractZero}) = Zero()
+    _back(::Nothing) = (legacytype_warn(Nothing); return Zero())
+    _back(x::AbstractZero) = x
     _back(Δ) = (DoesNotExist(), DoesNotExist(), unbroadcast(x, Δ .* dx))
     return log1pexp.(x), _back
 end
@@ -56,7 +58,8 @@ end
 end
 function _pullback(__context__::AContext, ::typeof(broadcasted), ::typeof(xlogy), x::Numeric, y::Numeric)
     result, dx, dy = ∇xlogy(x, y)
-    _back(::Union{Nothing,AbstractZero}) = Zero()
+    _back(::Nothing) = (legacytype_warn(Nothing); return Zero())
+    _back(x::AbstractZero) = x
     _back(Δ) = (DoesNotExist(), DoesNotExist(), unbroadcast(x, Δ .* dx), unbroadcast(y, Δ .* dy))
     return result, _back
 end
@@ -75,7 +78,8 @@ end
 end
 function _pullback(__context__::AContext, ::typeof(broadcasted), ::typeof(logaddexp), x::Numeric, y::Numeric)
     result, dx, dy = ∇logaddexp(x, y)
-    _back(::Union{Nothing,AbstractZero}) = Zero()
+    _back(::Nothing) = (legacytype_warn(Nothing); return Zero())
+    _back(x::AbstractZero) = x
     _back(Δ) = (DoesNotExist(), DoesNotExist(), unbroadcast(x, Δ .* dx), unbroadcast(y, Δ .* dy))
     return result, _back
 end
@@ -93,7 +97,8 @@ end
 end
 function _pullback(__context__::AContext, ::typeof(broadcasted), ::typeof(logsubexp), x::Numeric, y::Numeric)
     result, dx, dy = ∇logsubexp(x, y)
-    _back(::Union{Nothing,AbstractZero}) = Zero()
+    _back(::Nothing) = (legacytype_warn(Nothing); return Zero())
+    _back(x::AbstractZero) = x
     _back(Δ) = (DoesNotExist(), DoesNotExist(), unbroadcast(x, Δ .* dx), unbroadcast(y, Δ .* dy))
     return result, _back
 end

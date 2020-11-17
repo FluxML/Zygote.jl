@@ -12,12 +12,6 @@ using Distributed: pmap
 
 @adjoint Base.vect(xs...) = Base.vect(xs...), Δ -> (Δ...,)
 
-# function _pullback(__context__::AContext, ::typeof(Base.vect), xs...)
-#   _back(::Union{Nothing,AbstractZero}) = Zero()
-#   _back(Δ) = (DoesNotExist(), Δ...)
-#   return Base.vect(xs...), _back
-# end
-
 @adjoint copy(x::AbstractArray) = copy(x), ȳ -> (ȳ,)
 
 @adjoint collect(x::Tuple) = collect(x), dy -> (Tuple(dy),)
