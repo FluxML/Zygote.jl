@@ -314,8 +314,8 @@ end
   end
 end
 
-# LinAlg
-# ======
+# LinearAlgebra
+# =============
 
 @adjoint function transpose(x)
   back(Δ) = (transpose(Δ),)
