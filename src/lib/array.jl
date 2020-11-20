@@ -164,6 +164,13 @@ function unzip(tuples)
   _unzip(tuples, Val(N))
 end
 
+# if we have an iterator, unzip may (will) lose track of what the outer type should be
+# First arg is the primal iterator type to reconstruct to
+reconstruct_differential_from_iterator(::Type{T}, diff_iter::T) where T = diff_iter
+reconstruct_differential_from_iterator(::Type{T}, diff_iter) where T<:AbstractArray = convert(T, diff_iter)
+reconstruct_differential_from_iterator(::Type{T}, diff_iter) where T<:Tuple = Composite{T}(diff_iter...)
+reconstruct_differential_from_iterator(::Type{T}, diff_iter) where T<:NamedTuple = Composite{T}(; diff_iter...)
+
 # Reverse iteration order when ∇map is applied to vector,
 # needed for stateful functions.
 # See https://github.com/FluxML/Flux.jl/issues/1209
@@ -190,7 +197,13 @@ for (mapfunc,∇mapfunc) in [(:map,:∇map),(:pmap,:∇pmap),(:vmap,:∇vmap)]
         )
         Δf_and_args = unzip(_tryreverse($mapfunc, Δf_and_args_zipped))
         Δf = reduce(accum, Δf_and_args[1])
-        return (Δf, Δf_and_args[2:end]...)
+        Δargs_raw = Δf_and_args[2:end]
+        Δargs = ntuple(length(args)) do i
+            @show typeof(args[i])
+            @show Δargs_raw[i]
+            return reconstruct_differential_from_iterator(typeof(args[i]), Δargs_raw[i])
+        end
+        return (Δf, Δargs...)
       end
     end
   end
