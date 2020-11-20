@@ -166,10 +166,13 @@ end
 
 # if we have an iterator, unzip may (will) lose track of what the outer type should be
 # First arg is the primal iterator type to reconstruct to
-reconstruct_differential_from_iterator(::Type{T}, diff_iter::T) where T = diff_iter
+reconstruct_differential_from_iterator(::Type{T}, diff_iter) where T<:Union{UnitRange, StepRange} = diff_iter
 reconstruct_differential_from_iterator(::Type{T}, diff_iter) where T<:AbstractArray = convert(T, diff_iter)
 reconstruct_differential_from_iterator(::Type{T}, diff_iter) where T<:Tuple = Composite{T}(diff_iter...)
-reconstruct_differential_from_iterator(::Type{T}, diff_iter) where T<:NamedTuple = Composite{T}(; diff_iter...)
+reconstruct_differential_from_iterator(::Type{T}, diff_iter) where T<:NamedTuple = Composite{T}(;NamedTuple{fieldnames(T)}(diff_iter)...)
+
+# TODO: piracy, move to ChainRulesCore.jl
+Base.convert(::Type{T}, x::AbstractZero) where T <: Real = zero(T)
 
 # Reverse iteration order when ∇map is applied to vector,
 # needed for stateful functions.
