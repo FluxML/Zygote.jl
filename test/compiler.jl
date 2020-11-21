@@ -31,7 +31,11 @@ y, back = pullback(badly, 2)
 bt = try back(1) catch e stacktrace(catch_backtrace()) end
 
 @test trace_contains(bt, nothing, "compiler.jl", 20)
-@test trace_contains(bt, :badly, "compiler.jl", 24)
+if VERSION >= v"1.6-"
+  @test_broken trace_contains(bt, :badly, "compiler.jl", 24)
+else
+  @test trace_contains(bt, :badly, "compiler.jl", 24)
+end
 
 # Type inference checks
 
