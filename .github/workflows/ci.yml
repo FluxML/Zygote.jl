@@ -45,13 +45,13 @@ jobs:
             ${{ runner.os }}-test-
             ${{ runner.os }}-
       - uses: julia-actions/julia-buildpkg@v1
-        continue-on-error: ${{ matrix.version == 'nightly' }}
+        # continue-on-error: ${{ matrix.version == 'nightly' }}
       - uses: julia-actions/julia-runtest@v1
-        continue-on-error: ${{ matrix.version == 'nightly' }}
+        # continue-on-error: ${{ matrix.version == 'nightly' }}
       - uses: julia-actions/julia-processcoverage@v1
-        continue-on-error: ${{ matrix.version == 'nightly' }}
+        # continue-on-error: ${{ matrix.version == 'nightly' }}
       - uses: codecov/codecov-action@v1
-        continue-on-error: ${{ matrix.version == 'nightly' }}
+        # continue-on-error: ${{ matrix.version == 'nightly' }}
         with:
           file: lcov.info
   docs:
