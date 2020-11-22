@@ -5,7 +5,7 @@ using NNlib: conv, ∇conv_data, depthwiseconv, batched_mul
 using Base.Broadcast: broadcast_shape
 using LoopVectorization: vmap
 using Distributed: pmap
-using FiniteDifferences
+import FiniteDifferences
 
 function ngradient(f, xs::AbstractArray...)
   grads = zero.(xs)
@@ -1105,8 +1105,9 @@ end
         Y = copy(X)
         Δ = randn(P, P)
         Δ_fd = FiniteDifferences.j′vp(
-          central_fdm(5, 1), X -> pairwise(metric, X, Y; dims=2), Δ, X,
-        )
+                  FiniteDifferences.central_fdm(5, 1), 
+                  X -> pairwise(metric, X, Y; dims=2), 
+                  Δ, X)
         _, pb = Zygote.pullback(X -> pairwise(metric, X, Y; dims=2), X)
 
         # This is impressively inaccurate, but at least it doesn't produce a NaN.
