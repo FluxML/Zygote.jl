@@ -182,8 +182,12 @@ _tryreverse(m, backs, Δ) = backs, Δ
 function _tryreverse(m::typeof(map), backs, Δ::Union{AbstractVector, Tuple})
   return reverse(backs), reverse(Δ)
 end
+function _tryreverse(m::typeof(map), backs, Δ::Composite)
+  return reverse(backs), _tryreverse(m, Δ)
+end
 _tryreverse(m, x) = x
 _tryreverse(m::typeof(map), x::Union{AbstractVector, Tuple}) = reverse(x)
+_tryreverse(m::typeof(map), c::Composite) = Composite{typeof(reverse(c.backing)), typeof(reverse(c.backing))}(reverse(c.backing))
 
 for (mapfunc,∇mapfunc) in [(:map,:∇map),(:pmap,:∇pmap),(:vmap,:∇vmap)]
   @eval function $∇mapfunc(cx, f, args...)

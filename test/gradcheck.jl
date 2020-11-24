@@ -345,6 +345,22 @@ for mapfunc in [map,pmap,vmap]
     Δy = randn(3)
     @test length(first(pb(Δy))) == 3
   end
+
+  @testset "_pullback outputs differential type for tuple" begin
+    _, pb = Zygote._pullback(map, identity, (1,1,1))
+    @test pb(Composite{Tuple{Int, Int, Int}}(1,2,3)) ==
+        pb((1, 2, 3)) ==
+        (DoesNotExist(), Zero(), Composite{Tuple{Int64,Int64,Int64}}(1, 2, 3))
+  end
+
+  @testset "_pullback outputs differential type for named tuple" begin
+  _, pb = Zygote._pullback(map, identity, (a=1, b=1, c=1))
+  nt = (a=1, b=2, c=3)
+  cnt = cnt = Composite{typeof(nt), typeof(nt)}(nt)
+  @test pb(nt) ==
+    pb(cnt) ==
+    (Zero(), Zero(), Composite{NamedTuple{(:a, :b, :c),Tuple{Int64,Int64,Int64}}}(a = 1, b = 2, c = 3))
+  end
 end
 
 @testset "Stateful Map" begin
