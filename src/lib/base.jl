@@ -53,7 +53,7 @@ grad_mut(ch::Channel) = Channel(ch.sz_max)
 @adjoint! function put!(ch::Channel, x)
   put!(ch, x), function (ȳ)
     x̄ = take!(grad_mut(__context__, ch))
-    (nothing, accum(x̄, ȳ), nothing)
+    return (nothing, accum(x̄, ȳ))
   end
 end
 
@@ -64,36 +64,36 @@ end
   end
 end
 
-@adjoint! function Task(f)
+function _pullback(__context__::AContext, ::Type{<:Task}, f)
   t = Task(f)
   t.code = function ()
-    y, back = _pullback(__context__, f)
-    cache(__context__)[t] = Task(back)
+    y, _back = _pullback(__context__, f)
+    cache(__context__)[t] = Task(_back)  # when `fetch`ed, this returns a tuple: (f̄,)
     return y
   end
-  t, _ -> fetch(cache(__context__)[t])
+  return t, _ -> (DoesNotExist(), first(fetch(cache(__context__)[t])))
 end
 
-function runadjoint(cx, t, ȳ = nothing)
+function runadjoint(cx, t, ȳ = DoesNotExist())
   t̄ = cache(cx)[t]
   f = t̄.code
-  t̄.code = () -> differential2legacy(f(legacy2differential(ȳ)))
+  t̄.code = () -> f(ȳ)
   @static if VERSION > v"1.3-"
     t̄.sticky = t.sticky
   end
   schedule(t̄)
 end
 
-@adjoint! function wait(t::Task)
-  wait(t), _ -> (runadjoint(__context__, t); nothing)
+function _pullback(__context__::AContext, ::typeof(wait), t::Task)
+  wait(t), _ -> (runadjoint(__context__, t); DoesNotExist())
 end
 
-@adjoint! function fetch(t::Task)
-  fetch(t), ȳ -> (runadjoint(__context__, t, ȳ); nothing)
+function _pullback(__context__::AContext, ::typeof(fetch), t::Task)
+  fetch(t), ȳ -> (runadjoint(__context__, t, ȳ); DoesNotExist())
 end
 
-@adjoint! function Base.sync_end(refs)
-  Base.sync_end(refs), _ -> foreach(t -> runadjoint(__context__, t), refs)
+function _pullback(__context__::AContext, ::typeof(Base.sync_end), refs)
+  Base.sync_end(refs), _ -> (foreach(t -> runadjoint(__context__, t), refs); DoesNotExist())
 end
 
 # Make @sync work

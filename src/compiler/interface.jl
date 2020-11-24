@@ -41,9 +41,28 @@ tailmemaybe(::Nothing) = nothing
 tailmemaybe(x::Tuple) = Base.tail(x)
 
 function pullback(f, args...)
-  y, back = _pullback(f, args...)
-  y, Δ -> tailmemaybe(differential2legacy(back(legacy2differential(Δ))))
+  y, _back = _pullback(f, args...)
+  y, Δ -> tailmemaybe(differential2legacy(_back(ZygoteRules.l2d(Δ, y))))
 end
+
+#==
+function _pullback(__context__::AContext, ::typeof(pullback), f, args...)
+  lesser_y, _lesser_back = _pullback(__context__, f, args...)
+  lesser_back = Δ -> tailmemaybe(differential2legacy(_lesser_back(ZygoteRules.l2d(Δ, lesser_y))))
+  @show f
+  greater_y = lesser_y, lesser_back
+  @show 2
+  function greater_back(greater_Δ)
+    @show 3
+    Δlesser_y, Δlesser_back = greater_Δ
+    greater_y_again, second_back = _pullback(__context__, _lesser_back, Δlesser_y)
+    Δf_and_Δargs = second_back(greater_Δ)
+    Δf, Δargs = Iterators.peel(Δf_and_Δargs)
+    (Zero(), Δf, Δargs...)
+  end
+  return greater_y, greater_back
+end
+==#
 
 sensitivity(y::Number) = one(y)
 sensitivity(y::Complex) = error("Output is complex, so the gradient is not defined.")
@@ -169,12 +188,12 @@ end
 
 function pullback(f, ps::Params)
   cx = Context()
-  y, back = _pullback(cx, f)
+  y, _back = _pullback(cx, f)
   y, function (Δ)
     for p in ps
       cache(cx)[p] = nothing
     end
-    differential2legacy(back(legacy2differential(Δ))) # has non-local effects via accum (?)
+    differential2legacy(_back(ZygoteRules.l2d(Δ, y))) # has non-local effects via accum (?)
     Grads(cx.cache, ps) # TODO make a copy
   end
 end

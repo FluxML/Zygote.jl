@@ -8,10 +8,12 @@ using Base.Broadcast: broadcasted
     back(δ) = (dx * δ,)
     return result, back
 end
-@adjoint function broadcasted(::typeof(xlogx), x::Numeric)
+function _pullback(__context__::AContext, ::typeof(broadcasted), ::typeof(xlogx), x::Numeric)
     result, dx = ∇xlogx(x)
-    back(δ) = (nothing, unbroadcast(x, δ .* dx))
-    return result, back
+    _back(::Nothing) = (legacytype_warn(Nothing); return Zero())
+    _back(x::AbstractZero) = x
+    _back(Δ) = (DoesNotExist(), DoesNotExist(), unbroadcast(x, Δ .* dx))
+    return result, _back
 end
 function ∇xlogx(x::Numeric)
     logx = log.(x)
@@ -34,9 +36,12 @@ end
     dx = ∂log1pexp(x)
     return log1pexp(x), δ -> (δ * dx,)
 end
-@adjoint function broadcasted(::typeof(log1pexp), x::Numeric)
+function _pullback(__context__::AContext, ::typeof(broadcasted), ::typeof(log1pexp), x::Numeric)
     dx = ∂log1pexp.(x)
-    return log1pexp.(x), δ -> (nothing, unbroadcast(x, δ .* dx))
+    _back(::Nothing) = (legacytype_warn(Nothing); return Zero())
+    _back(x::AbstractZero) = x
+    _back(Δ) = (DoesNotExist(), DoesNotExist(), unbroadcast(x, Δ .* dx))
+    return log1pexp.(x), _back
 end
 ∂log1pexp(x::Real)    = x < 18.0 ? logistic(x) : x < 33.3 ? one(x) - exp(-x) : oftype(exp(x), 1)
 ∂log1pexp(x::Float32) = x < 9f0  ? logistic(x) : x < 16f0 ? one(x) - exp(-x) : oftype(exp(x), 1)
@@ -51,10 +56,12 @@ end
     back(δ) = (δ * dx, δ * dy)
     return result, back
 end
-@adjoint function broadcasted(::typeof(xlogy), x::Numeric, y::Numeric)
+function _pullback(__context__::AContext, ::typeof(broadcasted), ::typeof(xlogy), x::Numeric, y::Numeric)
     result, dx, dy = ∇xlogy(x, y)
-    back(δ) = (nothing, unbroadcast(x, δ .* dx), unbroadcast(y, δ .* dy))
-    return result, back
+    _back(::Nothing) = (legacytype_warn(Nothing); return Zero())
+    _back(x::AbstractZero) = x
+    _back(Δ) = (DoesNotExist(), DoesNotExist(), unbroadcast(x, Δ .* dx), unbroadcast(y, Δ .* dy))
+    return result, _back
 end
 function ∇xlogy(x::Numeric, y::Numeric)
     dx = logy = log.(y)
@@ -69,10 +76,12 @@ end
     back(δ) = (δ * dx, δ * dy)
     return result, back
 end
-@adjoint function broadcasted(::typeof(logaddexp), x::Numeric, y::Numeric)
+function _pullback(__context__::AContext, ::typeof(broadcasted), ::typeof(logaddexp), x::Numeric, y::Numeric)
     result, dx, dy = ∇logaddexp(x, y)
-    back(δ) = (nothing, unbroadcast(x, δ .* dx), unbroadcast(y, δ .* dy))
-    return result, back
+    _back(::Nothing) = (legacytype_warn(Nothing); return Zero())
+    _back(x::AbstractZero) = x
+    _back(Δ) = (DoesNotExist(), DoesNotExist(), unbroadcast(x, Δ .* dx), unbroadcast(y, Δ .* dy))
+    return result, _back
 end
 function ∇logaddexp(x::Numeric, y::Numeric)
     result = logaddexp.(x, y)
@@ -86,10 +95,12 @@ end
     back(δ) = (δ * dx, δ * dy)
     return result, back
 end
-@adjoint function broadcasted(::typeof(logsubexp), x::Numeric, y::Numeric)
+function _pullback(__context__::AContext, ::typeof(broadcasted), ::typeof(logsubexp), x::Numeric, y::Numeric)
     result, dx, dy = ∇logsubexp(x, y)
-    back(δ) = (nothing, unbroadcast(x, δ .* dx), unbroadcast(y, δ .* dy))
-    return result, back
+    _back(::Nothing) = (legacytype_warn(Nothing); return Zero())
+    _back(x::AbstractZero) = x
+    _back(Δ) = (DoesNotExist(), DoesNotExist(), unbroadcast(x, Δ .* dx), unbroadcast(y, Δ .* dy))
+    return result, _back
 end
 function ∇logsubexp(x::Numeric, y::Numeric)
     result = logsubexp.(x, y)

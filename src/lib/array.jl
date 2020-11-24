@@ -164,6 +164,16 @@ function unzip(tuples)
   _unzip(tuples, Val(N))
 end
 
+# if we have an iterator, unzip may (will) lose track of what the outer type should be
+# First arg is the primal iterator type to reconstruct to
+reconstruct_differential_from_iterator(::Type{T}, diff_iter) where T<:Union{UnitRange, StepRange} = diff_iter
+reconstruct_differential_from_iterator(::Type{T}, diff_iter) where T<:AbstractArray = convert(T, diff_iter)
+reconstruct_differential_from_iterator(::Type{T}, diff_iter) where T<:Tuple = Composite{T}(diff_iter...)
+reconstruct_differential_from_iterator(::Type{T}, diff_iter) where T<:NamedTuple = Composite{T}(;NamedTuple{fieldnames(T)}(diff_iter)...)
+
+# TODO: piracy, move to ChainRulesCore.jl
+Base.convert(::Type{T}, x::AbstractZero) where T <: Real = zero(T)
+
 # Reverse iteration order when ∇map is applied to vector,
 # needed for stateful functions.
 # See https://github.com/FluxML/Flux.jl/issues/1209
@@ -172,39 +182,53 @@ _tryreverse(m, backs, Δ) = backs, Δ
 function _tryreverse(m::typeof(map), backs, Δ::Union{AbstractVector, Tuple})
   return reverse(backs), reverse(Δ)
 end
+function _tryreverse(m::typeof(map), backs, Δ::Composite)
+  return reverse(backs), _tryreverse(m, Δ)
+end
 _tryreverse(m, x) = x
 _tryreverse(m::typeof(map), x::Union{AbstractVector, Tuple}) = reverse(x)
+_tryreverse(m::typeof(map), c::Composite) = Composite{typeof(reverse(c.backing)), typeof(reverse(c.backing))}(reverse(c.backing))
 
 for (mapfunc,∇mapfunc) in [(:map,:∇map),(:pmap,:∇pmap),(:vmap,:∇vmap)]
   @eval function $∇mapfunc(cx, f, args...)
     ys_and_backs = $mapfunc((args...) -> _pullback(cx, f, args...), args...)
     if isempty(ys_and_backs)
-      ys_and_backs, _ -> nothing
+      return ys_and_backs, _ -> Zero()
     else
       ys, backs = unzip(ys_and_backs)
       ys, function (Δ)
         # Apply pullbacks in reverse order. Needed for correctness if `f` is stateful.
         Δf_and_args_zipped = $mapfunc(
-          (f, δ) -> differential2legacy(f(legacy2differential(δ))),
+          (f, δ) -> f(δ),
           _tryreverse($mapfunc, backs, Δ)...
         )
         Δf_and_args = unzip(_tryreverse($mapfunc, Δf_and_args_zipped))
         Δf = reduce(accum, Δf_and_args[1])
-        (Δf, Δf_and_args[2:end]...)
+        Δargs_raw = Δf_and_args[2:end]
+        Δargs = ntuple(length(args)) do i
+            @show typeof(args[i])
+            @show Δargs_raw[i]
+            return reconstruct_differential_from_iterator(typeof(args[i]), Δargs_raw[i])
+        end
+        return (Δf, Δargs...)
       end
     end
   end
 
-  @eval @adjoint function $mapfunc(f, args::Union{AbstractArray,Tuple}...)
-    $∇mapfunc(__context__, f, args...)
+  @eval function _pullback(__context__::AContext, ::typeof($mapfunc), f, args::Union{AbstractArray,Tuple}...)
+    ys, _f_back = $∇mapfunc(__context__, f, args...)
+    _back(::Nothing) = (legacytype_warn(Nothing); return Zero())
+    _back(x::AbstractZero) = x
+    _back(Δ) = diffgradtuple1(_f_back(Δ))
+    return ys, _back
   end
 end
 
 function _pullback(cx::AContext, ::typeof(collect), g::Base.Generator)
-  y, back = ∇map(cx, g.f, g.iter)
+  y, _back = ∇map(cx, g.f, g.iter)
   y, function (ȳ)
-    f̄, x̄ = legacy2differential(back(differential2legacy(ȳ)))
-    (DoesNotExist(), (f = f̄, iter = x̄),)
+    f̄, x̄ = _back(ȳ)
+    (DoesNotExist(), Composite{typeof(g)}(f = f̄, iter = x̄),)
   end
 end
 
@@ -456,7 +480,7 @@ end
   Y, back = Zygote.pullback((U, B)->U \ (U' \ B), A.U, B)
   return Y, function(Ȳ)
     Ā_factors, B̄ = back(Ȳ)
-    return ((uplo=nothing, status=nothing, factors=Ā_factors), B̄)
+    return ((factors=Ā_factors, uplo=nothing, info=nothing), B̄)
   end
 end
 
@@ -513,7 +537,7 @@ end
   C = cholesky(Σ, check = check)
   return C, Δ::NamedTuple -> begin
     issuccess(C) || throw(PosDefException(C.info))
-    return Diagonal(diag(Δ.factors) .* inv.(2 .* C.factors.diag)), nothing
+    return (Diagonal(diag(Δ.factors) .* inv.(2 .* C.factors.diag)),)
   end
 end
 
@@ -752,30 +776,30 @@ end
 # Various sensitivities for `literal_getproperty`, depending on the 2nd argument.
 @adjoint function literal_getproperty(C::Cholesky, ::Val{:uplo})
   return literal_getproperty(C, Val(:uplo)), function(Δ)
-    return ((uplo=nothing, info=nothing, factors=nothing),)
+    return ((factors=nothing, uplo=nothing, info=nothing), nothing)
   end
 end
-@adjoint function literal_getproperty(C::Cholesky, ::Val{:info})
+@adjoint function literal_getproperty(C::Cholesky, ::Val{:info}) # TODO make sure these work by changing the @adjoint macro
   return literal_getproperty(C, Val(:info)), function(Δ)
-    return ((uplo=nothing, info=nothing, factors=nothing),)
+    return ((factors=nothing, uplo=nothing, info=nothing), nothing)
   end
 end
 @adjoint function literal_getproperty(C::Cholesky, ::Val{:U})
   return literal_getproperty(C, Val(:U)), function(Δ)
     Δ_factors = C.uplo == 'U' ? UpperTriangular(Δ) : LowerTriangular(copy(Δ'))
-    return ((uplo=nothing, info=nothing, factors=Δ_factors),)
+    return ((factors=Δ_factors, uplo=nothing, info=nothing), nothing)
   end
 end
 @adjoint function literal_getproperty(C::Cholesky, ::Val{:L})
   return literal_getproperty(C, Val(:L)), function(Δ)
     Δ_factors = C.uplo == 'L' ? LowerTriangular(Δ) : UpperTriangular(copy(Δ'))
-    return ((uplo=nothing, info=nothing, factors=Δ_factors),)
+    return ((factors=Δ_factors, uplo=nothing, info=nothing), nothing)
   end
 end
 
 @adjoint function logdet(C::Cholesky)
   return logdet(C), function(Δ)
-    return ((uplo=nothing, info=nothing, factors=Diagonal(2 .* Δ ./ diag(C.factors))),)
+    return ((factors=Diagonal(2 .* Δ ./ diag(C.factors)), uplo=nothing, info=nothing),)
   end
 end
 

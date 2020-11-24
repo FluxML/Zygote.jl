@@ -42,16 +42,17 @@ end
   isbitstype(x) && return :(Δ)
   quote
     if haskey(cache(cx), x)
-      cache(cx)[x] = accum(cache(cx)[x],Δ)
-      return
+      cache(cx)[x] = accum(cache(cx)[x], Δ)
+      return Zero()  # we have already accumulated it into the cache so nothing left to accumulate
     else
-      return Δ
+      return Δ  # we are not accumulating it into the cache so it must be accumulated later
     end
   end
 end
 
 function accum_global(cx::Context, ref, x̄)
-  (x̄ === nothing || isconst(ref.mod, ref.name)) && return
+  x̄ isa Nothing && legacytype_warn(Nothing)
+  (x̄ isa AbstractZero || isconst(ref.mod, ref.name)) && return x̄
   gs = cache(cx)
   gs[ref] = accum(get(gs, ref, Zero()), x̄)
   return
@@ -59,13 +60,23 @@ end
 
 unwrap(x) = x
 
-@adjoint unwrap(x) = unwrap(x), x̄ -> (accum_param(__context__, x, x̄),)
+function _pullback(__context__::AContext, ::typeof(unwrap), x)
+  _back(::Nothing) = (legacytype_warn(Nothing); return Zero())
+  _back(x::AbstractZero) = x
+  _back(x̄) = diffgradtuple1(accum_param(__context__, x, x̄))
+  return unwrap(x), _back
+end
 
 unwrap(ref, x) = x
 
-@adjoint unwrap(ref, x) = unwrap(x), function (x̄)
-  accum_global(__context__, ref, x̄)
-  (accum_param(__context__, x, x̄),)
+function _pullback(__context__::AContext, ::typeof(unwrap), ref, x)
+  _back(::Nothing) = (legacytype_warn(Nothing); return Zero())
+  _back(x::AbstractZero) = x
+  function _back(x̄)
+    accum_global(__context__, ref, x̄)
+    return diffgradtuple1((accum_param(__context__, x, x̄),))
+  end
+  return unwrap(x), _back
 end
 
 function global_set(ref, val)
@@ -88,30 +99,39 @@ using Base: tail
 
 @adjoint tuple(xs...) = xs, identity
 
-@adjoint function literal_getindex(xs::NTuple{N,Any}, ::Val{i}) where {N,i}
+function _pullback(__context__::AContext, ::typeof(literal_getindex), xs::NTuple{N,Any}, ::Val{i}) where {N,i}
   val = xs[i]
-  function back(Δ)
-    accum_param(__context__, val, Δ) === nothing && return
-    return ntuple(j -> i == j ? Δ : nothing, Val(N)), nothing
+  function _back(Δ)
+    Δ_accum = accum_param(__context__, val, Δ)
+    Δ_accum isa AbstractZero && return Δ_accum
+    nt = ntuple(j -> i == j ? Δ : Zero(), Val(N))
+    return diffgradtuple1((Composite{typeof(xs), typeof(nt)}(nt), DoesNotExist()))
   end
-  val, back
+  val, _back
 end
 
-@adjoint function getindex(xs::NTuple{N,Any}, i::Integer) where N
+function _pullback(__context__::AContext, ::typeof(getindex), xs::NTuple{N,Any}, i::Integer) where N
   val = xs[i]
-  function back(Δ)
-    accum_param(__context__, val, Δ) === nothing && return
-    return ntuple(j -> i == j ? Δ : nothing, Val(N)), nothing
+  function _back(Δ)
+    Δ_accum = accum_param(__context__, val, Δ)
+    Δ_accum isa AbstractZero && return Δ_accum
+    nt = ntuple(j -> i == j ? Δ : Zero(), Val(N))
+    return diffgradtuple1((Composite{typeof(xs), typeof(nt)}(nt), DoesNotExist()))
   end
-  return val, back
+  val, _back
 end
 
-@adjoint getindex(xs::NTuple{N,Any}, r::AbstractUnitRange) where N =
-  (xs[r], Δ -> (ntuple(j -> j in r ? Δ[findfirst(isequal(j), r)] : nothing, Val(N)), nothing))
+function _pullback(__context__::AContext, ::typeof(getindex), xs::NTuple{N,Any}, r::AbstractUnitRange) where N
+  function _back(Δ)
+    t = ntuple(j -> j in r ? Δ[findfirst(isequal(j), r)] : Zero(), Val(N))
+    return diffgradtuple1((Composite{typeof(xs), typeof(t)}(t), DoesNotExist()))
+  end
+  return xs[r], _back
+end
 
 function _pullback(cx::Context, ::typeof(literal_indexed_iterate), xs::Tuple, ::Val{i}) where i
   y, b = _pullback(cx, literal_getindex, xs, Val(i))
-  back(::Nothing) = (legacytype_warn(); return Zero())
+  back(::Nothing) = (legacytype_warn(Nothing); return Zero())
   back(x::AbstractZero) = x
   back(ȳ) = b(ȳ[1])
   (y, i+1), back
@@ -119,18 +139,28 @@ end
 
 function _pullback(cx::Context, ::typeof(literal_indexed_iterate), xs::Tuple, ::Val{i}, st) where i
   y, b = _pullback(cx, literal_getindex, xs, Val(i))
-  back(::Nothing) = (legacytype_warn(); return Zero())
+  back(::Nothing) = (legacytype_warn(Nothing); return Zero())
   back(x::AbstractZero) = x
   back(ȳ) = (b(ȳ[1])..., Zero())
   (y, i+1), back
 end
 
 # Needed for iteration lowering
-@adjoint Core.getfield(xs::NTuple{N,Any}, i::Integer) where N =
-  (xs[i], Δ -> (ntuple(j -> i == j ? Δ : nothing, Val(N)), nothing))
+function _pullback(cx::Context, ::typeof(Core.getfield), xs::NTuple{N,Any}, i::Integer) where N
+  function _back(Δ)
+    t = ntuple(j -> i == j ? Δ : Zero(), Val(N))
+    return diffgradtuple1((Composite{typeof(xs), typeof(t)}(t), DoesNotExist()))
+  end
+  return xs[i], _back
+end
 
-@adjoint Core.getfield(xs::NamedTuple{K,<:NTuple{N,Any}}, i::Integer) where {K,N} =
-  (xs[i], Δ -> (NamedTuple{K}(ntuple(j -> i == j ? Δ : nothing, Val(N))), nothing))
+function _pullback(cx::Context, ::typeof(Core.getfield), xs::NamedTuple{K,<:NTuple{N,Any}}, i::Integer) where {K,N}
+  function _back(Δ)
+    t = NamedTuple{K}(ntuple(j -> i == j ? Δ : Zero(), Val(N)))
+    return diffgradtuple1((Composite{typeof(xs), typeof(t)}(t), DoesNotExist()))
+  end
+  return xs[i], _back
+end
 
 @adjoint function Base.first(xs::Tuple)
   drest = map(_->nothing, tail(xs))
@@ -140,7 +170,7 @@ end
 @adjoint Base.tail(xs::Tuple) = tail(xs), x̄s -> ((nothing, x̄s...),)
 
 _empty(x) = length(x)
-_empty(x::Union{Tuple,NamedTuple}) = map(_->nothing, x)
+_empty(x::Union{Tuple,NamedTuple}) = map(_->DoesNotExist(), x)
 
 _unapply(t::Integer, xs) = xs[1:t], xs[t+1:end]
 _unapply(t, xs) = first(xs), tail(xs)
@@ -159,29 +189,39 @@ end
 
 unapply(t, xs) = _unapply(t, xs)[1]
 
-@adjoint! function Core._apply(f, args...)
-  y, back = Core._apply(_pullback, (__context__, f), args...)
+function _pullback(__context__::AContext, ::typeof(Core._apply), f, args...)
+  y, _back = Core._apply(_pullback, (__context__, f), args...)
   st = map(_empty, args)
-  y, function (Δ)
-    Δ = differential2legacy(back(legacy2differential(Δ)))
-    if Δ === nothing
-      return nothing
+  y, function (ȳ)
+    Δ = _back(ȳ)
+    if Δ isa AbstractZero
+      return Δ
     else
-      (first(Δ), unapply(st, Base.tail(Δ))...)
+      tuple_grads = unapply(st, Base.tail(Δ))
+      composite_grads = ntuple(
+        i -> Composite{typeof(tuple_grads[i]), typeof(tuple_grads[i])}(tuple_grads[i]),
+        length(tuple_grads)
+      )
+      return (DoesNotExist(), first(Δ), composite_grads...)
     end
   end
 end
 
 if VERSION >= v"1.4.0-DEV.304"
-  @adjoint! function Core._apply_iterate(::typeof(iterate), f, args...)
-    y, back = Core._apply(_pullback, (__context__, f), args...)
+  function _pullback(__context__::AContext, ::typeof(Core._apply_iterate), f, args...)
+    y, _back = Core._apply(_pullback, (__context__, f), args...)
     st = map(_empty, args)
-    y, function (Δ)
-      Δ = differential2legacy(back(legacy2differential(Δ)))
-      if Δ === nothing
-        return nothing
+    y, function (ȳ)
+      Δ = _back(ȳ)
+      if Δ isa AbstractZero
+        return Δ
       else
-        (nothing, first(Δ), unapply(st, Base.tail(Δ))...)
+        tuple_grads = unapply(st, Base.tail(Δ))
+        composite_grads = ntuple(
+          i -> Composite{typeof(tuple_grads[i]), typeof(tuple_grads[i])}(tuple_grads[i]),
+          length(tuple_grads)
+        )
+        return (DoesNotExist(), DoesNotExist(), first(Δ), composite_grads...)
       end
     end
   end
@@ -197,26 +237,26 @@ function deref!(x::Ref)
   return d
 end
 
-@generated nt_nothing(x) = Expr(:tuple, [:($f=nothing) for f in fieldnames(x)]...)
-
 @generated nt_zero(x) = Expr(:tuple, [:($f=Zero()) for f in fieldnames(x)]...)
 
 @generated pair(::Val{k}, v) where k = :($k = v,)
 
-@adjoint function literal_getproperty(x, ::Val{f}) where f
-  val = getproperty(x, f)
-  function back(Δ)
-    accum_param(__context__, val, Δ) === nothing && return
-    if isimmutable(x)
-      ((;nt_nothing(x)...,pair(Val(f), Δ)...), nothing)
-    else
-      dx = grad_mut(__context__, x)
-      dx[] = (;dx[]...,pair(Val(f),accum(getfield(dx[], f), Δ))...)
-      return (dx,nothing)
+function _pullback(__context__::AContext, ::typeof(literal_getproperty), x, ::Val{f}) where f
+    val = getproperty(x, f)
+    _back(::Nothing) = (legacytype_warn(Nothing); return Zero())
+    _back(x::AbstractZero) = x
+    function _back(Δ)
+      accum_param(__context__, val, Δ) isa AbstractZero && return Zero()
+      if isimmutable(x)
+        return (DoesNotExist(), Composite{typeof(x)}(;f => Δ), DoesNotExist())
+      else
+        dx = grad_mut(__context__, x)
+        dx[] += Composite{typeof(x)}(;f => Δ) # is += the right thing to do? (a=1, b=2, :a=>3) gives (a = 3, b = 2)
+        return (DoesNotExist(), dx, DoesNotExist())
+      end
     end
+    unwrap(val), _back
   end
-  unwrap(val), back
-end
 
 _pullback(cx::Context, ::typeof(getproperty), x, f::Symbol) =
   _pullback(cx, literal_getproperty, x, Val(f))
@@ -230,7 +270,7 @@ _pullback(cx::Context, ::typeof(literal_getindex), x::NamedTuple, ::Val{f}) wher
 _pullback(cx::Context, ::typeof(literal_getproperty), x::Tuple, ::Val{f}) where f =
   _pullback(cx, literal_getindex, x, Val(f))
 
-grad_mut(x) = Ref{Any}(nt_zero(x))
+grad_mut(x::T) where T = Ref{Any}(Composite{T}())
 
 function grad_mut(cx::Context, x)
   ch = cache(cx)
@@ -241,17 +281,17 @@ function grad_mut(cx::Context, x)
   end
 end
 
-@adjoint! function setfield!(x, f, val)
+function _pullback(__context__::AContext, ::typeof(setfield!), x, f, val)
   y = setfield!(x, f, val)
   g = grad_mut(__context__, x)
-  y, function (_)
-    Δ = differential2legacy(getfield(g[], f))
-    g[] = (;g[]...,pair(Val(f),Zero())...)
-    (nothing, nothing, Δ)
+  y, function _back(_)
+    Δ = getproperty(g[], f)
+    g[] += Composite{typeof(x)}(;f => -Δ) # i.e. g[].f = Zero(), but that is not implemented
+    return (DoesNotExist(), DoesNotExist(), DoesNotExist(), Δ)
   end
 end
 
-struct Jnew{T,G,splat}
+struct Jnew{T,G,splat} # T is the primal type, G is the gradient type
   g::G
 end
 
@@ -260,49 +300,63 @@ Jnew{T}(g) where T = Jnew{T,typeof(g)}(g)
 function _pullback(__context__::AContext, ::typeof(__new__), ::Type{T}, args...) where T
   x = __new__(T, args...)
   g = !T.mutable || fieldcount(T) == 0 ? Zero() : grad_mut(__context__, x)
-  return x, Δ -> gradtuple1(Jnew{T,typeof(g),false}(g)(Δ))
+  _back(::Nothing) = (legacytype_warn(Nothing); return Zero())
+  _back(x::AbstractZero) = x
+  _back(Δ) = diffgradtuple1(Jnew{T,typeof(g),false}(g)(Δ))
+  return x, _back
 end
 
 function _pullback(__context__::AContext, ::typeof(__splatnew__), ::Type{T}, args) where T
   x = __splatnew__(T, args)
   g = !T.mutable || fieldcount(T) == 0 ? Zero() : grad_mut(__context__, x)
-  return x,  Δ -> gradtuple1(Jnew{T,typeof(g),true}(g)(Δ))
+  _back(::Nothing) = (legacytype_warn(Nothing); return Zero())
+  _back(x::AbstractZero) = x
+  _back(Δ) = diffgradtuple1(Jnew{T,typeof(g),true}(g)(Δ))
+  return x, _back
 end
 
+const allowed_gradient_T = Union{
+  NamedTuple,
+  Nothing,
+  AbstractZero,
+  RefValue,
+  ChainRules.Composite
+}
+
 # TODO captured mutables + multiple calls to `back`
-@generated function (back::Jnew{T,G,false})(Δ::Union{NamedTuple,Nothing,AbstractZero,RefValue}) where {T,G}
-  Δ == Nothing && legacytype_warn()
+@generated function (back::Jnew{T,G,false})(Δ::allowed_gradient_T) where {T,G}
+  Δ <: Union{Nothing, NamedTuple} && legacytype_warn(Δ)
   if !T.mutable
     Δ <: AbstractZero && return :Δ
   end
   Δ_expr = if G <: AbstractZero
     :Δ
   elseif Δ <: RefValue
-    :(back.g[]) # TODO: is this right? Why don't we need to accum? 
+    :(back.g[]) # TODO: is this right? Why don't we need to accum?
   else
     :(accum(back.g[], Δ))
   end
   quote
     x̄ = $Δ_expr
     $(G <: AbstractZero || :(back.g[] = nt_zero($Δ_expr)))
-    return (DoesNotExist(), $(map(f -> :(x̄.$f), fieldnames(T))...))
+    return (DoesNotExist(), $(map(fn -> :(x̄.$fn), fieldnames(T))...))
   end
 end
 
-@generated function (back::Jnew{T,G,true})(Δ::Union{NamedTuple,Nothing,AbstractZero,RefValue}) where {T,G}
-  Δ == Nothing && legacytype_warn()
+@generated function (back::Jnew{T,G,true})(Δ::allowed_gradient_T) where {T,G}
+  Δ == Union{Nothing, NamedTuple} && legacytype_warn(Δ)
   if !T.mutable
     Δ <: AbstractZero && return :Δ
   end
   if G <: AbstractZero
     quote
-      (DoesNotExist(), ($(map(f -> :(Δ.$f), fieldnames(T))...),))
+      return (DoesNotExist(), ($(map(fn -> :(Δ.$fn), fieldnames(T))...),))
     end
   else # TODO is this dead code? back is an (immutable) struct
     quote
       x̄ = back.g
       back.g = nt_zero(back.g)
-      (DoesNotExist(), ($(map(f -> :(x̄.$f), fieldnames(T))...),))
+      return (DoesNotExist(), ($(map(fn -> :(x̄.$fn), fieldnames(T))...),))
     end
   end
 end
