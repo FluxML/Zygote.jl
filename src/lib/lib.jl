@@ -99,26 +99,35 @@ using Base: tail
 
 @adjoint tuple(xs...) = xs, identity
 
-@adjoint function literal_getindex(xs::NTuple{N,Any}, ::Val{i}) where {N,i}
+function _pullback(__context__::AContext, ::typeof(literal_getindex), xs::NTuple{N,Any}, ::Val{i}) where {N,i}
   val = xs[i]
-  function back(Δ)
-    accum_param(__context__, val, Δ) isa AbstractZero && return
-    return ntuple(j -> i == j ? Δ : nothing, Val(N)), nothing
+  function _back(Δ)
+    Δ_accum = accum_param(__context__, val, Δ)
+    Δ_accum isa AbstractZero && return Δ_accum
+    nt = ntuple(j -> i == j ? Δ : Zero(), Val(N))
+    return diffgradtuple1((Composite{typeof(xs), typeof(nt)}(nt), DoesNotExist()))
   end
-  val, back
+  val, _back
 end
 
-@adjoint function getindex(xs::NTuple{N,Any}, i::Integer) where N
+function _pullback(__context__::AContext, ::typeof(getindex), xs::NTuple{N,Any}, i::Integer) where N
   val = xs[i]
-  function back(Δ)
-    accum_param(__context__, val, Δ) isa AbstractZero && return
-    return ntuple(j -> i == j ? Δ : nothing, Val(N)), nothing
+  function _back(Δ)
+    Δ_accum = accum_param(__context__, val, Δ)
+    Δ_accum isa AbstractZero && return Δ_accum
+    nt = ntuple(j -> i == j ? Δ : Zero(), Val(N))
+    return diffgradtuple1((Composite{typeof(xs), typeof(nt)}(nt), DoesNotExist()))
   end
-  return val, back
+  val, _back
 end
 
-@adjoint getindex(xs::NTuple{N,Any}, r::AbstractUnitRange) where N =
-  (xs[r], Δ -> (ntuple(j -> j in r ? Δ[findfirst(isequal(j), r)] : nothing, Val(N)), nothing))
+function _pullback(__context__::AContext, ::typeof(getindex), xs::NTuple{N,Any}, r::AbstractUnitRange) where N
+  function _back(Δ)
+    t = ntuple(j -> j in r ? Δ[findfirst(isequal(j), r)] : Zero(), Val(N))
+    return diffgradtuple1((Composite{typeof(xs), typeof(t)}(t), DoesNotExist()))
+  end
+  return xs[r], _back
+end
 
 function _pullback(cx::Context, ::typeof(literal_indexed_iterate), xs::Tuple, ::Val{i}) where i
   y, b = _pullback(cx, literal_getindex, xs, Val(i))
