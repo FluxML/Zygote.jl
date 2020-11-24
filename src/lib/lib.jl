@@ -146,11 +146,21 @@ function _pullback(cx::Context, ::typeof(literal_indexed_iterate), xs::Tuple, ::
 end
 
 # Needed for iteration lowering
-@adjoint Core.getfield(xs::NTuple{N,Any}, i::Integer) where N =
-  (xs[i], Δ -> (ntuple(j -> i == j ? Δ : nothing, Val(N)), nothing))
+function _pullback(cx::Context, ::typeof(Core.getfield), xs::NTuple{N,Any}, i::Integer) where N
+  function _back(Δ)
+    t = ntuple(j -> i == j ? Δ : Zero(), Val(N))
+    return diffgradtuple1((Composite{typeof(xs), typeof(t)}(t), DoesNotExist()))
+  end
+  return xs[i], _back
+end
 
-@adjoint Core.getfield(xs::NamedTuple{K,<:NTuple{N,Any}}, i::Integer) where {K,N} =
-  (xs[i], Δ -> (NamedTuple{K}(ntuple(j -> i == j ? Δ : nothing, Val(N))), nothing))
+function _pullback(cx::Context, ::typeof(Core.getfield), xs::NamedTuple{K,<:NTuple{N,Any}}, i::Integer) where {K,N}
+  function _back(Δ)
+    t = NamedTuple{K}(ntuple(j -> i == j ? Δ : Zero(), Val(N)))
+    return diffgradtuple1((Composite{typeof(xs), typeof(t)}(t), DoesNotExist()))
+  end
+  return xs[i], _back
+end
 
 @adjoint function Base.first(xs::Tuple)
   drest = map(_->nothing, tail(xs))
