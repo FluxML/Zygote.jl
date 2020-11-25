@@ -389,3 +389,11 @@ end
   Zygote.gradient(loss_adjoint,[1.0])
   @test x[1] == x[2]
 end
+
+@testset "PyCall custom @adjoint" begin
+  import PyCall
+  math = PyCall.pyimport("math")
+  pysin(x) = math.sin(x)
+  Zygote.@adjoint pysin(x) = math.sin(x), (δ) -> (δ * math.cos(x), )
+  @test Zygote.gradient(pysin, 1.5) == Zygote.gradient(sin, 1.5)
+end
