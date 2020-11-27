@@ -160,11 +160,8 @@ using Zygote, Test, ChainRules
 
         @test (1,) == h(1)
 
-        if VERSION >= v"1.3"
-            # broken on Julia 1.0 because of https://github.com/FluxML/Zygote.jl/issues/638
-            a3, pb3 = Zygote.pullback(h, 1)
-            @test ((1,),) == pb3(1)
-        end
+        a3, pb3 = Zygote.pullback(h, 1)
+        @test ((1,),) == pb3(1)
     end
 
     @testset "kwargs" begin

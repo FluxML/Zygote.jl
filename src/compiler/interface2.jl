@@ -27,10 +27,8 @@ end
   forw = varargs!(meta, forw, 3)
   # IRTools.verify(forw)
   forw = slots!(pis!(inlineable!(forw)))
-  @static if VERSION >= v"1.3" # no edges pre-1.3
-    # be ready to swap to using chainrule if one is declared
-    cr_edge != nothing && edge!(meta, cr_edge)
-  end
+  # be ready to swap to using chainrule if one is declared
+  cr_edge != nothing && edge!(meta, cr_edge)
   return update!(meta.code, forw)
 end
 
