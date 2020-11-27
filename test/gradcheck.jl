@@ -1646,32 +1646,28 @@ end
 
 
 @testset "broadcasted $op with sizes $s" for op in (+,-,*), s in ((4,), (2,3))
-o = ones(s)
-z = zeros(s)
+  o = ones(s)
+  z = zeros(s)
 
-@testset "Explicit" begin
-  gfun(args...) = gradient((x, y) -> sum(op.(x,y)), args...)
-  g = gfun(o, z)
-  @test gfun(o, false) == (g[1], nothing)
+  @testset "Explicit" begin
+    gfun(args...) = gradient((x, y) -> sum(op.(x,y)), args...)
+    g = gfun(o, z)
+    @test gfun(o, false) == (g[1], nothing)
 
-  g = gfun(z, o)
-  @test gfun(false, o) == (nothing, g[2])
-end
+    g = gfun(z, o)
+    @test gfun(false, o) == (nothing, g[2])
+  end
 
-@testset "Implicit" begin
-  gfun(args...) = gradient(() -> sum(op.(args...)), params(collect(args)))
-  g = gfun(o, z)
+  @testset "Implicit" begin
+    gfun(args...) = gradient(() -> sum(op.(args...)), Params(collect(args)))
+    g = gfun(o, z)
 
-  gres = gfun(o, false)
-  @test gres[o] == g[o]
-  @test false ∉ gres.params
-  @test length(gres.params) == 1
+    gres = gfun(o, false)
+    @test gres[o] == g[o]
 
-  g = gfun(z, o)
-  gres = gfun(false, o)
-  @test gres[o] == g[o]
-  @test false ∉ gres.params
-  @test length(gres.params) == 1
-end
+    g = gfun(z, o)
+    gres = gfun(false, o)
+    @test gres[o] == g[o]
+  end
 end
 
