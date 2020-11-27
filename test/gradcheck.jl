@@ -1645,29 +1645,33 @@ end
 @test gradient(x -> norm(x), rand(Float32, 2, 2))[1] isa Matrix{Float32}
 
 
-@testset "broadcasted $op with sizes $s" for op in (+,-,*), s in ((4,), (2,3))
-  o = ones(s)
-  z = zeros(s)
+@testset "broadcasted($op, Array, Bool)" for op in (+,-,*)
+  @testset "with $bool and sizes $s" for s in ((4,), (2,3)), bool in (true,false)
+    r = rand(Int8, s) .+ 0.0
+    z = fill(bool, s) .+ 0.0
 
-  @testset "Explicit" begin
-    gfun(args...) = gradient((x, y) -> sum(op.(x,y)), args...)
-    g = gfun(o, z)
-    @test gfun(o, false) == (g[1], nothing)
+    @testset "Explicit" begin
+      fun(args...) = pullback((x, y) -> sum(op.(x,y)), args...)[1]
+      gfun(args...) = gradient((x, y) -> sum(op.(x,y)), args...)
 
-    g = gfun(z, o)
-    @test gfun(false, o) == (nothing, g[2])
-  end
+      @test fun(r, z) == fun(r, bool)
+      @test gfun(r, bool) == (gfun(r, z)[1], nothing)
 
-  @testset "Implicit" begin
-    gfun(args...) = gradient(() -> sum(op.(args...)), Params(collect(args)))
-    g = gfun(o, z)
+      @test fun(z, r) == fun(bool, r)
+      @test gfun(bool, r) == (nothing, gfun(z, r)[2])
+    end
 
-    gres = gfun(o, false)
-    @test gres[o] == g[o]
+    @testset "Implicit" begin
+      gfun(args...) = gradient(() -> sum(op.(args...)), Params(filter(a->a isa Array, collect(args))  ))
 
-    g = gfun(z, o)
-    gres = gfun(false, o)
-    @test gres[o] == g[o]
+      g = gfun(r, z)
+      gres = gfun(r, bool)
+      @test gres[r] == g[r]
+
+      g = gfun(z, r)
+      gres = gfun(bool, r)
+      @test gres[r] == g[r]
+    end
   end
 end
 
