@@ -1642,4 +1642,11 @@ end
   end
 end
 
-@test gradient(x -> norm(x), rand(Float32, 2, 2))[1] isa Matrix{Float32}
+@testset "norm" begin
+    for T in (Float64, Float32, ComplexF64, ComplexF32)
+        x = randn(T, 2, 2)
+        y = x / norm(x)
+        z = gradient(norm, x)[1]
+        @test z ≈ y && typeof(z) == typeof(y)
+    end
+end
