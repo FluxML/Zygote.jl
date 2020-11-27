@@ -264,14 +264,9 @@ end
 
 @adjoint enumerate(xs) = enumerate(xs), diys -> (map(last, diys),)
 
-@adjoint function Iterators.Filter(f, x)
-  b = map(f, x)
-  Iterators.Filter(f, x), dy -> begin
-    dx = similar(x, eltype(dy)) .= 0
-    dx[b] .= dy
-    (nothing, dx,)
-  end
-end
+@adjoint Iterators.Filter(f, x::AbstractArray) = pullback(filter, f, x)
+# @adjoint Iterators.Filter(f, x) = pullback(filter, f, collect(x))
+@adjoint Iterators.Filter(f, x) = pullback((f,x) -> filter(f,collect(x)), f, x)
 
 _ndims(::Base.HasShape{d}) where {d} = d
 _ndims(x) = Base.IteratorSize(x) isa Base.HasShape ? _ndims(Base.IteratorSize(x)) : 1
