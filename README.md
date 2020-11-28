@@ -4,7 +4,7 @@
 
 <!-- [![Build Status](https://travis-ci.org/FluxML/Zygote.jl.svg?branch=master)](https://travis-ci.org/FluxML/Zygote.jl) -->
 ![CI Testing](https://github.com/FluxML/Zygote.jl/workflows/CI/badge.svg)
-![Dev Docs](https://img.shields.io/badge/docs-dev-blue.svg)(https://fluxml.ai/Zygote.jl/dev)
+[![Dev Docs](https://img.shields.io/badge/docs-dev-blue.svg)](https://fluxml.ai/Zygote.jl/dev)
 
 `] add Zygote`
 
