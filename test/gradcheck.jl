@@ -3,7 +3,6 @@ using Zygote, NNlib, Test, Random, LinearAlgebra, Statistics, FillArrays,
 using Zygote: gradient
 using NNlib: conv, ∇conv_data, depthwiseconv, batched_mul
 using Base.Broadcast: broadcast_shape
-using LoopVectorization: vmap
 using Distributed: pmap
 import FiniteDifferences
 
@@ -333,7 +332,7 @@ end
 @test gradtest(kron, rand(5,1), rand(3,1), rand(8,1))
 @test gradtest(kron, rand(5,2), rand(3,2), rand(8,2))
 
-for mapfunc in [map,pmap,vmap]
+for mapfunc in [map,pmap]
   @testset "$mapfunc" begin
     @test gradtest(xs -> sum(mapfunc(x -> x^2, xs)), rand(2,3))
     @test gradtest((xss...) -> sum(mapfunc((xs...) -> sqrt(sum(xs.^2)), xss...)), [rand(5) for _ in 1:6]...)

@@ -11,8 +11,6 @@ using IRTools
 using MacroTools, Requires
 using MacroTools: @forward
 
-using LoopVectorization: vmap
-
 export Params, gradient, pullback, pushforward, @code_adjoint
 
 include("tools/idset.jl")
