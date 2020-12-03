@@ -256,7 +256,7 @@ function adjoint(pr::Primal)
       for br in branches(rb)
         br.block == 0 && continue
         br′ = branchfor(pr.ir, br.block=>b.id)
-        br′ == nothing && continue
+        br′ === nothing && continue
         ins = br′.args
         for i = 1:length(br.args)
           ā = [gs[j] for j = 1:length(ins) if ins[j] == sigs[br.block][i]]
@@ -265,7 +265,7 @@ function adjoint(pr::Primal)
       end
     else # Backprop function arguments
       gs = [grad(arg) for arg = arguments(pr.ir)]
-      Δ = push!(rb, pr.varargs == nothing ?
+      Δ = push!(rb, pr.varargs === nothing ?
                       xcall(Zygote, :tuple, gs...) :
                       xcall(Zygote, :tuple_va, Val(pr.varargs), gs...))
       branches(rb)[1].args[1] = Δ

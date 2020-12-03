@@ -167,9 +167,7 @@ D(f, x) = grad(f, x)[1]
 @test D(x -> x*D(y -> x+y, 1), 1) == 1
 @test D(x -> x*D(y -> x*y, 1), 4) == 8
 
-if VERSION >= v"1.1"
-  @test sin'''(1.0) ==  -cos(1.0)
-end
+@test sin'''(1.0) ==  -cos(1.0)
 
 f(x) = throw(DimensionMismatch("fubar"))
 
@@ -218,7 +216,7 @@ end[1] == 1
   return x*5
 end[1] == 5
 
-@test gradient(x -> one(eltype(x)), rand(10))[1] == nothing
+@test gradient(x -> one(eltype(x)), rand(10))[1] === nothing
 
 # Thre-way control flow merge
 @test gradient(1) do x
