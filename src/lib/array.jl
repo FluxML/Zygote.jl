@@ -197,6 +197,26 @@ for (mapfunc,∇mapfunc) in [(:map,:∇map),(:pmap,:∇pmap),(:vmap,:∇vmap)]
   end
 end
 
+function ∇pmap(cx, f, wp, args...; kwargs...)
+  ys_and_backs = pmap((args...) -> _pullback(cx, f, args...), wp, args...; kwargs...)
+  if isempty(ys_and_backs)
+    ys_and_backs, _ -> nothing
+  else
+    ys, backs = unzip(ys_and_backs)
+    ys, function (Δ)
+      # Apply pullbacks in reverse order. Needed for correctness if `f` is stateful.
+      Δf_and_args_zipped = pmap((f, δ) -> f(δ), wp, _tryreverse(pmap, backs, Δ)...)
+      Δf_and_args = unzip(_tryreverse(pmap, Δf_and_args_zipped))
+      Δf = reduce(accum, Δf_and_args[1])
+      (Δf, nothing, Δf_and_args[2:end]...)
+    end
+  end
+end
+
+@adjoint function Distributed.pmap(f, wp::Distributed.CachingPool, args::Union{AbstractArray,Tuple}...; kwargs...)
+  ∇pmap(__context__, f, wp, args...; kwargs...)
+end
+
 function _pullback(cx::AContext, ::typeof(collect), g::Base.Generator)
   y, back = ∇map(cx, g.f, g.iter)
   y, function (ȳ)
