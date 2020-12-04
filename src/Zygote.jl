@@ -12,6 +12,7 @@ using MacroTools, Requires
 using MacroTools: @forward
 
 using LoopVectorization: vmap
+import Distributed: pmap
 
 export Params, gradient, pullback, pushforward, @code_adjoint
 
