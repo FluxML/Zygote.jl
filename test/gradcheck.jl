@@ -1641,3 +1641,13 @@ end
     @test gradient(x -> sum(randexp(Random.default_rng(), Float32, (1,1))), 1) == (nothing,)
   end
 end
+
+@testset "iterate(::nothing) #804" begin
+  function h(x)
+    t = [i for i in x]
+    sum(x)
+  end
+  for sz in [(3,), (3,3)]
+    @test gradtest(h, rand(sz...))
+  end
+end
