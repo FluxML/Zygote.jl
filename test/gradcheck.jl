@@ -1105,8 +1105,8 @@ end
         Y = copy(X)
         Δ = randn(P, P)
         Δ_fd = FiniteDifferences.j′vp(
-                  FiniteDifferences.central_fdm(5, 1), 
-                  X -> pairwise(metric, X, Y; dims=2), 
+                  FiniteDifferences.central_fdm(5, 1),
+                  X -> pairwise(metric, X, Y; dims=2),
                   Δ, X)
         _, pb = Zygote.pullback(X -> pairwise(metric, X, Y; dims=2), X)
 
@@ -1642,5 +1642,3 @@ end
     @test gradient(x -> sum(randexp(Random.default_rng(), Float32, (1,1))), 1) == (nothing,)
   end
 end
-
-@test gradient(x -> norm(x), rand(Float32, 2, 2))[1] isa Matrix{Float32}
