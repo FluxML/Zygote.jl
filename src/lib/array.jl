@@ -421,11 +421,6 @@ end
   end
 end
 
-function _pullback(cx::AContext, ::typeof(norm), x::AbstractArray, p::Real = 2)
-  fallback = (x, p) -> sum(abs.(x).^p .+ eps(0f0)) ^ (one(eltype(x)) / p) # avoid d(sqrt(x))/dx == Inf at 0
-  _pullback(cx, fallback, x, p)
-end
-
 # LinAlg Matrix Types
 # ===================
 
