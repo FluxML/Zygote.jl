@@ -1642,3 +1642,5 @@ end
     @test gradient(x -> sum(randexp(Random.default_rng(), Float32, (1,1))), 1) == (nothing,)
   end
 end
+
+@test gradient(x -> norm(x), rand(Float32, 2, 2))[1] isa Matrix{Float32}
