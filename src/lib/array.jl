@@ -314,23 +314,8 @@ end
   end
 end
 
-# LinAlg
-# ======
-
-# TODO: remove these once https://github.com/JuliaDiff/ChainRules.jl/pull/305 is merged
-@adjoint function(A::AbstractMatrix * x::AbstractVector)
-  return A * x, Δ::AbstractVector->(Δ * x', A' * Δ)
-end
-
-@adjoint function *(x::Union{Transpose{<:Any, <:AbstractVector},
-                             LinearAlgebra.Adjoint{<:Any, <:AbstractVector}},
-                    y::AbstractVector)
-  return x * y, Δ->(Δ * y', x' * Δ)
-end
-
-@adjoint function(a::AbstractVector * x::AbstractMatrix)
-  return a * x, Δ::AbstractMatrix->(vec(Δ * x'), a' * Δ)
-end
+# LinearAlgebra
+# =============
 
 @adjoint function transpose(x)
   back(Δ) = (transpose(Δ),)
@@ -434,11 +419,6 @@ end
       return (a + b + c, B̄)
     end
   end
-end
-
-function _pullback(cx::AContext, ::typeof(norm), x::AbstractArray, p::Real = 2)
-  fallback = (x, p) -> sum(abs.(x).^p .+ eps(0f0)) ^ (one(eltype(x)) / p) # avoid d(sqrt(x))/dx == Inf at 0
-  _pullback(cx, fallback, x, p)
 end
 
 # LinAlg Matrix Types
