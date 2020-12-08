@@ -410,8 +410,8 @@ end
     y2, back2 = Zygote.pullback(x->f.(x), A)
     @test y == y2
     @testset "back(::Array{$BT})" for BT in Ts
-      ȳ = randn(BT, N, N)
-      @test back(ȳ)[1] == back2(ȳ)[1]
+      ȳ = randn(BT, N, N)
+      @test back(ȳ)[1] == back2(ȳ)[1]
     end
   end
 end
@@ -749,8 +749,8 @@ end
           0.0    0.0    1.0
           -4.34 -18.31  -0.43]
     _,back = Zygote.pullback(exp,A)
-    Ȳ = rand(3,3)
-    @test isreal(back(Ȳ)[1])
+    Ȳ = rand(3,3)
+    @test isreal(back(Ȳ)[1])
   end
 end
 
@@ -1557,6 +1557,36 @@ end
     @test gradient(x -> sum(randn(Random.default_rng(), Float32, (1,1))), 1) == (nothing,)
     @test gradient(x -> sum(randexp(Random.default_rng(), Float32, 1,1)), 1) == (nothing,)
     @test gradient(x -> sum(randexp(Random.default_rng(), Float32, (1,1))), 1) == (nothing,)
+  end
+end
+
+@testset "broadcasted($op, Array, Bool)" for op in (+,-,*)
+  @testset "with $bool and sizes $s" for s in ((4,), (2,3)), bool in (true,false)
+    r = rand(Int8, s) .+ 0.0
+    z = fill(bool, s) .+ 0.0
+
+    @testset "Explicit" begin
+      fun(args...) = pullback((x, y) -> sum(op.(x,y)), args...)[1]
+      gfun(args...) = gradient((x, y) -> sum(op.(x,y)), args...)
+
+      @test fun(r, z) == fun(r, bool)
+      @test gfun(r, bool) == (gfun(r, z)[1], nothing)
+
+      @test fun(z, r) == fun(bool, r)
+      @test gfun(bool, r) == (nothing, gfun(z, r)[2])
+    end
+
+    @testset "Implicit" begin
+      gfun(args...) = gradient(() -> sum(op.(args...)), Params(filter(a->a isa Array, collect(args))  ))
+
+      g = gfun(r, z)
+      gres = gfun(r, bool)
+      @test gres[r] == g[r]
+
+      g = gfun(z, r)
+      gres = gfun(bool, r)
+      @test gres[r] == g[r]
+    end
   end
 end
 
