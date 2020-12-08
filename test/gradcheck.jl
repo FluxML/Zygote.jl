@@ -4,7 +4,7 @@ using Zygote: gradient
 using Base.Broadcast: broadcast_shape
 using LoopVectorization: vmap
 using Distributed: pmap
-using FiniteDifferences
+import FiniteDifferences
 
 function ngradient(f, xs::AbstractArray...)
   grads = zero.(xs)
@@ -1022,8 +1022,9 @@ end
         Y = copy(X)
         Δ = randn(P, P)
         Δ_fd = FiniteDifferences.j′vp(
-          central_fdm(5, 1), X -> pairwise(metric, X, Y; dims=2), Δ, X,
-        )
+                  FiniteDifferences.central_fdm(5, 1), 
+                  X -> pairwise(metric, X, Y; dims=2), 
+                  Δ, X)
         _, pb = Zygote.pullback(X -> pairwise(metric, X, Y; dims=2), X)
 
         # This is impressively inaccurate, but at least it doesn't produce a NaN.
@@ -1559,4 +1560,21 @@ end
   end
 end
 
-@test gradient(x -> norm(x), rand(Float32, 2, 2))[1] isa Matrix{Float32}
+@testset "norm" begin
+    # rrule for norm is defined in ChainRules. These tests just check various norm-related
+    # issues are resolved
+
+    # check that type is not unnecessarily promoted
+    # https://github.com/FluxML/Zygote.jl/issues/663
+    @test gradient(norm, randn(Float32, 2, 2)) isa Tuple{Matrix{Float32}}
+    @test gradient(norm, randn(Float32, 2, 2), 3) isa Tuple{Matrix{Float32},Float32}
+    @test gradient(norm, randn(Float32, 2, 2), 3f0) isa Tuple{Matrix{Float32},Float32}
+    @test gradient(norm, randn(ComplexF32, 2, 2), 3.5f0) isa Tuple{Matrix{ComplexF32},Float32}
+
+    # just check that these do not error
+    # https://github.com/FluxML/Zygote.jl/issues/331
+    gradient(x->norm(x*[1, 1]), 1.23)
+    gradient(x->norm(x*[1 1]), 1.23)
+    gradient(x->norm(x*[1im, 1]), 1.23)
+    gradient(x->norm(x*[1im 1]), 1.23)
+end
