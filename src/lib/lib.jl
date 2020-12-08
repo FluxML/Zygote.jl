@@ -125,14 +125,14 @@ end
   val, back
 end
 
-function _pullback(cx::Context, ::typeof(literal_indexed_iterate), xs::Tuple, ::Val{i}) where i
+function _pullback(cx::AContext, ::typeof(literal_indexed_iterate), xs::Tuple, ::Val{i}) where i
   y, b = _pullback(cx, literal_getindex, xs, Val(i))
   back(::Nothing) = nothing
   back(ȳ) = b(ȳ[1])
   (y, i+1), back
 end
 
-function _pullback(cx::Context, ::typeof(literal_indexed_iterate), xs::Tuple, ::Val{i}, st) where i
+function _pullback(cx::AContext, ::typeof(literal_indexed_iterate), xs::Tuple, ::Val{i}, st) where i
   y, b = _pullback(cx, literal_getindex, xs, Val(i))
   back(::Nothing) = nothing
   back(ȳ) = (b(ȳ[1])..., nothing)
@@ -224,16 +224,16 @@ end
   unwrap(val), back
 end
 
-_pullback(cx::Context, ::typeof(getproperty), x, f::Symbol) =
+_pullback(cx::AContext, ::typeof(getproperty), x, f::Symbol) =
   _pullback(cx, literal_getproperty, x, Val(f))
 
-_pullback(cx::Context, ::typeof(getfield), x, f::Symbol) =
+_pullback(cx::AContext, ::typeof(getfield), x, f::Symbol) =
   _pullback(cx, literal_getproperty, x, Val(f))
 
-_pullback(cx::Context, ::typeof(literal_getindex), x::NamedTuple, ::Val{f}) where f =
+_pullback(cx::AContext, ::typeof(literal_getindex), x::NamedTuple, ::Val{f}) where f =
   _pullback(cx, literal_getproperty, x, Val(f))
 
-_pullback(cx::Context, ::typeof(literal_getproperty), x::Tuple, ::Val{f}) where f =
+_pullback(cx::AContext, ::typeof(literal_getproperty), x::Tuple, ::Val{f}) where f =
   _pullback(cx, literal_getindex, x, Val(f))
 
 grad_mut(x) = Ref{Any}(nt_nothing(x))
