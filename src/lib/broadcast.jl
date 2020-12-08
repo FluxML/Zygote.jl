@@ -14,7 +14,6 @@
 
 using Base.Broadcast
 using Base.Broadcast: Broadcasted, AbstractArrayStyle, broadcasted, materialize
-using NNlib
 
 # There's a saying that debugging code is about twice as hard as writing it in
 # the first place. So if you're as clever as you can be when writing code, how
@@ -88,11 +87,6 @@ end
 end
 
 @adjoint broadcasted(::typeof(identity), x::Numeric) = x, Δ -> (nothing, Δ)
-
-@adjoint function broadcasted(::typeof(σ), x::Numeric)
-  y = σ.(x)
-  y, ȳ -> (nothing, ȳ .* conj.(y .* (1 .- y)))
-end
 
 @adjoint function broadcasted(::typeof(tanh), x::Numeric)
   y = tanh.(x)
