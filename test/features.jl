@@ -466,6 +466,14 @@ end
     sum([x^2+y for x in xs, y in ys])  # Iterators.Product
   end == (10:10:100, fill(10, 5))
 
+  @test gradient(rand(2,3)) do A
+    sum([A[i,j] for i in 1:1, j in 1:2])
+  end == ([1 1 0; 0 0 0],)
+
+  @test gradient(rand(2,3), rand(3)) do A, ys
+    sum([A[i,j] + ys[i] for i in 1:2, j in 1:2])
+  end == ([1 1 0; 1 1 0], [2, 2, 0])
+
   @test gradient(ones(3,5), 1:7) do xs, ys
     sum([x+y for x in xs, y in ys])
   end == (fill(7, 3,5), fill(15, 7))

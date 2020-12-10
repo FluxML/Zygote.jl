@@ -272,13 +272,20 @@ _ndims(::Base.HasShape{d}) where {d} = d
 _ndims(x) = Base.IteratorSize(x) isa Base.HasShape ? _ndims(Base.IteratorSize(x)) : 1
 
 @adjoint function Iterators.product(xs...)
-  d = 1
-  Iterators.product(xs...), dy -> ntuple(length(xs)) do n
-    nd = _ndims(xs[n])
-    dims = ntuple(i -> i<d ? i : i+nd, ndims(dy)-nd)
-    d += nd
-    reshape(sum(y->y[n], dy; dims=dims), axes(xs[n]))
+  back(::Nothing) = nothing
+  back(::AbstractArray{Nothing}) = nothing
+  function back(dy::AbstractArray)
+    d = 1
+    ntuple(length(xs)) do n
+      first(dy)[n] === nothing && return nothing
+      nd = _ndims(xs[n])
+      dims = ntuple(i -> i<d ? i : i+nd, ndims(dy)-nd)
+      d += nd
+      # reshape(sum(y->y[n], dy; dims=dims), axes(xs[n]))
+      return reshape(sum(StaticGetter{n}(), dy; dims=dims), axes(xs[n]))
+    end
   end
+  Iterators.product(xs...), back
 end
 
 @adjoint function Iterators.Zip(xs)
