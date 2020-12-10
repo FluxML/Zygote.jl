@@ -458,6 +458,14 @@ end
     sum([x^i for (i,x) in enumerate(xs)])
   end == ([1, 4, 27, 256, 3125],)
 
+  @test gradient([1,10,100]) do xs
+    sum([xs[i]^i for (i,x) in enumerate(xs)])
+  end == ([1, 2 * 10^1, 3 * 100^2],)
+
+  @test gradient(10:14, 1:10) do xs, ys
+    sum([x/y for (x,y) in zip(xs, ys)])
+  end[2] ≈ vcat(.-(10:14) ./ (1:5).^2, zeros(5))
+
   @test gradient(2:9) do xs
     sum([x^2 for x in xs if iseven(x)])  # Iterators.Filter
   end == ([4, 0, 8, 0, 12, 0, 16, 0],)
@@ -477,10 +485,6 @@ end
   @test gradient(ones(3,5), 1:7) do xs, ys
     sum([x+y for x in xs, y in ys])
   end == (fill(7, 3,5), fill(15, 7))
-
-  @test gradient(10:14, 1:10) do xs, ys
-    sum([x/y for (x,y) in zip(xs, ys)])
-  end[2] ≈ vcat(.-(10:14) ./ (1:5).^2, zeros(5))
 end
 
 # https://github.com/JuliaDiff/ChainRules.jl/issues/257

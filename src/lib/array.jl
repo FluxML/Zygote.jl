@@ -262,17 +262,18 @@ end
 
 # Iterators
 
-@adjoint enumerate(xs) = enumerate(xs), diys -> (map(last, diys),)
+@adjoint function enumerate(xs)
+  back(::AbstractArray{Nothing}) = nothing
+  back(diys) = (map(last, diys),)
+  enumerate(xs), back
+end
 
-@adjoint Iterators.Filter(f, x::AbstractArray) = pullback(filter, f, x)
-# @adjoint Iterators.Filter(f, x) = pullback(filter, f, collect(x))
-@adjoint Iterators.Filter(f, x) = pullback((f,x) -> filter(f,collect(x)), f, x)
+@adjoint Iterators.Filter(f, x) = pullback(filter, f, collect(x))
 
 _ndims(::Base.HasShape{d}) where {d} = d
 _ndims(x) = Base.IteratorSize(x) isa Base.HasShape ? _ndims(Base.IteratorSize(x)) : 1
 
 @adjoint function Iterators.product(xs...)
-  back(::Nothing) = nothing
   back(::AbstractArray{Nothing}) = nothing
   function back(dy::AbstractArray)
     d = 1
@@ -281,7 +282,6 @@ _ndims(x) = Base.IteratorSize(x) isa Base.HasShape ? _ndims(Base.IteratorSize(x)
       nd = _ndims(xs[n])
       dims = ntuple(i -> i<d ? i : i+nd, ndims(dy)-nd)
       d += nd
-      # reshape(sum(y->y[n], dy; dims=dims), axes(xs[n]))
       return reshape(sum(StaticGetter{n}(), dy; dims=dims), axes(xs[n]))
     end
   end
