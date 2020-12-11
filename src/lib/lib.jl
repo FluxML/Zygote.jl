@@ -209,7 +209,7 @@ end
 
 @generated pair(::Val{k}, v) where k = :($k = v,)
 
-@adjoint function literal_getproperty(x, ::Val{f}) where f
+@adjoint function literal_getproperty(x, ::Val{f}, getproperty=getproperty) where f
   val = getproperty(x, f)
   function back(Δ)
     accum_param(__context__, val, Δ) === nothing && return
@@ -228,7 +228,7 @@ _pullback(cx::AContext, ::typeof(getproperty), x, f::Symbol) =
   _pullback(cx, literal_getproperty, x, Val(f))
 
 _pullback(cx::AContext, ::typeof(getfield), x, f::Symbol) =
-  _pullback(cx, literal_getproperty, x, Val(f))
+  _pullback(cx, literal_getproperty, x, Val(f), getfield)
 
 _pullback(cx::AContext, ::typeof(literal_getindex), x::NamedTuple, ::Val{f}) where f =
   _pullback(cx, literal_getproperty, x, Val(f))
