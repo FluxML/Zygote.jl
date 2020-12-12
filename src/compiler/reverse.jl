@@ -26,15 +26,21 @@ end
 unwrapquote(x) = x
 unwrapquote(x::QuoteNode) = x.value
 
-is_literal_getproperty(ex) =
-  (iscall(ex, Base, :getproperty) || iscall(ex, Core, :getfield) || iscall(ex, Base, :getfield)) &&
-  ex.args[3] isa Union{QuoteNode,Integer}
+is_literal_getproperty(ex) = iscall(ex, Base, :getproperty) && ex.args[3] isa Union{QuoteNode,Integer}
 
 function instrument_getproperty!(ir, v, ex)
   is_literal_getproperty(ex) ?
-    iscall(ex, Base, :getproperty) ?
-      (ir[v] = xcall(Zygote, :literal_getproperty, ex.args[2], Val(unwrapquote(ex.args[3])))) :
-      (ir[v] = xcall(Zygote, :literal_getproperty, ex.args[2], Val(unwrapquote(ex.args[3])), ex.args[1])) :
+    (ir[v] = xcall(Zygote, :literal_getproperty, ex.args[2], Val(unwrapquote(ex.args[3])))) :
+    ex
+end
+
+is_literal_getfield(ex) =
+  (iscall(ex, Core, :getfield) || iscall(ex, Base, :getfield)) &&
+  ex.args[3] isa Union{QuoteNode,Integer}
+
+function instrument_getfield!(ir, v, ex)
+  is_literal_getfield(ex) ?
+    (ir[v] = xcall(Zygote, :literal_getfield, ex.args[2], Val(unwrapquote(ex.args[3])))) :
     ex
 end
 
@@ -59,6 +65,7 @@ end
 
 function instrument_literals!(ir, v, ex)
   ex = instrument_getproperty!(ir, v, ex)
+  ex = instrument_getfield!(ir, v, ex)
   ex = instrument_getindex!(ir, v, ex)
   ex = instrument_iterate!(ir, v, ex)
 end
