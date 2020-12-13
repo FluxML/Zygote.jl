@@ -133,4 +133,6 @@ Check whether the current function call is happening while taking the derivative
     (nothing,)
 """
 isderiving() = false
+isderiving(x) = false
 @adjoint isderiving() = true, _ -> nothing
+@adjoint isderiving(x) = true, x -> (nothing,)
