@@ -27,7 +27,7 @@ end
 @testset "isderiving" begin
 
   function f(x)
-    if isderiving(x)
+    if Zygote.isderiving(x)
       x^2
     else
       2x^2
@@ -48,8 +48,8 @@ end
   end
 
   function Tester(p)
-      @show isderiving(p)
-      cpu_offload = isderiving(p) ? 0.0 : 0.2
+      @show Zygote.isderiving(p)
+      cpu_offload = Zygote.isderiving(p) ? 0.0 : 0.2
       Tester(cpu_offload)
   end
 
