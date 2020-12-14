@@ -64,18 +64,14 @@ end
 
 using ..Zygote: literal_getproperty, literal_getfield, literal_getindex
 
-_pushforward(dargs, ::typeof(getproperty), x, f) =
-  _pushforward(dargs, literal_getproperty, x, Val(f))
+_pushforward(dargs, ::typeof(literal_getproperty), x::NamedTuple, ::Val{f}) where {f} =
+  _pushforward(dargs, literal_getfield, x, Val(f))
+
+_pushforward(dargs, ::typeof(getproperty), x::NamedTuple, f) =
+  _pushforward(dargs, literal_getfield, x, Val(f))
 
 _pushforward(dargs, ::typeof(getfield), x, f) =
   _pushforward(dargs, literal_getfield, x, Val(f))
-
-@tangent function literal_getproperty(t, ::Val{i}) where i
-  y = getproperty(t, i)
-  forw(ṫ, _) = getproperty(ṫ, i)
-  forw(ṫ::Nothing, _) = zerolike(y)
-  return y, forw
-end
 
 @tangent function literal_getfield(t, ::Val{i}) where i
   y = getfield(t, i)

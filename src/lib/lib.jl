@@ -207,30 +207,28 @@ end
 
 @generated nt_nothing(x) = Expr(:tuple, [:($f=nothing) for f in fieldnames(x)]...)
 
-@generated pair(::Val{k}, v, x=nothing) where k = :($k = v,)
-@generated pair(::Val{k}, v, x::NamedTuple{keys}) where {k,keys} = k isa Int ? :($(getfield(keys, k)) = v,) : :($k = v,)
+@generated pair(::Val{k}, v, _=nothing) where k = :($k = v,)
+@generated pair(::Val{k}, v, ::NamedTuple{keys}) where {k,keys} = k isa Int ? :($(getfield(keys, k)) = v,) : :($k = v,)
 
-for getproperty in [:getproperty, :getfield]
-  @eval @adjoint function $(Symbol(:literal_, getproperty))(x, ::Val{f}) where f
-    val = $getproperty(x, f)
-    function back(Δ)
-      accum_param(__context__, val, Δ) === nothing && return
-      if isimmutable(x)
-        ((; nt_nothing(x)..., pair(Val(f), Δ, x)...), nothing)
-      else
-        dx = grad_mut(__context__, x)
-        dx[] = (; dx[]..., pair(Val(f), accum(getfield(dx[], f), Δ))...)
-        return (dx,nothing)
-      end
+@adjoint function literal_getfield(x, ::Val{f}) where f
+  val = getfield(x, f)
+  function back(Δ)
+    accum_param(__context__, val, Δ) === nothing && return
+    if isimmutable(x)
+      ((; nt_nothing(x)..., pair(Val(f), Δ, x)...), nothing)
+    else
+      dx = grad_mut(__context__, x)
+      dx[] = (; dx[]..., pair(Val(f), accum(getfield(dx[], f), Δ))...)
+      return (dx,nothing)
     end
-    unwrap(val), back
   end
+  unwrap(val), back
 end
 
-_pullback(cx::AContext, ::typeof(getproperty), x, f::Symbol) =
-  _pullback(cx, literal_getproperty, x, Val(f))
-
 _pullback(cx::AContext, ::typeof(getfield), x, f::Symbol) =
+  _pullback(cx, literal_getfield, x, Val(f))
+
+_pullback(cx::AContext, ::typeof(literal_getproperty), x::NamedTuple, ::Val{f}) where f =
   _pullback(cx, literal_getfield, x, Val(f))
 
 _pullback(cx::AContext, ::typeof(literal_getindex), x::NamedTuple, ::Val{f}) where f =
