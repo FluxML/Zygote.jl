@@ -354,12 +354,12 @@ for mapfunc in [map,pmap,vmap]
 end
 
 @testset "Alternative Pmap Dispatch" begin
-    wp=CachingPool(workers())
-    @test gradtest(xs -> sum(pmap(x -> x^2, wp, xs; batch_size = 1)), rand(2,3))
-    @test gradtest((xss...) -> sum(pmap((xs...) -> sqrt(sum(xs.^2)), wp, xss...; batch_size = 1)), [rand(5) for _ in 1:6]...)
+    cache_and_map(f,xs) = pmap(f, CachingPool(workers()), xs; batch_size = 1)
+    @test gradtest(xs -> sum(cache_and_map(x -> x^2, xs)), rand(2,3))
+    @test gradtest((xss...) -> sum(cache_and_map((xs...) -> sqrt(sum(xs.^2)), xss...)), [rand(5) for _ in 1:6]...)
     function foo(y)
       bar = (x) -> x*y
-      sum(mapfunc(bar, 1:5))
+      sum(cache_and_map(bar, 1:5))
     end
     @test gradtest(foo, 3)
     @test gradient(v -> sum([x for x in v]), [1.1,2.2,3.3]) == ([1, 1, 1],)
