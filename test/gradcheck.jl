@@ -275,7 +275,7 @@ for mapfunc in [map,pmap]
 end
 
 @testset "Alternative Pmap Dispatch" begin
-    cache_and_map(f,xs) = pmap(f, CachingPool(workers()), xs; batch_size = 1)
+    cache_and_map(f,xs...) = pmap(f, CachingPool(workers()), xs...; batch_size = 1)
     @test gradtest(xs -> sum(cache_and_map(x -> x^2, xs)), rand(2,3))
     @test gradtest((xss...) -> sum(cache_and_map((xs...) -> sqrt(sum(xs.^2)), xss...)), [rand(5) for _ in 1:6]...)
     function foo(y)
