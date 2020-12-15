@@ -4,7 +4,7 @@ using Zygote: gradient
 using NNlib: conv, ∇conv_data, depthwiseconv, batched_mul
 using Base.Broadcast: broadcast_shape
 using LoopVectorization: vmap
-using Distributed: pmap
+using Distributed: pmap, CachingPool, workers
 import FiniteDifferences
 
 function ngradient(f, xs::AbstractArray...)
