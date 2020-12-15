@@ -197,7 +197,7 @@ for (mapfunc,∇mapfunc) in [(:map,:∇map),(:vmap,:∇vmap)]
   end
 end
 
-@adjoint function pmap(f, wp::Distributed.CachingPool, args...; kwargs...)
+@adjoint function pmap(f, wp::CachingPool, args...; kwargs...)
   ys_backs = pmap((x...) -> pullback(f, x...), wp, args...; kwargs...)
   ys, backs = unzip(ys_backs)
   ys, function (Δ)
