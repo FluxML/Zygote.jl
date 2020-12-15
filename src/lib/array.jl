@@ -295,7 +295,7 @@ end
 
 @adjoint real(x::AbstractArray) = real(x), r̄ -> (real(r̄),)
 @adjoint conj(x::AbstractArray) = conj(x), r̄ -> (conj(r̄),)
-@adjoint imag(x::AbstractArray) = imag(x), ī -> (complex.(0, real.(ī)),)
+@adjoint imag(x::AbstractArray) = imag(x), ı̄ -> (complex.(0, real.(ı̄)),)
 
 @adjoint function mean(xs::AbstractArray; dims = :)
   return mean(xs, dims=dims), Δ -> (_backmean(xs,Δ,dims),)
@@ -404,17 +404,17 @@ end
   B::AbstractVecOrMat,
 )
   Y = A \ B
-  return Y, function(Ȳ)
-    B̄ = A' \ Ȳ
+  return Y, function(Ȳ)
+    B̄ = A' \ Ȳ
     return (-B̄ * Y', B̄)
   end
 end
 
 @adjoint function /(A::AbstractMatrix, B::Union{Diagonal, AbstractTriangular})
   Y = A / B
-  return Y, function(Ȳ)
-    Ā = Ȳ / B'
-    return (Ā, -Y' * Ā)
+  return Y, function(Ȳ)
+    Ā = Ȳ / B'
+    return (Ā, -Y' * Ā)
   end
 end
 
@@ -444,9 +444,9 @@ end
 # This is basically a hack while we don't have a working `ldiv!`.
 @adjoint function \(A::Cholesky, B::AbstractVecOrMat)
   Y, back = Zygote.pullback((U, B)->U \ (U' \ B), A.U, B)
-  return Y, function(Ȳ)
-    Ā_factors, B̄ = back(Ȳ)
-    return ((uplo=nothing, status=nothing, factors=Ā_factors), B̄)
+  return Y, function(Ȳ)
+    Ā_factors, B̄ = back(Ȳ)
+    return ((uplo=nothing, status=nothing, factors=Ā_factors), B̄)
   end
 end
 
@@ -474,11 +474,11 @@ end
 _hermitian_back(Δ::Diagonal, uplo) = real.(Δ)
 function _hermitian_back(Δ::LinearAlgebra.AbstractTriangular, uplo)
   isreal(Δ) && return _symmetric_back(Δ, uplo)
-  ŪL̄ = Δ .- Diagonal(_extract_imag(diag(Δ)))
+  ŪL̄ = Δ .- Diagonal(_extract_imag(diag(Δ)))
   if istriu(Δ)
-    return collect(uplo == 'U' ? ŪL̄ : ŪL̄')
+    return collect(uplo == 'U' ? ŪL̄ : ŪL̄')
   else
-    return collect(uplo == 'U' ? ŪL̄' : ŪL̄)
+    return collect(uplo == 'U' ? ŪL̄' : ŪL̄)
   end
 end
 
@@ -512,9 +512,9 @@ end
   C = cholesky(Σ, check = check)
   return C, function(Δ::NamedTuple)
     issuccess(C) || throw(PosDefException(C.info))
-    U, Ū = C.U, Δ.factors
+    U, Ū = C.U, Δ.factors
     Σ̄ = similar(U.data)
-    Σ̄ = mul!(Σ̄, Ū, U')
+    Σ̄ = mul!(Σ̄, Ū, U')
     Σ̄ = copytri!(Σ̄, 'U')
     Σ̄ = ldiv!(U, Σ̄)
     Σ̄ = BLAS.trsm!('R', 'U', 'T', 'N', one(eltype(Σ)), U.data, Σ̄)
@@ -527,8 +527,8 @@ end
   X = lyap(A, C)
   return X, function (X̄)
     C̄ = lyap(collect(A'), X̄)
-    Ā = C̄*X' + C̄'*X
-    return (Ā, C̄)
+    Ā = C̄*X' + C̄'*X
+    return (Ā, C̄)
   end
 end
 
@@ -561,21 +561,21 @@ end
   X = _pairdiffquotmat(exp, n, w, ew, ew, ew)
   V = E.vectors
   VF = factorize(V)
-  Āc = (V * ((VF \ F̄' * V) .* X) / VF)'
-  Ā = isreal(A) && isreal(F̄) ? real(Āc) : Āc
-  return (Ā,)
+  Āc = (V * ((VF \ F̄' * V) .* X) / VF)'
+  Ā = isreal(A) && isreal(F̄) ? real(Āc) : Āc
+  return (Ā,)
 end
 
 @adjoint function LinearAlgebra.eigen(A::LinearAlgebra.RealHermSymComplexHerm)
   dU = eigen(A)
   return dU, function (Δ)
     d, U = dU
-    d̄, Ū = Δ
-    if Ū === nothing
+    d̄, Ū = Δ
+    if Ū === nothing
       P = Diagonal(d̄)
     else
       F = inv.(d' .- d)
-      P = F .* (U' * Ū)
+      P = F .* (U' * Ū)
       if d̄ === nothing
         P[diagind(P)] .= 0
       else
@@ -657,10 +657,10 @@ _apply_series_func(f, A, args...) = f(A, args...)
   Ω = _process_series_matrix(f, fA, A, fλ)
   return Ω, function (f̄A)
     f̄Λ = U' * f̄A * U
-    ārgs = hasargs ? argsback(diag(f̄Λ)) : ()
+    ārgs = hasargs ? argsback(diag(f̄Λ)) : ()
     P = _pairdiffquotmat(f, n, λ, conj(fλ), dfthunk(), d²fthunk())
-    Ā = U * (P .* f̄Λ) * U'
-    return (nothing, Ā, ārgs...)
+    Ā = U * (P .* f̄Λ) * U'
+    return (nothing, Ā, ārgs...)
   end
 end
 
@@ -676,8 +676,8 @@ _hermsympow(A::Hermitian, p::Integer) = A^p
   Ω = Hermitian(_realifydiag!(B))
   return Ω, function (Ω̄)
     B̄ = _hermitian_back(Ω̄, 'U')
-    Ā = back(B̄)[1]
-    return (Ā, nothing)
+    Ā = back(B̄)[1]
+    return (Ā, nothing)
   end
 end
 
@@ -723,8 +723,8 @@ end
     s̄inΛ, c̄osΛ = U' * s̄inA * U, U' * c̄osA * U
     PS = _pairdiffquotmat(sin, n, λ, sinλ, cosλ, -sinλ)
     PC = _pairdiffquotmat(cos, n, λ, cosλ, -sinλ, -cosλ)
-    Ā = U * (PS .* s̄inΛ .+ PC .* c̄osΛ) * U'
-    return (Ā,)
+    Ā = U * (PS .* s̄inΛ .+ PC .* c̄osΛ) * U'
+    return (Ā,)
   end
 end
 
