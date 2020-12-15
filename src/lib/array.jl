@@ -197,6 +197,15 @@ for (mapfunc,∇mapfunc) in [(:map,:∇map),(:vmap,:∇vmap)]
   end
 end
 
+@adjoint function pmap(f, args...; kwargs...)
+  ys_backs = pmap((x...) -> pullback(f, x...), args...; kwargs...)
+  ys, backs = unzip(ys_backs)
+  ys, function (Δ)
+    res = pmap((df,d) -> df(d), backs, Δ; kwargs...)
+    (nothing, nothing, unzip(res)...)
+  end
+end
+
 @adjoint function pmap(f, wp::CachingPool, args...; kwargs...)
   ys_backs = pmap((x...) -> pullback(f, x...), wp, args...; kwargs...)
   ys, backs = unzip(ys_backs)
