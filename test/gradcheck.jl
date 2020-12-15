@@ -2,7 +2,7 @@ using Zygote, Test, Random, LinearAlgebra, Statistics, FillArrays,
     AbstractFFTs, FFTW, Distances
 using Zygote: gradient
 using Base.Broadcast: broadcast_shape
-using Distributed: pmap
+using Distributed: pmap, CachingPool, workers
 import FiniteDifferences
 
 function ngradient(f, xs::AbstractArray...)
