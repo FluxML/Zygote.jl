@@ -1,5 +1,4 @@
 using Zygote, Test
-using NNlib: relu
 
 D(f, x) = pushforward(f, x)(1)
 

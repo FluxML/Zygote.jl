@@ -14,7 +14,6 @@
 
 using Base.Broadcast
 using Base.Broadcast: Broadcasted, AbstractArrayStyle, broadcasted, materialize
-using NNlib
 
 # There's a saying that debugging code is about twice as hard as writing it in
 # the first place. So if you're as clever as you can be when writing code, how
@@ -89,11 +88,6 @@ end
 
 @adjoint broadcasted(::typeof(identity), x::Numeric) = x, Δ -> (nothing, Δ)
 
-@adjoint function broadcasted(::typeof(σ), x::Numeric)
-  y = σ.(x)
-  y, ȳ -> (nothing, ȳ .* conj.(y .* (1 .- y)))
-end
-
 @adjoint function broadcasted(::typeof(tanh), x::Numeric)
   y = tanh.(x)
   y, ȳ -> (nothing, ȳ .* conj.(1 .- y.^2))
@@ -107,6 +101,38 @@ end
 
 @adjoint broadcasted(::typeof(imag), x::Numeric) =
   imag.(x), z̄ -> (nothing, im .* real.(z̄))
+
+@adjoint function broadcasted(::typeof(+), a::AbstractArray{<:Number}, b::Bool)
+  y = b === false ? a : a .+ b
+  y, Δ -> (nothing, Δ, nothing)
+end
+@adjoint function broadcasted(::typeof(+), b::Bool, a::AbstractArray{<:Number})
+  y = b === false ? a : b .+ a
+  y, Δ -> (nothing, nothing, Δ)
+end
+
+@adjoint function broadcasted(::typeof(-), a::AbstractArray{<:Number}, b::Bool)
+  y = b === false ? a : a .- b
+  y, Δ -> (nothing, Δ, nothing)
+end
+@adjoint function broadcasted(::typeof(-), b::Bool, a::AbstractArray{<:Number})
+  b .- a, Δ -> (nothing, nothing, .-Δ)
+end
+
+@adjoint function broadcasted(::typeof(*), a::AbstractArray{<:Number}, b::Bool)
+  if b === false
+    zero(a), Δ -> (nothing, zero(Δ), nothing)
+  else
+    a, Δ -> (nothing, Δ, nothing)
+  end
+end
+@adjoint function broadcasted(::typeof(*), b::Bool, a::AbstractArray{<:Number})
+  if b === false
+    zero(a), Δ -> (nothing, nothing, zero(Δ))
+  else
+    a, Δ -> (nothing, nothing, Δ)
+  end
+end
 
 # General Fallback
 # ================
@@ -195,7 +221,7 @@ end
 
 @init @require CUDA="052768ef-5323-5732-b1bb-66c8b64840ba" begin
   const CuArrayStyle = CUDA.CuArrayStyle
-  
+
   @adjoint function broadcasted(::CuArrayStyle, f, args...)
     y, back = broadcast_forward(CUDA.cufunc(f), args...)
     y, ȳ -> (nothing, nothing, back(ȳ)...)

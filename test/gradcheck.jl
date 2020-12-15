@@ -1,9 +1,7 @@
-using Zygote, NNlib, Test, Random, LinearAlgebra, Statistics, FillArrays,
+using Zygote, Test, Random, LinearAlgebra, Statistics, FillArrays,
     AbstractFFTs, FFTW, Distances
 using Zygote: gradient
-using NNlib: conv, ∇conv_data, depthwiseconv, batched_mul
 using Base.Broadcast: broadcast_shape
-using LoopVectorization: vmap
 using Distributed: pmap
 import FiniteDifferences
 
@@ -92,36 +90,9 @@ end
 @test gradtest((x, W, b) -> identity.(W*x .+ b), 5, (2,5), 2)
 @test gradtest((x, W, b) -> identity.(W*x .+ b), (5,3), (2,5), 2)
 
-@test gradtest((x, W, b) -> relu.(W*x .+ b), 5, (2,5), 2)
-@test gradtest((x, W, b) -> relu.(W*x .+ b), (5,3), (2,5), 2)
-@test gradtest((x, W, b) -> selu.(W*x .+ b), 5, (2,5), 2)
-@test gradtest((x, W, b) -> selu.(W*x .+ b), (5,3), (2,5), 2)
-@test gradtest((x, W, b) -> elu.(W*x .+ b, 2), 5, (2,5), 2)
-@test gradtest((x, W, b) -> elu.(W*x .+ b, 2), (5,3), (2,5), 2)
-
-# tests for https://github.com/FluxML/Zygote.jl/issues/758
-@test gradient(xs -> sum(selu.(xs)), [1_000, 10_000]) == ([1.0507009873554805, 1.0507009873554805],)
-@test gradient(x -> selu(x), 1_000) == (1.0507009873554805,)
-@test gradient(xs -> sum(elu.(xs, 2)), [1_000, 10_000]) == ([1., 1.],)
-@test gradient(x -> elu(x, 2), 1_000) == (1.,)
-@test gradient(x -> elu(x, 2), -1) == (2*exp(-1),)
-@test gradcheck(x->sum(selu.(x)),[100., 1_000.])
-@test gradcheck(x->sum(elu.(x, 3.5)),[100., 1_000.])
-@test gradcheck(x->sum(elu.(x, 3.5)),[1_000., 10_000.]) # for elu the tests are passing but for selu not, interesting
-# numerical instability even for the linear part of such function, see:
-# julia> ngradient(x->sum(selu.(x)),[1_000., 10_000.])
-# ([1.0506591796875, 1.0506591796875],)
-# julia> gradient(x->sum(selu.(x)),[1_000., 10_000.])
-# ([1.0507009873554805, 1.0507009873554805],)
-@test_broken gradcheck(x->sum(selu.(x)),[1_000., 10_000.])
 
 @test gradtest((x, W, b) -> tanh.(W*x .+ b), 5, (2,5), 2)
 @test gradtest((x, W, b) -> tanh.(W*x .+ b), (5,3), (2,5), 2)
-
-@test gradtest((x, W, b) -> σ.(W*x .+ b), 5, (2,5), 2)
-@test gradtest((x, W, b) -> σ.(W*x .+ b), (5,3), (2,5), 2)
-@test gradtest((x, W, b) -> logσ.(W*x .+ b), 5, (2,5), 2)
-@test gradtest((x, W, b) -> logσ.(W*x .+ b), (5,3), (2,5), 2)
 
 @test gradtest((w, x) -> w'*x, randn(10, 2), randn(10))
 @test gradtest((w, x) -> Adjoint(w)*x, randn(10, 2), randn(10))
@@ -162,13 +133,6 @@ end
   @test gradtest(x -> cumsum(x, dims=3), (5,))  # trivial
   @test gradtest(x -> cumsum(x, dims=3), (3,4)) # trivial
 end
-
-@test gradtest(x -> softmax(x).*(1:3), 3)
-@test gradtest(x -> softmax(x).*(1:3), (3,5))
-@test gradtest(x -> softmax(x, dims=2).*(1:3), (3,5))
-@test gradtest(x -> logsoftmax(x).*(1:3), 3)
-@test gradtest(x -> logsoftmax(x).*(1:3), (3,5))
-@test gradtest(x -> logsoftmax(x, dims=2).*(1:3), (3,5))
 
 @test gradtest(x -> x', rand(5))
 
@@ -235,49 +199,6 @@ end
   @test gradient(xs -> sum(inv, [x^2 for x in xs]), ones(2)) == ([-2, -2],)
 end
 
-@testset "conv: spatial_rank=$spatial_rank" for spatial_rank in (1, 2, 3)
-  x = rand(repeat([5], spatial_rank)..., 3, 2)
-  w = rand(repeat([3], spatial_rank)..., 3, 3)
-  cdims = DenseConvDims(x, w)
-  @test gradtest((x, w) -> conv(x, w, cdims), x, w)
-  @test gradtest((x, w) -> sum(conv(x, w, cdims)), x, w)  # https://github.com/FluxML/Flux.jl/issues/1055
-
-  y = conv(x, w, cdims)
-  @test gradtest((y, w) -> ∇conv_data(y, w, cdims), y, w)
-  if spatial_rank == 3
-    @test_broken gradtest((y, w) -> sum(∇conv_data(y, w, cdims)), y, w)
-  else
-    @test gradtest((y, w) -> sum(∇conv_data(y, w, cdims)), y, w)
-  end
-
-  dcdims = DepthwiseConvDims(x, w)
-  @test gradtest((x, w) -> depthwiseconv(x, w, dcdims), x, w)
-
-  y = depthwiseconv(x, w, dcdims)
-  @test gradtest((y, w) -> ∇depthwiseconv_data(y, w, dcdims), y, w)
-  if spatial_rank == 3
-    @test_broken gradtest((y, w) -> sum(∇depthwiseconv_data(y, w, dcdims)), y, w)
-  else
-    @test gradtest((y, w) -> sum(∇depthwiseconv_data(y, w, dcdims)), y, w)
-  end
-end
-
-@testset "pooling: spatial_rank=$spatial_rank" for spatial_rank in (1, 2)
-  x = rand(repeat([10], spatial_rank)..., 3, 2)
-  pdims = PoolDims(x, 2)
-  @test gradtest(x -> maxpool(x, pdims), x)
-  @test gradtest(x -> meanpool(x, pdims), x)
-  @test gradtest(x -> sum(maxpool(x, pdims)), x)
-  @test gradtest(x -> sum(meanpool(x, pdims)), x)
-
-  #https://github.com/FluxML/NNlib.jl/issues/188
-  k = ntuple(_ -> 2, spatial_rank)  # Kernel size of pool in ntuple format
-  @test gradtest(x -> maxpool(x, k), x)
-  @test gradtest(x -> meanpool(x, k), x)
-  @test gradtest(x -> sum(maxpool(x, k)), x)
-  @test gradtest(x -> sum(meanpool(x, k)), x)
-end
-
 @test gradtest(x -> reverse(x), rand(17))
 @test gradtest(x -> reverse(x, 8), rand(17))
 @test gradtest(x -> reverse(x, 8, 13), rand(17))
@@ -333,7 +254,7 @@ end
 @test gradtest(kron, rand(5,1), rand(3,1), rand(8,1))
 @test gradtest(kron, rand(5,2), rand(3,2), rand(8,2))
 
-for mapfunc in [map,pmap,vmap]
+for mapfunc in [map,pmap]
   @testset "$mapfunc" begin
     @test gradtest(xs -> sum(mapfunc(x -> x^2, xs)), rand(2,3))
     @test gradtest((xss...) -> sum(mapfunc((xs...) -> sqrt(sum(xs.^2)), xss...)), [rand(5) for _ in 1:6]...)
@@ -500,8 +421,8 @@ end
     y2, back2 = Zygote.pullback(x->f.(x), A)
     @test y == y2
     @testset "back(::Array{$BT})" for BT in Ts
-      ȳ = randn(BT, N, N)
-      @test back(ȳ)[1] == back2(ȳ)[1]
+      ȳ = randn(BT, N, N)
+      @test back(ȳ)[1] == back2(ȳ)[1]
     end
   end
 end
@@ -534,11 +455,6 @@ end
       y, back = Zygote.pullback(*, randn(rng, M), randn(rng, 1, P))
       @test first(back(randn(rng, M, P))) isa Vector
     end
-  end
-
-  @testset "batched matrix multiplication" begin
-    B = 3
-    @test gradtest(batched_mul, randn(rng, M, P, B), randn(rng, P, Q, B))
   end
 end
 
@@ -844,8 +760,8 @@ end
           0.0    0.0    1.0
           -4.34 -18.31  -0.43]
     _,back = Zygote.pullback(exp,A)
-    Ȳ = rand(3,3)
-    @test isreal(back(Ȳ)[1])
+    Ȳ = rand(3,3)
+    @test isreal(back(Ȳ)[1])
   end
 end
 
@@ -1655,4 +1571,51 @@ end
   end
 end
 
-@test gradient(x -> norm(x), rand(Float32, 2, 2))[1] isa Matrix{Float32}
+@testset "broadcasted($op, Array, Bool)" for op in (+,-,*)
+  @testset "with $bool and sizes $s" for s in ((4,), (2,3)), bool in (true,false)
+    r = rand(Int8, s) .+ 0.0
+    z = fill(bool, s) .+ 0.0
+
+    @testset "Explicit" begin
+      fun(args...) = pullback((x, y) -> sum(op.(x,y)), args...)[1]
+      gfun(args...) = gradient((x, y) -> sum(op.(x,y)), args...)
+
+      @test fun(r, z) == fun(r, bool)
+      @test gfun(r, bool) == (gfun(r, z)[1], nothing)
+
+      @test fun(z, r) == fun(bool, r)
+      @test gfun(bool, r) == (nothing, gfun(z, r)[2])
+    end
+
+    @testset "Implicit" begin
+      gfun(args...) = gradient(() -> sum(op.(args...)), Params(filter(a->a isa Array, collect(args))  ))
+
+      g = gfun(r, z)
+      gres = gfun(r, bool)
+      @test gres[r] == g[r]
+
+      g = gfun(z, r)
+      gres = gfun(bool, r)
+      @test gres[r] == g[r]
+    end
+  end
+end
+
+@testset "norm" begin
+    # rrule for norm is defined in ChainRules. These tests just check various norm-related
+    # issues are resolved
+
+    # check that type is not unnecessarily promoted
+    # https://github.com/FluxML/Zygote.jl/issues/663
+    @test gradient(norm, randn(Float32, 2, 2)) isa Tuple{Matrix{Float32}}
+    @test gradient(norm, randn(Float32, 2, 2), 3) isa Tuple{Matrix{Float32},Float32}
+    @test gradient(norm, randn(Float32, 2, 2), 3f0) isa Tuple{Matrix{Float32},Float32}
+    @test gradient(norm, randn(ComplexF32, 2, 2), 3.5f0) isa Tuple{Matrix{ComplexF32},Float32}
+
+    # just check that these do not error
+    # https://github.com/FluxML/Zygote.jl/issues/331
+    gradient(x->norm(x*[1, 1]), 1.23)
+    gradient(x->norm(x*[1 1]), 1.23)
+    gradient(x->norm(x*[1im, 1]), 1.23)
+    gradient(x->norm(x*[1im 1]), 1.23)
+end
