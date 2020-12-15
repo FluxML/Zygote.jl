@@ -13,7 +13,6 @@ using MacroTools: @forward
 
 using LoopVectorization: vmap
 import Distributed: pmap, CachingPool, workers
-
 export Params, gradient, pullback, pushforward, @code_adjoint
 
 include("tools/idset.jl")
