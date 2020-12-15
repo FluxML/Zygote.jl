@@ -1,7 +1,7 @@
 using Random, FillArrays, AbstractFFTs
 using FillArrays: AbstractFill, getindex_value
 using Base.Broadcast: broadcasted, broadcast_shape
-using Distributed: pmap
+using Distributed: pmap, CachingPool, workers
 
 @adjoint (::Type{T})(::UndefInitializer, args...) where T<:Array = T(undef, args...), Δ -> nothing
 
@@ -175,7 +175,7 @@ end
 _tryreverse(m, x) = x
 _tryreverse(m::typeof(map), x::Union{AbstractVector, Tuple}) = reverse(x)
 
-for (mapfunc,∇mapfunc) in [(:map,:∇map),(:pmap,:∇pmap)]
+for (mapfunc,∇mapfunc) in [(:map,:∇map)]
   @eval function $∇mapfunc(cx, f, args...)
     ys_and_backs = $mapfunc((args...) -> _pullback(cx, f, args...), args...)
     if isempty(ys_and_backs)
@@ -196,6 +196,17 @@ for (mapfunc,∇mapfunc) in [(:map,:∇map),(:pmap,:∇pmap)]
     $∇mapfunc(__context__, f, args...)
   end
 end
+
+@adjoint function pmap(f, wp::Distributed.CachingPool, args...; kwargs...)
+  ys_backs = pmap((x...) -> pullback(f, x...), wp, args...; kwargs...)
+  ys, backs = unzip(ys_backs)
+  ys, function (Δ)
+    res = pmap((df,d) -> df(d), wp, backs, Δ; kwargs...)
+    (nothing, nothing, unzip(res)...)
+  end
+end
+@nograd Distributed.CachingPool
+@nograd Distributed.workers
 
 function _pullback(cx::AContext, ::typeof(collect), g::Base.Generator)
   y, back = ∇map(cx, g.f, g.iter)
