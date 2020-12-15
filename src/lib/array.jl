@@ -175,7 +175,7 @@ end
 _tryreverse(m, x) = x
 _tryreverse(m::typeof(map), x::Union{AbstractVector, Tuple}) = reverse(x)
 
-for (mapfunc,∇mapfunc) in [(:map,:∇map),(:pmap,:∇pmap),(:vmap,:∇vmap)]
+for (mapfunc,∇mapfunc) in [(:map,:∇map),(:vmap,:∇vmap)]
   @eval function $∇mapfunc(cx, f, args...)
     ys_and_backs = $mapfunc((args...) -> _pullback(cx, f, args...), args...)
     if isempty(ys_and_backs)
@@ -197,25 +197,17 @@ for (mapfunc,∇mapfunc) in [(:map,:∇map),(:pmap,:∇pmap),(:vmap,:∇vmap)]
   end
 end
 
-function ∇pmap(cx, f, wp, args...; kwargs...)
-  ys_and_backs = pmap((args...) -> _pullback(cx, f, args...), wp, args...; kwargs...)
-  if isempty(ys_and_backs)
-    ys_and_backs, _ -> nothing
-  else
-    ys, backs = unzip(ys_and_backs)
-    ys, function (Δ)
-      # Apply pullbacks in reverse order. Needed for correctness if `f` is stateful.
-      Δf_and_args_zipped = pmap((f, δ) -> f(δ), wp, _tryreverse(pmap, backs, Δ)...)
-      Δf_and_args = unzip(_tryreverse(pmap, Δf_and_args_zipped))
-      Δf = reduce(accum, Δf_and_args[1])
-      (Δf, nothing, Δf_and_args[2:end]...)
-    end
+Zygote.@adjoint function pmap(f, wp::Distributed.CachingPool, args...; kwargs...)
+  ys_backs = pmap((x...) -> Zygote.pullback(f, x...), wp, args...; kwargs...)
+  ys, backs = Zygote.unzip(ys_backs)
+  ys, function (Δ)
+    res = pmap((df,d) -> df(d), wp, backs, Δ; kwargs...)
+    (nothing, nothing, Zygote.unzip(res)...)
   end
 end
 
-@adjoint function Distributed.pmap(f, wp::Distributed.CachingPool, args::Union{AbstractArray,Tuple}...; kwargs...)
-  ∇pmap(__context__, f, wp, args...; kwargs...)
-end
+Zygote.@nograd CachingPool
+Zygote.@nograd workers
 
 function _pullback(cx::AContext, ::typeof(collect), g::Base.Generator)
   y, back = ∇map(cx, g.f, g.iter)
