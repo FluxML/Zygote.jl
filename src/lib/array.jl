@@ -175,7 +175,7 @@ end
 _tryreverse(m, x) = x
 _tryreverse(m::typeof(map), x::Union{AbstractVector, Tuple}) = reverse(x)
 
-for (mapfunc,∇mapfunc) in [(:map,:∇map),(:vmap,:∇vmap)]
+for (mapfunc,∇mapfunc) in [(:map,:∇map),(:vmap, :∇vmap),(:pmap, :∇pmap)]
   @eval function $∇mapfunc(cx, f, args...)
     ys_and_backs = $mapfunc((args...) -> _pullback(cx, f, args...), args...)
     if isempty(ys_and_backs)
@@ -197,25 +197,20 @@ for (mapfunc,∇mapfunc) in [(:map,:∇map),(:vmap,:∇vmap)]
   end
 end
 
-@adjoint function pmap(f, args...; kwargs...)
-  ys_backs = pmap((x...) -> pullback(f, x...), args...; kwargs...)
-  ys, backs = unzip(ys_backs)
-  ys, function (Δ)
-    res = pmap((df,d) -> df(d), backs, Δ; kwargs...)
-    (nothing, nothing, unzip(res)...)
-  end
-end
-
-@adjoint function pmap(f, wp::CachingPool, args...; kwargs...)
-  ys_backs = pmap((x...) -> pullback(f, x...), wp, args...; kwargs...)
+@adjoint function pmap(f, wp::AbstractWorkerPool, args...; kwargs...)
+  ys_backs = pmap((x...) -> _pullback(__context__, f, x...), wp, args...; kwargs...)
   ys, backs = unzip(ys_backs)
   ys, function (Δ)
     res = pmap((df,d) -> df(d), wp, backs, Δ; kwargs...)
-    (nothing, nothing, unzip(res)...)
+    Δf_and_args = unzip(res)
+    Δf = reduce(accum, Δf_and_args[1])
+    (Δf, nothing, Δf_and_args[2:end]..., nothing, nothing)
   end
 end
 
-@nograd CachingPool
+for t in subtypes(AbstractWorkerPool)
+  @nograd t
+end
 @nograd workers
 
 function _pullback(cx::AContext, ::typeof(collect), g::Base.Generator)
