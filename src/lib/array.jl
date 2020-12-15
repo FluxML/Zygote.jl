@@ -143,7 +143,7 @@ end
 end
 
 @adjoint repeat(x::AbstractVector, m::Integer) =
-   repeat(x, m), ȳ -> (dropdims(sum(reshape(ȳ, length(x), :); dims=2); dims=2), nothing)
+   repeat(x, m), ȳ -> (dropdims(sum(reshape(ȳ, length(x), :); dims=2); dims=2), nothing)
 
 @adjoint function repeat(x::AbstractVecOrMat, m::Integer, n::Integer=1)
    return repeat(x, m, n), function (ȳ)
@@ -295,7 +295,7 @@ end
 
 @adjoint real(x::AbstractArray) = real(x), r̄ -> (real(r̄),)
 @adjoint conj(x::AbstractArray) = conj(x), r̄ -> (conj(r̄),)
-@adjoint imag(x::AbstractArray) = imag(x), ı̄ -> (complex.(0, real.(ı̄)),)
+@adjoint imag(x::AbstractArray) = imag(x), ī -> (complex.(0, real.(ī)),)
 
 @adjoint function mean(xs::AbstractArray; dims = :)
   return mean(xs, dims=dims), Δ -> (_backmean(xs,Δ,dims),)
@@ -562,7 +562,7 @@ end
   V = E.vectors
   VF = factorize(V)
   Āc = (V * ((VF \ F̄' * V) .* X) / VF)'
-  Ā = isreal(A) && isreal(F̄) ? real(Āc) : Āc
+  Ā = isreal(A) && isreal(F̄) ? real(Āc) : Āc
   return (Ā,)
 end
 
