@@ -1,7 +1,7 @@
 using Random, FillArrays, AbstractFFTs
 using FillArrays: AbstractFill, getindex_value
 using Base.Broadcast: broadcasted, broadcast_shape
-using Distributed: pmap
+using Distributed: pmap, AbstractWorkerPool
 
 @adjoint (::Type{T})(::UndefInitializer, args...) where T<:Array = T(undef, args...), Δ -> nothing
 
@@ -196,6 +196,22 @@ for (mapfunc,∇mapfunc) in [(:map,:∇map),(:pmap,:∇pmap)]
     $∇mapfunc(__context__, f, args...)
   end
 end
+
+@adjoint function pmap(f, wp::AbstractWorkerPool, args...; kwargs...)
+  ys_backs = pmap((x...) -> _pullback(__context__, f, x...), wp, args...; kwargs...)
+  ys, backs = unzip(ys_backs)
+  ys, function (Δ)
+    res = pmap((df,d) -> df(d), wp, backs, Δ; kwargs...)
+    Δf_and_args = unzip(res)
+    Δf = reduce(accum, Δf_and_args[1])
+    (Δf, nothing, Δf_and_args[2:end]..., nothing, nothing)
+  end
+end
+
+for t in subtypes(AbstractWorkerPool)
+  @nograd t
+end
+@nograd workers
 
 function _pullback(cx::AContext, ::typeof(collect), g::Base.Generator)
   y, back = ∇map(cx, g.f, g.iter)

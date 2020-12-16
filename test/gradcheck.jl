@@ -2,7 +2,7 @@ using Zygote, Test, Random, LinearAlgebra, Statistics, FillArrays,
     AbstractFFTs, FFTW, Distances
 using Zygote: gradient
 using Base.Broadcast: broadcast_shape
-using Distributed: pmap
+using Distributed: pmap, CachingPool, workers
 import FiniteDifferences
 
 function ngradient(f, xs::AbstractArray...)
@@ -272,6 +272,18 @@ for mapfunc in [map,pmap]
     Δy = randn(3)
     @test first(pb((Δy..., ))) ≈ first(pb(Δy))
   end
+end
+
+@testset "Alternative Pmap Dispatch" begin
+    cache_and_map(f,xs...) = pmap(f, CachingPool(workers()), xs...; batch_size = 1)
+    @test gradtest(xs -> sum(cache_and_map(x -> x^2, xs)), rand(2,3))
+    @test gradtest((xss...) -> sum(cache_and_map((xs...) -> sqrt(sum(xs.^2)), xss...)), [rand(5) for _ in 1:6]...)
+    function foo(y)
+      bar = (x) -> x*y
+      sum(cache_and_map(bar, 1:5))
+    end
+    @test gradtest(foo, 3)
+    @test gradient(v -> sum([x for x in v]), [1.1,2.2,3.3]) == ([1, 1, 1],)
 end
 
 @testset "Stateful Map" begin
