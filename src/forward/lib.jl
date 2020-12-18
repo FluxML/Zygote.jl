@@ -64,9 +64,10 @@ end
 
 using ..Zygote: literal_getproperty, literal_getfield, literal_getindex
 
-_pushforward(dargs, ::typeof(literal_getproperty), x::NamedTuple, ::Val{f}) where {f} =
-  _pushforward(dargs, literal_getfield, x, Val(f))
-
+function _pushforward(dargs, ::typeof(literal_getproperty), x::NamedTuple,
+                      ::Val{property_name}) where {property_name}
+  return _pushforward(dargs, literal_getfield, x, Val(property_name))
+end
 _pushforward(dargs, ::typeof(getproperty), x::NamedTuple, f) =
   _pushforward(dargs, literal_getfield, x, Val(f))
 
