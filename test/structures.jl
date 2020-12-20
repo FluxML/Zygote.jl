@@ -55,3 +55,13 @@ struct A594 x::Float64 end
   @test ∇[1] == [(x = 2.0,); (x = 2.0,)]
   @test ∇[2] == [1 1; 1 1]
 end
+
+@testset "UnionAll Stackoverflow" begin
+  struct M{T,B}
+    a::T
+    b::B
+  end
+
+  m, b = Zygote._pullback(Zygote.Context(), nameof, M)
+  @test b(m) == (nothing, nothing)
+end

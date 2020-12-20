@@ -48,6 +48,10 @@ include("profiler/Profile.jl")
   include("flux.jl")
 end
 
+@init @require Colors="5ae59095-9a9b-59fe-a467-6f913c188581" begin
+  @nograd Colors.ColorTypes._parameter_upper_bound
+end
+
 precompile() = include(joinpath(@__DIR__, "precompile.jl"))
 
 # helps to work around 265-y issues
