@@ -48,13 +48,11 @@ include("profiler/Profile.jl")
   include("flux.jl")
 end
 
-precompile() = include(joinpath(dirname(pathof(@__MODULE__)),
-                                "precompile.jl"))
+precompile() = Requires.@include("precompile.jl")
 
 # helps to work around 265-y issues
 function refresh()
-  include(joinpath(dirname(pathof(@__MODULE__)),
-                   "compiler/interface2.jl"))
+  Requires.@include("compiler/interface2.jl")
   precompile()
   return
 end
