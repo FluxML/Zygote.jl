@@ -124,8 +124,8 @@ end
   @test gradient((x,y) -> prod(map(yi -> yi*x, y)), 1, [1,1]) == (2, [1, 1])
 
   @test gradtest(x -> prod(x, dims = (2, 3)), (3,4,5))
-  @test gradtest(x -> prod(x), (3,4))
-  @test gradient(x -> prod(x), (1,2,3))[1] == (6,3,2)
+  @test gradtest(prod, (3,4))
+  @test gradient(prod, (1,2,3))[1] == (6,3,2)
 
   @test gradtest(x -> cumsum(x, dims=2), (3,4,5))
   @test gradtest(x -> cumsum(x, dims=1), (3,))
@@ -1518,8 +1518,8 @@ end
 end
 
 @testset "fastmath" begin
-  @test gradient(x -> begin @fastmath sin(x) end, 1) == gradient(x -> sin(x), 1)
-  @test gradient(x -> begin @fastmath tanh(x) end, 1) == gradient(x -> tanh(x), 1)
+  @test gradient(x -> begin @fastmath sin(x) end, 1) == gradient(sin, 1)
+  @test gradient(x -> begin @fastmath tanh(x) end, 1) == gradient(tanh, 1)
   @test gradient((x, y) -> begin @fastmath x*y end, 3, 2) == gradient((x, y) -> x*y, 3, 2)
   @test gradient(x -> begin @fastmath real(log(x)) end, 1 + 2im) == gradient(x -> real(log(x)), 1 + 2im)
 end

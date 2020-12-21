@@ -26,8 +26,7 @@ dx = back(4)
 @test y == 6
 @test dx == (8,)
 
-fglobal = x -> 5x
-gglobal = x -> fglobal(x)
+gglobal(x) = 5x
 
 @test gradient(gglobal, 2) == (5,)
 
