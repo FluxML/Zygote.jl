@@ -1,6 +1,3 @@
-using IRTools: varargs!, inlineable!, pis!, slots!
-using IRTools.Inner: argnames!, update!
-
 ignore_sig(T) = all(T -> T <: Type, T.parameters)
 
 function edge!(m::IRTools.Meta, edge::Core.MethodInstance)
