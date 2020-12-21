@@ -3,7 +3,8 @@ module Zygote
 using LinearAlgebra, Statistics
 using LinearAlgebra: copytri!, AbstractTriangular
 
-import ZygoteRules: @adjoint, @adjoint!, AContext, adjoint, _pullback, pullback, literal_getproperty
+import ZygoteRules: @adjoint, @adjoint!, AContext, adjoint, _pullback, pullback,
+  literal_getproperty, literal_getfield
 
 using ChainRules: ChainRules, rrule, unthunk
 using IRTools
@@ -49,6 +50,10 @@ include("profiler/Profile.jl")
 
 @init @require Tracker="9f7883ad-71c0-57eb-9f7f-b5c9e6d3789c" begin
   include("flux.jl")
+end
+
+@init @require Colors="5ae59095-9a9b-59fe-a467-6f913c188581" begin
+  @nograd Colors.ColorTypes._parameter_upper_bound
 end
 
 using InteractiveUtils

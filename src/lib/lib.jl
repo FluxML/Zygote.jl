@@ -140,10 +140,10 @@ function _pullback(cx::AContext, ::typeof(literal_indexed_iterate), xs::Tuple, :
 end
 
 # Needed for iteration lowering
-@adjoint Core.getfield(xs::NTuple{N,Any}, i::Integer) where N =
+@adjoint Core.getfield(xs::NTuple{N,Any}, i::Int) where N =
   (xs[i], Δ -> (ntuple(j -> i == j ? Δ : nothing, Val(N)), nothing))
 
-@adjoint Core.getfield(xs::NamedTuple{K,<:NTuple{N,Any}}, i::Integer) where {K,N} =
+@adjoint Core.getfield(xs::NamedTuple{K,<:NTuple{N,Any}}, i::Int) where {K,N} =
   (xs[i], Δ -> (NamedTuple{K}(ntuple(j -> i == j ? Δ : nothing, Val(N))), nothing))
 
 @adjoint function Base.first(xs::Tuple)
@@ -207,34 +207,44 @@ end
 
 @generated nt_nothing(x) = Expr(:tuple, [:($f=nothing) for f in fieldnames(x)]...)
 
-@generated pair(::Val{k}, v) where k = :($k = v,)
+@generated pair(::Val{k}, v, _=nothing) where k = :($k = v,)
+@generated pair(::Val{k}, v, ::NamedTuple{keys}) where {k,keys} = k isa Int ? :($(getfield(keys, k)) = v,) : :($k = v,)
 
-@adjoint function literal_getproperty(x, ::Val{f}) where f
-  val = getproperty(x, f)
+@adjoint function literal_getfield(x, ::Val{f}) where f
+  val = getfield(x, f)
   function back(Δ)
     accum_param(__context__, val, Δ) === nothing && return
     if isimmutable(x)
-      ((;nt_nothing(x)...,pair(Val(f), Δ)...), nothing)
+      ((; nt_nothing(x)..., pair(Val(f), Δ, x)...), nothing)
     else
       dx = grad_mut(__context__, x)
-      dx[] = (;dx[]...,pair(Val(f),accum(getfield(dx[], f), Δ))...)
+      dx[] = (; dx[]..., pair(Val(f), accum(getfield(dx[], f), Δ))...)
       return (dx,nothing)
     end
   end
   unwrap(val), back
 end
 
-_pullback(cx::AContext, ::typeof(getproperty), x, f::Symbol) =
-  _pullback(cx, literal_getproperty, x, Val(f))
+_pullback(cx::AContext, ::typeof(getfield), x, field_name::Symbol) =
+  _pullback(cx, literal_getfield, x, Val(field_name))
 
-_pullback(cx::AContext, ::typeof(getfield), x, f::Symbol) =
-  _pullback(cx, literal_getproperty, x, Val(f))
+function _pullback(cx::AContext, ::typeof(literal_getproperty), x::NamedTuple,
+                   ::Val{property_name}) where {property_name}
+  return _pullback(cx, literal_getfield, x, Val(property_name))
+end
+function _pullback(cx::AContext, ::typeof(literal_getindex), x::NamedTuple,
+                   ::Val{key}) where {key}
+  return _pullback(cx, literal_getfield, x, Val(key))
+end
 
-_pullback(cx::AContext, ::typeof(literal_getindex), x::NamedTuple, ::Val{f}) where f =
-  _pullback(cx, literal_getproperty, x, Val(f))
-
-_pullback(cx::AContext, ::typeof(literal_getproperty), x::Tuple, ::Val{f}) where f =
-  _pullback(cx, literal_getindex, x, Val(f))
+function _pullback(cx::AContext, ::typeof(literal_getproperty), x::Tuple,
+                   ::Val{index}) where {index}
+  return _pullback(cx, literal_getindex, x, Val(index))
+end
+function _pullback(cx::AContext, ::typeof(literal_getfield), x::Tuple,
+                   ::Val{index}) where {index}
+  return _pullback(cx, literal_getindex, x, Val(index))
+end
 
 grad_mut(x) = Ref{Any}(nt_nothing(x))
 

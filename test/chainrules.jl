@@ -160,8 +160,15 @@ using Zygote, Test, ChainRules
 
         @test (1,) == h(1)
 
-        a3, pb3 = Zygote.pullback(h, 1)
-        @test ((1,),) == pb3(1)
+        if VERSION >= v"1.6-"
+            @test_broken begin
+                a3, pb3 = Zygote.pullback(h, 1)
+                ((1,),) == pb3(1)
+            end
+        else
+            a3, pb3 = Zygote.pullback(h, 1)
+            @test ((1,),) == pb3(1)
+        end
     end
 
     @testset "kwargs" begin

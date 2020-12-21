@@ -136,3 +136,7 @@ end
     end
     return getfield(p, i), pair_getfield
 end
+
+@adjoint Base.nameof(x::UnionAll) = nameof(x), _ -> (nothing,)
+
+@nograd typeintersect
