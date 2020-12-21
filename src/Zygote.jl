@@ -41,6 +41,9 @@ include("lib/range.jl")
 @init @require StatsFuns="4c63d2b9-4356-54db-8cca-17b64c39e42c" include("lib/statsfuns.jl")
 
 # we need to define this late, so that the genfuncs see lib.jl
+# Move using statements out of this file to help with sysimage building
+using IRTools: varargs!, inlineable!, pis!, slots!
+using IRTools.Inner: argnames!, update!
 include("compiler/interface2.jl")
 
 include("profiler/Profile.jl")
@@ -53,11 +56,12 @@ end
   @nograd Colors.ColorTypes._parameter_upper_bound
 end
 
-precompile() = include(joinpath(@__DIR__, "precompile.jl"))
+using InteractiveUtils
+precompile() = Requires.@include("precompile.jl")
 
 # helps to work around 265-y issues
 function refresh()
-  include(joinpath(@__DIR__, "compiler/interface2.jl"))
+  Requires.@include("compiler/interface2.jl")
   precompile()
   return
 end
