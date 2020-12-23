@@ -976,4 +976,4 @@ end
   Float32.(a), Δ -> (nothing, T.(Δ), )
 end
 
-@nograd issymmetric(x)
+@nograd issymmetric
