@@ -967,7 +967,7 @@ end
 end
 
 @adjoint function SparseVector{T,N}(v) where {T,N}
-  SparseVector{T,N}(arr), Δ -> (collect(Δ),)
+  SparseVector{T,N}(v), Δ -> (collect(Δ),)
 end
 
 @adjoint diagm(x::AbstractSparseArray) = diagm(x), Δ -> (diag(Δ), )
