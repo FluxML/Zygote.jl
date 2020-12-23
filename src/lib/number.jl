@@ -1,5 +1,5 @@
 
-@nograd floor, ceil, trunc, round, hash, div
+@nograd floor, ceil, trunc, round, div
 
 @adjoint Base.literal_pow(::typeof(^), x::Number, ::Val{p}) where {p} =
   Base.literal_pow(^,x,Val(p)),
