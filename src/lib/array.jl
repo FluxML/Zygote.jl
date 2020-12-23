@@ -965,9 +965,15 @@ end
 @adjoint function SparseMatrixCSC{T,N}(arr) where {T,N}
   SparseMatrixCSC{T,N}(arr), Δ -> (collect(Δ),)
 end
-@adjoint diagm(x) = diagm(x), Δ -> (diag(Δ), )
+
+@adjoint function SparseVector{T,N}(v) where {T,N}
+  SparseVector{T,N}(arr), Δ -> (collect(Δ),)
+end
+
+@adjoint diagm(x::AbstractSparseArray) = diagm(x), Δ -> (diag(Δ), )
 
 @adjoint function Broadcast.broadcasted(Float32, a::SparseMatrixCSC{T,N}) where {T,N}
   Float32.(a), Δ -> (nothing, T.(Δ), )
 end
-@adjoint issymmetric(x) = issymmetric(x), Δ -> (Δ,)
+
+@nograd issymmetric(x)
