@@ -152,9 +152,9 @@ version = "0.9.0"
 
 [[ForwardDiff]]
 deps = ["CommonSubexpressions", "DiffResults", "DiffRules", "NaNMath", "Random", "SpecialFunctions", "StaticArrays"]
-git-tree-sha1 = "67d5fdd067626132aa9e7d2830ee9cdd09018775"
+git-tree-sha1 = "8de2519a83c6c1c2442c2f481dd9a8364855daf4"
 uuid = "f6369f11-7733-5829-9624-2563aa707210"
-version = "0.10.13"
+version = "0.10.14"
 
 [[GPUArrays]]
 deps = ["Adapt", "FFTW", "FillArrays", "LinearAlgebra", "Printf", "Random", "Serialization", "Test"]
@@ -164,9 +164,9 @@ version = "1.0.4"
 
 [[IRTools]]
 deps = ["InteractiveUtils", "MacroTools", "Test"]
-git-tree-sha1 = "a8d88c05a23b44b4da6cf4fb5659e13ff95e0f47"
+git-tree-sha1 = "c67e7515a11f726f44083e74f218d134396d6510"
 uuid = "7869d1d1-7146-5819-86e3-90919afe41df"
-version = "0.4.1"
+version = "0.4.2"
 
 [[InteractiveUtils]]
 deps = ["Markdown"]
@@ -246,9 +246,9 @@ version = "1.3.2"
 
 [[Parsers]]
 deps = ["Dates"]
-git-tree-sha1 = "b417be52e8be24e916e34b3d70ec2da7bdf56a68"
+git-tree-sha1 = "50c9a9ed8c714945e01cd53a21007ed3865ed714"
 uuid = "69de0a69-1ddd-5017-9359-2bf0b02dc9f0"
-version = "1.0.12"
+version = "1.0.15"
 
 [[Pkg]]
 deps = ["Dates", "LibGit2", "Markdown", "Printf", "REPL", "Random", "SHA", "UUIDs"]
@@ -264,9 +264,9 @@ uuid = "9abbd945-dff8-562f-b5e8-e1ebf5ef1b79"
 
 [[ProgressMeter]]
 deps = ["Distributed", "Printf"]
-git-tree-sha1 = "4cff8da83f89e06eeae5b81307a08bb33a96a602"
+git-tree-sha1 = "45640774ee2efa24e52686dbdf895e88102e68fc"
 uuid = "92933f4c-e287-5a05-a399-4b506db050ca"
-version = "1.4.0"
+version = "1.4.1"
 
 [[REPL]]
 deps = ["InteractiveUtils", "Markdown", "Sockets"]
@@ -315,9 +315,9 @@ version = "0.8.0"
 
 [[StaticArrays]]
 deps = ["LinearAlgebra", "Random", "Statistics"]
-git-tree-sha1 = "794e88df12426adc7eb3370b4ec3aee12f8d6911"
+git-tree-sha1 = "9da72ed50e94dbff92036da395275ed114e04d49"
 uuid = "90137ffa-7385-5640-81b9-e52037218182"
-version = "1.0.0"
+version = "1.0.1"
 
 [[Statistics]]
 deps = ["LinearAlgebra", "SparseArrays"]
@@ -381,4 +381,4 @@ git-tree-sha1 = "d3c2ae55d116b5360a73b1e88d1a974b446d933a"
 repo-rev = "ffc50480ff8f7662110bfb82b0b6d4f9cef6e59d"
 repo-url = "https://github.com/FluxML/Zygote.jl.git"
 uuid = "e88e6eb3-aa80-5325-afca-941959d7151f"
-version = "0.5.13+"
+version = "0.6.0+"
