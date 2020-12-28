@@ -11,6 +11,27 @@ Context() = Context(nothing)
 
 cache(cx::Context) = cx.cache === nothing ? (cx.cache = IdDict()) : cx.cache
 
+"""
+  NoContext <: Zygote.AContext
+
+The `NoContext` context assumes that there is no global context, and errors if any part of a
+function that is being differentiated interacts with either globals or tasks.
+
+The benefit of using such a construct is the elimination of overhead associated with the
+`cache` `IdDict` in a standard `Context`, which can be prohibitively large in certain
+settings.
+"""
+struct NoContext <: Zygote.AContext end
+
+# There is no cache, so there are never any fields.
+cache(cx::NoContext) = (cache_fields=nothing)
+
+# The is no cache, so this context never has any fields.
+Base.haskey(cx::NoContext, x) = false
+
+accum_param(::NoContext, x, Δ) = Δ
+
+
 struct Pullback{S,T}
   t::T
 end
