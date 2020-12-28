@@ -28,9 +28,13 @@ end
 @adjoint (::Type{T})(sz) where {T<:Zeros} = T(sz), Δ->(nothing,)
 @adjoint (::Type{T})(sz) where {T<:Ones} = T(sz), Δ->(nothing,)
 
-@adjoint getindex(x::AbstractArray, inds...) = x[inds...], ∇getindex(x, inds)
+@adjoint function getindex(x::Array, inds...)
+  return x[inds...], ∇getindex(x, inds)
+end
 
-@adjoint view(x::AbstractArray, inds...) = view(x, inds...), ∇getindex(x, inds)
+@adjoint function view(x::AbstractArray, inds...)
+  return view(x, inds...), ∇getindex(x, inds)
+end
 
 ∇getindex(x::AbstractArray, inds) = dy -> begin
   if inds isa  NTuple{<:Any, Integer}
