@@ -62,7 +62,7 @@ _droplike(dy::Union{LinearAlgebra.Adjoint, LinearAlgebra.Transpose}, dxv::Abstra
 
 for f in [push!, pop!, pushfirst!, popfirst!]
   @eval @adjoint! $f(xs::Vector, x...) =
-    push!(xs, x...), _ -> error("Mutating arrays is not supported")
+    $f(xs, x...), _ -> error("Mutating arrays is not supported")
 end
 
 # General
