@@ -167,9 +167,7 @@ D(f, x) = grad(f, x)[1]
 @test D(x -> x*D(y -> x+y, 1), 1) == 1
 @test D(x -> x*D(y -> x*y, 1), 4) == 8
 
-if VERSION >= v"1.1"
-  @test sin'''(1.0) ==  -cos(1.0)
-end
+@test sin'''(1.0) ==  -cos(1.0)
 
 f(x) = throw(DimensionMismatch("fubar"))
 
@@ -218,7 +216,7 @@ end[1] == 1
   return x*5
 end[1] == 5
 
-@test gradient(x -> one(eltype(x)), rand(10))[1] == nothing
+@test gradient(x -> one(eltype(x)), rand(10))[1] === nothing
 
 # Thre-way control flow merge
 @test gradient(1) do x
@@ -359,4 +357,33 @@ end
 
     @test (x->10*(x => 2)[1])'(100) === 10
     @test (x->10*(x => 2)[2])'(100) === 0
+end
+
+# https://github.com/JuliaDiff/ChainRules.jl/issues/257
+@testset "Keyword Argument Passing" begin
+  struct Type1{VJP}
+    x::VJP
+  end
+
+  struct Type2{compile}
+    Type2(compile=false) = new{compile}()
+  end
+
+  function loss_adjoint(θ)
+    sum(f(sensealg=Type1(Type2(true))))
+  end
+
+  i = 1
+  global x = Any[nothing,nothing]
+
+  Zygote.@nograd g(x,i,sensealg) = Main.x[i] = sensealg
+  function f(;sensealg=nothing)
+    g(x,i,sensealg)
+    return rand(100)
+  end
+
+  loss_adjoint([1.0])
+  i = 2
+  Zygote.gradient(loss_adjoint,[1.0])
+  @test x[1] == x[2]
 end

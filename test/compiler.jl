@@ -31,7 +31,11 @@ y, back = pullback(badly, 2)
 bt = try back(1) catch e stacktrace(catch_backtrace()) end
 
 @test trace_contains(bt, nothing, "compiler.jl", 20)
-@test trace_contains(bt, :badly, "compiler.jl", 24)
+if VERSION >= v"1.6-"
+  @test_broken trace_contains(bt, :badly, "compiler.jl", 24)
+else
+  @test trace_contains(bt, :badly, "compiler.jl", 24)
+end
 
 # Type inference checks
 
@@ -74,3 +78,34 @@ y, back = @test_inferred pullback(x->x[1], (5,:a))
 
 y, back = @test_inferred pullback(((a,b),) -> a, (5, 10))
 @test_inferred back(1)
+
+# testcase for issue #808
+# testing that methods(Base.show) does not throw. Having something more specific would be too fragile
+buf = IOBuffer()
+Base.show(buf, methods(Base.show))
+str_repr = String(take!(buf))
+@test !isempty(str_repr)
+
+struct Funky
+    x
+    y
+end
+
+@testset "issue #851" begin
+  f = Funky(1, 1);
+  function Base.getproperty(f::Funky, i::Symbol)
+      return 2
+  end
+  @test getproperty(f, :x) == 2
+  @test getfield(f, :x) == 1
+
+  y, pb = Zygote._pullback(getproperty, f, :x)
+  @test y == 2
+  @test pb(1) == (nothing, nothing, nothing)
+  y, pb = Zygote._pullback((f, x) -> getproperty(f, x), f, :x)
+  @test y == 2
+  @test pb(1) == (nothing, nothing, nothing)
+  y, pb = Zygote._pullback(getfield, f, :x)
+  @test y == 1
+  @test pb(1) == (nothing, (x = 1, y = nothing), nothing)
+end

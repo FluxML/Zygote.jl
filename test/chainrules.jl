@@ -124,6 +124,22 @@ using Zygote, Test, ChainRules
         @test mimo_pullback_hitcount[] == 1
     end
 
+    @testset "all AbstractZero partials" begin
+        # while ChainRules always has a partial for every input, Zygote combined them all
+        # to a single `nothing` if they are all zero-like.
+
+        not_diff_eg(x, i) = [10, 20][i]
+        function ChainRules.rrule(::typeof(not_diff_eg), x, i)
+            function not_diff_eg_pullback(Δ)
+                return ChainRules.NO_FIELDS, ChainRules.Zero(), ChainRules.DoesNotExist()
+            end
+            return not_diff_eg(x, i), not_diff_eg_pullback
+        end
+
+        _, pb = Zygote.pullback(not_diff_eg, 10.4, 2)
+        @test pb(1.2) === nothing
+    end
+
     @testset "nested AD hitting identity(::Tuple) pullback" begin
         # This is is  a particularly fiddly case.
         # Its kind of a simplified version of `sin'''(0.5)` but different in some places.
@@ -143,13 +159,17 @@ using Zygote, Test, ChainRules
         end
 
         @test (1,) == h(1)
-        
-        if VERSION >= v"1.3"
-            # broken on Julia 1.0 because of https://github.com/FluxML/Zygote.jl/issues/638
+
+        if VERSION >= v"1.6-"
+            @test_broken begin
+                a3, pb3 = Zygote.pullback(h, 1)
+                ((1,),) == pb3(1)
+            end
+        else
             a3, pb3 = Zygote.pullback(h, 1)
             @test ((1,),) == pb3(1)
         end
-    end 
+    end
 
     @testset "kwargs" begin
         kwfoo_rrule_hitcount = Ref(0)
@@ -174,6 +194,23 @@ using Zygote, Test, ChainRules
             @test kwfoo_rrule_hitcount[] == 1
             @test kwfoo_pullback_hitcount[] == 1
         end
+    end
+
+
+    @testset "kwarg, with all AbstractZero partials" begin
+        # while ChainRules always has a partial for every input, Zygote combined them all
+        # to a single `nothing` if they are all zero-like.
+
+        not_diff_kw_eg(x, i; kw=1.0) = [10, 20][i]
+        function ChainRules.rrule(::typeof(not_diff_kw_eg), x, i; kwargs...)
+            function not_diff_kw_eg_pullback(Δ)
+                return ChainRules.NO_FIELDS, ChainRules.Zero(), ChainRules.DoesNotExist()
+            end
+            return not_diff_kw_eg(x, i; kwargs...), not_diff_kw_eg_pullback
+        end
+
+        @test (nothing,) == Zygote.gradient(x->not_diff_kw_eg(x, 2), 10.4)
+        @test (nothing,) == Zygote.gradient(x->not_diff_kw_eg(x, 2; kw=2.0), 10.4)
     end
 end
 

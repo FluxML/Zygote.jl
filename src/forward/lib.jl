@@ -62,14 +62,21 @@ if VERSION >= v"1.4.0-DEV.304"
     _pushforward((first(args), tail(tail(dargs))...), Core._apply, f, args...)
 end
 
-using ..Zygote: literal_getproperty, literal_getindex
+using ..Zygote: literal_getproperty, literal_getfield, literal_getindex
 
-_pushforward(dargs, ::typeof(getproperty), x, f) =
-  _pushforward(dargs, literal_getproperty, x, Val(f))
+function _pushforward(dargs, ::typeof(literal_getproperty), x::NamedTuple,
+                      ::Val{property_name}) where {property_name}
+  return _pushforward(dargs, literal_getfield, x, Val(property_name))
+end
+_pushforward(dargs, ::typeof(getproperty), x::NamedTuple, f) =
+  _pushforward(dargs, literal_getfield, x, Val(f))
 
-@tangent function literal_getproperty(t, ::Val{i}) where i
-  y = getproperty(t, i)
-  forw(ṫ, _) = getproperty(ṫ, i)
+_pushforward(dargs, ::typeof(getfield), x, f) =
+  _pushforward(dargs, literal_getfield, x, Val(f))
+
+@tangent function literal_getfield(t, ::Val{i}) where i
+  y = getfield(t, i)
+  forw(ṫ, _) = getfield(ṫ, i)
   forw(ṫ::Nothing, _) = zerolike(y)
   return y, forw
 end

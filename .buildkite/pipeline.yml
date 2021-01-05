@@ -1,0 +1,11 @@
+steps:
+  - label: "GPU integration"
+    plugins:
+      - JuliaCI/julia#v0.5:
+          version: '1.5'
+      - JuliaCI/julia-test#v0.3: ~
+    agents:
+      queue: "juliagpu"
+      cuda: "*"
+    if: build.message !~ /\[skip tests\]/
+    timeout_in_minutes: 60
