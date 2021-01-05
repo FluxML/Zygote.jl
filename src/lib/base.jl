@@ -138,7 +138,8 @@ end
 end
 
 @adjoint function Base.Iterators.Zip(is)
-  Base.Iterators.Zip(is), Δ -> (unzip(Δ),)
+  Zip_pullback(Δ) = (unzip(Δ),)
+  return Base.Iterators.Zip(is), Zip_pullback
 end
 
 @adjoint Base.nameof(x::UnionAll) = nameof(x), _ -> (nothing,)
