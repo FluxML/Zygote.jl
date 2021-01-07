@@ -22,7 +22,7 @@ ZygoteRules = "700de1a5-db45-46bc-99cf-38207098b444"
 
 [compat]
 AbstractFFTs = "0.5, 1.0"
-ChainRules = "0.7.34"
+ChainRules = "0.7.44"
 DiffRules = "1.0"
 FillArrays = "0.8, 0.9, 0.10, 0.11"
 ForwardDiff = "0.10"
