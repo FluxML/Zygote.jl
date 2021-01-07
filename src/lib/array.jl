@@ -570,32 +570,6 @@ end
   return (Ā,)
 end
 
-@adjoint function LinearAlgebra.eigen(A::LinearAlgebra.RealHermSymComplexHerm)
-  dU = eigen(A)
-  return dU, function (Δ)
-    d, U = dU
-    d̄, Ū = Δ
-    if Ū === nothing
-      P = Diagonal(d̄)
-    else
-      F = inv.(d' .- d)
-      P = F .* (U' * Ū)
-      if d̄ === nothing
-        P[diagind(P)] .= 0
-      else
-        P[diagind(P)] = d̄
-      end
-    end
-    return (U * P * U',)
-  end
-end
-
-@adjoint function LinearAlgebra.eigvals(A::LinearAlgebra.RealHermSymComplexHerm)
-  d, U = eigen(A)
-  return d, d̄ -> (U * Diagonal(d̄) * U',)
-end
-
-
 # Hermitian/Symmetric matrix functions that can be written as power series
 _realifydiag!(A::AbstractArray{<:Real}) = A
 function _realifydiag!(A)
