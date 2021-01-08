@@ -2,9 +2,9 @@ module Zygote
 
 using LinearAlgebra, Statistics
 using LinearAlgebra: copytri!, AbstractTriangular
-using ArrayLayouts: MemoryLayout, AbstractColumnMajor
 
-import ZygoteRules: @adjoint, @adjoint!, AContext, adjoint, _pullback, pullback, literal_getproperty
+import ZygoteRules: @adjoint, @adjoint!, AContext, adjoint, _pullback, pullback,
+  literal_getproperty, literal_getfield
 using Buffers: Buffer, bufferfrom
 
 using ChainRules: ChainRules, rrule, unthunk
@@ -12,7 +12,8 @@ using IRTools
 using MacroTools, Requires
 using MacroTools: @forward
 
-export Params, gradient, pullback, pushforward, @code_grad
+import Distributed: pmap, CachingPool, workers
+export Params, gradient, pullback, pushforward, @code_adjoint
 
 include("tools/idset.jl")
 include("tools/builtins.jl")
@@ -32,7 +33,6 @@ include("lib/number.jl")
 include("lib/base.jl")
 include("lib/array.jl")
 include("lib/broadcast.jl")
-include("lib/nnlib.jl")
 include("lib/forward.jl")
 include("lib/utils.jl")
 include("lib/range.jl")
@@ -40,6 +40,9 @@ include("lib/range.jl")
 @init @require StatsFuns="4c63d2b9-4356-54db-8cca-17b64c39e42c" include("lib/statsfuns.jl")
 
 # we need to define this late, so that the genfuncs see lib.jl
+# Move using statements out of this file to help with sysimage building
+using IRTools: varargs!, inlineable!, pis!, slots!
+using IRTools.Inner: argnames!, update!
 include("compiler/interface2.jl")
 
 include("profiler/Profile.jl")
@@ -48,11 +51,16 @@ include("profiler/Profile.jl")
   include("flux.jl")
 end
 
-precompile() = include(joinpath(@__DIR__, "precompile.jl"))
+@init @require Colors="5ae59095-9a9b-59fe-a467-6f913c188581" begin
+  @nograd Colors.ColorTypes._parameter_upper_bound
+end
+
+using InteractiveUtils
+precompile() = Requires.@include("precompile.jl")
 
 # helps to work around 265-y issues
 function refresh()
-  include(joinpath(@__DIR__, "compiler/interface2.jl"))
+  Requires.@include("compiler/interface2.jl")
   precompile()
   return
 end

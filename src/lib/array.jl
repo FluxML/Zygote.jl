@@ -1,20 +1,14 @@
 using Random, FillArrays, AbstractFFTs
 using FillArrays: AbstractFill, getindex_value
 using Base.Broadcast: broadcasted, broadcast_shape
+using Distributed: pmap, AbstractWorkerPool
 
 @adjoint (::Type{T})(::UndefInitializer, args...) where T<:Array = T(undef, args...), Δ -> nothing
 
 @adjoint Array(xs::AbstractArray) = Array(xs), ȳ -> (ȳ,)
 @adjoint Array(xs::Array) = Array(xs), ȳ -> (ȳ,)
 
-@nograd size, length, eachindex, axes, Colon(), findfirst, findlast, findall, ones, zeros, one, zero, any, all
-@nograd randn, randexp, randn!, randexp!
-@static if VERSION > v"1.3"
-  @nograd Random.default_rng
-end
-
-@adjoint Base.rand(rng::AbstractRNG, ::Type{T}, dims...) where {T<:Number} =
-  rand(rng, T, dims...), _ -> nothing
+@nograd ones, zeros, Base.OneTo, Colon(), one, zero
 
 @adjoint Base.vect(xs...) = Base.vect(xs...), Δ -> (Δ...,)
 
@@ -170,24 +164,54 @@ function unzip(tuples)
   _unzip(tuples, Val(N))
 end
 
-function ∇map(cx, f, args...)
-  ys_and_backs = map((args...) -> _pullback(cx, f, args...), args...)
-  if isempty(ys_and_backs)
-    ys_and_backs, _ -> nothing
-  else
-    ys, backs = unzip(ys_and_backs)
-    ys, function (Δ)
-      Δf_and_args_zipped = map((f, δ) -> f(δ), backs, Δ)
-      Δf_and_args = unzip(Δf_and_args_zipped)
-      Δf = reduce(accum, Δf_and_args[1])
-      (Δf, Δf_and_args[2:end]...)
+# Reverse iteration order when ∇map is applied to vector,
+# needed for stateful functions.
+# See https://github.com/FluxML/Flux.jl/issues/1209
+# Should be generalized to abstract array, but reverse takes a dims keyword there
+_tryreverse(m, backs, Δ) = backs, Δ
+function _tryreverse(m::typeof(map), backs, Δ::Union{AbstractVector, Tuple})
+  return reverse(backs), reverse(Δ)
+end
+_tryreverse(m, x) = x
+_tryreverse(m::typeof(map), x::Union{AbstractVector, Tuple}) = reverse(x)
+
+for (mapfunc,∇mapfunc) in [(:map,:∇map),(:pmap,:∇pmap)]
+  @eval function $∇mapfunc(cx, f, args...)
+    ys_and_backs = $mapfunc((args...) -> _pullback(cx, f, args...), args...)
+    if isempty(ys_and_backs)
+      ys_and_backs, _ -> nothing
+    else
+      ys, backs = unzip(ys_and_backs)
+      ys, function (Δ)
+        # Apply pullbacks in reverse order. Needed for correctness if `f` is stateful.
+        Δf_and_args_zipped = $mapfunc((f, δ) -> f(δ), _tryreverse($mapfunc, backs, Δ)...)
+        Δf_and_args = unzip(_tryreverse($mapfunc, Δf_and_args_zipped))
+        Δf = reduce(accum, Δf_and_args[1])
+        (Δf, Δf_and_args[2:end]...)
+      end
     end
+  end
+
+  @eval @adjoint function $mapfunc(f, args::Union{AbstractArray,Tuple}...)
+    $∇mapfunc(__context__, f, args...)
   end
 end
 
-@adjoint function map(f, args::Union{AbstractArray,Tuple}...)
-  ∇map(__context__, f, args...)
+@adjoint function pmap(f, wp::AbstractWorkerPool, args...; kwargs...)
+  ys_backs = pmap((x...) -> _pullback(__context__, f, x...), wp, args...; kwargs...)
+  ys, backs = unzip(ys_backs)
+  ys, function (Δ)
+    res = pmap((df,d) -> df(d), wp, backs, Δ; kwargs...)
+    Δf_and_args = unzip(res)
+    Δf = reduce(accum, Δf_and_args[1])
+    (Δf, nothing, Δf_and_args[2:end]..., nothing, nothing)
+  end
 end
+
+for t in subtypes(AbstractWorkerPool)
+  @nograd t
+end
+@nograd workers
 
 function _pullback(cx::AContext, ::typeof(collect), g::Base.Generator)
   y, back = ∇map(cx, g.f, g.iter)
@@ -214,13 +238,16 @@ end
 end
 
 # Reductions
-
 @adjoint function sum(xs::AbstractArray; dims = :)
   if dims === (:)
     sum(xs), Δ -> (Fill(Δ, size(xs)),)
   else
     sum(xs, dims = dims), Δ -> (similar(xs) .= Δ,)
   end
+end
+
+@adjoint function sum(xs::AbstractArray{Bool}; dims = :)
+  sum(xs, dims = dims), Δ -> (nothing,)
 end
 
 _normalize_kws(kws::NamedTuple) = kws
@@ -303,26 +330,8 @@ end
   end
 end
 
-# LinAlg
-# ======
-
-@adjoint function(A::AbstractMatrix * B::AbstractMatrix)
-  return A * B, Δ::AbstractMatrix->(Δ * B', A' * Δ)
-end
-
-@adjoint function(A::AbstractMatrix * x::AbstractVector)
-  return A * x, Δ::AbstractVector->(Δ * x', A' * Δ)
-end
-
-@adjoint function *(x::Union{Transpose{<:Any, <:AbstractVector},
-                             LinearAlgebra.Adjoint{<:Any, <:AbstractVector}},
-                    y::AbstractVector)
-  return x * y, Δ->(Δ * y', x' * Δ)
-end
-
-@adjoint function(a::AbstractVector * x::AbstractMatrix)
-  return a * x, Δ::AbstractMatrix->(vec(Δ * x'), a' * Δ)
-end
+# LinearAlgebra
+# =============
 
 @adjoint function transpose(x)
   back(Δ) = (transpose(Δ),)
@@ -426,11 +435,6 @@ end
       return (a + b + c, B̄)
     end
   end
-end
-
-function _pullback(cx::AContext, ::typeof(norm), x::AbstractArray, p::Real = 2)
-  fallback = (x, p) -> sum(abs.(x).^p .+ eps(0f0))^(1/p) # avoid d(sqrt(x))/dx == Inf at 0
-  _pullback(cx, fallback, x, p)
 end
 
 # LinAlg Matrix Types
@@ -769,17 +773,17 @@ end
   end
 end
 
-@adjoint function Matrix(::UniformScaling, i::Integer, j::Integer)
-  return Matrix(I, i, j), Δ -> ((λ=tr(Δ),), nothing, nothing)
+@adjoint function Matrix(S::UniformScaling, i::Integer, j::Integer)
+  return Matrix(S, i, j), Δ -> ((λ=tr(Δ),), nothing, nothing)
 end
-@adjoint function Matrix(::UniformScaling, ij::NTuple{2, Integer})
-  return Matrix(I, ij), Δ -> ((λ=tr(Δ),), nothing)
+@adjoint function Matrix(S::UniformScaling, ij::NTuple{2, Integer})
+  return Matrix(S, ij), Δ -> ((λ=tr(Δ),), nothing)
 end
-@adjoint function Matrix{T}(::UniformScaling, i::Integer, j::Integer) where {T}
-  return Matrix{T}(I, i, j), Δ -> ((λ=tr(Δ),), nothing, nothing)
+@adjoint function Matrix{T}(S::UniformScaling, i::Integer, j::Integer) where {T}
+  return Matrix{T}(S, i, j), Δ -> ((λ=tr(Δ),), nothing, nothing)
 end
-@adjoint function Matrix{T}(::UniformScaling, ij::NTuple{2, Integer}) where {T}
-  return Matrix{T}(I, ij), Δ -> ((λ=tr(Δ),), nothing)
+@adjoint function Matrix{T}(S::UniformScaling, ij::NTuple{2, Integer}) where {T}
+  return Matrix{T}(S, ij), Δ -> ((λ=tr(Δ),), nothing)
 end
 @adjoint function +(A::AbstractMatrix, S::UniformScaling)
   return A + S, Δ->(Δ, (λ=tr(Δ),))
@@ -823,7 +827,7 @@ end
 @adjoint function \(P::AbstractFFTs.Plan, xs)
   return P \ xs, function(Δ)
     N = prod(size(Δ)[[P.region...]])
-    return (nothing, 1/N * (P * Δ))
+    return (nothing, (P * Δ)/N)
   end
 end
 
@@ -831,7 +835,7 @@ end
 @adjoint function ifft(xs)
   return AbstractFFTs.ifft(xs), function(Δ)
     N = length(xs)
-    return (1/N* AbstractFFTs.fft(Δ),)
+    return (AbstractFFTs.fft(Δ)/N,)
   end
 end
 
@@ -871,7 +875,7 @@ end
 @adjoint function irfft(xs, d)
   return AbstractFFTs.irfft(xs, d), function(Δ)
     total = length(Δ)
-    fullTransform = 1/total * AbstractFFTs.rfft(real.(Δ))
+    fullTransform = AbstractFFTs.rfft(real.(Δ))/total
     return (fullTransform, nothing)
   end
 end
@@ -905,7 +909,7 @@ end
   return AbstractFFTs.ifft(xs, dims), function(Δ)
     dims = collect(dims)
     N = prod(collect(size(xs))[dims])
-    return (1/N * AbstractFFTs.fft(Δ, dims),nothing)
+    return (AbstractFFTs.fft(Δ, dims)/N,nothing)
   end
 end
 
@@ -918,16 +922,16 @@ end
 end
 
 @adjoint function irfft(xs, d, dims)
-  return AbstractFFTs.ifft(xs, dims), function(Δ)
+  return AbstractFFTs.irfft(xs, d, dims), function(Δ)
     dims = collect(dims)
     N = prod(collect(size(xs))[dims])
-    return (1/N * AbstractFFTs.rfft(Δ, dims), nothing, nothing)
+    return (AbstractFFTs.rfft(real.(Δ), dims)/N, nothing, nothing)
   end
 end
 @adjoint function brfft(xs, d, dims)
-  return AbstractFFTs.ifft(xs, dims), function(Δ)
+  return AbstractFFTs.brfft(xs, d, dims), function(Δ)
     dims = collect(dims)
-    return (AbstractFFTs.rfft(Δ, dims), nothing, nothing)
+    return (AbstractFFTs.rfft(real.(Δ), dims), nothing, nothing)
   end
 end
 

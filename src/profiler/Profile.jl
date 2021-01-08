@@ -57,7 +57,7 @@ function merge(cs)
   for c in cs
     c.size == 0 && continue
     i = findfirst(x -> (x.func, x.file, x.line) == (c.func, c.file, c.line), ds)
-    i == nothing ? push!(ds, c) : (ds[i] = merge(ds[i], c))
+    i === nothing ? push!(ds, c) : (ds[i] = merge(ds[i], c))
   end
   return ds
 end
