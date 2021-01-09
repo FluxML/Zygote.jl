@@ -775,6 +775,49 @@ function _gradtest_hermsym(f, ST, A)
   end
 end
 
+@testset "eigen(::RealHermSymComplexHerm)" begin
+  MTs = (Symmetric{Float64}, Hermitian{Float64}, Hermitian{ComplexF64})
+  rng, N = MersenneTwister(123), 7
+  @testset "eigen(::$MT)" for MT in MTs
+    T = eltype(MT)
+    ST = _hermsymtype(MT)
+
+    A = ST(randn(rng, T, N, N))
+    U = eigvecs(A)
+
+    @test _gradtest_hermsym(ST, A) do (A)
+      d, U = eigen(A)
+      return U * Diagonal(exp.(d)) * U'
+    end
+
+    y = Zygote.pullback(eigen, A)[1]
+    y2 = eigen(A)
+    @test y.values ≈ y2.values
+    @test y.vectors ≈ y2.vectors
+
+    @testset "low rank" begin
+      A2 = Symmetric(U * Diagonal([randn(rng), zeros(N-1)...]) * U')
+      @test_broken _gradtest_hermsym(ST, A2) do (A)
+        d, U = eigen(A)
+        return U * Diagonal(exp.(d)) * U'
+      end
+    end
+  end
+end
+
+@testset "eigvals(::RealHermSymComplexHerm)" begin
+  MTs = (Symmetric{Float64}, Hermitian{Float64}, Hermitian{ComplexF64})
+  rng, N = MersenneTwister(123), 7
+  @testset "eigvals(::$MT)" for MT in MTs
+    T = eltype(MT)
+    ST = _hermsymtype(MT)
+
+    A = ST(randn(rng, T, N, N))
+    @test _gradtest_hermsym(A ->eigvals(A), ST, A)
+    @test Zygote.pullback(eigvals, A)[1] ≈ eigvals(A)
+  end
+end
+
 _randmatunitary(rng, T, n) = qr(randn(rng, T, n, n)).Q
 function _randvectorin(rng, n, r)
   l, u = r
