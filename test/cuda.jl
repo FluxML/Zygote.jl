@@ -15,3 +15,10 @@ end
   log_grada = cu(Float32[1.0, 0.5, 0.33333334, 0.25, 0.2, 0.16666667, 0.14285715, 0.125, 0.11111111])
   @test gradient(x -> w(x) |> sum, a) == (log_grada,)
 end
+
+@testset "vcat scalar indexing" begin
+  r = cu(rand(Float32, 3))
+  grads = (cu(ones(Float32, 3)), nothing)
+  @test gradient((x,y) -> sum(vcat(x,y)), r, 5) == grads
+end
+
