@@ -70,10 +70,9 @@ end
 # function _pullback(cx::Context, ::typeof(push!), xs::AbstractVector{<:AbstractArray}, x::AbstractArray{T}...) where T
 @adjoint! function push!(xs::AbstractVector{<:AbstractArray}, x::AbstractArray{T}...) where T
   sz_xs = size.(xs)
-  sz_x = size(x)
+  sz_x = size.(x)
   push!(xs, x...), Δ -> begin
-    # @show Δ
-    ([Ones{T}(sz...) for sz in sz_xs], Ones{T}(sz_x...))
+    ([Ones{T}(sz...) for sz in sz_xs], foreach(x -> Ones{T}(x...), sz_x)...)
   end
 end
 
