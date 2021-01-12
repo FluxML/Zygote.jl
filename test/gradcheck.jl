@@ -1143,6 +1143,13 @@ end
   @test gradtest(catdim, rand(2,5,3), rand(2,5,3), rand(2,5,3))
 end
 
+@testset "cat(..., dims = Val($dim))" for dim in 1:5
+  catdim = (x...) -> cat(x..., dims = Val(dim))
+  @test gradtest(catdim, rand(5), rand(5))
+  @test gradtest(catdim, rand(2,5), rand(2,5), rand(2,5))
+  @test gradtest(catdim, rand(2,5,3), rand(2,5,3), rand(2,5,3))
+end
+
 @testset "cat empty" begin
   catdim = (x...) -> cat(x..., dims = (1, 2))
   @test gradtest(catdim, rand(0,5,3), rand(2,5,3), rand(2,5,3))

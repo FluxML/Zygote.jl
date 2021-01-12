@@ -117,9 +117,10 @@ end
 @adjoint function cat(Xs...; dims)
   cat(Xs...; dims = dims), Δ -> begin
     start = ntuple(_ -> 0, ndims(Δ))
+    catdims = Base.dims2cat(dims)
     dXs = map(Xs) do x
-      move = ntuple(d -> d in dims ? size(x,d) : 0, ndims(Δ))
-      x_in_Δ = ntuple(d -> d in dims ? (start[d]+1:start[d]+move[d]) : Colon(), ndims(Δ))
+      move = ntuple(d -> (d<=length(catdims) && catdims[d]) ? size(x,d) : 0, ndims(Δ))
+      x_in_Δ = ntuple(d -> (d<=length(catdims) && catdims[d]) ? (start[d]+1:start[d]+move[d]) : Colon(), ndims(Δ))
       start = start .+ move
       dx = reshape(Δ[x_in_Δ...], size(x))
     end
