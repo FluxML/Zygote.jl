@@ -570,6 +570,13 @@ end
   return (Ā,)
 end
 
+# The adjoint for exp(::AbstractArray) intercepts ChainRules' rrule for exp(::Hermitian),
+# so we call it manually. This can be removed when the generic rule for exp is moved to
+# ChainRules
+function _pullback(::AContext, ::typeof(exp), A::LinearAlgebra.RealHermSymComplexHerm)
+    return chain_rrule(exp, A)
+end
+
 # Hermitian/Symmetric matrix functions that can be written as power series
 _realifydiag!(A::AbstractArray{<:Real}) = A
 function _realifydiag!(A)
