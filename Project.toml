@@ -21,10 +21,10 @@ Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 ZygoteRules = "700de1a5-db45-46bc-99cf-38207098b444"
 
 [compat]
-AbstractFFTs = "0.5"
-ChainRules = "0.7.34"
+AbstractFFTs = "0.5, 1.0"
+ChainRules = "0.7.45"
 DiffRules = "1.0"
-FillArrays = "0.8, 0.9, 0.10"
+FillArrays = "0.8, 0.9, 0.10, 0.11"
 ForwardDiff = "0.10"
 IRTools = "0.4"
 MacroTools = "0.5"
