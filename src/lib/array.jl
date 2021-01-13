@@ -673,39 +673,6 @@ function _pullback(cx::AContext,
   return _pullback(cx, (A, p) -> _apply_series_func(f, A, p), A, p)
 end
 
-for func in (:exp, :log, :cos, :sin, :tan, :cosh, :sinh, :tanh, :acos, :asin, :atan, :acosh, :asinh, :atanh, :sqrt)
-  @eval begin
-    function _pullback(cx::AContext,
-                       f::typeof($func),
-                       A::LinearAlgebra.RealHermSymComplexHerm)
-      return _pullback(cx, A -> _apply_series_func(f, A), A)
-    end
-  end
-end
-
-@adjoint function sincos(A::LinearAlgebra.RealHermSymComplexHerm)
-  n = LinearAlgebra.checksquare(A)
-  λ, U = eigen(A)
-  sλ, cλ = Buffer(λ), Buffer(λ)
-  for i in Base.OneTo(n)
-    @inbounds sλ[i], cλ[i] = sincos(λ[i])
-  end
-  sinλ, cosλ = copy(sλ), copy(cλ)
-  sinA, cosA = U * Diagonal(sinλ) * U', U * Diagonal(cosλ) * U'
-  Ω, processback = Zygote.pullback(sinA, cosA) do s,c
-    return (_process_series_matrix(sin, s, A, λ),
-            _process_series_matrix(cos, c, A, λ))
-  end
-  return Ω, function (Ω̄)
-    s̄inA, c̄osA = processback(Ω̄)
-    s̄inΛ, c̄osΛ = U' * s̄inA * U, U' * c̄osA * U
-    PS = _pairdiffquotmat(sin, n, λ, sinλ, cosλ, -sinλ)
-    PC = _pairdiffquotmat(cos, n, λ, cosλ, -sinλ, -cosλ)
-    Ā = U * (PS .* s̄inΛ .+ PC .* c̄osΛ) * U'
-    return (Ā,)
-  end
-end
-
 # ChainRules has this also but does not use FillArrays, so we have our own definition
 # for improved performance. See https://github.com/JuliaDiff/ChainRules.jl/issues/46
 Zygote.@adjoint function LinearAlgebra.tr(x::AbstractMatrix)
