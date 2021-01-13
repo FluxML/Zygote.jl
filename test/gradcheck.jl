@@ -865,10 +865,17 @@ _randmatseries(rng, ::typeof(atanh), T, n, domain::Type{Complex}) = nothing
 
         @test _gradtest_hermsym(f, ST, A)
 
-        y = Zygote.pullback(f, A)[1]
+        y, back = Zygote.pullback(f, A)
         y2 = f(A)
         @test y ≈ y2
         @test typeof(y) == typeof(y2)
+        ȳ = randn(eltype(y), size(y))
+        if y isa Union{Symmetric,Hermitian}
+            ȳ = typeof(y)(ȳ, y.uplo)
+        end
+        Ā = back(ȳ)[1]
+        @test typeof(Ā) == typeof(A)
+        @test Ā.uplo == A.uplo
 
         @testset "similar eigenvalues" begin
           λ[1] = λ[3] + sqrt(eps(eltype(λ))) / 10
