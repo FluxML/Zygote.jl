@@ -1,10 +1,7 @@
-using IRTools: varargs!, inlineable!, pis!, slots!
-using IRTools.Inner: argnames!, update!
-
 ignore_sig(T) = all(T -> T <: Type, T.parameters)
 
 function edge!(m::IRTools.Meta, edge::Core.MethodInstance)
-  m.code.edges == nothing && (m.code.edges = Core.MethodInstance[])
+  m.code.edges === nothing && (m.code.edges = Core.MethodInstance[])
   push!(m.code.edges, edge)
   return
 end
@@ -27,10 +24,8 @@ end
   forw = varargs!(meta, forw, 3)
   # IRTools.verify(forw)
   forw = slots!(pis!(inlineable!(forw)))
-  @static if VERSION >= v"1.3" # no edges pre-1.3
-    # be ready to swap to using chainrule if one is declared
-    cr_edge != nothing && edge!(meta, cr_edge)
-  end
+  # be ready to swap to using chainrule if one is declared
+  cr_edge != nothing && edge!(meta, cr_edge)
   return update!(meta.code, forw)
 end
 
@@ -40,7 +35,7 @@ end
   catch e
     rethrow(CompileError(T,e))
   end
-  if g == nothing
+  if g === nothing
     Δ == Nothing && return :nothing
     return :(error("Non-differentiable function $(repr(j.t[1]))"))
   end

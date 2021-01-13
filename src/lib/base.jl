@@ -73,8 +73,9 @@ grad_mut(ch::Channel) = Channel(ch.sz_max)
 
 @adjoint! function put!(ch::Channel, x)
   put!(ch, x), function (ȳ)
-    x̄ = take!(grad_mut(__context__, ch))
-    (nothing, accum(x̄, ȳ), nothing)
+    x̄ = grad_mut(__context__, ch)
+    dx = isopen(x̄) ? take!(x̄) : nothing
+    (nothing, accum(dx, ȳ), nothing)
   end
 end
 
@@ -99,9 +100,7 @@ function runadjoint(cx, t, ȳ = nothing)
   t̄ = cache(cx)[t]
   f = t̄.code
   t̄.code = () -> f(ȳ)
-  @static if VERSION > v"1.3-"
-    t̄.sticky = t.sticky
-  end
+  t̄.sticky = t.sticky
   schedule(t̄)
 end
 
@@ -115,6 +114,23 @@ end
 
 @adjoint! function Base.sync_end(refs)
   Base.sync_end(refs), _ -> foreach(t -> runadjoint(__context__, t), refs)
+end
+
+# Need to hold onto the references here
+@adjoint! function Base.sync_end(ch::Channel)
+  ch_copy = grad_mut(__context__, ch)
+  dch = grad_mut(ch_copy)
+  while !isempty(ch)
+    i = take!(ch)
+    put!(ch_copy, i)
+    put!(dch, i)
+  end
+  Base.sync_end(ch_copy), _ -> begin
+    while !isempty(dch)
+      t = take!(dch)
+      runadjoint(__context__, t)
+    end
+  end
 end
 
 # Make @sync work
@@ -141,3 +157,7 @@ end
     end
     return getfield(p, i), pair_getfield
 end
+
+@adjoint Base.nameof(x::UnionAll) = nameof(x), _ -> (nothing,)
+
+@nograd typeintersect

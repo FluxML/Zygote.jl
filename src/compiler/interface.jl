@@ -1,12 +1,7 @@
 using InteractiveUtils
 using InteractiveUtils: typesof
 using Core: Typeof
-
-@static if VERSION >= v"1.1"
-  import Base: copy!
-else
-  import Future: copy!
-end
+import Base: copy!
 
 mutable struct Context <: AContext
   cache::Union{IdDict{Any,Any},Nothing}
