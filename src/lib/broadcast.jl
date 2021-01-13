@@ -239,5 +239,5 @@ end
     Base.convert(T, xs), Δ -> (nothing, Base.convert(Array, Δ),)
   end
 
-  pull_block_vert(sz, Δ::CuArray, A::Number) = CUDA.@allowscalar Δ[sz]
+  pull_block_vert(sz, Δ::CUDA.CuArray, A::Number) = CUDA.@allowscalar Δ[sz]
 end
