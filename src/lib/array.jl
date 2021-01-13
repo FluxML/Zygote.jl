@@ -581,10 +581,7 @@ function _realifydiag!(A)
 end
 @adjoint _realifydiag!(A) = _realifydiag!(A), Δ -> (_realifydiag!(Δ),)
 
-_hasrealdomain(f, x) = true
-_hasrealdomain(::Union{typeof.((acos,asin))...}, x) = all(x -> -1 ≤ x ≤ 1, x)
-_hasrealdomain(::typeof(acosh), x) = all(x -> x ≥ 1, x)
-_hasrealdomain(::Union{typeof.((log,sqrt,^))...}, x) = all(x -> x ≥ 0, x)
+_hasrealdomain(::typeof(^), x) = all(x -> x ≥ 0, x)
 
 _process_series_eigvals(f, λ) = _hasrealdomain(f, λ) ? λ : complex.(λ)
 
@@ -598,16 +595,6 @@ _process_series_matrix(::typeof(^), fA, ::Hermitian{<:Complex}, ::AbstractVector
 
 # Compute function on eigvals, thunks for conjugates of 1st and 2nd derivatives,
 # and function to pull back adjoints to args
-function _pullback_series_func_scalar(f, λ, args...)
-  compλ = _process_series_eigvals(f, λ)
-  fλ, fback = Zygote.pullback((x,args...) -> f.(x, args...), compλ, args...)
-  n = length(λ)
-  return (fλ,
-          ()->fback(ones(n))[1],
-          ()->nothing, # TODO: add 2nd deriv
-          isempty(args) ? _ -> () : f̄λ -> tail(fback(f̄λ)))
-end
-
 function _pullback_series_func_scalar(f::typeof(^), λ, p)
   compλ = _process_series_eigvals(f, λ)
   r, powλ = isinteger(p) ? (Integer(p), λ) : (p, compλ)
@@ -616,11 +603,6 @@ function _pullback_series_func_scalar(f::typeof(^), λ, p)
           ()->conj.(r .* powλ .^ (r - 1)),
           ()->conj.((r * (r - 1)) .* powλ .^ (r - 2)),
           f̄λ -> (dot(fλ .* log.(compλ), f̄λ),))
-end
-
-function _pullback_series_func_scalar(f::typeof(exp), λ)
-  expλ = exp.(λ)
-  return expλ, ()->expλ, ()->expλ, _ -> ()
 end
 
 _apply_series_func(f, A, args...) = f(A, args...)
