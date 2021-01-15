@@ -573,7 +573,7 @@ end
 # The adjoint for exp(::AbstractArray) intercepts ChainRules' rrule for exp(::Hermitian),
 # so we call it manually. This can be removed when the generic rule for exp is moved to
 # ChainRules
-@adjoint exp(A::LinearAlgebra.RealHermSymComplexHerm)
+@adjoint function exp(A::LinearAlgebra.RealHermSymComplexHerm)
     Y, back = chain_rrule(exp, A)
     return Y, Δ -> (back(Δ)[2],)
 end
