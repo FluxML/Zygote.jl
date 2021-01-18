@@ -14,3 +14,24 @@ macro which(ex)
   @capture(ex, f_(args__)) || error("Zygote.@which f(args...)")
   :(InteractiveUtils.@which adjoint(Context(), $(esc(f)), $(esc.(args)...)))
 end
+
+"""
+
+    checkpointed(f, xs...)
+
+Use gradient checkpointing on the call `f(xs...)`. This means that
+`checkpointed(f, xs...) === f(xs...)`, but when computing the derivative
+intermediate results from the forward pass of `f` will not be stored. Instead the forward
+pass will be repeated, when computing the derivative.
+This this saves memory at the cost of inreasing exectution time.
+"""
+checkpointed(f, xs...) = f(xs...)
+
+function Zygote._pullback(ctx::Zygote.AContext, ::typeof(checkpointed), f, xs...)
+    y = f(xs...)
+    function pullback_checkpointed(Δy)
+        y, pb = Zygote._pullback(ctx, f, xs...)
+        return pb(Δy)
+    end
+    return y, pullback_checkpointed
+end
