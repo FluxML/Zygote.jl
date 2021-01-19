@@ -31,7 +31,7 @@ function Zygote._pullback(ctx::Zygote.AContext, ::typeof(checkpointed), f, xs...
     y = f(xs...)
     function pullback_checkpointed(Δy)
         y, pb = Zygote._pullback(ctx, f, xs...)
-        return pb(Δy)
+        return (nothing, pb(Δy)...)
     end
     return y, pullback_checkpointed
 end
