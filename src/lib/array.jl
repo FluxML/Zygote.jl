@@ -555,29 +555,6 @@ Base.@propagate_inbounds function _pairdiffquotmat(f, n, x, fx, dfx, d²fx = not
   return Δfij.(Base.OneTo(n), Base.OneTo(n)')
 end
 
-# Adjoint based on the Theano implementation, which uses the differential as described
-# in Brančík, "Matlab programs for matrix exponential function derivative evaluation"
-@adjoint exp(A::AbstractMatrix) = exp(A), function(F̄)
-  n = size(A, 1)
-  E = eigen(A)
-  w = E.values
-  ew = exp.(w)
-  X = _pairdiffquotmat(exp, n, w, ew, ew, ew)
-  V = E.vectors
-  VF = factorize(V)
-  Āc = (V * ((VF \ F̄' * V) .* X) / VF)'
-  Ā = isreal(A) && isreal(F̄) ? real(Āc) : Āc
-  return (Ā,)
-end
-
-# The adjoint for exp(::AbstractArray) intercepts ChainRules' rrule for exp(::Hermitian),
-# so we call it manually. This can be removed when the generic rule for exp is moved to
-# ChainRules
-@adjoint function exp(A::LinearAlgebra.RealHermSymComplexHerm)
-    Y, back = chain_rrule(exp, A)
-    return Y, Δ -> (back(Δ)[2],)
-end
-
 # Hermitian/Symmetric matrix functions that can be written as power series
 _realifydiag!(A::AbstractArray{<:Real}) = A
 function _realifydiag!(A)
