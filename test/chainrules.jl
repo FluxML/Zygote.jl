@@ -161,7 +161,7 @@ using Zygote, Test, ChainRules
         @test (1,) == h(1)
 
         if VERSION >= v"1.6-"
-            @test_broken begin
+            @test begin
                 a3, pb3 = Zygote.pullback(h, 1)
                 ((1,),) == pb3(1)
             end
