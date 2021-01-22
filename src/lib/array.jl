@@ -122,7 +122,7 @@ end
       move = ntuple(d -> (d<=length(catdims) && catdims[d]) ? size(x,d) : 0, ndims(Δ))
       x_in_Δ = ntuple(d -> (d<=length(catdims) && catdims[d]) ? (start[d]+1:start[d]+move[d]) : Colon(), ndims(Δ))
       start = start .+ move
-      dx = reshape(Δ[x_in_Δ...], size(x))
+      dx = Δ[x_in_Δ...]
     end
   end
 end
