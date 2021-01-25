@@ -2,7 +2,6 @@ using Zygote, Test
 using Zygote: gradient
 using CUDA: has_cuda
 
-using Zygote
 @testset "Interface" begin
   include("interface.jl")
 end
