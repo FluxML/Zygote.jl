@@ -31,11 +31,11 @@ ignore(f) = f()
 Tell Zygote to ignore an expression. Equivalent to `ignore() do (...) end`.
 Example:
 
-```julia-repl	
-julia> f(x) = (y = Zygote.@ignore x; x * y); 
+```julia-repl
+julia> f(x) = (y = Zygote.@ignore x; x * y);
 julia> f'(1)
 1
-```	
+```
 """
 macro ignore(ex)
     return :(Zygote.ignore() do
@@ -102,15 +102,37 @@ end
 """
     hessian(f, x)
 
-Construct the Hessian of `f`, where `x` is a real or real array and `f(x)` is
-a real.
+Construct the Hessian `∂²f/∂x∂x`, where `x` is a real number or an array,
+and `f(x)` is a real number.
 
-    julia> hessian(((a, b),) -> a*b, [2, 3])
-    2×2 Array{Int64,2}:
-     0  1
-     1  0
+Uses forward over reverse, ForwardDiff over Zygote, by default: `hessian_dual(f, x)`.
+
+# Examples
+
+```jldoctest
+julia> Zygote.hessian(x -> x[1]*x[2], randn(2))
+2×2 Array{Float64,2}:
+ 0.0  1.0
+ 1.0  0.0
+
+julia> Zygote.hessian(x -> sum(x.^3), [1 2; 3 4])  # uses linear indexing of x
+4×4 Array{$Int,2}:
+ 6   0   0   0
+ 0  18   0   0
+ 0   0  12   0
+ 0   0   0  24
+
+julia> Zygote.hessian(sin, pi/2)
+-1.0
+```
 """
 hessian(f, x::AbstractArray) = forward_jacobian(x -> gradient(f, x)[1], x)[2]
+
+hessian(f, x) = hessian_dual(f, x)
+
+hessian_dual(f, x::AbstractArray) = forward_jacobian(x -> gradient(f, x)[1], x)[2]
+
+hessian_dual(f, x::Number) = ForwardDiff.derivative(x -> gradient(f, x)[1], x)
 
 """
    isderiving()
@@ -122,13 +144,13 @@ Check whether the current function call is happening while taking the derivative
     julia> function f(x)
              @show isderiving()
            end
-    
+
     f (generic function with 1 method)
-    
+
     julia> f(3)
     isderiving() = false
     false
-    
+
     julia> gradient(f, 4)
     isderiving() = true
     (nothing,)
