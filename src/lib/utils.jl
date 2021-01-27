@@ -239,8 +239,9 @@ function jacobian(f, args...)
 end
 
 _jvec(x::AbstractArray) = vec(x)
-_jvec(x::Number) = vcat(x)
+_jvec(x::Number) = _jvec(vcat(x))
 _jvec(x) = throw(ArgumentError("jacobian expected a function which returns an array, or a scalar, got $(typeof(x))"))
+_jvec(x::AbstractArray{<:Complex}) = throw(ArgumentError("jacobian does not accept complex output"))
 
 _gradcopy!(dst::AbstractArray, src::AbstractArray{<:Number}) = copyto!(dst, src)
 _gradcopy!(dst::AbstractArray, src::Number) = copyto!(dst, src)
