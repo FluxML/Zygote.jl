@@ -226,15 +226,13 @@ function jacobian(f, args...)
       x isa Number ? similar(y, T, length(y)) :
       nothing
   end
-  delta = fill!(similar(y), 0)
+  delta = Diagonal(fill!(similar(y), 1))
   for k in LinearIndices(y)
-    delta[k] = 1
-    grads = back(delta)
+    grads = back(delta[:,k])
     for (dx, grad) in zip(out, grads)
       dx isa AbstractArray || continue
       _gradcopy!(view(dx,k,:), grad)
     end
-    delta[k] = 0
   end
   out
 end
@@ -281,15 +279,13 @@ function jacobian(f, pars::Params)
     J = similar(y, T, length(y), length(p))
     out[p] = J
   end
-  delta = fill!(similar(y), 0)
+  delta = Diagonal(fill!(similar(y), 1))
   for k in LinearIndices(y)
-    delta[k] = 1
-    grads = back(delta)
+    grads = back(delta[:,k])
     for p in pars
       out[p] isa AbstractArray || continue
       _gradcopy!(view(out[p],k,:), grads[p])
     end
-    delta[k] = 0
   end
   Grads(out, pars)
 end
