@@ -226,7 +226,7 @@ function jacobian(f, args...)
       x isa Number ? similar(y, T, length(y)) :
       nothing
   end
-  delta = Diagonal(fill!(similar(y), 1))
+  delta = diagm(fill!(similar(y), 1))
   for k in LinearIndices(y)
     grads = back(delta[:,k])
     for (dx, grad) in zip(out, grads)
@@ -279,7 +279,7 @@ function jacobian(f, pars::Params)
     J = similar(y, T, length(y), length(p))
     out[p] = J
   end
-  delta = Diagonal(fill!(similar(y), 1))
+  delta = diagm(fill!(similar(y), 1))
   for k in LinearIndices(y)
     grads = back(delta[:,k])
     for p in pars
