@@ -131,12 +131,12 @@ isderiving(x) = false
 Construct the Hessian `∂²f/∂x∂x`, where `x` is a real number or an array,
 and `f(x)` is a real number.
 
-Uses forward over reverse, ForwardDiff over Zygote, by default: `hessian_dual(f, x)`.
+Uses forward over reverse, ForwardDiff over Zygote, calling `hessian_dual(f, x)`.
 See [`hessian_reverse`](@ref) for an all-Zygote version.
 
 # Examples
 
-```jldoctest
+```jldoctest; setup=:(using Zygote)
 julia> Zygote.hessian(x -> x[1]*x[2], randn(2))
 2×2 Array{Float64,2}:
  0.0  1.0
@@ -246,7 +246,7 @@ _jvec(x::AbstractArray{<:Complex}) = throw(ArgumentError("jacobian does not acce
 
 _gradcopy!(dst::AbstractArray, src::AbstractArray{<:Number}) = copyto!(dst, src)
 _gradcopy!(dst::AbstractArray, src::Number) = copyto!(dst, src)
-_gradcopy!(dst::AbstractArray, ::Nothing) = dst .= false
+_gradcopy!(dst::AbstractArray, src::Nothing) = dst .= 0
 _gradcopy!(dst::AbstractArray, src::AbstractArray) = copyto!(dst, g isa Number ? g : 0 for g in src) # e.g. Union{Nothing,Float64}
 
 """
