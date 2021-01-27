@@ -100,6 +100,32 @@ macro showgrad(x)
 end
 
 """
+   isderiving()
+   isderiving(x)
+
+Check whether the current function call is happening while taking the derivative.
+
+
+    julia> function f(x)
+             @show isderiving()
+           end
+
+    f (generic function with 1 method)
+
+    julia> f(3)
+    isderiving() = false
+    false
+
+    julia> gradient(f, 4)
+    isderiving() = true
+    (nothing,)
+"""
+isderiving() = false
+isderiving(x) = false
+@adjoint isderiving() = true, _ -> nothing
+@adjoint isderiving(x) = true, x -> (nothing,)
+
+"""
     hessian(f, x)
 
 Construct the Hessian `∂²f/∂x∂x`, where `x` is a real number or an array,
@@ -134,28 +160,122 @@ hessian_dual(f, x::AbstractArray) = forward_jacobian(x -> gradient(f, x)[1], x)[
 
 hessian_dual(f, x::Number) = ForwardDiff.derivative(x -> gradient(f, x)[1], x)
 
+
 """
-   isderiving()
-   isderiving(x)
+    jacobian(f, args...)
 
-Check whether the current function call is happening while taking the derivative.
+For each array `a ∈ args` this returns a matrix with `Ja[k,i] = ∂y[k]/∂a[i]`
+where `y = f(args...)` is usually a vector.
+For scalar `x::Number ∈ args`, the result `Jx[k,1] = ∂y[k]/∂x` is a vector,
+while for scalar `y` all results have just one row.
 
+For any other argument type, no result is produced, even if [`gradient`](@ref) would work.
 
-    julia> function f(x)
-             @show isderiving()
-           end
+This reverse-mode Jacobian needs to evaluate the pullback once for each element of `y`.
+This is usually only efficient when `length(y)` is small compared to `length(a)`,
+otherwise forward mode is likely to be better.
 
-    f (generic function with 1 method)
+# Examples
 
-    julia> f(3)
-    isderiving() = false
-    false
+```jldoctest
+julia> jacobian(a -> 100*a[1:3].^2, 1:7)[1]  # first index (rows) is output
+3×7 Array{$Int,2}:
+ 200    0    0  0  0  0  0
+   0  400    0  0  0  0  0
+   0    0  600  0  0  0  0
 
-    julia> gradient(f, 4)
-    isderiving() = true
-    (nothing,)
+julia> jacobian((a,x) -> a.^2 .* x, [1,2,3], 1)  # scalar argument has vector jacobian
+([2 0 0; 0 4 0; 0 0 6], [1, 4, 9])
+
+julia> jacobian((a,d) -> prod(a, dims=d), [1 2; 3 4; 5 6], 2)
+([2 0 … 0 0; 0 4 … 3 0; 0 0 … 0 5], [0, 0, 0])
+```
+
+!!! Warning: for arguments of any type except `Number` & `AbstractArray`, the result is `nothing`.
+
+```jldoctest
+julia> jacobian((a,s) -> a.^length(s), [1,2,3], "str")
+([3 0 0; 0 12 0; 0 0 27], nothing)
+
+julia> jacobian((a,t) -> sum(a .* t[1]) + t[2], [1,2,3], (4,5))
+([4 4 4], nothing)
+
+julia> gradient((a,t) -> sum(a .* t[1]) + t[2], [1,2,3], (4,5))  # gradient undersands the tuple
+([4, 4, 4], (6, 1))
+ ```
 """
-isderiving() = false
-isderiving(x) = false
-@adjoint isderiving() = true, _ -> nothing
-@adjoint isderiving(x) = true, x -> (nothing,)
+function jacobian(f, args...)
+  y, back = pullback(_jvec∘f, args...)
+  out = map(args) do x
+    T = promote_type(eltype(x), eltype(y))
+    dx = x isa AbstractArray ? similar(x, T, length(y), length(x)) :
+      x isa Number ? similar(y, T, length(y)) :
+      nothing
+  end
+  delta = fill!(similar(y), 0)
+  for k in LinearIndices(y)
+    delta[k] = 1
+    grads = back(delta)
+    for (dx, grad) in zip(out, grads)
+      dx isa AbstractArray || continue
+      _gradcopy!(view(dx,k,:), grad)
+    end
+    delta[k] = 0
+  end
+  out
+end
+
+_jvec(x::AbstractArray) = vec(x)
+_jvec(x::Number) = vcat(x)
+_jvec(x) = throw(ArgumentError("jacobian expected a function which returns an array, or a scalar, got $(typeof(x))"))
+
+_gradcopy!(dst::AbstractArray, src::AbstractArray{<:Number}) = copyto!(dst, src)
+_gradcopy!(dst::AbstractArray, src::Number) = copyto!(dst, src)
+_gradcopy!(dst::AbstractArray, ::Nothing) = dst .= false
+_gradcopy!(dst::AbstractArray, src::AbstractArray) = copyto!(dst, g isa Number ? g : 0 for g in src) # e.g. Union{Nothing,Float64}
+
+"""
+    jacobian(loss, ::Params)
+
+Like `gradient` with implicit parameters, this method takes a zero-argument function
+and returns an `IdDict`-like object, now containing the Jacobian for each parameter.
+
+# Examples
+```jldoctest
+julia> xs = [1 2; 3 4]; ys = [5,7,9];
+
+julia> Jxy = jacobian(() -> ys[1:2] .+ sum(xs.^2), Params([xs, ys]))
+Grads(...)
+
+julia> Jxy[ys]
+2×3 Array{$Int,2}:
+ 1  0  0
+ 0  1  0
+
+julia> Jxy[xs]
+2×4 Array{$Int,2}:
+ 2  6  4  8
+ 2  6  4  8
+```
+"""
+function jacobian(f, pars::Params)
+  y, back = pullback(_jvec∘f, pars)
+  out = IdDict()
+  for p in pars
+    T = Base.promote_type(eltype(p), eltype(y))
+    J = similar(y, T, length(y), length(p))
+    out[p] = J
+  end
+  delta = fill!(similar(y), 0)
+  for k in LinearIndices(y)
+    delta[k] = 1
+    grads = back(delta)
+    for p in pars
+      out[p] isa AbstractArray || continue
+      _gradcopy!(view(out[p],k,:), grads[p])
+    end
+    delta[k] = 0
+  end
+  Grads(out, pars)
+end
+

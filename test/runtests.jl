@@ -6,9 +6,12 @@ using CUDA: has_cuda
   include("interface.jl")
 end
 
-
 @testset "Tools" begin
   include("tools.jl")
+end
+
+@testset "Utils" begin
+  include("utils.jl")
 end
 
 @testset "lib/number" begin
