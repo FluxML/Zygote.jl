@@ -132,6 +132,7 @@ Construct the Hessian `∂²f/∂x∂x`, where `x` is a real number or an array,
 and `f(x)` is a real number.
 
 Uses forward over reverse, ForwardDiff over Zygote, by default: `hessian_dual(f, x)`.
+See [`hessian_reverse`](@ref) for an all-Zygote version.
 
 # Examples
 
@@ -160,6 +161,16 @@ hessian_dual(f, x::AbstractArray) = forward_jacobian(x -> gradient(f, x)[1], x)[
 
 hessian_dual(f, x::Number) = ForwardDiff.derivative(x -> gradient(f, x)[1], x)
 
+"""
+    hessian_reverse(f, x)
+
+This should be equivalent to [`hessian(f, x)`](@ref hessian),
+but implemented using reverse over reverse mode, all Zygote.
+(This is usually much slower, and more likely to find errors.)
+"""
+hessian_reverse(f, x::AbstractArray) = jacobian(x -> gradient(f, x)[1], x)[1]
+
+hessian_reverse(f, x::Number) = gradient(x -> gradient(f, x)[1], x)[1]
 
 """
     jacobian(f, args...)
@@ -174,6 +185,8 @@ For any other argument type, no result is produced, even if [`gradient`](@ref) w
 This reverse-mode Jacobian needs to evaluate the pullback once for each element of `y`.
 This is usually only efficient when `length(y)` is small compared to `length(a)`,
 otherwise forward mode is likely to be better.
+
+See also [`hessian`](@ref), [`hessian_reverse`](@ref).
 
 # Examples
 

@@ -1,4 +1,22 @@
 using LinearAlgebra
+using Zygote: hessian_dual, hessian_reverse
+
+@testset "hessian: $hess" for hess in [hessian_dual, hessian_reverse]
+
+  if hess == hessian_dual
+    @test hess(x -> x[1]*x[2], randn(2)) ≈ [0 1; 1 0]
+    @test hess(((x,y),) -> x*y, randn(2)) ≈ [0 1; 1 0]  # original docstring version
+  else
+    @test_broken hess(x -> x[1]*x[2], randn(2)) ≈ [0 1; 1 0]  # can't differentiate ∇getindex
+    @test_broken hess(((x,y),) -> x*y, randn(2)) ≈ [0 1; 1 0]
+  end
+  @test hess(x -> sum(x.^3), [1 2; 3 4]) ≈ Diagonal([6, 18, 12, 24])
+  @test hess(sin, pi/2) ≈ -1
+
+  @test_throws Exception hess(sin, im*pi)
+  @test_throws Exception hess(x -> x+im, pi)
+  @test_throws Exception hess(identity, randn(2))
+end
 
 @testset "jacobian(f, x, y)" begin
   j1 = jacobian((a,x) -> a.^2 .* x, [1,2,3], 1)
