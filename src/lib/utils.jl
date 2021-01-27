@@ -204,7 +204,8 @@ julia> jacobian((a,d) -> prod(a, dims=d), [1 2; 3 4; 5 6], 2)
 ([2 0 … 0 0; 0 4 … 3 0; 0 0 … 0 5], [0, 0, 0])
 ```
 
-!!! Warning: for arguments of any type except `Number` & `AbstractArray`, the result is `nothing`.
+!!! warning
+    For arguments of any type except `Number` & `AbstractArray`, the result is `nothing`.
 
 ```jldoctest
 julia> jacobian((a,s) -> a.^length(s), [1,2,3], "str")
@@ -215,7 +216,7 @@ julia> jacobian((a,t) -> sum(a .* t[1]) + t[2], [1,2,3], (4,5))
 
 julia> gradient((a,t) -> sum(a .* t[1]) + t[2], [1,2,3], (4,5))  # gradient undersands the tuple
 ([4, 4, 4], (6, 1))
- ```
+```
 """
 function jacobian(f, args...)
   y, back = pullback(_jvec∘f, args...)
