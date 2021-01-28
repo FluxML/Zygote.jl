@@ -12,6 +12,7 @@ Zygote.hessian
 Zygote.Buffer
 Zygote.forwarddiff
 Zygote.ignore
+Zygote.checkpointed
 ```
 
 `Params` and `Grads` can be copied to and from arrays using the `copy!` function.
