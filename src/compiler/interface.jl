@@ -122,12 +122,22 @@ function copy!(x::AbstractVector, ps::Params)
   ps
 end
 
+"""
+    gradient(() -> loss(), ::Params) -> Grads
+
+Gradient with implicit parameters. Returns a container, from which
+`grads[W]` extracts the gradient with respect to `W`.
+This contains as `grads.value` the value of the function.
+"""
+function gradient end
 
 struct Grads{T}
   grads::IdDict{Any,Any}
   params::Params
   value::T
 end
+
+Grads(gs, ps) = Grads(gs, ps, nothing)
 
 Base.show(io::IO, gs::Grads) = print(io, "Grads([...], value = ", gs.value, ")")
 
