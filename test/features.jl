@@ -296,6 +296,7 @@ let
     p′[1]
   end
   @test θ̄[p][1] == 1
+  @test θ̄.value == 1
 end
 
 @test gradient(2) do x

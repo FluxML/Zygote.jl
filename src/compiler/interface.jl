@@ -123,12 +123,13 @@ function copy!(x::AbstractVector, ps::Params)
 end
 
 
-struct Grads
+struct Grads{T}
   grads::IdDict{Any,Any}
   params::Params
+  value::T
 end
 
-Base.show(io::IO, ps::Grads) = print(io, "Grads(...)")
+Base.show(io::IO, gs::Grads) = print(io, "Grads([...], value = ", gs.value, ")")
 
 @forward Grads.grads Base.getindex, Base.haskey
 
@@ -170,7 +171,7 @@ function pullback(f, ps::Params)
       cache(cx)[p] = nothing
     end
     back(Δ)
-    Grads(cx.cache, ps) # TODO make a copy
+    Grads(cx.cache, ps, y) # TODO make a copy
   end
 end
 
