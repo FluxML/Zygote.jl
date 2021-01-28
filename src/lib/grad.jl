@@ -25,8 +25,8 @@ intermediate results from the forward pass of `f` will not be stored. Instead th
 pass will be repeated, when computing the derivative.
 This saves memory at the cost of increasing exectution time.
 
-!!! Warning:
-If `f` is not a pure function, `checkpointed` will likely give wrong results.
+!!! warning
+    If `f` is not a pure function, `checkpointed` will likely give wrong results.
 """
 checkpointed(f, xs...) = f(xs...)
 
