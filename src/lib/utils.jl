@@ -128,11 +128,13 @@ isderiving(x) = false
 """
     hessian(f, x)
 
-Construct the Hessian `∂²f/∂x∂x`, where `x` is a real number or an array,
-and `f(x)` is a real number.
+Construct the Hessian `∂²f/∂x²`, where `x` is a real number or an array,
+and `f(x)` is a real number. When `x` is an array, the result is a matrix
+`H[i,j] = ∂²f/∂x[i]∂x[j]`, using linear indexing `x[i]` even if the argument
+is higher-dimensional.
 
-Uses forward over reverse, ForwardDiff over Zygote, calling `hessian_dual(f, x)`.
-See [`hessian_reverse`](@ref) for an all-Zygote version.
+This uses forward over reverse, ForwardDiff over Zygote, calling `hessian_dual(f, x)`.
+See [`hessian_reverse`](@ref) for an all-Zygote alternative.
 
 # Examples
 
@@ -173,24 +175,26 @@ hessian_reverse(f, x::AbstractArray) = jacobian(x -> gradient(f, x)[1], x)[1]
 hessian_reverse(f, x::Number) = gradient(x -> gradient(f, x)[1], x)[1]
 
 """
-    jacobian(f, args...)
+    jacobian(f, args...) -> Tuple
 
 For each array `a ∈ args` this returns a matrix with `Ja[k,i] = ∂y[k]/∂a[i]`
 where `y = f(args...)` is usually a vector.
+Arrays of higher dimension are treated like `vec(a)`, or `vec(y)` for output.
+
 For scalar `x::Number ∈ args`, the result `Jx[k,1] = ∂y[k]/∂x` is a vector,
 while for scalar `y` all results have just one row.
 
-For any other argument type, no result is produced, even if [`gradient`](@ref) would work.
+With any other argument type, no result is produced, even if [`gradient`](@ref) would work.
 
 This reverse-mode Jacobian needs to evaluate the pullback once for each element of `y`.
-This is usually only efficient when `length(y)` is small compared to `length(a)`,
+Doing so is usually only efficient when `length(y)` is small compared to `length(a)`,
 otherwise forward mode is likely to be better.
 
 See also [`hessian`](@ref), [`hessian_reverse`](@ref).
 
 # Examples
 
-```jldoctest
+```jldoctest; setup=:(using Zygote)
 julia> jacobian(a -> 100*a[1:3].^2, 1:7)[1]  # first index (rows) is output
 3×7 Array{$Int,2}:
  200    0    0  0  0  0  0
@@ -207,7 +211,7 @@ julia> jacobian((a,d) -> prod(a, dims=d), [1 2; 3 4; 5 6], 2)
 !!! warning
     For arguments of any type except `Number` & `AbstractArray`, the result is `nothing`.
 
-```jldoctest
+```jldoctest; setup=:(using Zygote)
 julia> jacobian((a,s) -> a.^length(s), [1,2,3], "str")
 ([3 0 0; 0 12 0; 0 0 27], nothing)
 
@@ -257,11 +261,11 @@ _gradcopy!(dst::AbstractArray, src::AbstractArray) = copyto!(dst, g isa Number ?
 """
     jacobian(loss, ::Params)
 
-Like `gradient` with implicit parameters, this method takes a zero-argument function
+Like [`gradient`](@ref) with implicit parameters, this method takes a zero-argument function
 and returns an `IdDict`-like object, now containing the Jacobian for each parameter.
 
 # Examples
-```jldoctest
+```jldoctest; setup=:(using Zygote)
 julia> xs = [1 2; 3 4]; ys = [5,7,9];
 
 julia> Jxy = jacobian(() -> ys[1:2] .+ sum(xs.^2), Params([xs, ys]))
