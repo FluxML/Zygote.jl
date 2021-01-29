@@ -111,3 +111,29 @@ a real.
      1  0
 """
 hessian(f, x::AbstractArray) = forward_jacobian(x -> gradient(f, x)[1], x)[2]
+
+"""
+   isderiving()
+   isderiving(x)
+
+Check whether the current function call is happening while taking the derivative.
+
+
+    julia> function f(x)
+             @show isderiving()
+           end
+    
+    f (generic function with 1 method)
+    
+    julia> f(3)
+    isderiving() = false
+    false
+    
+    julia> gradient(f, 4)
+    isderiving() = true
+    (nothing,)
+"""
+isderiving() = false
+isderiving(x) = false
+@adjoint isderiving() = true, _ -> nothing
+@adjoint isderiving(x) = true, x -> (nothing,)
