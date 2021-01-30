@@ -94,7 +94,7 @@ For each array `a ∈ args` this returns a matrix with `Ja[k,i] = ∂y[k]/∂a[i
 where `y = f(args...)` is usually a vector.
 Arrays of higher dimension are treated like `vec(a)`, or `vec(y)` for output.
 
-For scalar `x::Number ∈ args`, the result `Jx[k,1] = ∂y[k]/∂x` is a vector,
+For scalar `x::Number ∈ args`, the result is a vector `Jx[k] = ∂y[k]/∂x`,
 while for scalar `y` all results have just one row.
 
 With any other argument type, no result is produced, even if [`gradient`](@ref) would work.
