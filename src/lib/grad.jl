@@ -53,19 +53,19 @@ See [`hessian_reverse`](@ref) for an all-Zygote alternative.
 # Examples
 
 ```jldoctest; setup=:(using Zygote)
-julia> Zygote.hessian(x -> x[1]*x[2], randn(2))
+julia> hessian(x -> x[1]*x[2], randn(2))
 2×2 Array{Float64,2}:
  0.0  1.0
  1.0  0.0
 
-julia> Zygote.hessian(x -> sum(x.^3), [1 2; 3 4])  # uses linear indexing of x
+julia> hessian(x -> sum(x.^3), [1 2; 3 4])  # uses linear indexing of x
 4×4 Array{$Int,2}:
  6   0   0   0
  0  18   0   0
  0   0  12   0
  0   0   0  24
 
-julia> Zygote.hessian(sin, pi/2)
+julia> hessian(sin, pi/2)
 -1.0
 ```
 """
