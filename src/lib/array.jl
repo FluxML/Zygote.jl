@@ -76,6 +76,14 @@ end
   end
 end
 
+@adjoint! function pop!(xs::AbstractVector{<:AbstractArray{T}}) where T
+  sz_xs = size.(xs)
+  op = pop!(xs)
+  op, Δ -> begin
+    ([Ones{T}(sz...) for sz in sz_xs], )
+  end
+end
+
 # General
 
 @adjoint collect(x::Array) = collect(x), Δ -> (Δ,)
