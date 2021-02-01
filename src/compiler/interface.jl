@@ -51,7 +51,7 @@ sensitivity(y) = error("Output should be scalar; gradients are not defined for o
 Returns a tuple containing `∂f/∂x` for each argument `x`,
 the derivative (for scalar x) or the gradient.
 
-`f(x)` must be a real number, see [`jacobian`](@ref) for array output.
+`f(args...)` must be a real number, see [`jacobian`](@ref) for array output.
 """
 function gradient(f, args...)
   y, back = pullback(f, args...)
