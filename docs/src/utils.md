@@ -1,6 +1,14 @@
 # Utilities
 
-Zygote provides a set of helpful utilities. These are all "user-level" tools –
+Zygote's gradients can be used to construct a Jacobian (by repeated evaluation)
+or a Hessian (by taking a second derivative).
+
+```@docs
+Zygote.jacobian
+Zygote.hessian
+```
+
+Zygote also provides a set of helpful utilities. These are all "user-level" tools –
 in other words you could have written them easily yourself, but they live in
 Zygote for convenience.
 
@@ -8,7 +16,6 @@ Zygote for convenience.
 Zygote.@showgrad
 Zygote.hook
 Zygote.dropgrad
-Zygote.hessian
 Zygote.Buffer
 Zygote.forwarddiff
 Zygote.ignore

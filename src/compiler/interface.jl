@@ -42,8 +42,17 @@ end
 
 sensitivity(y::Number) = one(y)
 sensitivity(y::Complex) = error("Output is complex, so the gradient is not defined.")
+sensitivity(y::AbstractArray) = error("output an array, so the gradient is not defined. Perhaps you wanted jacobian.")
 sensitivity(y) = error("Output should be scalar; gradients are not defined for output $(repr(y))")
 
+"""
+    gradient(f, args...)
+
+Returns a tuple containing `∂f/∂x` for each argument `x`,
+the derivative (for scalar x) or the gradient.
+
+`f(args...)` must be a real number, see [`jacobian`](@ref) for array output.
+"""
 function gradient(f, args...)
   y, back = pullback(f, args...)
   return back(sensitivity(y))
