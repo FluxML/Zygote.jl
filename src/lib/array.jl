@@ -331,6 +331,27 @@ end
   end
 end
 
+@adjoint eachrow(x::AbstractVecOrMat) = collect(eachrow(x)), dys -> ∇eachslice(dys, x, 1)
+@adjoint eachcol(x::AbstractVecOrMat) = collect(eachcol(x)), dys -> ∇eachslice(dys, x, 2)
+@adjoint eachslice(x::AbstractArray; dims::Integer) =
+  collect(eachslice(x; dims=dims)), dys -> ∇eachslice(dys, x, dims)
+
+function ∇eachslice(dys, x::AbstractArray, dim::Integer) where {TX}
+  i1 = findfirst(dy -> dy isa AbstractArray, dys)
+  i1 === nothing && return (zero(x),) # all slices get nothing
+  T = promote_type(eltype(dys[i1]), eltype(x))
+  dx = similar(x, T)
+  for i in axes(x, dim)
+    if dys[i] isa AbstractArray
+      copyto!(selectdim(dx,dim,i), dys[i])
+    else
+      selectdim(dx,dim,i) .= 0
+    end
+  end
+  (dx,)
+end
+
+
 # LinearAlgebra
 # =============
 
