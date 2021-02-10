@@ -54,15 +54,15 @@ _droplike(dy::Union{LinearAlgebra.Adjoint, LinearAlgebra.Transpose}, dxv::Abstra
 
 @adjoint getindex(::Type{T}, xs...) where {T} = T[xs...], dy -> (nothing, dy...)
 
-@adjoint! setindex!(xs::AbstractArray, x...) = setindex!(xs, x...),
-  _ -> error("Mutating arrays is not supported")
+@adjoint! setindex!(xs::Array, x...) = setindex!(xs, x...),
+  _ -> error("Mutating Arrays is not supported")
 
-@adjoint! copyto!(args...) = copyto!(args...),
-  _ -> error("Mutating arrays is not supported")
+@adjoint! copyto!(dest::Array, args...) = copyto!(dest, args...),
+  _ -> error("Mutating Arrays is not supported")
 
 for f in [push!, pop!, pushfirst!, popfirst!]
-  @eval @adjoint! $f(xs::Vector, x...) =
-    push!(xs, x...), _ -> error("Mutating arrays is not supported")
+  @eval @adjoint! $f(xs::Vector, x...) = $f(xs, x...),
+    _ -> error("Mutating Arrays is not supported")
 end
 
 # General
