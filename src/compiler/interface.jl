@@ -2,6 +2,7 @@ using InteractiveUtils
 using InteractiveUtils: typesof
 using Core: Typeof
 import Base: copy!
+import Base.Broadcast: broadcasted
 
 mutable struct Context <: AContext
   cache::Union{IdDict{Any,Any},Nothing}
@@ -139,7 +140,8 @@ end
 
 Base.show(io::IO, ps::Grads) = print(io, "Grads(...)")
 
-@forward Grads.grads Base.getindex, Base.haskey
+@forward Grads.grads  Base.haskey
+@forward Grads.params  Base.length
 
 function Base.getindex(gs::Grads, x)
   isbits(x) && error("Only reference types can be differentiated with `Params`.")
@@ -169,6 +171,39 @@ function copy!(x::AbstractVector,  gs::Grads)
       i += length(p)
   end
   x
+end
+
+# # Gradient Algebra: unary 
+# for op in (:+, :-)
+#   @eval broadcasted(::typeof($op), gs::Grads) = map($op, gs)
+# end
+
+# # Gradient Algebra: binary 
+# for op in (:+, :-)
+#   @eval broadcasted(::typeof($op), gs1::Grads, gs2::Grads) = map($op, gs1, gs2)
+# end
+
+broadcasted(f, gss::Grads...) = map(f, gss...)
+broadcasted(f, gs1::Grads, xs...) = map(f, gs1, xs...)
+broadcasted(::typeof(*), a::Number, gs::Grads) = map(*, gs, a)
+
+function Base.map(f, gs1::Grads, gss::Grads...)
+  @assert all(issetequal(gs1.params, gs.params) for gs in gss)
+  grads = IdDict{Any,Any}()
+  ps = Params(gs1.params)
+  for p in ps
+    grads[p] = f(gs1[p], (gs[p] for gs in gss)...) 
+  end
+  return Grads(grads, ps)
+end
+
+function Base.map(f, gs1::Grads, xs...)
+  grads = IdDict{Any,Any}()
+  ps = Params(gs1.params)
+  for p in ps
+    grads[p] = f(gs1[p], xs...) 
+  end
+  return Grads(grads, ps)
 end
 
 function pullback(f, ps::Params)

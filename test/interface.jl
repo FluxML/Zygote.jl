@@ -1,4 +1,6 @@
-@testset "Parmas" begin
+using Zygote: Grads
+
+@testset "Params" begin
   @testset "delete!" begin
     w = rand(2,3)
     b = rand(2)
@@ -55,4 +57,37 @@
     @test ps1 == ps2 
     @test ps1 != ps3  # comparison is order dependent
   end
+end
+
+@testset "Grads" begin
+  @testset "algebra" begin
+    w = rand(2)
+    x1 = rand(2)
+    x2 = rand(2)
+    
+    gs1 = gradient(() -> sum(w .* x1), Params([w])) 
+    gs2 = gradient(() -> sum(w .* x2), Params([w])) 
+    
+    @test .- gs1 isa Grads
+    @test gs1 .- gs2 isa Grads 
+    @test .+ gs1 isa Grads
+    @test gs1 .+ gs2 isa Grads 
+    @test 2 .* gs1 isa Grads 
+    @test gs1 .* 2 isa Grads 
+    @test gs1 ./ 2 isa Grads  
+    @test gs1 .+ rand(2) isa Grads  
+  end
+
+  @testset "map and broadcast" begin
+    w = rand(2)
+    x1 = rand(2)
+    x2 = rand(2)
+    
+    gs1 = gradient(() -> sum(w .* x1), Params([w])) 
+    gs2 = gradient(() -> sum(w .* x2), Params([w])) 
+    
+    @test map(x -> zeros(2), gs1) isa Grads
+    @test (x -> zeros(2)).(gs1) isa Grads
+  end
+
 end
