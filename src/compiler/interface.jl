@@ -151,7 +151,7 @@ Base.pairs(gs::Grads) =  (p => gs.grads[p] for p in gs.params)
 
 function Base.iterate(gs::Grads, state...)
   res = iterate(gs.params, state...)
-  res === nothing && return nothing
+  isnothing(res) && return nothing
   p, next_state = res
   return gs[p], next_state
 end
