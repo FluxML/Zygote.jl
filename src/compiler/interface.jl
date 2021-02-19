@@ -176,8 +176,8 @@ end
 broadcasted(f, gss::Grads...) = map(f, gss...)
 
 for op in (:*, :/)
-  @eval broadcasted(::typeof($op), a::Number, gs::Grads) = _mapscalar($op, a, gs)
-  @eval broadcasted(::typeof($op), gs::Grads, a::Number) = _mapscalar($op, gs, a)
+  @eval broadcasted(::typeof($op), a::Number, gs::Grads) = map(x -> $op.(a, x), gs)
+  @eval broadcasted(::typeof($op), gs::Grads, a::Number) = map(x -> $op.(x, a), gs)
 end
 
 function Base.map(f, gs1::Grads, gss::Grads...)
@@ -189,22 +189,6 @@ function Base.map!(f, gsout::Grads, gss::Grads...)
   @assert all(issetequal(gsout.params, gs.params) for gs in gss)
   for p in gsout.params
     gsout[p] = f((_getformap(gs, p) for gs in gss)...) 
-  end
-  return gsout
-end
-
-function _mapscalar(f, gs::Grads, xs...)
-  gsout = Grads(IdDict{Any,Any}(), Params(gs.params))
-  for p in gsout.params
-    gsout[p] = f(_getformap(gs, p), xs...) 
-  end
-  return gsout 
-end
-
-function _mapscalar(f, x, gs::Grads, xs...)
-  gsout = Grads(IdDict{Any,Any}(), Params(gs.params))
-  for p in gsout.params
-    gsout[p] = f(x, _getformap(gs, p), xs...) 
   end
   return gsout
 end
