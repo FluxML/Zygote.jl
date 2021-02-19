@@ -102,9 +102,22 @@ end
     
     @test map(x -> zeros(2), gs1) isa Grads
     
-    @test map!(x -> clamp!(x, -1e-5, 1e-5), gs1, gs1) isa Grads
-    @test all(abs.(gs1[w]) .<= 1e-5) 
+    gs11 = map(x -> clamp.(x, -1e-5, 1e-5), gs1) 
+    @test gs11 isa Grads
+    @test all(abs.(gs11[w]) .<= 1e-5) 
   
     @test (x -> zeros(2)).(gs1) isa Grads
+  end
+
+  @testset "dictionary" begin
+    w, b, x = rand(2), rand(2), rand(2)
+    ps = Params([w, b])
+    gs = gradient(() -> sum(tanh.(w .* x .+ b)), ps) 
+    
+    @test issetequal(keys(gs), ps) 
+
+    foreach(x -> clamp!(x, -1e-5, 1e-5), gs)
+    @test all(abs.(gs[w]) .<= 1e-5) 
+    @test all(abs.(gs[b]) .<= 1e-5) 
   end
 end

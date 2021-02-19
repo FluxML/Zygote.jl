@@ -143,6 +143,19 @@ Base.show(io::IO, ps::Grads) = print(io, "Grads(...)")
 @forward Grads.grads  Base.haskey, Base.setindex!
 @forward Grads.params  Base.length
 
+# Dictionary interface.
+# Don't use the IdDict dircetly since it sometimes contains some spurios pairs. 
+Base.keys(gs::Grads) = gs.params
+Base.values(gs::Grads) =  (gs.grads[p] for p in gs.params)
+Base.pairs(gs::Grads) =  (p => gs.grads[p] for p in gs.params)
+
+function Base.iterate(gs::Grads, state...)
+  res = iterate(gs.params, state...)
+  res === nothing && return nothing
+  p, next_state = res
+  return gs[p], next_state
+end
+
 function Base.getindex(gs::Grads, x)
   isbits(x) && error("Only reference types can be differentiated with `Params`.")
   return gs.grads[x]
@@ -186,7 +199,8 @@ function Base.map(f, gs1::Grads, gss::Grads...)
 end
 
 function Base.map!(f, gsout::Grads, gss::Grads...)
-  @assert all(issetequal(gsout.params, gs.params) for gs in gss)
+  all(issetequal(gsout.params, gs.params) for gs in gss) || 
+    throw(ArgumentError("map! expects Grads objects with the same Params"))
   for p in gsout.params
     gsout[p] = f((_getformap(gs, p) for gs in gss)...) 
   end
