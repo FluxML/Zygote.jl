@@ -101,6 +101,10 @@ end
     gs2 = gradient(() -> sum(w .* x2), Params([w])) 
     
     @test map(x -> zeros(2), gs1) isa Grads
+    
+    @test map!(x -> clamp!(x, -1e-5, 1e-5), gs1, gs1) isa Grads
+    @test all(abs.(gs1[w]) .<= 1e-5) 
+  
     @test (x -> zeros(2)).(gs1) isa Grads
   end
 end
