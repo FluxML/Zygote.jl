@@ -19,12 +19,12 @@ end
 @testset "jacobian" begin
   v1 = cu(collect(1:3f0))
 
-  res1 = jacobian(x -> x .* x', 1:3f0)[1]
+  res1 = jacobian(x -> x .* x', collect(1:3f0))[1]
   j1 = jacobian(x -> x .* x', v1)[1]
   @test j1 isa CuArray
   @test j1 ≈ cu(res1)
 
-  res2 = jacobian(x -> x ./ sum(x), 1:3f0)[1]
+  res2 = jacobian(x -> x ./ sum(x), collect(1:3f0))[1]
   j2 = jacobian(() -> v1 ./ sum(v1), Params([v1]))
   @test j2[v1] isa CuArray
   @test j2[v1] ≈ cu(res2)
