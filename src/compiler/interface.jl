@@ -188,27 +188,30 @@ end
 function Base.map!(f, gsout::Grads, gss::Grads...)
   @assert all(issetequal(gsout.params, gs.params) for gs in gss)
   for p in gsout.params
-    gsout[p] = f((gs[p] for gs in gss)...) 
+    gsout[p] = f((_getformap(gs, p) for gs in gss)...) 
   end
   return gsout
 end
 
 function _mapscalar(f, gs::Grads, xs...)
-  grads = IdDict{Any,Any}()
-  ps = Params(gs.params)
-  for p in ps
-    grads[p] = f(gs[p], xs...) 
+  gsout = Grads(IdDict{Any,Any}(), Params(gs.params))
+  for p in gsout.params
+    gsout[p] = f(_getformap(gs, p), xs...) 
   end
-  return Grads(grads, ps)
+  return gsout 
 end
 
 function _mapscalar(f, x, gs::Grads, xs...)
-  grads = IdDict{Any,Any}()
-  ps = Params(gs.params)
-  for p in ps
-    grads[p] = f(x, gs[p], xs...) 
+  gsout = Grads(IdDict{Any,Any}(), Params(gs.params))
+  for p in gsout.params
+    gsout[p] = f(x, _getformap(gs, p), xs...) 
   end
-  return Grads(grads, ps)
+  return gsout
+end
+
+function _getformap(gs::Grads, p)
+  g = gs[p]
+  g === nothing ? fill!(similar(p), 0) : g 
 end
 
 function pullback(f, ps::Params)
