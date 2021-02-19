@@ -140,7 +140,7 @@ end
 
 Base.show(io::IO, ps::Grads) = print(io, "Grads(...)")
 
-@forward Grads.grads  Base.haskey
+@forward Grads.grads  Base.haskey, Base.setindex!
 @forward Grads.params  Base.length
 
 function Base.getindex(gs::Grads, x)
@@ -173,35 +173,40 @@ function copy!(x::AbstractVector,  gs::Grads)
   x
 end
 
-# # Gradient Algebra: unary 
-# for op in (:+, :-)
-#   @eval broadcasted(::typeof($op), gs::Grads) = map($op, gs)
-# end
-
-# # Gradient Algebra: binary 
-# for op in (:+, :-)
-#   @eval broadcasted(::typeof($op), gs1::Grads, gs2::Grads) = map($op, gs1, gs2)
-# end
-
 broadcasted(f, gss::Grads...) = map(f, gss...)
-broadcasted(f, gs1::Grads, xs...) = map(f, gs1, xs...)
-broadcasted(::typeof(*), a::Number, gs::Grads) = map(*, gs, a)
+
+for op in (:*, :/)
+  @eval broadcasted(::typeof($op), a::Number, gs::Grads) = _mapscalar($op, a, gs)
+  @eval broadcasted(::typeof($op), gs::Grads, a::Number) = _mapscalar($op, gs, a)
+end
 
 function Base.map(f, gs1::Grads, gss::Grads...)
-  @assert all(issetequal(gs1.params, gs.params) for gs in gss)
+  gsout = Grads(IdDict{Any,Any}(), Params(gs1.params))
+  return map!(f, gsout, gs1, gss...)
+end
+
+function Base.map!(f, gsout::Grads, gss::Grads...)
+  @assert all(issetequal(gsout.params, gs.params) for gs in gss)
+  for p in gsout.params
+    gsout[p] = f((gs[p] for gs in gss)...) 
+  end
+  return gsout
+end
+
+function _mapscalar(f, gs::Grads, xs...)
   grads = IdDict{Any,Any}()
-  ps = Params(gs1.params)
+  ps = Params(gs.params)
   for p in ps
-    grads[p] = f(gs1[p], (gs[p] for gs in gss)...) 
+    grads[p] = f(gs[p], xs...) 
   end
   return Grads(grads, ps)
 end
 
-function Base.map(f, gs1::Grads, xs...)
+function _mapscalar(f, x, gs::Grads, xs...)
   grads = IdDict{Any,Any}()
-  ps = Params(gs1.params)
+  ps = Params(gs.params)
   for p in ps
-    grads[p] = f(gs1[p], xs...) 
+    grads[p] = f(x, gs[p], xs...) 
   end
   return Grads(grads, ps)
 end
