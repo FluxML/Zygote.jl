@@ -2,7 +2,7 @@ using InteractiveUtils
 using InteractiveUtils: typesof
 using Core: Typeof
 import Base: copy!
-import Base.Broadcast: broadcasted
+import Base.Broadcast: broadcasted, materialize!
 
 mutable struct Context <: AContext
   cache::Union{IdDict{Any,Any},Nothing}
@@ -144,7 +144,7 @@ Base.show(io::IO, ps::Grads) = print(io, "Grads(...)")
 @forward Grads.params  Base.length
 
 # Dictionary interface.
-# Don't use the IdDict dircetly since it sometimes contains some spurios pairs. 
+# Don't use the IdDict directly since it may contain some spurious pairs. 
 Base.keys(gs::Grads) = gs.params
 Base.values(gs::Grads) =  (gs.grads[p] for p in gs.params)
 Base.pairs(gs::Grads) =  (p => gs.grads[p] for p in gs.params)
@@ -193,6 +193,15 @@ for op in (:*, :/)
   @eval broadcasted(::typeof($op), gs::Grads, a::Number) = map(x -> $op.(x, a), gs)
 end
 
+function materialize!(gs1::Grads, gs2::Grads)
+  issetequal(gs1.params, gs2.params) || 
+    throw(ArgumentError("Expected Grads objects with the same Params."))
+  for p in gs1.params
+    gs1[p] = gs2[p]
+  end
+  return gs1
+end
+
 function Base.map(f, gs1::Grads, gss::Grads...)
   gsout = Grads(IdDict{Any,Any}(), Params(gs1.params))
   return map!(f, gsout, gs1, gss...)
@@ -200,7 +209,7 @@ end
 
 function Base.map!(f, gsout::Grads, gss::Grads...)
   all(issetequal(gsout.params, gs.params) for gs in gss) || 
-    throw(ArgumentError("map! expects Grads objects with the same Params"))
+    throw(ArgumentError("map! expects Grads objects with the same Params."))
   for p in gsout.params
     gsout[p] = f((_getformap(gs, p) for gs in gss)...) 
   end

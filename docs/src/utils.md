@@ -38,7 +38,7 @@ gs1 = gradient(() -> sum(tanh.(w .* x1 .+ b)), Params([w, b]))
 gs2 = gradient(() -> sum(tanh.(w .* x2 .+ b)), Params([w, b])) 
 
 # accumulate gradients
-gs = gs .+ gs
+gs = gs1 .+ gs2
 @test gs[w] ≈ gs1[w] + gs2[w] 
 @test gs[b] ≈ gs1[b] + gs2[b] 
 

@@ -78,6 +78,10 @@ end
     @test gs1 ./ 2 isa Grads  
     @test (gs1 .+ gs2)[w] ≈ gs1[w] .+ gs2[w] 
 
+    gs12 = gs1 .+ gs2
+    gs1 .+= gs2
+    @test gs12[w] ≈ gs1[w] 
+
     gs3 = gradient(() -> sum(w .* x1), Params([w, b])) # grad nothing with respect to b
     gs4 = gradient(() -> sum(w .* x2 .+ b), Params([w, b])) 
 
@@ -90,6 +94,7 @@ end
     @test gs3 ./ 2 isa Grads  
     @test (gs3 .+ gs4)[w] ≈ gs3[w] .+ gs4[w]
     @test (gs3 .+ gs4)[b] ≈ gs4[b] 
+
   end
 
   @testset "map and broadcast" begin
