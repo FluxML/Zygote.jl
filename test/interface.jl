@@ -74,6 +74,7 @@ end
     @test .+ gs1 isa Grads
     @test gs1 .+ gs2 isa Grads 
     @test 2 .* gs1 isa Grads 
+    @test (2 .* gs1)[w] ≈ 2 * gs1[w]
     @test gs1 .* 2 isa Grads 
     @test gs1 ./ 2 isa Grads  
     @test (gs1 .+ gs2)[w] ≈ gs1[w] .+ gs2[w] 
@@ -114,13 +115,22 @@ end
     @test (x -> zeros(2)).(gs1) isa Grads
   end
 
-  @testset "dictionary" begin
+  @testset "dictionary interface" begin
     w, b, x = rand(2), rand(2), rand(2)
     ps = Params([w, b])
     gs = gradient(() -> sum(tanh.(w .* x .+ b)), ps) 
     
     @test issetequal(keys(gs), ps) 
+    @test length(values(gs)) == 2
+    @test length(pairs(gs)) == 2
+  end
 
+  @testset "iteration" begin
+    w, b, x = rand(2), rand(2), rand(2)
+    ps = Params([w, b])
+    gs = gradient(() -> sum(tanh.(w .* x .+ b)), ps) 
+    
+    # value-based iteration
     foreach(x -> clamp!(x, -1e-5, 1e-5), gs)
     @test all(abs.(gs[w]) .<= 1e-5) 
     @test all(abs.(gs[b]) .<= 1e-5) 

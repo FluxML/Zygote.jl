@@ -24,10 +24,10 @@ Zygote.checkpointed
 
 `Params` and `Grads` can be copied to and from arrays using the `copy!` function.
 
-### Operations with Grads
+## Working with Grads
 
 Map, broadcast, and iteration are supported for the dictionary-like `Grads` objects.
-These operations preserve the keys and transform the values.
+These operations are value based and preserve the keys.
 
 ```julia
 using Zygote, Test
@@ -47,4 +47,8 @@ map(x -> clamp.(x, -0.1, 0.1), gs)
 
 # clip gradients in-place
 foreach(x -> clamp!(x, -0.1, 0.1), gs)
+
+for (p, g) in pairs(gs)
+  # do something with parameter `p` and corresponding gradient `g`
+end
 ```
