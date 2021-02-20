@@ -14,6 +14,8 @@ using MacroTools: @forward
 import Distributed: pmap, CachingPool, workers
 export Params, gradient, jacobian, hessian, pullback, pushforward, @code_adjoint
 
+const Numeric{T<:Number} = Union{T, AbstractArray{<:T}}
+
 include("tools/idset.jl")
 include("tools/buffer.jl")
 include("tools/builtins.jl")

@@ -2,6 +2,7 @@ using InteractiveUtils
 using InteractiveUtils: typesof
 using Core: Typeof
 import Base: copy!
+import Base.Broadcast: broadcasted, materialize!
 
 mutable struct Context <: AContext
   cache::Union{IdDict{Any,Any},Nothing}
@@ -139,7 +140,23 @@ end
 
 Base.show(io::IO, ps::Grads) = print(io, "Grads(...)")
 
-@forward Grads.grads Base.getindex, Base.haskey
+@forward Grads.grads  Base.setindex!
+@forward Grads.params  Base.length
+
+const ADictOrGrads = Union{AbstractDict, Grads}
+
+# Dictionary interface.
+# Don't use the IdDict directly since it may contain some spurious pairs.
+Base.haskey(gs::Grads, x) = x ∈ gs.params 
+Base.keys(gs::Grads) = gs.params
+Base.values(gs::Grads) = (gs.grads[p] for p in gs.params)
+
+function Base.iterate(gs::Grads, state...)
+  res = iterate(gs.params, state...)
+  isnothing(res) && return nothing
+  p, next_state = res
+  return gs[p], next_state
+end
 
 function Base.getindex(gs::Grads, x)
   isbits(x) && error("Only reference types can be differentiated with `Params`.")
@@ -169,6 +186,40 @@ function copy!(x::AbstractVector,  gs::Grads)
       i += length(p)
   end
   x
+end
+
+broadcasted(f, gs::Grads, gss::ADictOrGrads...) = map(f, gs, gss...)
+
+broadcasted(f, a::Numeric, gs::Grads) = map(x -> f(a, x), gs)
+broadcasted(f, gs::Grads, a::Numeric) = map(x -> f(x, a), gs)
+
+function materialize!(gs1::Grads, gs2::Grads)
+  issetequal(gs1.params, gs2.params) || 
+    throw(ArgumentError("Expected Grads objects with the same Params."))
+  for p in gs1.params
+    gs1[p] = gs2[p]
+  end
+  return gs1
+end
+
+
+function Base.map(f, gs1::Grads, gss::ADictOrGrads...)
+  gsout = Grads(IdDict{Any,Any}(), Params(gs1.params))
+  return map!(f, gsout, gs1, gss...)
+end
+
+function Base.map!(f, gsout::Grads, gss::ADictOrGrads...)
+  all(issetequal(gsout.params, keys(gs)) for gs in gss) || 
+    throw(ArgumentError("map! expects Grads objects with the same Params."))
+  for p in gsout.params
+    gsout[p] = f((_getformap(gs, p) for gs in gss)...) 
+  end
+  return gsout
+end
+
+function _getformap(gs, p)
+  g = gs[p]
+  isnothing(g) ? fill!(similar(p), 0) : g 
 end
 
 function pullback(f, ps::Params)
