@@ -48,9 +48,13 @@ jobs:
             ${{ runner.os }}-test-
             ${{ runner.os }}-
       - uses: julia-actions/julia-buildpkg@v1
+        env:
+           JULIA_PKG_SERVER: ""
         # `allow-failure` not available yet https://github.com/actions/toolkit/issues/399
         #continue-on-error: ${{ matrix.version == 'nightly' }} # comment out to report nightly failures
       - uses: julia-actions/julia-runtest@v1
+        env:
+           JULIA_PKG_SERVER: ""
         #continue-on-error: ${{ matrix.version == 'nightly' }} # comment out to report nightly failures
       - uses: julia-actions/julia-processcoverage@v1
         #continue-on-error: ${{ matrix.version == 'nightly' }} # comment out to report nightly failures
