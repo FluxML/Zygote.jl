@@ -145,7 +145,6 @@ Base.show(io::IO, ps::Grads) = print(io, "Grads(...)")
 
 const ADictOrGrads = Union{AbstractDict, Grads}
 
-
 # Dictionary interface.
 # Don't use the IdDict directly since it may contain some spurious pairs. 
 Base.keys(gs::Grads) = gs.params
@@ -190,10 +189,8 @@ end
 
 broadcasted(f, gs::Grads, gss::ADictOrGrads...) = map(f, gs, gss...)
 
-for op in (:*, :/)
-  @eval broadcasted(::typeof($op), a::Number, gs::Grads) = map(x -> $op(a, x), gs)
-  @eval broadcasted(::typeof($op), gs::Grads, a::Number) = map(x -> $op(x, a), gs)
-end
+broadcasted(f, a::Numeric, gs::Grads) = map(x -> f(a, x), gs)
+broadcasted(f, gs::Grads, a::Numeric) = map(x -> f(x, a), gs)
 
 function materialize!(gs1::Grads, gs2::Grads)
   issetequal(gs1.params, gs2.params) || 
