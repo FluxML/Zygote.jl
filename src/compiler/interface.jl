@@ -146,8 +146,7 @@ Base.show(io::IO, ps::Grads) = print(io, "Grads(...)")
 # Dictionary interface.
 # Don't use the IdDict directly since it may contain some spurious pairs. 
 Base.keys(gs::Grads) = gs.params
-Base.values(gs::Grads) =  (gs.grads[p] for p in gs.params)
-Base.pairs(gs::Grads) =  (p => gs.grads[p] for p in gs.params)
+Base.values(gs::Grads) = (gs.grads[p] for p in gs.params)
 
 function Base.iterate(gs::Grads, state...)
   res = iterate(gs.params, state...)

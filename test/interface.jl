@@ -123,6 +123,9 @@ end
     @test issetequal(keys(gs), ps) 
     @test length(values(gs)) == 2
     @test length(pairs(gs)) == 2
+    k, v = first(pairs(gs))
+    @test k === first(ps) 
+    @test v === gs[first(ps)]  
   end
 
   @testset "iteration" begin
