@@ -65,8 +65,6 @@ unbroadcast(x::AbstractArray, x̄::Nothing) = nothing
 # to do CSE, then broadcast-ify the expression so that the closure captures the
 # right arrays.
 
-Numeric{T<:Number} = Union{T,AbstractArray{<:T}}
-
 @adjoint broadcasted(::typeof(+), xs::Numeric...) =
   broadcast(+, xs...), ȳ -> (nothing, map(x -> unbroadcast(x, ȳ), xs)...)
 

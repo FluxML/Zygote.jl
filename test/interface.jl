@@ -95,6 +95,8 @@ end
     @test (gs3 .+ gs4)[b] ≈ gs4[b] 
     
     @test gs3 .+ Dict(w => similar(w), b => similar(b)) isa Grads
+    gs3 .+= Dict(p => randn(size(p)) for p in keys(gs3))
+    @test gs3 isa Grads 
   end
 
   @testset "map and broadcast" begin
