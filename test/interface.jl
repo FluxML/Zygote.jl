@@ -61,11 +61,9 @@ end
 
 @testset "Grads" begin
   @testset "algebra" begin
-    w = rand(2)
-    x1 = rand(2)
-    x2 = rand(2)
-    b = rand(2)
-
+    w, b = rand(2), rand(2)
+    x1, x2 = rand(2), rand(2)
+   
     gs1 = gradient(() -> sum(w .* x1), Params([w])) 
     gs2 = gradient(() -> sum(w .* x2), Params([w])) 
   
@@ -95,7 +93,8 @@ end
     @test gs3 ./ 2 isa Grads  
     @test (gs3 .+ gs4)[w] ≈ gs3[w] .+ gs4[w]
     @test (gs3 .+ gs4)[b] ≈ gs4[b] 
-
+    
+    @test gs3 .+ Dict(w => similar(w), b => similar(b)) isa Grads
   end
 
   @testset "map and broadcast" begin

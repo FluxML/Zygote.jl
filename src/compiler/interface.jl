@@ -143,6 +143,9 @@ Base.show(io::IO, ps::Grads) = print(io, "Grads(...)")
 @forward Grads.grads  Base.haskey, Base.setindex!
 @forward Grads.params  Base.length
 
+const ADictOrGrads = Union{AbstractDict, Grads}
+
+
 # Dictionary interface.
 # Don't use the IdDict directly since it may contain some spurious pairs. 
 Base.keys(gs::Grads) = gs.params
@@ -185,7 +188,7 @@ function copy!(x::AbstractVector,  gs::Grads)
   x
 end
 
-broadcasted(f, gss::Grads...) = map(f, gss...)
+broadcasted(f, gs::Grads, gss::ADictOrGrads...) = map(f, gs, gss...)
 
 for op in (:*, :/)
   @eval broadcasted(::typeof($op), a::Number, gs::Grads) = map(x -> $op(a, x), gs)
@@ -201,13 +204,14 @@ function materialize!(gs1::Grads, gs2::Grads)
   return gs1
 end
 
-function Base.map(f, gs1::Grads, gss::Grads...)
+
+function Base.map(f, gs1::Grads, gss::ADictOrGrads...)
   gsout = Grads(IdDict{Any,Any}(), Params(gs1.params))
   return map!(f, gsout, gs1, gss...)
 end
 
-function Base.map!(f, gsout::Grads, gss::Grads...)
-  all(issetequal(gsout.params, gs.params) for gs in gss) || 
+function Base.map!(f, gsout::Grads, gss::ADictOrGrads...)
+  all(issetequal(gsout.params, keys(gs)) for gs in gss) || 
     throw(ArgumentError("map! expects Grads objects with the same Params."))
   for p in gsout.params
     gsout[p] = f((_getformap(gs, p) for gs in gss)...) 
@@ -215,7 +219,7 @@ function Base.map!(f, gsout::Grads, gss::Grads...)
   return gsout
 end
 
-function _getformap(gs::Grads, p)
+function _getformap(gs, p)
   g = gs[p]
   isnothing(g) ? fill!(similar(p), 0) : g 
 end
