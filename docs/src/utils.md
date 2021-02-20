@@ -54,4 +54,9 @@ foreach(x -> clamp!(x, -0.1, 0.1), gs)
 for (p, g) in pairs(gs)
   # do something with parameter `p` and corresponding gradient `g`
 end
+
+# note that gradients must be w.r.t. to the same parameter key set
+gs3 = gradient(() -> sum(tanh.(w .* x2)), Params([w]))
+# gs3 does not have the key b
+@test_throws ArgumentError gs1 .+ gs3
 ```
