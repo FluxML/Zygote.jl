@@ -97,6 +97,8 @@ end
     @test gs3 .+ Dict(w => similar(w), b => similar(b)) isa Grads
     gs3 .+= Dict(p => randn(size(p)) for p in keys(gs3))
     @test gs3 isa Grads 
+
+  @test_throws ArgumentError gs1 .+ gs4
   end
 
   @testset "map and broadcast" begin
