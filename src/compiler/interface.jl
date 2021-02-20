@@ -189,8 +189,8 @@ end
 broadcasted(f, gss::Grads...) = map(f, gss...)
 
 for op in (:*, :/)
-  @eval broadcasted(::typeof($op), a::Number, gs::Grads) = map(x -> $op.(a, x), gs)
-  @eval broadcasted(::typeof($op), gs::Grads, a::Number) = map(x -> $op.(x, a), gs)
+  @eval broadcasted(::typeof($op), a::Number, gs::Grads) = map(x -> $op(a, x), gs)
+  @eval broadcasted(::typeof($op), gs::Grads, a::Number) = map(x -> $op(x, a), gs)
 end
 
 function materialize!(gs1::Grads, gs2::Grads)
@@ -218,7 +218,7 @@ end
 
 function _getformap(gs::Grads, p)
   g = gs[p]
-  g === nothing ? fill!(similar(p), 0) : g 
+  isnothing(g) ? fill!(similar(p), 0) : g 
 end
 
 function pullback(f, ps::Params)
