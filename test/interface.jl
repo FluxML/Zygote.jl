@@ -57,6 +57,28 @@ using Zygote: Grads
     @test ps1 == ps2 
     @test ps1 != ps3  # comparison is order dependent
   end
+
+  @testset "set interface" begin
+    x, y, z = [1,2], [1], [3,4]
+    ps1 = Params([x, y])
+    ps2 = Params([z])
+    ps3 = Params([y, z])
+    
+    ps = union(ps1, ps2)
+    @test ps isa Params
+    @test issetequal(ps, Set([x,y,z]))
+    ps = union(ps1, ps3)
+    @test ps isa Params
+    @test issetequal(ps, Set([x,y,z]))
+
+    ps = intersect(ps1, ps2) 
+    @test ps isa Params
+    @test issetequal(ps, Set())
+    
+    ps = intersect(ps1, ps3) 
+    @test ps isa Params
+    @test issetequal(ps, Set([y]))
+  end
 end
 
 @testset "Grads" begin
