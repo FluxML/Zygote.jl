@@ -71,6 +71,26 @@ struct Params
 end
 
 @forward Params.order Base.iterate, Base.length, Base.getindex
+@forward Params.params Base.in
+
+function Base.union!(ps::Params, itrs...)
+  foreach(itr -> foreach(x -> push!(ps, x), itr), itrs)
+  return ps
+end
+
+Base.copy(ps::Params) = union!(Params(), ps)
+Base.union(ps::Params, itrs...) = union!(copy(ps), itrs...)
+
+function Base.intersect!(ps::Params, itrs...)
+  for itr in itrs
+    for x in collect(ps)
+      x ∉ itr && delete!(ps, x)
+    end
+  end
+  return ps
+end
+
+Base.intersect(ps::Params, itrs...) = intersect!(copy(ps), itrs...)
 
 function Base.push!(ps::Params, x)
   if !(x in ps.params)
