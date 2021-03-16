@@ -1332,8 +1332,8 @@ using Zygote: Buffer
     @test gs[1] ≈ map(x -> one.(x), p)
     @test gs[2] ≈ one.(r)
 
-    gs = gradient(x -> sum(pop!(x)), p)
     p = [rand(3,3), rand(3,3)] # redefine `p` after mutation
+    gs = gradient(x -> sum(pop!(x)), p)
     @test length(gs[1]) == 2
     @test gs[1][1] == one.(p[1])
   end
