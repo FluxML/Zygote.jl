@@ -61,7 +61,7 @@ _droplike(dy::Union{LinearAlgebra.Adjoint, LinearAlgebra.Transpose}, dxv::Abstra
   _ -> error("Mutating arrays is not supported")
 
 for f in [push!, pop!, pushfirst!, popfirst!]
-  @eval @adjoint! $f(xs::Vector, x...) =
+  @eval @adjoint! $f(xs, x...) =
     push!(xs, x...), _ -> error("Mutating arrays is not supported")
 end
 
@@ -72,7 +72,7 @@ end
   sz_xs = size.(xs)
   sz_x = size.(x)
   push!(xs, x...), Δ -> begin
-    ([Ones{T}(sz...) for sz in sz_xs], foreach(x -> Ones{T}(x...), sz_x)...)
+    (Δ, map(x -> Ones{T}(x...), sz_x)...)
   end
 end
 
