@@ -972,7 +972,7 @@ end
 
 @adjoint diagm(x::AbstractSparseArray) = diagm(x), Δ -> (diag(Δ), )
 
-@adjoint function Broadcast.broadcasted(Float32, a::AbstractSparseArray{T,N}) where {T,N}
+@adjoint function Broadcast.broadcasted(::Type{Float32}, a::AbstractSparseArray{T,N}) where {T,N}
   Float32.(a), Δ -> (nothing, T.(Δ), )
 end
 
