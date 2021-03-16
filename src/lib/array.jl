@@ -976,4 +976,6 @@ end
   Float32.(a), Δ -> (nothing, T.(Δ), )
 end
 
+@adjoint Matrix(a::AbstractSparseArray) = Matrix(a), Δ -> (Δ,)
+
 @nograd issymmetric
