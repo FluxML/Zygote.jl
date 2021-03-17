@@ -1,7 +1,5 @@
 using Base.Broadcast: AbstractArrayStyle, broadcasted
 
-Numeric{T<:Number} = Union{T,AbstractArray{<:T}}
-
 @tangent Broadcast.preprocess(dest, bc) =
   Broadcast.preprocess(dest, bc), (ddest, dbc) -> dbc
 

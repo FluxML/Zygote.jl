@@ -2,13 +2,24 @@ using Zygote, Test
 using Zygote: gradient
 using CUDA: has_cuda
 
+if has_cuda()
+  @testset "CUDA tests" begin
+    include("cuda.jl")
+  end
+else
+  @warn "CUDA not found - Skipping CUDA Tests"
+end
+
 @testset "Interface" begin
   include("interface.jl")
 end
 
-
 @testset "Tools" begin
   include("tools.jl")
+end
+
+@testset "Utils" begin
+  include("utils.jl")
 end
 
 @testset "lib/number" begin
@@ -41,12 +52,4 @@ end
 
 @testset "Compiler" begin
   include("compiler.jl")
-end
-
-if has_cuda()
-  @testset "CUDA tests" begin
-    include("cuda.jl")
-  end
-else
-  @warn "CUDA not found - Skipping CUDA Tests"
 end

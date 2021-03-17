@@ -2,6 +2,7 @@ using InteractiveUtils
 using InteractiveUtils: typesof
 using Core: Typeof
 import Base: copy!
+import Base.Broadcast: broadcasted, materialize!
 
 mutable struct Context <: AContext
   cache::Union{IdDict{Any,Any},Nothing}
@@ -42,8 +43,17 @@ end
 
 sensitivity(y::Number) = one(y)
 sensitivity(y::Complex) = error("Output is complex, so the gradient is not defined.")
+sensitivity(y::AbstractArray) = error("output an array, so the gradient is not defined. Perhaps you wanted jacobian.")
 sensitivity(y) = error("Output should be scalar; gradients are not defined for output $(repr(y))")
 
+"""
+    gradient(f, args...)
+
+Returns a tuple containing `∂f/∂x` for each argument `x`,
+the derivative (for scalar x) or the gradient.
+
+`f(args...)` must be a real number, see [`jacobian`](@ref) for array output.
+"""
 function gradient(f, args...)
   y, back = pullback(f, args...)
   return back(sensitivity(y))
@@ -61,6 +71,26 @@ struct Params
 end
 
 @forward Params.order Base.iterate, Base.length, Base.getindex
+@forward Params.params Base.in
+
+function Base.union!(ps::Params, itrs...)
+  foreach(itr -> foreach(x -> push!(ps, x), itr), itrs)
+  return ps
+end
+
+Base.copy(ps::Params) = union!(Params(), ps)
+Base.union(ps::Params, itrs...) = union!(copy(ps), itrs...)
+
+function Base.intersect!(ps::Params, itrs...)
+  for itr in itrs
+    for x in collect(ps)
+      x ∉ itr && delete!(ps, x)
+    end
+  end
+  return ps
+end
+
+Base.intersect(ps::Params, itrs...) = intersect!(copy(ps), itrs...)
 
 function Base.push!(ps::Params, x)
   if !(x in ps.params)
@@ -130,7 +160,23 @@ end
 
 Base.show(io::IO, ps::Grads) = print(io, "Grads(...)")
 
-@forward Grads.grads Base.getindex, Base.haskey
+@forward Grads.grads  Base.setindex!
+@forward Grads.params  Base.length
+
+const ADictOrGrads = Union{AbstractDict, Grads}
+
+# Dictionary interface.
+# Don't use the IdDict directly since it may contain some spurious pairs.
+Base.haskey(gs::Grads, x) = x ∈ gs.params 
+Base.keys(gs::Grads) = gs.params
+Base.values(gs::Grads) = (gs.grads[p] for p in gs.params)
+
+function Base.iterate(gs::Grads, state...)
+  res = iterate(gs.params, state...)
+  isnothing(res) && return nothing
+  p, next_state = res
+  return gs[p], next_state
+end
 
 function Base.getindex(gs::Grads, x)
   isbits(x) && error("Only reference types can be differentiated with `Params`.")
@@ -160,6 +206,40 @@ function copy!(x::AbstractVector,  gs::Grads)
       i += length(p)
   end
   x
+end
+
+broadcasted(f, gs::Grads, gss::ADictOrGrads...) = map(f, gs, gss...)
+
+broadcasted(f, a::Numeric, gs::Grads) = map(x -> f(a, x), gs)
+broadcasted(f, gs::Grads, a::Numeric) = map(x -> f(x, a), gs)
+
+function materialize!(gs1::Grads, gs2::Grads)
+  issetequal(gs1.params, gs2.params) || 
+    throw(ArgumentError("Expected Grads objects with the same Params."))
+  for p in gs1.params
+    gs1[p] = gs2[p]
+  end
+  return gs1
+end
+
+
+function Base.map(f, gs1::Grads, gss::ADictOrGrads...)
+  gsout = Grads(IdDict{Any,Any}(), Params(gs1.params))
+  return map!(f, gsout, gs1, gss...)
+end
+
+function Base.map!(f, gsout::Grads, gss::ADictOrGrads...)
+  all(issetequal(gsout.params, keys(gs)) for gs in gss) || 
+    throw(ArgumentError("map! expects Grads objects with the same Params."))
+  for p in gsout.params
+    gsout[p] = f((_getformap(gs, p) for gs in gss)...) 
+  end
+  return gsout
+end
+
+function _getformap(gs, p)
+  g = gs[p]
+  isnothing(g) ? fill!(similar(p), 0) : g 
 end
 
 function pullback(f, ps::Params)
