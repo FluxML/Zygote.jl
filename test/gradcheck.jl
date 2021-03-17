@@ -1335,6 +1335,23 @@ using Zygote: Buffer
     push!(b, 3)
     prod(copy(b))
   end == (3,)
+
+  @testset "Limited Mutation" begin
+    p = [rand(3,3), rand(3,3)]
+    r = rand(5,5)
+
+    # TODO: ngradient cannot handle Vector{Array}
+    gs = gradient((p,x) -> sum(sum.(push!(p,x))), p, r)
+    @test length(p[end]) == length(gs[1][end])
+    @test gs[1] ≈ map(x -> one.(x), p)
+    @test gs[2] ≈ one.(r)
+
+    p = [rand(3,3), rand(3,3)] # redefine `p` after mutation
+    gs = gradient(x -> sum(pop!(x)), p)
+    @test length(gs[1]) == 2
+    @test gs[1][1] == one.(p[1])
+  end
+
 end
 
 @testset "FillArrays" begin
