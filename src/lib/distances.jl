@@ -57,11 +57,18 @@ end
 end
 
 @adjoint function colwise(s::Euclidean, x::AbstractMatrix, y::AbstractMatrix)
-  d = colwise(s, x, y)
-  return d, function (Δ::AbstractVector)
-    x̄ = (Δ ./ max.(d, eps(eltype(d))))' .* (x .- y)
-    return nothing, x̄, -x̄
+
+  # Modify the forwards-pass slightly to ensure stability on the reverse.
+  function _colwise_euclidean(x, y)
+    δ = eps(promote_type(eltype(x), eltype(y)))^2
+    return sqrt.(max.(colwise(SqEuclidean(), x, y), δ))
   end
+
+  D, pb = pullback(_colwise_euclidean, x, y)
+
+  colwise_Euclidean_binary_pullback(Δ) = (nothing, pb(Δ)...)
+
+  return D, colwise_Euclidean_binary_pullback
 end
 
 @adjoint function pairwise(::Euclidean, X::AbstractMatrix, Y::AbstractMatrix; dims=2)
@@ -71,19 +78,24 @@ end
     δ = eps(promote_type(eltype(X), eltype(Y)))^2
     return sqrt.(max.(pairwise(SqEuclidean(), X, Y; dims=dims), δ))
   end
-  D, back = pullback(_pairwise_euclidean, X, Y)
 
-  return D, function(Δ)
-    return (nothing, back(Δ)...)
-  end
+  D, pb = pullback(_pairwise_euclidean, X, Y)
+
+  pairwise_Euclidean_binary_pullback(Δ) = (nothing, pb(Δ)...)
+
+  return D, pairwise_Euclidean_binary_pullback
 end
 
 @adjoint function pairwise(::Euclidean, X::AbstractMatrix; dims=2)
-  D, back = pullback(X -> pairwise(SqEuclidean(), X; dims = dims), X)
-  D .= sqrt.(D)
-  return D, function(Δ)
-    Δ = Δ ./ (2 .* max.(D, eps(eltype(D))))
-    Δ[diagind(Δ)] .= 0
-    return (nothing, first(back(Δ)))
+
+  # Modify the forwards-pass slightly to ensure stability on the reverse.
+  function _pairwise_euclidean(X)
+    return sqrt.(max.(pairwise(SqEuclidean(), X; dims=dims), eps(eltype(X))^2))
   end
+
+  D, pb = pullback(_pairwise_euclidean, X)
+
+  pairwise_Euclidean_unary_pullback(Δ) = (nothing, first(pb(Δ)))
+
+  return D, pairwise_Euclidean_unary_pullback
 end
