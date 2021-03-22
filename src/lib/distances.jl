@@ -1,6 +1,6 @@
 using .Distances
 
-@adjoint function (::SqEuclidean)(x::AbstractVector, y::AbstractVector)
+function rrule(::SqEuclidean, x::AbstractVector, y::AbstractVector)
   δ = x .- y
   function sqeuclidean(Δ::Real)
     x̄ = (2 * Δ) .* δ
@@ -9,14 +9,14 @@ using .Distances
   return sum(abs2, δ), sqeuclidean
 end
 
-@adjoint function colwise(s::SqEuclidean, x::AbstractMatrix, y::AbstractMatrix)
+function rrule(::typeof(colwise), s::SqEuclidean, x::AbstractMatrix, y::AbstractMatrix)
   return colwise(s, x, y), function (Δ::AbstractVector)
     x̄ = 2 .* Δ' .* (x .- y)
     return nothing, x̄, -x̄
   end
 end
 
-@adjoint function pairwise(s::SqEuclidean, x::AbstractMatrix, y::AbstractMatrix; dims::Int=2)
+function rrule(::typeof(pairwise), s::SqEuclidean, x::AbstractMatrix, y::AbstractMatrix; dims::Int=2)
   if dims==1
     return pairwise(s, x, y; dims=1), ∇pairwise(s, transpose(x), transpose(y), transpose)
   else
@@ -31,7 +31,7 @@ end
     return (nothing, f(x̄), f(ȳ))
   end
 
-@adjoint function pairwise(s::SqEuclidean, x::AbstractMatrix; dims::Int=2)
+function rrule(::typeof(pairwise), s::SqEuclidean, x::AbstractMatrix; dims::Int=2)
   if dims==1
     return pairwise(s, x; dims=1), ∇pairwise(s, transpose(x), transpose)
   else
@@ -46,7 +46,7 @@ end
     return (nothing, x * (2 .* (d1 .+ d2 .- Δ .- transpose(Δ))) |> f)
   end
 
-@adjoint function (::Euclidean)(x::AbstractVector, y::AbstractVector)
+function rrule(::Euclidean, x::AbstractVector, y::AbstractVector)
   D = x .- y
   δ = sqrt(sum(abs2, D))
   function euclidean(Δ::Real)
@@ -56,7 +56,7 @@ end
   return δ, euclidean
 end
 
-@adjoint function colwise(s::Euclidean, x::AbstractMatrix, y::AbstractMatrix)
+function rrule(::typeof(colwise), s::Euclidean, x::AbstractMatrix, y::AbstractMatrix)
   d = colwise(s, x, y)
   return d, function (Δ::AbstractVector)
     x̄ = (Δ ./ max.(d, eps(eltype(d))))' .* (x .- y)
@@ -64,7 +64,7 @@ end
   end
 end
 
-@adjoint function pairwise(::Euclidean, X::AbstractMatrix, Y::AbstractMatrix; dims=2)
+function rrule(::typeof(pairwise), ::Euclidean, X::AbstractMatrix, Y::AbstractMatrix; dims=2)
 
   # Modify the forwards-pass slightly to ensure stability on the reverse.
   function _pairwise_euclidean(X, Y)
@@ -78,7 +78,7 @@ end
   end
 end
 
-@adjoint function pairwise(::Euclidean, X::AbstractMatrix; dims=2)
+function rrule(::typeof(pairwise), ::Euclidean, X::AbstractMatrix; dims=2)
   D, back = pullback(X -> pairwise(SqEuclidean(), X; dims = dims), X)
   D .= sqrt.(D)
   return D, function(Δ)
