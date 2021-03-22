@@ -1,5 +1,5 @@
 using .Distances
-using .ChainRules: NO_FIELDS, rrule
+import .ChainRules: NO_FIELDS, rrule
 
 function rrule(::SqEuclidean, x::AbstractVector, y::AbstractVector)
   δ = x .- y
