@@ -978,4 +978,11 @@ end
 
 @adjoint Matrix(a::AbstractSparseArray) = Matrix(a), Δ -> (Δ,)
 
+@adjoint function SparseArrays.spdiagm(x::Pair...)
+  ks = first.(x)
+  SparseArrays.spdiagm(x...), Δ -> begin
+    tuple((k => diag(Δ, k) for k in ks)...)
+  end
+end
+
 @nograd issymmetric
