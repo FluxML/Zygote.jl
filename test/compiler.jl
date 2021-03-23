@@ -109,3 +109,17 @@ end
   @test y == 1
   @test pb(1) == (nothing, (x = 1, y = nothing), nothing)
 end
+
+# this test fails if adjoint for literal_getproperty is added
+# https://github.com/FluxML/Zygote.jl/issues/922#issuecomment-804128905
+@testset "overloaded getproperty" begin
+  struct MyStruct
+      a
+      b
+  end
+  Base.getproperty(ms::MyStruct, s::Symbol) = s === :c ? ms.a + ms.b : getfield(ms, s)
+  sumall(ms::MyStruct) = ms.a + ms.b + ms.c
+
+  ms = MyStruct(1, 2)
+  @test Zygote.gradient(sumall, ms) == ((a = 2, b = 2),)
+end
