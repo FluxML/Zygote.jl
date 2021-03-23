@@ -16,7 +16,10 @@ accum(x::Tuple, y::Tuple) = accum.(x, y)
 accum(x::AbstractArray, y::AbstractArray) = accum.(x, y)
 
 @generated function accum(x::NamedTuple, y::NamedTuple)
-  grad(x) = x in fieldnames(y) ? :(y.$x) : :nothing
+  # assumes that y has no keys apart from those also in x
+  fieldnames(y) ⊆ fieldnames(x) || throw(ArgumentError("$y keys must be a subset of $x keys"))
+
+  grad(field) = field in fieldnames(y) ? :(y.$field) : :nothing
   Expr(:tuple, [:($f=accum(x.$f, $(grad(f)))) for f in fieldnames(x)]...)
 end
 
