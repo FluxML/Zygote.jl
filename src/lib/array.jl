@@ -1,7 +1,6 @@
 using Random, FillArrays, AbstractFFTs
 using FillArrays: AbstractFill, getindex_value
 using Base.Broadcast: broadcasted, broadcast_shape
-using Distributed: pmap
 using SparseArrays
 using Distributed: pmap, AbstractWorkerPool
 
