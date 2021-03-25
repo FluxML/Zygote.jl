@@ -221,7 +221,7 @@ end
   const CuArrayStyle = CUDA.CuArrayStyle
 
   @adjoint function broadcasted(::CuArrayStyle, f, args...)
-    y, back = broadcast_forward(CUDA.cufunc(f), args...)
+    y, back = broadcast_forward(f, args...)
     y, ȳ -> (nothing, nothing, back(ȳ)...)
   end
 
