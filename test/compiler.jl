@@ -111,7 +111,7 @@ end
 end
 
 @testset "issue #922" begin
-    # checks whether getproperty gets accumulated correctly
+    # check whether getproperty gets accumulated correctly
     # instead of defining a test function as in the issue, compare the two pullbacks
     function two_svds(X::StridedMatrix{<:Union{Real, Complex}})
         return svd(X).U * svd(X).V'
