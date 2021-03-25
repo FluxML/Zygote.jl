@@ -48,7 +48,7 @@ for T_outer in (:Tuple, :NamedTuple)
   # branch that changes output type, because nested AD on that kinda thing makes Zygote less
   # than happy.
   @eval @inline function wrap_chainrules_output(x::ChainRules.Composite{P, T}) where {P, T<:$T_outer}
-    xp = map(wrap_chainrules_output, x)
+    xp = map(wrap_chainrules_output, canonicalize(x))
     convert($T_outer, xp)
   end
 end

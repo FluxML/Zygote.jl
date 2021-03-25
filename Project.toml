@@ -1,10 +1,11 @@
 name = "Zygote"
 uuid = "e88e6eb3-aa80-5325-afca-941959d7151f"
-version = "0.6.5"
+version = "0.6.6"
 
 [deps]
 AbstractFFTs = "621f4979-c628-5d54-868e-fcf4e3e8185c"
 ChainRules = "082447d4-558c-5d27-93f4-14fc19e9eca2"
+ChainRulesCore = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
 DiffRules = "b552c78f-8df3-52c6-915a-8e097449b14b"
 Distributed = "8ba89e20-285c-5b6f-9357-94700520ee1b"
 FillArrays = "1a297f60-69ca-5386-bcde-b61e274b549b"
@@ -22,7 +23,8 @@ ZygoteRules = "700de1a5-db45-46bc-99cf-38207098b444"
 
 [compat]
 AbstractFFTs = "0.5, 1.0"
-ChainRules = "0.7.49"
+ChainRules = "0.7.55"
+ChainRulesCore = "0.9.32"
 DiffRules = "1.0"
 FillArrays = "0.8, 0.9, 0.10, 0.11"
 ForwardDiff = "0.10"
