@@ -5,7 +5,7 @@ function rrule(::SqEuclidean, x::AbstractVector, y::AbstractVector)
   δ = x .- y
   function sqeuclidean(Δ::Real)
     x̄ = (2 * Δ) .* δ
-    return x̄, -x̄
+    return NO_FIELDS, x̄, -x̄
   end
   return sum(abs2, δ), sqeuclidean
 end
