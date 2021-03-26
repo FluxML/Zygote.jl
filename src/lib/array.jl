@@ -984,4 +984,6 @@ end
   end
 end
 
+@adjoint Pair(x,y) = Pair(x,y), Δ -> (nothing, Δ.second)
+
 @nograd issymmetric
