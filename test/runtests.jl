@@ -22,8 +22,9 @@ end
   include("utils.jl")
 end
 
-@testset "lib/number" begin
+@testset "lib" begin
   include("lib/number.jl")
+  include("lib/lib.jl")
 end
 
 @testset "Features" begin
