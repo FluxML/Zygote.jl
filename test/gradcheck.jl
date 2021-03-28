@@ -548,6 +548,12 @@ end
     @test Zygote.pullback(g, X)[2]((factors=LowerTriangular(X),)) ==
       Zygote.pullback(g, X)[2]((factors=Matrix(LowerTriangular(X)),))
     @test_throws PosDefException Zygote.pullback(X -> cholesky(X, check = false), X)[2]((factors=X,))
+
+    # https://github.com/FluxML/Zygote.jl/issues/932
+    @test gradcheck(rand(5, 5), rand(5)) do A, x
+        C = cholesky(Symmetric(A' * A + I))
+        return sum(C \ x) + logdet(C)
+    end
   end
 end
 
