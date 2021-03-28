@@ -470,7 +470,7 @@ end
   Y, back = Zygote.pullback((U, B)->U \ (U' \ B), A.U, B)
   return Y, function(Ȳ)
     Ā_factors, B̄ = back(Ȳ)
-    return ((uplo=nothing, status=nothing, factors=Ā_factors), B̄)
+    return ((uplo=nothing, info=nothing, factors=Ā_factors), B̄)
   end
 end
 
