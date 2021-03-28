@@ -190,6 +190,22 @@ end
   @test gradient(g, ones(3)) == ([1,0,0],)
 end
 
+@testset "eachcol" begin
+    @test gradtest(x -> map(sum, eachcol(x)), (3,4))
+    @test gradtest(x -> map(sum, eachcol(transpose(x))), (3,4))
+
+    @test gradtest(x -> map(norm, eachcol(x)), (3,4))
+    @test gradtest(x -> map(norm, eachrow(x)), (3,4))
+    @test gradtest(x -> map(norm, eachslice(x, dims=3)), (3,4,5))
+
+    # some slices may have gradient nothing
+    @test gradient(x -> sum(y -> rand()>0.5 ? 0 : first(y), eachcol(x)), rand(3,10))[1] isa Matrix
+
+    # strange errors
+    @test_skip gradient(x -> sum(norm, eachcol(x)), [1 2 3; 4 5 6])[1] isa Matrix
+    @test_skip gradient(x -> sum(norm, eachcol(x)), rand(3,400))[1] isa Matrix
+end
+
 @testset "collect" begin
   @test gradient(x -> sum(inv, collect(x)), (1,2)) === ((-1.0, -1/4),)
 
@@ -1046,8 +1062,8 @@ end
         Y = copy(X)
         Δ = randn(P, P)
         Δ_fd = FiniteDifferences.j′vp(
-                  FiniteDifferences.central_fdm(5, 1), 
-                  X -> pairwise(metric, X, Y; dims=2), 
+                  FiniteDifferences.central_fdm(5, 1),
+                  X -> pairwise(metric, X, Y; dims=2),
                   Δ, X)
         _, pb = Zygote.pullback(X -> pairwise(metric, X, Y; dims=2), X)
 
