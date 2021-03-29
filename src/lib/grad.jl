@@ -54,12 +54,12 @@ See [`hessian_reverse`](@ref) for an all-Zygote alternative.
 
 ```jldoctest; setup=:(using Zygote)
 julia> hessian(x -> x[1]*x[2], randn(2))
-2×2 Array{Float64,2}:
+2×2 Matrix{Float64}:
  0.0  1.0
  1.0  0.0
 
 julia> hessian(x -> sum(x.^3), [1 2; 3 4])  # uses linear indexing of x
-4×4 Array{$Int,2}:
+4×4 Matrix{$Int}:
  6   0   0   0
  0  18   0   0
  0   0  12   0
@@ -109,7 +109,7 @@ See also [`hessian`](@ref), [`hessian_reverse`](@ref).
 
 ```jldoctest; setup=:(using Zygote)
 julia> jacobian(a -> 100*a[1:3].^2, 1:7)[1]  # first index (rows) is output
-3×7 Array{$Int,2}:
+3×7 Matrix{$Int}:
  200    0    0  0  0  0  0
    0  400    0  0  0  0  0
    0    0  600  0  0  0  0
@@ -185,12 +185,12 @@ julia> Jxy = jacobian(() -> ys[1:2] .+ sum(xs.^2), Params([xs, ys]))
 Grads(...)
 
 julia> Jxy[ys]
-2×3 Array{$Int,2}:
+2×3 Matrix{$Int}:
  1  0  0
  0  1  0
 
 julia> Jxy[xs]
-2×4 Array{$Int,2}:
+2×4 Matrix{$Int}:
  2  6  4  8
  2  6  4  8
 ```
