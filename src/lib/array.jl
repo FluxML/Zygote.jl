@@ -8,7 +8,7 @@ using Distributed: pmap, AbstractWorkerPool
 @adjoint Array(xs::AbstractArray) = Array(xs), ȳ -> (ȳ,)
 @adjoint Array(xs::Array) = Array(xs), ȳ -> (ȳ,)
 
-@nograd ones, zeros, Base.OneTo, Colon(), one, zero
+@nograd ones, zeros, Base.OneTo, Colon(), one, zero, sizehint!
 
 @adjoint Base.vect(xs...) = Base.vect(xs...), Δ -> (Δ...,)
 
