@@ -225,7 +225,7 @@ end
       y, back = broadcast_forward(CUDA.cufunc(f), args...)
       y, ȳ -> (nothing, nothing, back(ȳ)...)
     end
-  else # CUDA >=
+  else # CUDA >= 3.0
     @eval @adjoint function broadcasted(::CuArrayStyle, f, args...)
       y, back = broadcast_forward(f, args...)
       y, ȳ -> (nothing, nothing, back(ȳ)...)
