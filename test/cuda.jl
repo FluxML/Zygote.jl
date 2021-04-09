@@ -3,17 +3,25 @@ using CUDA
 # Test GPU movement inside the call to `gradient`
 @testset "GPU movement" begin
   r = rand(Float32, 3,3)
-  @test gradient(x -> sum(cu(x)), r)[1] isa AbstractArray
+  @test gradient(x -> sum(cu(x)), r)[1] isa Array{Float32, 2}
 end
 
 @testset "basic bcasting" begin
-  a = cu(Float32.(1:9))
-  v(x, n) = x .^ n
-  pow_grada = cu(Float32[7.0, 448.0, 5103.0, 28672.0, 109375.0, 326592.0, 823543.0, 1.835008e6, 3.720087e6])
-  @test gradient(x -> v(x, 7) |> sum, a) == (pow_grada,)
-  w(x) = broadcast(log, x)
-  log_grada = cu(Float32[1.0, 0.5, 0.33333334, 0.25, 0.2, 0.16666667, 0.14285715, 0.125, 0.11111111])
-  @test gradient(x -> w(x) |> sum, a) == (log_grada,)
+  a = Float32.(1:9)
+  a_gpu = a |> cu
+
+  v(x, n) = sum(x .^ n)
+  g = gradient(x -> v(x, 7), a)[1]
+  g_gpu = gradient(x -> v(x, 7), a_gpu)[1]
+  @test g_gpu isa CuArray
+  @test g_gpu |> collect ≈ g
+  
+  w(x) = sum(broadcast(log, x))
+  g = gradient(x -> w(x), a)[1]
+  g_gpu = gradient(x -> w(x), a_gpu)[1]
+  @test g_gpu isa CuArray
+  @test g_gpu |> collect ≈ g
+  
 end
 
 @testset "jacobian" begin
