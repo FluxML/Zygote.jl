@@ -32,16 +32,23 @@ end
 
 @adjoint view(x::AbstractArray, inds...) = view(x, inds...), ∇getindex(x, inds)
 
-∇getindex(x::AbstractArray, inds) = dy -> begin
-  if inds isa  NTuple{<:Any, Integer}
-    dx = _zero(x, typeof(dy))
-    dx[inds...] = dy
-  else
-    dx = _zero(x, eltype(dy))
-    dxv = view(dx, inds...)
-    dxv .= accum.(dxv, _droplike(dy, dxv))
-  end
-  return (dx, map(_->nothing, inds)...)
+∇getindex(x::AbstractArray, inds) = dy -> (_zerosetindex(x, inds, dy), map(_->nothing, inds)...)
+
+function _zerosetindex(x, inds::NTuple{<:Any, Integer}, dy)
+  dx = _zero(x, typeof(dy))
+  dx[inds...] = dy
+  dx
+end
+
+function _zerosetindex(x, inds, dy)
+  dx = _zero(x, eltype(dy))
+  dxv = view(dx, inds...)
+  dxv .= accum.(dxv, _droplike(dy, dxv))
+  dx
+end
+
+@adjoint function _zerosetindex(x, inds, dy)
+  _zerosetindex(x, inds, dy), ddx -> (nothing, nothing, ddx[inds...])
 end
 
 _zero(xs::AbstractArray{<:Number}, T::Type{Nothing}) = fill!(similar(xs), zero(eltype(xs)))
