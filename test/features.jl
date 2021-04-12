@@ -481,7 +481,6 @@ end
   Zygote.gradient(loss_adjoint,[1.0])
   @test x[1] == x[2]
 end
-@test Zygote.@code_adjoint(f(1)) isa Zygote.Adjoint
 
 # Basic nested
 f_nested(x) = x^4
