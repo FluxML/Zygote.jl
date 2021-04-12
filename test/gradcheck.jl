@@ -4,6 +4,7 @@ using Zygote: gradient
 using Base.Broadcast: broadcast_shape
 using Distributed: pmap, CachingPool, workers
 import FiniteDifferences
+import ForwardDiff
 
 function ngradient(f, xs::AbstractArray...)
   grads = zero.(xs)
@@ -1671,4 +1672,28 @@ end
     gradient(x->norm(x*[1 1]), 1.23)
     gradient(x->norm(x*[1im, 1]), 1.23)
     gradient(x->norm(x*[1im 1]), 1.23)
+end
+
+# Currently disabled pending improvements in Zygote and Base
+if false
+  @testset "third order AD (indexing)" begin
+    # Nested AD for getindex
+    grad_tracker = gradient([1.0, 2.0, 3.0]) do x
+      sum(gradient(x) do x
+        sum(gradient(x) do x
+          sum(x[1:2])^4
+        end[1])
+      end[1])
+    end[1]
+    # We compare to ForwardDiff, since the high order derivative is not
+    # numerically stable under finite differencing.
+    grad_forward = ForwardDiff.gradient([1.0, 2.0, 3.0]) do x
+      sum(ForwardDiff.gradient(x) do x
+        sum(ForwardDiff.gradient(x) do x
+          sum(x[1:2])^4
+        end)
+      end)
+    end
+    @test grad_tracker ≈ grad_forward ≈ [288.0, 288.0, 0.0]
+  end
 end
