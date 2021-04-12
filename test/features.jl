@@ -485,25 +485,18 @@ end
 
 # Basic nested
 f_nested(x) = x^4
-@test f_nested''(1.0) = 12.0
+@test f_nested''(1.0) == 12.0
 
 # Nested AD for `sum`
 @test gradient([1.0, 2.0]) do x
     gradient(x) do x
         sin(sum(x))
     end[1][1]
-end == -sin(3.0)
+end[1][1] == -sin(3.0)
 
 # Nested AD for getindex
 @test gradient([1.0, 2.0]) do x
    gradient(x) do x
        sin(x[1])
    end[1][1]
-end == -sin(1.0)
-
-# Third-order AD
-
-# Currently disabled pending improvements to Base and Zygote
-if false
-    @test sin'''(1.0) == -sin(1.0)
-end
+end[1][1] == -sin(1.0)
