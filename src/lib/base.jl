@@ -139,4 +139,4 @@ end
 
 @adjoint Base.nameof(x::UnionAll) = nameof(x), _ -> (nothing,)
 
-@nograd typeintersect
+@nograd typeintersect, typejoin
