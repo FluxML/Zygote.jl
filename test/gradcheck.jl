@@ -1196,44 +1196,44 @@ end
     @test gradcheck(x -> muladd(x[1], x[2], x[3]), [2.0, 3.0, 5.0])
 end
 
-import StatsFuns
+import LogExpFunctions
 
 Zygote.refresh()
 
 @testset "xlogx" begin
-  @test gradcheck(x->2.5 * StatsFuns.xlogx(x[1]), [1.0])
-  @test gradcheck(x->2.5 * StatsFuns.xlogx(x[1]), [2.45])
-  @test gradtest(x -> StatsFuns.xlogx.(x), (3,3))
+  @test gradcheck(x->2.5 * LogExpFunctions.xlogx(x[1]), [1.0])
+  @test gradcheck(x->2.5 * LogExpFunctions.xlogx(x[1]), [2.45])
+  @test gradtest(x -> LogExpFunctions.xlogx.(x), (3,3))
 end
 
 @testset "xlogy" begin
-  @test gradcheck(x -> StatsFuns.xlogy(x[1], x[2]), [1.0, 2.0])
-  @test gradcheck(x -> StatsFuns.xlogy(x[1], x[2]), [0.0, 2.0])
-  @test gradtest((x,y) -> StatsFuns.xlogy.(x,y), (3,3), (3,3))
+  @test gradcheck(x -> LogExpFunctions.xlogy(x[1], x[2]), [1.0, 2.0])
+  @test gradcheck(x -> LogExpFunctions.xlogy(x[1], x[2]), [0.0, 2.0])
+  @test gradtest((x,y) -> LogExpFunctions.xlogy.(x,y), (3,3), (3,3))
 end
 
 @testset "logistic" begin
-  @test gradcheck(x->3.0 * StatsFuns.logistic(x[1]), [-5.0])
-  @test gradcheck(x->3.0 * StatsFuns.logistic(x[1]), [-1.0])
-  @test gradcheck(x->3.0 * StatsFuns.logistic(x[1]), [-eps()])
-  @test gradcheck(x->3.0 * StatsFuns.logistic(x[1]), [0.0])
-  @test gradcheck(x->3.0 * StatsFuns.logistic(x[1]), [eps()])
-  @test gradcheck(x->3.0 * StatsFuns.logistic(x[1]), [1.0])
-  @test gradcheck(x->3.0 * StatsFuns.logistic(x[1]), [5.0])
+  @test gradcheck(x->3.0 * LogExpFunctions.logistic(x[1]), [-5.0])
+  @test gradcheck(x->3.0 * LogExpFunctions.logistic(x[1]), [-1.0])
+  @test gradcheck(x->3.0 * LogExpFunctions.logistic(x[1]), [-eps()])
+  @test gradcheck(x->3.0 * LogExpFunctions.logistic(x[1]), [0.0])
+  @test gradcheck(x->3.0 * LogExpFunctions.logistic(x[1]), [eps()])
+  @test gradcheck(x->3.0 * LogExpFunctions.logistic(x[1]), [1.0])
+  @test gradcheck(x->3.0 * LogExpFunctions.logistic(x[1]), [5.0])
 end
 
 @testset "logit" begin
-  @test gradcheck(x->5.0 * StatsFuns.logit(x[1]), [0.1])
-  @test gradcheck(x->5.0 * StatsFuns.logit(x[1]), [0.3])
-  @test gradcheck(x->5.0 * StatsFuns.logit(x[1]), [0.5])
-  @test gradcheck(x->5.0 * StatsFuns.logit(x[1]), [0.7])
-  @test gradcheck(x->5.0 * StatsFuns.logit(x[1]), [0.9])
+  @test gradcheck(x->5.0 * LogExpFunctions.logit(x[1]), [0.1])
+  @test gradcheck(x->5.0 * LogExpFunctions.logit(x[1]), [0.3])
+  @test gradcheck(x->5.0 * LogExpFunctions.logit(x[1]), [0.5])
+  @test gradcheck(x->5.0 * LogExpFunctions.logit(x[1]), [0.7])
+  @test gradcheck(x->5.0 * LogExpFunctions.logit(x[1]), [0.9])
 end
 
 function test_log1pexp(T, xs)
   y = T(4.3)
   for x in xs
-    @test gradcheck(x->y * StatsFuns.log1pexp(x[1]), [x])
+    @test gradcheck(x->y * LogExpFunctions.log1pexp(x[1]), [x])
   end
 end
 
@@ -1249,43 +1249,43 @@ end
       test_log1pexp(Float64, [33.3, 33.3 + eps(), 100.0])
     end
   end
-  @test gradcheck(x->2.5 * StatsFuns.log1pexp(x[1]), [1.0])
-  @test gradcheck(x->2.5 * StatsFuns.log1pexp(x[1]), [2.45])
-  @test gradtest(x -> StatsFuns.log1pexp.(x), (3,3))
+  @test gradcheck(x->2.5 * LogExpFunctions.log1pexp(x[1]), [1.0])
+  @test gradcheck(x->2.5 * LogExpFunctions.log1pexp(x[1]), [2.45])
+  @test gradtest(x -> LogExpFunctions.log1pexp.(x), (3,3))
 end
 
 @testset "log1psq" begin
   rng = MersenneTwister(123456)
   @testset "Float64" begin
     for x in [-10.0, -5.0, -1.0, -eps(), 0.0, eps(), 1.0, 5.0, 10.0]
-      @test gradcheck(x->5.1 * StatsFuns.log1psq(x[1]), [x])
+      @test gradcheck(x->5.1 * LogExpFunctions.log1psq(x[1]), [x])
     end
   end
 end
 
 @testset "logaddexp" begin
-  @test gradcheck(x -> StatsFuns.logaddexp(x[1], x[2]), [1.0, 2.0])
-  @test gradcheck(x -> StatsFuns.logaddexp(x[1], x[2]), [1.0, -1.0])
-  @test gradcheck(x -> StatsFuns.logaddexp(x[1], x[2]), [-2.0, -3.0])
-  @test gradcheck(x -> StatsFuns.logaddexp(x[1], x[2]), [5.0, 5.0])
-  @test gradtest((x,y) -> StatsFuns.logaddexp.(x,y), (3,3), (3,3))
+  @test gradcheck(x -> LogExpFunctions.logaddexp(x[1], x[2]), [1.0, 2.0])
+  @test gradcheck(x -> LogExpFunctions.logaddexp(x[1], x[2]), [1.0, -1.0])
+  @test gradcheck(x -> LogExpFunctions.logaddexp(x[1], x[2]), [-2.0, -3.0])
+  @test gradcheck(x -> LogExpFunctions.logaddexp(x[1], x[2]), [5.0, 5.0])
+  @test gradtest((x,y) -> LogExpFunctions.logaddexp.(x,y), (3,3), (3,3))
 end
 
 @testset "logsubexp" begin
-  @test gradcheck(x -> StatsFuns.logsubexp(x[1], x[2]), [1.0, 2.0])
-  @test gradcheck(x -> StatsFuns.logsubexp(x[1], x[2]), [1.0, -1.0])
-  @test gradcheck(x -> StatsFuns.logsubexp(x[1], x[2]), [-2.0, -3.0])
-  @test gradtest((x,y) -> StatsFuns.logsubexp.(x,y), (3,3), (3,3))
+  @test gradcheck(x -> LogExpFunctions.logsubexp(x[1], x[2]), [1.0, 2.0])
+  @test gradcheck(x -> LogExpFunctions.logsubexp(x[1], x[2]), [1.0, -1.0])
+  @test gradcheck(x -> LogExpFunctions.logsubexp(x[1], x[2]), [-2.0, -3.0])
+  @test gradtest((x,y) -> LogExpFunctions.logsubexp.(x,y), (3,3), (3,3))
 end
 
 @testset "logsumexp" begin
   rng = MersenneTwister(123456)
   @testset "Float64" begin
-    @test gradtest(StatsFuns.logsumexp, randn(rng, 1))
-    @test gradtest(StatsFuns.logsumexp, randn(rng, 1, 1))
-    @test gradtest(StatsFuns.logsumexp, randn(rng, 3))
-    @test gradtest(StatsFuns.logsumexp, randn(rng, 3, 4, 5))
-    @test gradtest(x -> sum(StatsFuns.logsumexp(x; dims=1)), randn(rng, 4, 4))
+    @test gradtest(LogExpFunctions.logsumexp, randn(rng, 1))
+    @test gradtest(LogExpFunctions.logsumexp, randn(rng, 1, 1))
+    @test gradtest(LogExpFunctions.logsumexp, randn(rng, 3))
+    @test gradtest(LogExpFunctions.logsumexp, randn(rng, 3, 4, 5))
+    @test gradtest(x -> sum(LogExpFunctions.logsumexp(x; dims=1)), randn(rng, 4, 4))
   end
 end
 
