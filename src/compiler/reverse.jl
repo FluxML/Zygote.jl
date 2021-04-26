@@ -40,7 +40,7 @@ function instrument_getproperty!(ir, v, ex)
     if ex.args[3] isa Union{QuoteNode,Integer}
       ir[v] = xcall(Zygote, :literal_getproperty, ex.args[2], Val(unwrapquote(ex.args[3])))
     else
-      f = insert!(ir, v, :(Val($(ex.args[3]))))
+      f = insert!(ir, v, Expr(:nograd, :(Val($(ex.args[3])))))
       ir[v] = xcall(Zygote, :literal_getproperty, ex.args[2], f)
     end
   else
@@ -183,6 +183,8 @@ function primal(ir::IR)
       J = insertafter!(pr, v, stmt(xgetindex(yJ, 2),
                                    line = ir[v].line))
       pbs[v] = substitute(pr, J)
+    elseif isexpr(ex, :nograd)
+        pr[v] = stmt(st; expr=ex.args[1])
     end
   end
   pr = finish(pr)
@@ -275,7 +277,7 @@ function adjoint(pr::Primal)
         end
       elseif ex isa Core.PiNode
         grads[ex.val] = grads[v]
-      elseif isexpr(ex, GlobalRef, :call, :isdefined, :inbounds, :meta)
+      elseif isexpr(ex, GlobalRef, :call, :isdefined, :inbounds, :meta, :nograd)
       elseif isexpr(ex)
         push!(rb, stmt(xcall(Base, :error, "Can't differentiate $(ex.head) expression"),
                        line = b[v].line))

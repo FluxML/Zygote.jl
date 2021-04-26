@@ -213,6 +213,54 @@ end
 @generated pair(::Val{k}, v, _=nothing) where k = :($k = v,)
 @generated pair(::Val{k}, v, ::NamedTuple{keys}) where {k,keys} = k isa Int ? :($(getfield(keys, k)) = v,) : :($k = v,)
 
+# ugly hack to make differentiating `getproperty` infer a lot better
+@generated function _pullback(cx::AContext, ::typeof(literal_getproperty), x, ::Val{f}) where f
+    sig(x) = Tuple{x, typeof(f)}
+    rrule_sig(x) = Tuple{typeof(getproperty), x, typeof(f)}
+    pb_sig(x) = Tuple{cx, typeof(getproperty), x, typeof(f)}
+
+    # either `getproperty` has a custom implementation or `_pullback(cx, getproperty, x, f)`
+    # / `rrule(getproperty, x, f) is overloaded directly
+    is_getfield_fallback = which(getproperty, sig(x)) == which(getproperty, sig(Any)) &&
+        which(_pullback, pb_sig(x)) == which(_pullback, pb_sig(Any)) &&
+        which(rrule, rrule_sig(x)) == which(rrule, rrule_sig(Any))
+
+    if is_getfield_fallback
+        # just copy pullback of `literal_getfield`
+        _sig = Tuple{cx, typeof(literal_getfield), x, Val{f}}
+        ci = copy(code_lowered(_pullback, _sig)[1])
+
+        # we need to change the second arg to `_pullback` from `literal_getproperty` to
+        # `literal_getfield`
+        Meta.partially_inline!(
+            ci.code, Any[_pullback, Core.SlotNumber(2), literal_getfield],
+            Tuple{typeof(_pullback), _sig.parameters...}, Any[_sig.parameters...],
+            0, 0, :propagate,
+        )
+        ci.inlineable = true
+
+        # specialize `_pullback`, so recursive backedges work correctly
+        Base.precompile(_pullback, (pb_sig(x).parameters...,))
+
+        # backedge for `_pullback`, see https://docs.julialang.org/en/v1/devdocs/ast/#MethodInstance
+        # this will cause a backedge to this particular MethodInstance to be attached to
+        # `_pullback(cx, getproperty, x, f)`
+        mi_pb_getproperty = Core.Compiler.method_instances(_pullback, pb_sig(x))
+        if ci.edges === nothing
+            ci.edges = Core.MethodInstance[]
+        end
+        append!(ci.edges::Vector{Core.MethodInstance}, mi_pb_getproperty)
+
+        return ci
+    else
+        # nothing to optimize here, need to recurse into `getproperty`
+        return quote
+            Base.@_inline_meta
+            _pullback(cx, getproperty, x, $(QuoteNode(f)))
+        end
+    end
+end
+
 @adjoint function literal_getfield(x, ::Val{f}) where f
   val = getfield(x, f)
   function back(Δ)
