@@ -110,6 +110,40 @@ end
   @test pb(1) == (nothing, (x = 1, y = nothing), nothing)
 end
 
+@testset "issue #922" begin
+  # checks whether getproperty gets accumulated correctly
+  # instead of defining a test function as in the issue, compare the two pullbacks
+  function two_svds(X::StridedMatrix{<:Union{Real, Complex}})
+    return svd(X).U * svd(X).V'
+  end
+
+  function one_svd(X::StridedMatrix{<:Union{Real, Complex}})
+    F = svd(X)
+    return F.U * F.V'
+  end
+
+  Δoutput = randn(3,2)
+  X = randn(3,2)
+
+  d_two = Zygote.pullback(two_svds, X)[2](Δoutput)
+  d_one = Zygote.pullback(one_svd, X)[2](Δoutput)
+  @test d_one == d_two
+end 
+
+# this test fails if adjoint for literal_getproperty is added
+# https://github.com/FluxML/Zygote.jl/issues/922#issuecomment-804128905
+@testset "overloaded getproperty" begin
+  struct MyStruct
+      a
+      b
+  end
+  Base.getproperty(ms::MyStruct, s::Symbol) = s === :c ? ms.a + ms.b : getfield(ms, s)
+  sumall(ms::MyStruct) = ms.a + ms.b + ms.c
+
+  ms = MyStruct(1, 2)
+  @test Zygote.gradient(sumall, ms) == ((a = 2, b = 2),)
+end
+
 import ChainRules
 
 function _Gaussian(suffix::Symbol)
@@ -159,4 +193,3 @@ end
     Base.getproperty(g::Gaussian, s::Symbol) = 2getfield(g, s)
     @test_broken back([1., 0, 0]) == ((m = [4.0, 0.0, 0.0], P = nothing),)
 end
-

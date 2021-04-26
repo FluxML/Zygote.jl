@@ -6,7 +6,7 @@ using LinearAlgebra: copytri!, AbstractTriangular
 import ZygoteRules: @adjoint, @adjoint!, AContext, adjoint, _pullback, pullback,
   literal_getproperty, literal_getfield
 
-using ChainRules: ChainRules, rrule, unthunk
+using ChainRules: ChainRules, rrule, unthunk, canonicalize
 using IRTools
 using MacroTools, Requires
 using MacroTools: @forward

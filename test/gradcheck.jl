@@ -190,6 +190,22 @@ end
   @test gradient(g, ones(3)) == ([1,0,0],)
 end
 
+@testset "eachcol" begin
+    @test gradtest(x -> map(sum, eachcol(x)), (3,4))
+    @test gradtest(x -> map(sum, eachcol(transpose(x))), (3,4))
+
+    @test gradtest(x -> map(norm, eachcol(x)), (3,4))
+    @test gradtest(x -> map(norm, eachrow(x)), (3,4))
+    @test gradtest(x -> map(norm, eachslice(x, dims=3)), (3,4,5))
+
+    # some slices may have gradient nothing
+    @test gradient(x -> sum(y -> rand()>0.5 ? 0 : first(y), eachcol(x)), rand(3,10))[1] isa Matrix
+
+    # strange errors
+    @test_skip gradient(x -> sum(norm, eachcol(x)), [1 2 3; 4 5 6])[1] isa Matrix
+    @test_skip gradient(x -> sum(norm, eachcol(x)), rand(3,400))[1] isa Matrix
+end
+
 @testset "collect" begin
   @test gradient(x -> sum(inv, collect(x)), (1,2)) === ((-1.0, -1/4),)
 
@@ -548,6 +564,12 @@ end
     @test Zygote.pullback(g, X)[2]((factors=LowerTriangular(X),)) ==
       Zygote.pullback(g, X)[2]((factors=Matrix(LowerTriangular(X)),))
     @test_throws PosDefException Zygote.pullback(X -> cholesky(X, check = false), X)[2]((factors=X,))
+
+    # https://github.com/FluxML/Zygote.jl/issues/932
+    @test gradcheck(rand(5, 5), rand(5)) do A, x
+        C = cholesky(Symmetric(A' * A + I))
+        return sum(C \ x) + logdet(C)
+    end
   end
 end
 
@@ -1040,8 +1062,8 @@ end
         Y = copy(X)
         Δ = randn(P, P)
         Δ_fd = FiniteDifferences.j′vp(
-                  FiniteDifferences.central_fdm(5, 1), 
-                  X -> pairwise(metric, X, Y; dims=2), 
+                  FiniteDifferences.central_fdm(5, 1),
+                  X -> pairwise(metric, X, Y; dims=2),
                   Δ, X)
         _, pb = Zygote.pullback(X -> pairwise(metric, X, Y; dims=2), X)
 
@@ -1335,6 +1357,23 @@ using Zygote: Buffer
     push!(b, 3)
     prod(copy(b))
   end == (3,)
+
+  @testset "Limited Mutation" begin
+    p = [rand(3,3), rand(3,3)]
+    r = rand(5,5)
+
+    # TODO: ngradient cannot handle Vector{Array}
+    gs = gradient((p,x) -> sum(sum.(push!(p,x))), p, r)
+    @test length(p[end]) == length(gs[1][end])
+    @test gs[1] ≈ map(x -> one.(x), p)
+    @test gs[2] ≈ one.(r)
+
+    p = [rand(3,3), rand(3,3)] # redefine `p` after mutation
+    gs = gradient(x -> sum(pop!(x)), p)
+    @test length(gs[1]) == 2
+    @test gs[1][1] == one.(p[1])
+  end
+
 end
 
 @testset "FillArrays" begin
