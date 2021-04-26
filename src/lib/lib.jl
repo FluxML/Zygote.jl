@@ -225,7 +225,7 @@ end
     if is_getfield_fallback
         # just copy pullback of `literal_getfield`
         _sig = Tuple{cx, typeof(literal_getfield), x, Val{f}}
-        ci = code_lowered(_pullback, _sig)[1]
+        ci = copy(code_lowered(_pullback, _sig)[1])
 
         # we need to change the second arg to `_pullback` from `literal_getproperty` to
         # `literal_getfield`
