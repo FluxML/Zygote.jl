@@ -217,9 +217,8 @@ end
 """
     diaghessian(f, args...)
 
-Diagonal part of the Hessian. Returns a tuple containing 
-an array `h` the same shape as each argument `x`,
-with `Hᵢᵢ = h[i] = ∂²y/∂x[i]∂x[i]`. 
+Diagonal part of the Hessian. Returns a tuple containing, for each argument `x`,
+`h` of the same shape with `h[i] = Hᵢᵢ = ∂²y/∂x[i]∂x[i]`. 
 The original evaluation `y = f(args...)` must give a real number `y`.
 
 For one vector argument `x`, this is equivalent to `(diag(hessian(f,x)),)`.
@@ -252,14 +251,14 @@ julia> hessian(xy -> atan(xy[1], xy[2]), [1, 2])  # full Hessian is not diagonal
 """
 function diaghessian(f, args...)
   ntuple(length(args)) do n
-    x = args[n]
-    if x isa AbstractArray
-      forward_diag(x -> gradient(f, _splice(x, args, Val(n))...)[n], x)[2]
-    elseif x isa Number
-      ForwardDiff.derivative(x -> gradient(f, _splice(x, args, Val(n))...)[n], x)
+    let x = args[n], valn = Val(n)  # let Val improves speed, sometimes
+      if x isa AbstractArray
+        forward_diag(x -> gradient(f, _splice(x, args, valn)...)[n], x)[2]
+      elseif x isa Number
+        ForwardDiff.derivative(x -> gradient(f, _splice(x, args, valn)...)[n], x)
+      end
     end
   end
 end
 
 _splice(x, args, ::Val{n}) where {n} = ntuple(i -> i==n ? x : args[i], length(args))
-
