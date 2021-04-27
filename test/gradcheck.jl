@@ -1684,6 +1684,6 @@ end
     t = @elapsed(gradient(x -> prod(y -> y + 1, x), x))
     gradient(x -> prod(Base.Fix1(+, 1), x), x)
     @test @elapsed(gradient(x -> prod(Base.Fix1(+, 1), x), x)) < 2 * t
-    gradient(x -> prod(Base.Fix1(+, 1), x), x)
+    gradient(x -> prod(Base.Fix2(+, 1), x), x)
     @test @elapsed(gradient(x -> prod(Base.Fix2(+, 1), x), x)) < 2 * t
 end
