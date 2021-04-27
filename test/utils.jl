@@ -18,6 +18,27 @@ using Zygote: hessian_dual, hessian_reverse
   @test_throws Exception hess(identity, randn(2))
 end
 
+@testset "diagonal hessian" begin
+  @test diaghessian(x -> x[1]*x[2]^2, [1, pi]) == ([0, 2],)
+
+  xs, y = randn(2,3), rand()
+  f34(xs, y) = xs[1] * (sum(xs .^ (1:3)') + y^4)  # non-diagonal Hessian, two arguments
+  dx, dy = diaghessian(f34, xs, y)
+  @test size(dx) == size(xs)
+  @test vec(dx) ≈ diag(hessian(x -> f34(x,y), xs))
+  @test dy ≈ hessian(y -> f34(xs,y), y)
+
+  zs = randn(7,13)  # test chunk mode
+  @test length(zs) > ForwardDiff.DEFAULT_CHUNK_THRESHOLD
+  @test length(zs) % ForwardDiff.DEFAULT_CHUNK_THRESHOLD != 0
+  f713(zs) = sum(vec(zs)' .* exp.(vec(zs)))
+  @test vec(diaghessian(f713, zs)[1]) ≈ diag(hessian(f713, zs))
+
+  @test_throws Exception diaghessian(sin, im*pi)
+  @test_throws Exception diaghessian(x -> x+im, pi)
+  @test_throws Exception diaghessian(identity, randn(2))
+end
+
 @testset "jacobian(f, args...)" begin
   @test jacobian(identity, [1,2])[1] == [1 0; 0 1]
 

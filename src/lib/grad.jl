@@ -213,3 +213,31 @@ function jacobian(f, pars::Params)
   end
   Grads(out, pars)
 end
+
+"""
+    diaghessian(f, args...)
+
+Diagonal part of the Hessian, literally `diaghessian(f, x)[1] == diag(hessian(f,x))` 
+for one vector argument `x`. In general this returns a tuple, with an array the same shape 
+as each argument, `d[i] = ∂²y/∂x[i]∂x[i]`, where `y = f(args...)` must be a real number.
+
+Like [`hessian`](@ref) it uses ForwardDiff over Zygote. 
+
+!!! warning
+    For arguments of any type except `Number` & `AbstractArray`, the result is `nothing`.
+"""
+function diaghessian(f, args...)
+  ntuple(length(args)) do n
+    x = args[n]
+    if x isa AbstractArray
+      forward_diag(x -> gradient(f, _splice(x, args, Val(n))...)[n], x)[2]
+    elseif x isa Number
+      ForwardDiff.derivative(x -> gradient(f, _splice(x, args, Val(n))...)[n], x)
+    end
+  end
+end
+
+# diaghessian(f, x::AbstractArray) = (forward_diag(x -> gradient(f, x)[1], x)[2],)
+
+_splice(x, args, ::Val{n}) where {n} = ntuple(i -> i==n ? x : args[i], length(args))
+

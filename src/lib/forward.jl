@@ -46,6 +46,36 @@ vec_scalar(x::Real) = [x]
 reshape_scalar(x, y) = reshape(y, size(x))
 reshape_scalar(x::Real, y) = y[]
 
+function extract_diag(offset, xs::AbstractArray{ForwardDiff.Dual{T,V,N}}) where {T,V,N}
+  D = similar(xs, V, N)
+  for j in 1:min(N, length(xs)-offset)
+    D[j] = xs[offset+j].partials.values[j]
+  end
+  return map(x -> x.value, xs), D
+end
+
+function forward_diag(f, x::AbstractArray, ::Val{N}) where N
+  y, _D = extract_diag(0, f(seed(x, Val(N))))
+  D = similar(_D, size(x)...)
+  D[1:N] = _D
+  offset = 0
+  while offset + N < length(x)
+    offset += N
+    _, _D = extract_diag(offset, f(seed(x, Val(N), offset)))
+    range = (1+offset):min(N+offset,length(x))
+    D[range] = @view _D[range.-offset]
+  end
+  return y, D
+end
+
+function forward_diag(f, x::AbstractArray)
+  if length(x) < ForwardDiff.DEFAULT_CHUNK_THRESHOLD
+    forward_diag(f, x, Val(length(x)))
+  else
+    forward_diag(f, x, Val(ForwardDiff.DEFAULT_CHUNK_THRESHOLD))
+  end
+end
+
 """
     forwarddiff(f, x) -> f(x)
 
