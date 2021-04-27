@@ -217,14 +217,30 @@ end
 """
     diaghessian(f, args...)
 
-Diagonal part of the Hessian, literally `diaghessian(f, x)[1] == diag(hessian(f,x))` 
-for one vector argument `x`. In general this returns a tuple, with an array the same shape 
-as each argument, `d[i] = ∂²y/∂x[i]∂x[i]`, where `y = f(args...)` must be a real number.
+Diagonal part of the Hessian. Returns a tuple containing 
+an array `h` the same shape as each argument `x`,
+with `Hᵢᵢ = h[i] = ∂²y/∂x[i]∂x[i]`. 
+The original evaluation `y = f(args...)` must give a real number `y`.
 
+For one vector argument `x`, this is equivalent to `(diag(hessian(f,x)),)`.
 Like [`hessian`](@ref) it uses ForwardDiff over Zygote. 
 
 !!! warning
     For arguments of any type except `Number` & `AbstractArray`, the result is `nothing`.
+
+# Examples
+```jldoctest; setup=:(using Zygote, LinearAlgebra)
+julia> diaghessian(x -> sum(x.^3), [1 2; 3 4])[1]
+2×2 Matrix{$Int}:
+  6  12
+ 18  24
+
+julia> Diagonal(vec(ans)) == hessian(x -> sum(x.^3), [1 2; 3 4])
+true
+
+julia> diaghessian((x,y) -> sum(x .* y .* y'), [1 22; 333 4], [0.5, 0.666])
+([0.0 0.0; 0.0 0.0], [2.0, 8.0])
+```
 """
 function diaghessian(f, args...)
   ntuple(length(args)) do n
@@ -236,8 +252,6 @@ function diaghessian(f, args...)
     end
   end
 end
-
-# diaghessian(f, x::AbstractArray) = (forward_diag(x -> gradient(f, x)[1], x)[2],)
 
 _splice(x, args, ::Val{n}) where {n} = ntuple(i -> i==n ? x : args[i], length(args))
 
