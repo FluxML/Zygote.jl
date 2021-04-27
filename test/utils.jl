@@ -1,4 +1,5 @@
 using LinearAlgebra
+using ForwardDiff
 using Zygote: hessian_dual, hessian_reverse
 
 @testset "hessian: $hess" for hess in [hessian_dual, hessian_reverse]
