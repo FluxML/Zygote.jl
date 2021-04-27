@@ -131,3 +131,9 @@ forwarddiff(f, x) = f(x)
   y, J = forward_jacobian(f, x)
   return y, ȳ -> (nothing, reshape_scalar(x, J*vec_scalar(ȳ)))
 end
+
+# Second derivatives
+@adjoint ForwardDiff.derivative(f, x) = pullback(forwarddiff, x -> ForwardDiff.derivative(f, x), x)
+@adjoint ForwardDiff.gradient(f, x) = pullback(forwarddiff, x -> ForwardDiff.gradient(f, x), x)
+@adjoint ForwardDiff.jacobian(f, x) = pullback(forwarddiff, x -> ForwardDiff.jacobian(f, x), x)
+
