@@ -140,3 +140,17 @@ end
 @adjoint Base.nameof(x::UnionAll) = nameof(x), _ -> (nothing,)
 
 @nograd typeintersect
+
+# Base.Fix1 and Base.Fix2: https://github.com/FluxML/Zygote.jl/issues/957
+@adjoint function (g::Base.Fix1)(y)
+    f = g.f
+    x = g.x
+    fallback_Fix1(y) = f(x, y)
+    return _pullback(__context__, fallback_Fix1, y)
+end
+@adjoint function (g::Base.Fix2)(y)
+    f = g.f
+    x = g.x
+    fallback_Fix2(y) = f(y, x)
+    return _pullback(__context__, fallback_Fix2, y)
+end

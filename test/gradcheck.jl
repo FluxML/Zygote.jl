@@ -1672,3 +1672,18 @@ end
     gradient(x->norm(x*[1im, 1]), 1.23)
     gradient(x->norm(x*[1im 1]), 1.23)
 end
+
+@testset "Fix1 and Fix2" begin
+    @test gradcheck(x -> prod(Base.Fix1(+, 1), x), randn(100))
+    @test gradcheck(x -> prod(Base.Fix2(+, 1), x), randn(100))
+
+    # compile once and check the execution times compared with a closure
+    # https://github.com/FluxML/Zygote.jl/issues/957
+    x = randn(100)
+    gradient(x -> prod(y -> y + 1, x), x)
+    t = @elapsed(gradient(x -> prod(y -> y + 1, x), x))
+    gradient(x -> prod(Base.Fix1(+, 1), x), x)
+    @test @elapsed(gradient(x -> prod(Base.Fix1(+, 1), x), x)) < 2 * t
+    gradient(x -> prod(Base.Fix1(+, 1), x), x)
+    @test @elapsed(gradient(x -> prod(Base.Fix2(+, 1), x), x)) < 2 * t
+end
