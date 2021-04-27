@@ -235,11 +235,19 @@ julia> diaghessian(x -> sum(x.^3), [1 2; 3 4])[1]
   6  12
  18  24
 
-julia> Diagonal(vec(ans)) == hessian(x -> sum(x.^3), [1 2; 3 4])
+julia> Diagonal(vec(ans)) == hessian(x -> sum(x.^3), [1 2; 3 4])  # full Hessian is diagonal
 true
 
-julia> diaghessian((x,y) -> sum(x .* y .* y'), [1 22; 333 4], [0.5, 0.666])
+julia> diaghessian((x,y) -> sum(x .* y .* y'), [1 22; 333 4], [0.5, 0.666])  # two array arguments
 ([0.0 0.0; 0.0 0.0], [2.0, 8.0])
+
+julia> diaghessian(atan, 1, 2)  # scalar arguments
+(-0.16, 0.16)
+
+julia> hessian(xy -> atan(xy[1], xy[2]), [1, 2])  # full Hessian is not diagonal
+2×2 Matrix{Float64}:
+ -0.16  -0.12
+ -0.12   0.16
 ```
 """
 function diaghessian(f, args...)
