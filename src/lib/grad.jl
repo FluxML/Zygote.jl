@@ -50,6 +50,8 @@ is higher-dimensional.
 This uses forward over reverse, ForwardDiff over Zygote, calling `hessian_dual(f, x)`.
 See [`hessian_reverse`](@ref) for an all-Zygote alternative.
 
+See also [`diaghessian`](@ref) to compute only the diagonal part.
+
 # Examples
 
 ```jldoctest; setup=:(using Zygote)
@@ -240,7 +242,7 @@ true
 julia> diaghessian((x,y) -> sum(x .* y .* y'), [1 22; 333 4], [0.5, 0.666])  # two array arguments
 ([0.0 0.0; 0.0 0.0], [2.0, 8.0])
 
-julia> diaghessian(atan, 1, 2)  # scalar arguments
+julia> diaghessian(atan, 1, 2)  # two scalar arguments
 (-0.16, 0.16)
 
 julia> hessian(xy -> atan(xy[1], xy[2]), [1, 2])  # full Hessian is not diagonal

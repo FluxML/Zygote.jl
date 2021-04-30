@@ -46,26 +46,28 @@ vec_scalar(x::Real) = [x]
 reshape_scalar(x, y) = reshape(y, size(x))
 reshape_scalar(x::Real, y) = y[]
 
-function extract_diag(offset, xs::AbstractArray{ForwardDiff.Dual{T,V,N}}) where {T,V,N}
-  D = similar(xs, V, N)
+# very similar functions needed for diaghessian:
+
+function extract_diag!(_D, offset, xs::AbstractArray{ForwardDiff.Dual{T,V,N}}) where {T,V,N}
   for j in 1:min(N, length(xs)-offset)
-    D[j] = xs[offset+j].partials.values[j]
+    _D[j] = xs[offset+j].partials.values[j]
   end
-  return map(x -> x.value, xs), D
 end
 
-function forward_diag(f, x::AbstractArray, ::Val{N}) where N
-  y, _D = extract_diag(0, f(seed(x, Val(N))))
-  D = similar(_D, size(x)...)
+function forward_diag(f, x::AbstractArray{T}, ::Val{N}) where {N,T}
+  fx = f(seed(x, Val(N)))
+  D = similar(x, ForwardDiff.valtype(eltype(fx)))
+  _D = similar(D, N)
+  extract_diag!(_D, 0, fx)
   D[1:N] = _D
   offset = 0
   while offset + N < length(x)
     offset += N
-    _, _D = extract_diag(offset, f(seed(x, Val(N), offset)))
+    extract_diag!(_D, offset, f(seed(x, Val(N), offset)))
     range = (1+offset):min(N+offset,length(x))
     D[range] = @view _D[range.-offset]
   end
-  return y, D
+  return map(y -> y.value, fx), D
 end
 
 function forward_diag(f, x::AbstractArray)
