@@ -1672,3 +1672,38 @@ end
     gradient(x->norm(x*[1im, 1]), 1.23)
     gradient(x->norm(x*[1im 1]), 1.23)
 end
+
+# https://github.com/FluxML/Zygote.jl/issues/804
+@testset "Unused comprehension" begin
+    # Comprehension is used.
+    io = IOBuffer()
+    s = 0.0
+    gs = gradient([1.0, 2.0]) do xs
+        sum([(print(io, x); s += x; s * x) for x in xs])
+    end
+    @test String(take!(io)) == "1.02.0"
+    @test s == 3.0
+    @test gs == ([4.0, 5.0],)
+
+    # Comprehension is not used.
+    io = IOBuffer()
+    s = 0.0
+    gs = gradient([1.0, 2.0]) do xs
+        sum([(print(io, x); s += x; s * x) for x in xs])
+        0.0
+    end
+    @test String(take!(io)) == "1.02.0"
+    @test s == 3.0
+    @test gs == (nothing,)
+
+    # Comprehension is empty and not used.
+    io = IOBuffer()
+    s = 0.0
+    gs = gradient([]) do xs
+        [(print(io, x); s += x; s * x) for x in xs]
+        0.0
+    end
+    @test String(take!(io)) == ""
+    @test s == 0.0
+    @test gs == (nothing,)
+end

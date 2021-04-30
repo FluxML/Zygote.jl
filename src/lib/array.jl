@@ -203,6 +203,7 @@ for (mapfunc,∇mapfunc) in [(:map,:∇map),(:pmap,:∇pmap)]
     else
       ys, backs = unzip(ys_and_backs)
       ys, function (Δ)
+        isnothing(Δ) && return nothing
         # Apply pullbacks in reverse order. Needed for correctness if `f` is stateful.
         Δf_and_args_zipped = $mapfunc((f, δ) -> f(δ), _tryreverse($mapfunc, backs, Δ)...)
         Δf_and_args = unzip(_tryreverse($mapfunc, Δf_and_args_zipped))
@@ -234,11 +235,13 @@ end
 @nograd workers
 
 function _pullback(cx::AContext, ::typeof(collect), g::Base.Generator)
-  y, back = ∇map(cx, g.f, g.iter)
-  y, function (ȳ)
-    f̄, x̄ = back(ȳ)
+  y, b = ∇map(cx, g.f, g.iter)
+  back(::Nothing) = nothing
+  function back(ȳ)
+    f̄, x̄ = b(ȳ)
     (nothing, (f = f̄, iter = x̄),)
   end
+  y, back
 end
 
 @adjoint iterate(r::UnitRange, i...) = iterate(r, i...), _ -> nothing
