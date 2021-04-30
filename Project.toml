@@ -33,6 +33,7 @@ MacroTools = "0.5"
 NaNMath = "0.3"
 Requires = "1.1"
 SpecialFunctions = "0.10, 1.0"
+StatsFuns = "0.9.8"
 ZygoteRules = "0.2.1"
 julia = "1.3"
 
