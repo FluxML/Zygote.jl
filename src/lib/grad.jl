@@ -264,17 +264,3 @@ function diaghessian(f, args...)
 end
 
 _splice(x, args, ::Val{n}) where {n} = ntuple(i -> i==n ? x : args[i], length(args))
-
-function diaghessian_2nd(f, args...)
-  ntuple(length(args)) do n
-    let x = args[n], valn = Val(n)
-      if x isa AbstractArray
-        forward_2nd(x -> f(_splice(x, args, valn)...), x)[2]
-      elseif x isa Number
-        ForwardDiff.hessian(x -> f(_splice(x[1], args, valn)...), [x])[1]
-      end
-    end
-  end
-end
-
-export diaghessian_2nd
