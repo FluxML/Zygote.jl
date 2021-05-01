@@ -81,6 +81,53 @@ function forward_diag(f, x::AbstractArray)
   end
 end
 
+# and another approach: all forward, directly 2nd order
+
+seed_2nd(x::Real, ::Val) = Dual(Dual(x, true), true)
+
+function seed_2nd(xs, ::Val{N}, offset = 0) where N
+  map(xs, reshape(1:length(xs), size(xs))) do x, i
+    b = ntuple(j -> j+offset == i, Val(N))
+    Dual(Dual(x, b), b)
+  end
+end
+function seed_2nd!(xplus, xs, ::Val{N}, offset) where N
+  map!(xplus, xs, reshape(1:length(xs), size(xs))) do x, i
+    b = ntuple(j -> j+offset == i, Val(N))
+    Dual(Dual(x, b), b)
+  end
+end
+
+function extract_2nd!(out, fx::ForwardDiff.Dual{T,V,N}, offset) where {T,V,N}
+  for j in 1:min(N, length(out)-offset)
+    out[j+offset] = fx.partials.values[j].partials.values[j]
+  end
+end
+
+function forward_2nd(f, x::AbstractArray{T}, ::Val{N}) where {N,T}
+  xplus = seed_2nd(x, Val(N), 0)
+  fx = f(xplus)
+  out = similar(x, ForwardDiff.valtype(ForwardDiff.valtype(typeof(fx))))
+  extract_2nd!(out, fx, 0)
+  offset = 0
+  while offset + N < length(x)
+    offset += N
+    fx = f(seed_2nd!(xplus, x, Val(N), offset))
+    extract_2nd!(out, fx, offset)
+  end
+  return fx.value.value, out
+end
+
+function forward_2nd(f, x::AbstractArray)
+  # if length(x) < ForwardDiff.DEFAULT_CHUNK_THRESHOLD
+  #   forward_2nd(f, x, Val(length(x)))
+  # else
+  #   forward_2nd(f, x, Val(ForwardDiff.DEFAULT_CHUNK_THRESHOLD ÷ 2))
+    forward_2nd(f, x, Val(3))
+  # end
+end
+
+
 """
     forwarddiff(f, x) -> f(x)
 
