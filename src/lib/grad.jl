@@ -217,7 +217,7 @@ function jacobian(f, pars::Params)
 end
 
 """
-    diaghessian(f, args...)
+    diaghessian(f, args...) -> Tuple
 
 Diagonal part of the Hessian. Returns a tuple containing, for each argument `x`,
 `h` of the same shape with `h[i] = Hᵢᵢ = ∂²y/∂x[i]∂x[i]`. 

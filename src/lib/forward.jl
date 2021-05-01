@@ -8,6 +8,12 @@ function seed(x, ::Val{N}, offset = 0) where N
     Dual(x, ntuple(j -> j+offset == i, Val(N)))
   end
 end
+function seed!(xplus, x, ::Val{N}, offset) where N
+  @assert size(x) == size(xplus)
+  map!(xplus, x, reshape(1:length(x), size(x))) do x, i
+    Dual(x, ntuple(j -> j+offset == i, Val(N)))
+  end
+end
 
 extract(x::ForwardDiff.Dual) = x.value, [x.partials...]
 
@@ -48,26 +54,23 @@ reshape_scalar(x::Real, y) = y[]
 
 # very similar functions needed for diaghessian:
 
-function extract_diag!(_D, offset, xs::AbstractArray{ForwardDiff.Dual{T,V,N}}) where {T,V,N}
+function extract_diag!(out, offset, xs::AbstractArray{ForwardDiff.Dual{T,V,N}}) where {T,V,N}
   for j in 1:min(N, length(xs)-offset)
-    _D[j] = xs[offset+j].partials.values[j]
+    out[offset+j] = xs[offset+j].partials.values[j]
   end
 end
 
 function forward_diag(f, x::AbstractArray{T}, ::Val{N}) where {N,T}
-  fx = f(seed(x, Val(N)))
-  D = similar(x, ForwardDiff.valtype(eltype(fx)))
-  _D = similar(D, N)
-  extract_diag!(_D, 0, fx)
-  D[1:N] = _D
+  xplus = seed(x, Val(N))
+  fx = f(xplus)
+  out = similar(x, ForwardDiff.valtype(eltype(fx)))
+  extract_diag!(out, 0, fx)
   offset = 0
   while offset + N < length(x)
     offset += N
-    extract_diag!(_D, offset, f(seed(x, Val(N), offset)))
-    range = (1+offset):min(N+offset,length(x))
-    D[range] = @view _D[range.-offset]
+    extract_diag!(out, offset, f(seed!(xplus, x, Val(N), offset)))
   end
-  return map(y -> y.value, fx), D
+  return map(y -> y.value, fx), out
 end
 
 function forward_diag(f, x::AbstractArray)
