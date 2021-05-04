@@ -32,8 +32,10 @@ end
 
 @adjoint view(x::AbstractArray, inds...) = view(x, inds...), ∇getindex(x, inds)
 
-∇getindex(x::AbstractArray, inds) = dy -> begin
-  if inds isa  NTuple{<:Any, Integer}
+∇getindex(x::AbstractArray{T,N}, inds) where {T,N} = dy -> begin
+  if inds isa NTuple{N,Int} && T <: Number
+    dx = OneElement(dy, inds, axes(x))
+  elseif inds isa NTuple{<:Any, Integer}
     dx = _zero(x, typeof(dy))
     dx[inds...] = dy
   else
@@ -43,6 +45,16 @@ end
   end
   return (dx, map(_->nothing, inds)...)
 end
+
+struct OneElement{T,N,I,A} <: AbstractArray{T,N}
+  val::T
+  index::I
+  axes::A
+  OneElement(x::T, i::I, a::A) where {T,I<:NTuple{N,Int},A} where {N} = new{T,N,I,A}(x, i, a)
+end
+Base.size(A::OneElement) = map(length, A.axes)
+Base.axes(A::OneElement) = A.axes
+Base.getindex(A::OneElement{T,N}, i::Vararg{Int,N}) where {T,N} = ifelse(i==A.index, A.val, zero(T))
 
 _zero(xs::AbstractArray{<:Number}, T::Type{Nothing}) = fill!(similar(xs), zero(eltype(xs)))
 _zero(xs::AbstractArray{<:Number}, T) = fill!(similar(xs, T), false)
