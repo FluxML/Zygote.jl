@@ -14,6 +14,7 @@ accum(x, y, zs...) = accum(accum(x, y), zs...)
 
 accum(x::Tuple, y::Tuple) = accum.(x, y)
 accum(x::AbstractArray, y::AbstractArray) = accum.(x, y)
+accum(x::DenseArray, y::AbstractArray) = x .= accum.(x, y)
 
 @generated function accum(x::NamedTuple, y::NamedTuple)
   # assumes that y has no keys apart from those also in x
