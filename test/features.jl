@@ -402,7 +402,7 @@ function pow_simd(x, n)
   return r
 end
 
-@test_broken gradient(pow_simd, 2, 3) == (12,nothing)
+@test gradient(pow_simd, 2, 3) == (12,nothing)
 
 @testset "tuple getindex" begin
   @test gradient(x -> size(x)[2], ones(2,2,2)) == (nothing,)
