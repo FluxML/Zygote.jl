@@ -1,23 +1,26 @@
 
-using LinearAlgebra: Diagonal, UpperTriangular, LowerTriangular
+using LinearAlgebra: Diagonal, UpperTriangular, UnitUpperTriangular, LowerTriangular, UnitLowerTriangular
 using LinearAlgebra: AdjointAbsVec, TransposeAbsVec, AdjOrTransAbsVec
 
 import ZygoteRules: clamptype
 
 # Bool, Real, Complex
 
-clamptype(::Type{Bool}, dx) = nothing
-clamptype(::Type{<:AbstractArray{Bool}}, dx::AbstractArray) = nothing
+# clamptype(::Type{Bool}, dx) = nothing
+# clamptype(::Type{Bool}, dx::Complex) = nothing  # ambiguity
+# clamptype(::Type{<:AbstractArray{Bool}}, dx::AbstractArray) = nothing
+# clamptype(::Type{<:AbstractArray{Bool}}, dx::AbstractArray) = (@info "bool array" summary(dx); nothing)
+
+# clamptype(::Type{Bool}, dx) = (@info "bool, dropping" typeof(dx); nothing)
+# clamptype(::Type{Bool}, dx::Complex) = (@info "bool, dropping" typeof(dx); nothing)
+# clamptype(::Type{<:AbstractArray{Bool}}, dx::AbstractArray) = (@info "bool array, disabled" summary(dx); dx)
 
 clamptype(::Type{<:Real}, dx::Complex) = real(dx)
-clamptype(::Type{<:AbstractArray{<:Real}}, dx::AbstractArray{<:Complex}) = real(dx)
-
-clamptype(::Type{Bool}, dx::Complex) = nothing  # ambiguity
-clamptype(::Type{<:AbstractArray{Bool}}, dx::AbstractArray{<:Complex}) = nothing
+clamptype(::Type{<:AbstractArray{<:Real}}, dx::AbstractArray) = real(dx)
 
 # LinearAlgebra's matrix types
 
-for Wrap in [:Diagonal, :UpperTriangular, :LowerTriangular]
+for Wrap in [:Diagonal, :UpperTriangular, :UnitUpperTriangular, :LowerTriangular, :UnitLowerTriangular]
   @eval begin
     clamptype(::Type{<:$Wrap{T,PT}}, dx::$Wrap) where {T,PT} = 
       clamptype(PT, dx)
@@ -45,6 +48,25 @@ function _twofold(trans, dx::Array{<:AbstractFloat})
   dx
 end
 
+clamptype(::Type{<:AdjOrTransAbsVec{T,PT}}, dx::AdjOrTransAbsVec) where {T,PT} = 
+  clamptype(PT, dx)
+clamptype(::Type{<:AdjOrTransAbsVec{T,PT}}, dx::AbstractMatrix) where {T,PT} = 
+  clamptype(PT, transpose(vec(dx))) # sometimes wrong wrapper but avoids conjugation
+
+
+# clamptype(::Type{<:LinearAlgebra.Adjoint{T,PT}}, dx::AbstractMatrix) where {T<:Real,PT} = 
+#   clamptype(PT, LinearAlgebra.adjoint(vec(dx)))
+# clamptype(::Type{<:LinearAlgebra.Adjoint{T,PT}}, dx::AbstractMatrix) where {T,PT} = 
+#   clamptype(PT, transpose(vec(dx))) # wrong wrapper but avoids conjugation
+
+# for (trans, Wrap) in [(transpose, :TransposeAbsVec), (Base.adjoint, :AdjointAbsVec)]
+#   @eval begin
+#     clamptype(::Type{<:$Wrap{T,PT}}, dx::$Wrap) where {T,PT} = 
+#       clamptype(PT, dx)
+#     clamptype(::Type{<:$Wrap{T,PT}}, dx::AbstractMatrix) where {T,PT} = 
+#       clamptype(PT, $trans(vec(dx)))
+#   end
+# end
 
 # LinearAlgebra -- row vectors
 
