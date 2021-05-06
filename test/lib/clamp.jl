@@ -19,6 +19,7 @@ using ZygoteRules: clamptype
     # Structured, II
     TD = typeof(Diagonal(1:3))
     @test clamptype(TD, reshape(1:9, 3, 3)) isa Diagonal{Int,<:Vector}
+    @test clamptype(TD, Diagonal((1:3) .+ im)) == Diagonal(1:3)
     
     # Structured, II
     TH = typeof(Hermitian(rand(3,3) .+ im))
@@ -28,6 +29,11 @@ using ZygoteRules: clamptype
     @test AH == [1 2.5; 2.5 4]
     @test AH isa Hermitian{ComplexF64}
     @test clamptype(TH, reshape(1:4,2,2)) isa Hermitian{Float64}
+
+    # Tricky
+    TDB = typeof(Diagonal(rand(3) .> 0.5))
+    @test clamptype(TDB, rand(3,3)) === nothing
+    @test_broken clamptype(TDB, rand(ComplexF32, 3,3)) === nothing
 
     # Row vectors
     # TA = typeof((1:3)')

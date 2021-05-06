@@ -4,62 +4,46 @@ using LinearAlgebra: AdjointAbsVec, TransposeAbsVec, AdjOrTransAbsVec
 
 import ZygoteRules: clamptype
 
-# Booleans
+# Bool, Real, Complex
 
-clamptype(::Type{Bool}, dx::Number) = nothing
+clamptype(::Type{Bool}, dx) = nothing
+clamptype(::Type{Bool}, dx::Complex) = nothing  # ambiguity
 clamptype(::Type{<:AbstractArray{Bool}}, dx::AbstractArray) = nothing
-
-# Real numbers
+# clamptype(::Type{<:BitArray}, dx::AbstractArray) = nothing
 
 clamptype(::Type{<:Real}, dx::Complex) = real(dx)
 clamptype(::Type{<:AbstractArray{<:Real}}, dx::AbstractArray{<:Complex}) = real(dx)
 
-_elmap(::Type, ::Type) = identity  # for fusing fusing broadcasts below
-_elmap(::Type{T}, ::Type{S}) where {T<:Real, S<:Complex} = real
-_maybecast(proj, dx) = proj.(dx)
-_maybecast(::typeof(identity), dx) = dx
-
-# LinearAlgebra -- matrix projections with some zeros
+# LinearAlgebra's matrix types
 
 for Wrap in [:Diagonal, :UpperTriangular, :LowerTriangular]
   @eval begin
-    clamptype(::Type{<:$Wrap{T}}, dx::AbstractMatrix{S}) where {T,S} = 
-      _maybewrap($Wrap, _elmap(T,S), dx)
-
-    _maybewrap(::Type{$Wrap}, ::typeof(identity), dx::$Wrap) = dx  # avoids Diagonal(Diagonal(..., and @debug
+    clamptype(::Type{<:$Wrap}, dx::$Wrap) where {T,PT} = dx
+    clamptype(::Type{<:$Wrap{T,PT}}, dx::AbstractMatrix) where {T,PT} = clamptype(PT, $Wrap(dx))
+    clamptype(::Type{<:$Wrap{<:Real}}, dx::$Wrap{<:Complex}) = $Wrap(real(parent(dx)))
+    # clamptype(::Type{<:$Wrap{Bool}}, dx::$Wrap{<:Complex}) = nothing  # ambiguity
   end
 end
 
-_maybewrap(Wrap, proj, dx) = (@debug "broadcasting $proj & restoring $Wrap" typeof(dx); Wrap(proj.(dx)))
-_maybewrap(Wrap, ::typeof(identity), dx) = (@debug "restoring $Wrap" typeof(dx); Wrap(dx))
+for (trans, Wrap) in [(transpose, :Symmetric), (Base.adjoint, :Hermitian)]
+  @eval begin
+    clamptype(::Type{<:$Wrap}, dx::$Wrap) where {T,PT} = dx
+    clamptype(::Type{<:$Wrap{T,PT}}, dx::AbstractMatrix) where {T,PT} = clamptype(PT, $Wrap(_twofold($trans, dx)))
+    clamptype(::Type{<:$Wrap{<:Real}}, dx::$Wrap{<:Complex}) = $Wrap(real(parent(dx)))
+    # clamptype(::Type{<:$Wrap{Bool}}, dx::$Wrap{<:Complex}) = nothing  # ambiguity
+  end
+end
 
-# LinearAlgebra -- full matrix projections
-
-clamptype(::Type{<:Hermitian{T}}, dx::AbstractMatrix{S}) where {T,S} = hermitian!!(_elmap(T,S), dx)
-clamptype(::Type{<:Symmetric{T}}, dx::AbstractMatrix{S}) where {T,S} = symmetric!!(_elmap(T,S), dx)
-
-"""
-    hermitian!!(f, dx) == Hermitian(@.f(dx + dx')/2)
-
-Used for projecting gradients. Mutates when `dx::Array{<:AbstractFloat}`, to save time.
-"""
-hermitian!!(::typeof(identity), dx::Hermitian) = dx
-# hermitian!!(::typeof(identity), dx) = ishermitian(dx) ? Hermitian(dx) : Hermitian(_twofold(Base.adjoint, identity, dx))
-hermitian!!(proj, dx) = Hermitian(_twofold(transpose, proj, dx))
-
-symmetric!!(::typeof(identity), dx::Symmetric) = dx
-# symmetric!!(::typeof(identity), dx) = issymmetric(dx) ? Symmetric(dx) : Symmetric(_twofold(transpose, identity, dx))
-symmetric!!(proj, dx) = Symmetric(_twofold(transpose, proj, dx))
-
-_twofold(trans, proj, dx) = proj.(dx .+ trans(dx)) ./ 2
-function _twofold(trans, proj, dx::Array{<:AbstractFloat})
+_twofold(trans, dx) = (dx .+ trans(dx)) ./ 2
+function _twofold(trans, dx::Array{<:AbstractFloat})
   @inbounds for i in axes(dx,1)
     for j in i+1:lastindex(dx,2)
-      dx[i,j] = proj((dx[i,j] + trans(dx[j,i])) / 2)
+      dx[i,j] = (dx[i,j] + trans(dx[j,i])) / 2
     end
   end
   dx
 end
+
 
 # LinearAlgebra -- row vectors
 
