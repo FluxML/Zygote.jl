@@ -1,7 +1,4 @@
 
-using LinearAlgebra: Diagonal, UpperTriangular, UnitUpperTriangular, LowerTriangular, UnitLowerTriangular
-using LinearAlgebra: AdjointAbsVec, TransposeAbsVec, AdjOrTransAbsVec
-
 import ZygoteRules: clamptype
 # This sees a tuple of argument types, and can modify the resulting tuple of tangents
 
@@ -26,6 +23,9 @@ clamptype(Ts::Tuple, dxs::Tuple{}) = (@error "mismatch!" Ts; ())
 
 clamptype(::Type{<:Real}, dx::Complex) = real(dx)
 clamptype(::Type{<:AbstractArray{<:Real}}, dx::AbstractArray) = real(dx)
+
+using LinearAlgebra: Diagonal, UpperTriangular, UnitUpperTriangular, LowerTriangular, UnitLowerTriangular
+using LinearAlgebra: AdjointAbsVec, TransposeAbsVec, AdjOrTransAbsVec
 
 # LinearAlgebra's matrix types
 
@@ -61,31 +61,3 @@ clamptype(::Type{<:AdjOrTransAbsVec{T,PT}}, dx::AdjOrTransAbsVec) where {T,PT} =
   clamptype(PT, dx)
 clamptype(::Type{<:AdjOrTransAbsVec{T,PT}}, dx::AbstractMatrix) where {T,PT} = 
   clamptype(PT, transpose(vec(dx))) # sometimes wrong wrapper but avoids conjugation
-
-
-# clamptype(::Type{<:LinearAlgebra.Adjoint{T,PT}}, dx::AbstractMatrix) where {T<:Real,PT} = 
-#   clamptype(PT, LinearAlgebra.adjoint(vec(dx)))
-# clamptype(::Type{<:LinearAlgebra.Adjoint{T,PT}}, dx::AbstractMatrix) where {T,PT} = 
-#   clamptype(PT, transpose(vec(dx))) # wrong wrapper but avoids conjugation
-
-# for (trans, Wrap) in [(transpose, :TransposeAbsVec), (Base.adjoint, :AdjointAbsVec)]
-#   @eval begin
-#     clamptype(::Type{<:$Wrap{T,PT}}, dx::$Wrap) where {T,PT} = 
-#       clamptype(PT, dx)
-#     clamptype(::Type{<:$Wrap{T,PT}}, dx::AbstractMatrix) where {T,PT} = 
-#       clamptype(PT, $trans(vec(dx)))
-#   end
-# end
-
-# LinearAlgebra -- row vectors
-
-# clamptype(::Type{<:AdjointAbsVec{T}}, dx::AbstractMatrix{S}) where {T,S} = 
-#     _mayberow(Base.adjoint, _elmap(T,S), dx)
-# clamptype(::Type{<:TransposeAbsVec{T}}, dx::AbstractMatrix{S}) where {T,S} = 
-#     _mayberow(transpose, _elmap(T,S), dx)
-
-# _mayberow(_, ::typeof(identity), dx::AdjOrTransAbsVec) = dx
-# _mayberow(trans, proj, dx) = begin
-#   v = _maybecast(proj, vec(dx))
-#   isreal(v) ? trans(v) : transpose(v)  # making a Transpose is a smaller sin than conj.(v)
-# end
