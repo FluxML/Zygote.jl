@@ -29,12 +29,13 @@ using LinearAlgebra: AdjointAbsVec, TransposeAbsVec, AdjOrTransAbsVec
 
 # LinearAlgebra's matrix types
 
-for Wrap in [:Diagonal, :UpperTriangular, :UnitUpperTriangular, :LowerTriangular, :UnitLowerTriangular]
+for Wrap in [:Diagonal, :UpperTriangular, :LowerTriangular]
   @eval begin
     clamptype(::Type{<:$Wrap{T,PT}}, dx::$Wrap) where {T,PT} = 
       clamptype(PT, dx)
     clamptype(::Type{<:$Wrap{T,PT}}, dx::AbstractMatrix) where {T,PT} = 
       clamptype(PT, $Wrap(dx))
+    # not right for :UnitUpperTriangular, :UnitLowerTriangular
   end
 end
 

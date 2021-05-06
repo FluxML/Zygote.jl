@@ -65,6 +65,9 @@ end
     @test gradient(x -> sum(sqrt.(x .+ 1)./2), Diagonal(rand(3)))[1] isa Diagonal
     @test gradient(x -> sum(x .+ 1), UpperTriangular(rand(3,3)))[1] == UpperTriangular(ones(3,3))
 
+    @test gradient(x -> x[1,2], LowerTriangular(rand(3,3)))[1] == zeros(3,3)
+    @test_broken gradient(x -> x[1,2], UnitLowerTriangular(rand(3,3)))[1] == zeros(3,3)
+
     ld = gradient((x,y) -> sum(x * y), LowerTriangular(ones(3,3)), Diagonal(ones(3,3)))
     @test ld[1] isa LowerTriangular
     @test_broken ld[2] isa Diagonal
