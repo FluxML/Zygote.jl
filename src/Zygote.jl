@@ -39,6 +39,7 @@ include("lib/broadcast.jl")
 include("lib/forward.jl")
 include("lib/utils.jl")
 include("lib/range.jl")
+include("lib/clamp.jl")
 @init @require Distances="b4f34e82-e78d-54a5-968a-f98e89d6e8f7" include("lib/distances.jl")
 @init @require LogExpFunctions="2ab3a3ac-af41-5b50-aa03-7779005ae688" include("lib/logexpfunctions.jl")
 

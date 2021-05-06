@@ -26,6 +26,7 @@ end
   include("lib/number.jl")
   include("lib/lib.jl")
   include("lib/array.jl")
+  include("lib/clamp.jl")
 end
 
 @testset "Features" begin

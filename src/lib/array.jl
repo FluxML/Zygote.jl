@@ -45,7 +45,7 @@ end
 end
 
 _zero(xs::AbstractArray{<:Number}, T::Type{Nothing}) = fill!(similar(xs), zero(eltype(xs)))
-_zero(xs::AbstractArray{<:Number}, T) = fill!(similar(xs, T), false)
+_zero(xs::AbstractArray{<:Number}, T) = fill!(similar(xs, T, size(xs)), false)
 _zero(xs::AbstractArray, T) = fill!(similar(xs, Union{Nothing, T}), nothing)
 
 _droplike(dy, dxv) = dy
