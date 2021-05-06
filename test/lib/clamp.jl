@@ -60,6 +60,7 @@ end
     @test gradient(x -> abs2(sum(x .+ im)), [1, 2+0im])[1] == [6 + 4im, 6 + 4im]  # as before
 
     # Structured, some zeros
+    # (if rules improve, these will end up testing them not the projection)
     @test gradient(x -> sum(x .+ 1), Diagonal(rand(3)))[1] == Diagonal([1,1,1])
     @test gradient(x -> sum(sqrt.(x .+ 1)./2), Diagonal(rand(3)))[1] isa Diagonal
     @test gradient(x -> sum(x .+ 1), UpperTriangular(rand(3,3)))[1] == UpperTriangular(ones(3,3))
@@ -79,6 +80,7 @@ end
     @test pullback(x -> x.+1, rand(3)')[2]([1 2 3+im])[1] == [1 2 3]
     @test pullback(x -> x.+1, rand(ComplexF64, 3)')[2]([1 2 3+im])[1] == [1 2 3+im]  # as before
 
+    @test gradient(x -> x[1,2], rand(3)')[1] isa LinearAlgebra.AdjOrTransAbsVec  # worked, broken by _zero change
 end
 
 @info "----- done type clamp tests"
