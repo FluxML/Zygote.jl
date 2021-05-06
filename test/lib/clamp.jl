@@ -33,7 +33,7 @@ using ZygoteRules: clamptype
     # Tricky
     TDB = typeof(Diagonal(rand(3) .> 0.5))
     @test clamptype(TDB, rand(3,3)) === nothing
-    @test_broken clamptype(TDB, rand(ComplexF32, 3,3)) === nothing
+    @test clamptype(TDB, rand(ComplexF32, 3,3)) === nothing
 
     # Row vectors
     # TA = typeof((1:3)')

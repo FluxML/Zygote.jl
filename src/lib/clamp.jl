@@ -7,30 +7,31 @@ import ZygoteRules: clamptype
 # Bool, Real, Complex
 
 clamptype(::Type{Bool}, dx) = nothing
-clamptype(::Type{Bool}, dx::Complex) = nothing  # ambiguity
 clamptype(::Type{<:AbstractArray{Bool}}, dx::AbstractArray) = nothing
-# clamptype(::Type{<:BitArray}, dx::AbstractArray) = nothing
 
 clamptype(::Type{<:Real}, dx::Complex) = real(dx)
 clamptype(::Type{<:AbstractArray{<:Real}}, dx::AbstractArray{<:Complex}) = real(dx)
+
+clamptype(::Type{Bool}, dx::Complex) = nothing  # ambiguity
+clamptype(::Type{<:AbstractArray{Bool}}, dx::AbstractArray{<:Complex}) = nothing
 
 # LinearAlgebra's matrix types
 
 for Wrap in [:Diagonal, :UpperTriangular, :LowerTriangular]
   @eval begin
-    clamptype(::Type{<:$Wrap}, dx::$Wrap) where {T,PT} = dx
-    clamptype(::Type{<:$Wrap{T,PT}}, dx::AbstractMatrix) where {T,PT} = clamptype(PT, $Wrap(dx))
-    clamptype(::Type{<:$Wrap{<:Real}}, dx::$Wrap{<:Complex}) = $Wrap(real(parent(dx)))
-    # clamptype(::Type{<:$Wrap{Bool}}, dx::$Wrap{<:Complex}) = nothing  # ambiguity
+    clamptype(::Type{<:$Wrap{T,PT}}, dx::$Wrap) where {T,PT} = 
+      clamptype(PT, dx)
+    clamptype(::Type{<:$Wrap{T,PT}}, dx::AbstractMatrix) where {T,PT} = 
+      clamptype(PT, $Wrap(dx))
   end
 end
 
 for (trans, Wrap) in [(transpose, :Symmetric), (Base.adjoint, :Hermitian)]
   @eval begin
-    clamptype(::Type{<:$Wrap}, dx::$Wrap) where {T,PT} = dx
-    clamptype(::Type{<:$Wrap{T,PT}}, dx::AbstractMatrix) where {T,PT} = clamptype(PT, $Wrap(_twofold($trans, dx)))
-    clamptype(::Type{<:$Wrap{<:Real}}, dx::$Wrap{<:Complex}) = $Wrap(real(parent(dx)))
-    # clamptype(::Type{<:$Wrap{Bool}}, dx::$Wrap{<:Complex}) = nothing  # ambiguity
+    clamptype(::Type{<:$Wrap{T,PT}}, dx::$Wrap) where {T,PT} = 
+      clamptype(PT, dx)
+    clamptype(::Type{<:$Wrap{T,PT}}, dx::AbstractMatrix) where {T,PT} = 
+      clamptype(PT, $Wrap(_twofold($trans, dx)))
   end
 end
 
