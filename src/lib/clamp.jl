@@ -3,6 +3,15 @@ using LinearAlgebra: Diagonal, UpperTriangular, UnitUpperTriangular, LowerTriang
 using LinearAlgebra: AdjointAbsVec, TransposeAbsVec, AdjOrTransAbsVec
 
 import ZygoteRules: clamptype
+# This sees a tuple of argument types, and can modify the resulting tuple of tangents
+
+clamptype(Ts::Tuple{}, dxs::Tuple{}) = ()
+clamptype(Ts::Tuple, dxs::Tuple) =
+  first(Ts) === GlobalRef ? clamptype(Base.tail(Ts), dxs) :
+  (clamptype(first(Ts), first(dxs)), clamptype(Base.tail(Ts), Base.tail(dxs))...)
+
+clamptype(Ts::Tuple{}, dxs::Tuple) = (@error "mismatch!" dxs; dxs)
+clamptype(Ts::Tuple, dxs::Tuple{}) = (@error "mismatch!" Ts; ())
 
 # Bool, Real, Complex
 
