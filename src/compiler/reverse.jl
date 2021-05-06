@@ -275,7 +275,7 @@ function adjoint(pr::Primal)
         end
       elseif ex isa Core.PiNode
         grads[ex.val] = grads[v]
-      elseif isexpr(ex, GlobalRef, :call, :isdefined, :inbounds, :meta)
+      elseif isexpr(ex, GlobalRef, :call, :isdefined, :inbounds, :meta, :loopinfo)
       elseif isexpr(ex)
         push!(rb, stmt(xcall(Base, :error, "Can't differentiate $(ex.head) expression"),
                        line = b[v].line))

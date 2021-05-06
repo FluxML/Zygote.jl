@@ -143,3 +143,6 @@ end
   ms = MyStruct(1, 2)
   @test Zygote.gradient(sumall, ms) == ((a = 2, b = 2),)
 end
+
+# issue 897
+@test gradient(x -> sum(norm, collect(eachcol(x))), ones(3, 400))[1] ≈ fill(0.5773502691896258, 3, 400)
