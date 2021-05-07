@@ -60,7 +60,7 @@ end
 
 Convert `x` from the format Zygote uses internally to differentials types ChainRules uses.
 """
-@inline wrap_chainrules_input(x) = x
+@inline wrap_chainrules_input(x) = unthunk_tangent(x) # Unthunk here, pullback may not be able to handle thunk(s)
 @inline wrap_chainrules_input(::Nothing) = ChainRules.Zero()
 @inline function wrap_chainrules_input(xs::Union{Tuple, NamedTuple})
   xp = map(wrap_chainrules_input, xs)
