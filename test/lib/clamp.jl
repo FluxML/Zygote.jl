@@ -1,17 +1,17 @@
 using ZygoteRules: clamptype
 using LinearAlgebra
 
-@info "----- starting type clamp tests"
-
 @testset "clamptype" begin
 
     # Real & Complex
     @test clamptype(Float32, 1+im) === 1
     @test clamptype(ComplexF64, 1+im) === 1+im
+    @test clamptype(ComplexF64, nothing) === nothing
 
     TA = typeof(rand(3))
     @test clamptype(TA, 1:3) === 1:3
     @test clamptype(TA, (1:3) .+ im) isa Vector{Int}
+    @test clamptype(TA, [nothing]) == [nothing]
 
     # Boolean
     # @test clamptype(Bool, 1+im) === nothing
@@ -41,7 +41,7 @@ using LinearAlgebra
     @test clamptype(TA, ones(1,3) .+ im) isa LinearAlgebra.AdjOrTrans{Float64,<:Vector}
     @test clamptype(TC, ones(1,3) .+ im) == [1+im 1+im 1+im]
 
-     # Tricky
+     # Tricky: bool + structure
     # TDB = typeof(Diagonal(rand(3) .> 0.5))
     # @test clamptype(TDB, rand(3,3)) === nothing
     # @test clamptype(TDB, rand(ComplexF32, 3,3)) === nothing
@@ -60,23 +60,24 @@ end
     @test gradient(x -> abs2(sum(x .+ im)), [1, 2+0im])[1] == [6 + 4im, 6 + 4im]  # as before
 
     # Structured, some zeros
-    # (if rules improve, these will end up testing them not the projection)
     @test gradient(x -> sum(x .+ 1), Diagonal(rand(3)))[1] == Diagonal([1,1,1])
     @test gradient(x -> sum(sqrt.(x .+ 1)./2), Diagonal(rand(3)))[1] isa Diagonal
     @test gradient(x -> sum(x .+ 1), UpperTriangular(rand(3,3)))[1] == UpperTriangular(ones(3,3))
 
+    @test gradient(x -> sum(x .+ transpose(x)./2), Diagonal(rand(3)))[1] isa Diagonal  # needs accum
+
     @test gradient(x -> x[1,2], LowerTriangular(rand(3,3)))[1] == zeros(3,3)
-    @test_broken gradient(x -> x[1,2], UnitLowerTriangular(rand(3,3)))[1] == zeros(3,3)
+    @test_broken gradient(x -> x[1,2], UnitLowerTriangular(rand(3,3)))[1] == zeros(3,3)  # UnitLowerTriangular not handled yet
 
     ld = gradient((x,y) -> sum(x * y), LowerTriangular(ones(3,3)), Diagonal(ones(3,3)))
     @test ld[1] isa LowerTriangular
-    @test_broken ld[2] isa Diagonal
+    @test ld[2] isa Diagonal
 
     # Structured, some symmetry
     @test gradient(x -> sum(x .+ 1), Symmetric(rand(3,3)))[1] isa Symmetric
     @test gradient(x -> x[1,2], Symmetric(rand(3,3)))[1] == [0 1/2 0; 1/2 0 0; 0 0 0]
 
-    @test_broken gradient(x -> sum(x * x'), Symmetric(ones(3,3)))[1] isa Symmetric
+    @test gradient(x -> sum(x * x'), Hermitian(ones(3,3)))[1] isa Hermitian  # needs accum
 
     # Row vector restoration
     @test pullback(x -> x.+1, rand(3)')[2](ones(1,3))[1] isa LinearAlgebra.AdjOrTransAbsVec
@@ -85,5 +86,3 @@ end
 
     @test gradient(x -> x[1,2], rand(3)')[1] isa LinearAlgebra.AdjOrTransAbsVec  # worked, broken by _zero change
 end
-
-@info "----- done type clamp tests"

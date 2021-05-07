@@ -71,10 +71,16 @@ end
 Wrapper for a ChainRules pullback `back`, that causes it to follow Zygote conventions.
 (A functor here is used rather than a closure to avoid boxing issues);
 """
-struct ZBack{F} <: Function
+struct ZBack{F,T} <: Function
+  type::T
   back::F
 end
-@inline (s::ZBack)(dy) = wrap_chainrules_output(s.back(wrap_chainrules_input(dy)))
+@inline function (s::ZBack)(dy)
+  dx = wrap_chainrules_output(s.back(wrap_chainrules_input(dy)))
+  dx isa Tuple{Any,Vararg{Any}} || return dx
+  return (first(dx), clamptype(s.type, Base.tail(dx))...)
+end
+
 # `nothing->nothing` can be deleted after https://github.com/FluxML/Zygote.jl/issues/603
 # though it might be worth keeping as a performance optimization (benchmarking pending)
 @inline (s::ZBack)(::Nothing) = nothing
@@ -87,7 +93,7 @@ The pullback is appropriately wrapped up to follow Zygote conventions.
 """
 @inline function chain_rrule(f, args...)
   y, back = rrule(f, args...)
-  return y, ZBack(back)
+  return y, ZBack(map(typeof, args), back)
 end
 
 
@@ -98,9 +104,10 @@ As per [`chain_rrule`](@ref) but with support for kwargs.
 `kwf` should be the kwfunc matching to `f`, and `kwargs` are a `NamedTuple` of keyword arguments.
 """
 @inline function chain_rrule_kw(kwf, kwargs, f, args...)
+  xT = map(typeof, args)
   y, back = rrule(f, args...; kwargs...)
   function kw_zpullback(dy)
-    dxs = ZBack(back)(dy)
+    dxs = ZBack(xT, back)(dy)
     if dxs === nothing  # if dxs is nothing, then all partiaols are nothing
       # Zygote convention is a single nothing no mather how partials, if all are nothing
       return nothing
