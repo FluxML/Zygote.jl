@@ -1,14 +1,3 @@
-_unthunk(x) = unthunk(x)
-
-# @adjoint _unthunk(x) = _unthunk(x), ȳ -> (ȳ,)
-
-function ChainRulesCore.rrule(::typeof(_unthunk), x)
-  y = unthunk(x)
-  unthunk_pullback(ȳ) = (NO_FIELDS, ȳ)
-  return y, unthunk_pullback
-end
-
-
 const chainrules_fallback = which(rrule, Tuple{Any})
 
 """
