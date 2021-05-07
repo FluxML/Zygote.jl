@@ -34,7 +34,7 @@ end
 _pullback(f, args...) = _pullback(Context(), f, args...)
 
 tailmemaybe(::Nothing) = nothing
-tailmemaybe(x::Tuple) = map(unthunk, Base.tail(x))
+tailmemaybe(x::Tuple) = map(_unthunk, Base.tail(x))
 
 function pullback(f, args...)
   y, back = _pullback(f, args...)
@@ -250,7 +250,7 @@ function pullback(f, ps::Params)
       cache(cx)[p] = nothing
     end
     back(Δ)
-    Grads(IdDict(k => unthunk(v) for (k, v) in cx.cache), ps) # TODO make a copy
+    Grads(IdDict(k => _unthunk(v) for (k, v) in cx.cache), ps) # TODO make a copy
   end
 end
 
