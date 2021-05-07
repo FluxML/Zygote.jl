@@ -41,7 +41,7 @@ end
 end
 
 @testset "ChainRules" begin
-  include("chainrules.jl")
+  # include("chainrules.jl")
 end
 
 @testset "Gradients" begin
