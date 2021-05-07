@@ -1,3 +1,5 @@
+@inline unthunk_tangent(x::AbstractThunk) = unthunk(x)
+
 const chainrules_fallback = which(rrule, Tuple{Any})
 
 """
