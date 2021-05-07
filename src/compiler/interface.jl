@@ -250,7 +250,7 @@ function pullback(f, ps::Params)
       cache(cx)[p] = nothing
     end
     back(Δ)
-    Grads(IdDict(k => _unthunk(v) for (k, v) in cx.cache), ps) # TODO make a copy
+    Grads(IdDict([k => _unthunk(v) for (k, v) in cx.cache]), ps) # TODO make a copy
   end
 end
 
