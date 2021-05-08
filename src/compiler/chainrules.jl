@@ -1,4 +1,5 @@
 @inline unthunk_tangent(x::AbstractThunk) = unthunk(x)
+@inline unthunk_tangent(x::AbstractArray{<:AbstractThunk}) = map(unthunk, x)
 
 const chainrules_fallback = which(rrule, Tuple{Any})
 
