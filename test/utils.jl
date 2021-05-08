@@ -61,3 +61,13 @@ end
   @test Jxy[ys] ≈ [1 0 0; 0 1 0]
   @test Jxy[xs] ≈ [2 6 4 8; 2 6 4 8]
 end
+
+@testset "adjoints of ForwardDiff functions" begin
+  f1(x) = ForwardDiff.gradient(x -> sum(exp.(x.+1)), x)
+  x1 = randn(3,7)
+  @test Zygote.jacobian(f1, x1)[1] ≈ ForwardDiff.jacobian(f1, x1)
+
+  f2(x) = ForwardDiff.jacobian(x -> log.(x[1:3] .+ x[2:4]), x)
+  x2 = rand(5) .+ 1
+  @test Zygote.jacobian(f2, x2)[1] ≈ ForwardDiff.jacobian(f2, x2)
+end
