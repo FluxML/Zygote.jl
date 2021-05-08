@@ -8,7 +8,7 @@ accum(x) = x
 accum(x, y) =
   x === nothing ? y :
   y === nothing ? x :
-  ChainRulesCore.add!!
+  x + y
 
 accum(x, y, zs...) = accum(accum(x, y), zs...)
 
