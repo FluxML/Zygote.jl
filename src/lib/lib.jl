@@ -31,15 +31,15 @@ end
 # Core functions
 @nograd eps, Base.eval, Core.TypeVar, Core.UnionAll, Symbol
 
-@adjoint deepcopy(x) = deepcopy(x), ȳ -> (ȳ,)
+@adjoint_keepthunks deepcopy(x) = deepcopy(x), ȳ -> (ȳ,)
 
-@adjoint (::Type{V})(x...) where V<:Val = V(x...), _ -> nothing
+@adjoint_keepthunks (::Type{V})(x...) where V<:Val = V(x...), _ -> nothing
 
-@adjoint ifelse(cond::Bool, t, f) =
+@adjoint_keepthunks ifelse(cond::Bool, t, f) =
   ifelse(cond, t, f),
   Δ -> cond ? (nothing, Δ, zero(Δ)) : (nothing, zero(Δ), Δ)
 
-@adjoint Base.typeassert(x, T) = Base.typeassert(x, T), Δ -> (Δ, nothing)
+@adjoint_keepthunks Base.typeassert(x, T) = Base.typeassert(x, T), Δ -> (Δ, nothing)
 
 @generated function accum_param(cx::Context, x, Δ)
   isbitstype(x) && return :(Δ)
@@ -62,11 +62,11 @@ end
 
 unwrap(x) = x
 
-@adjoint unwrap(x) = unwrap(x), x̄ -> (accum_param(__context__, x, x̄),)
+@adjoint_keepthunks unwrap(x) = unwrap(x), x̄ -> (accum_param(__context__, x, x̄),)
 
 unwrap(ref, x) = x
 
-@adjoint unwrap(ref, x) = unwrap(x), function (x̄)
+@adjoint_keepthunks unwrap(ref, x) = unwrap(x), function (x̄)
   accum_global(__context__, ref, x̄)
   (accum_param(__context__, x, x̄),)
 end
@@ -76,7 +76,7 @@ function global_set(ref, val)
         ref.mod, ref.name, val)
 end
 
-@adjoint! function global_set(ref, x)
+@adjoint_keepthunks! function global_set(ref, x)
   global_set(ref, x), function (x̄)
     gs = cache(__context__)
     x̄ = accum(get(gs, ref, nothing), x̄)
@@ -176,7 +176,7 @@ end
 
 unapply(t, xs) = _unapply(t, xs)[1]
 
-@adjoint! function Core._apply(f, args...)
+@adjoint_keepthunks! function Core._apply(f, args...)
   y, back = Core._apply(_pullback, (__context__, f), args...)
   st = map(_empty, args)
   y, function (Δ)
@@ -187,7 +187,7 @@ unapply(t, xs) = _unapply(t, xs)[1]
 end
 
 if VERSION >= v"1.4.0-DEV.304"
-  @adjoint! function Core._apply_iterate(::typeof(iterate), f, args...)
+  @adjoint_keepthunks! function Core._apply_iterate(::typeof(iterate), f, args...)
     y, back = Core._apply(_pullback, (__context__, f), args...)
     st = map(_empty, args)
     y, function (Δ)
@@ -260,7 +260,7 @@ function grad_mut(cx::Context, x)
   end
 end
 
-@adjoint! function setfield!(x, f, val)
+@adjoint_keepthunks! function setfield!(x, f, val)
   y = setfield!(x, f, val)
   g = grad_mut(__context__, x)
   y, function (_)
@@ -276,13 +276,13 @@ end
 
 Jnew{T}(g) where T = Jnew{T,typeof(g)}(g)
 
-@adjoint! function __new__(T, args...)
+@adjoint_keepthunks! function __new__(T, args...)
   x = __new__(T, args...)
   g = !T.mutable || fieldcount(T) == 0 ? nothing : grad_mut(__context__, x)
   x, Jnew{T,typeof(g),false}(g)
 end
 
-@adjoint! function __splatnew__(T, args)
+@adjoint_keepthunks! function __splatnew__(T, args)
   x = __splatnew__(T, args)
   g = !T.mutable || fieldcount(T) == 0 ? nothing : grad_mut(__context__, x)
   x, Jnew{T,typeof(g),true}(g)
