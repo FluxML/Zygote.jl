@@ -5,14 +5,14 @@
   Base.literal_pow(^,x,Val(p)),
   Δ -> (nothing, Δ * conj(p * Base.literal_pow(^,x,Val(p-1))), nothing)
 
-@adjoint_keepthunks Base.convert(T::Type{<:Real}, x::Real) = convert(T, x), ȳ -> (nothing, ȳ)
-@adjoint_keepthunks (T::Type{<:Real})(x::Real) = T(x), ȳ -> (nothing, ȳ)
+@_adjoint_keepthunks Base.convert(T::Type{<:Real}, x::Real) = convert(T, x), ȳ -> (nothing, ȳ)
+@_adjoint_keepthunks (T::Type{<:Real})(x::Real) = T(x), ȳ -> (nothing, ȳ)
 
 for T in Base.uniontypes(Core.BuiltinInts)
     @adjoint (::Type{T})(x::Core.BuiltinInts) = T(x), Δ -> (Δ,)
 end
 
-@adjoint_keepthunks Base.:+(xs::Number...) = +(xs...), Δ -> map(_ -> Δ, xs)
+@_adjoint_keepthunks Base.:+(xs::Number...) = +(xs...), Δ -> map(_ -> Δ, xs)
 
 @adjoint a // b = (a // b, c̄ -> (c̄ * 1//b, - c̄ * a // b // b))
 
