@@ -4,7 +4,8 @@ using IRTools: IR, Variable, Pipe, xcall, var, prewalk, postwalk,
   block, block!, branch!, return!, stmt, meta
 
 
-# TODO: Temporary, to be removed when ChainRulesCore rrules are required to
+# TODO: Temporary, to be removed when https://github.com/JuliaDiff/ChainRules.jl/issues/408 is done
+# and ChainRulesCore rrules are required to
 # support thunks as an input and all instances of _adjoint_keepthunks in
 # Zygote have been replaces by rrules:
 macro _adjoint_keepthunks(ex)
