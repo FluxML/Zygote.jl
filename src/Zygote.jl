@@ -5,6 +5,7 @@ using LinearAlgebra: copytri!, AbstractTriangular
 
 import ZygoteRules: @adjoint, @adjoint!, AContext, adjoint, _pullback, pullback,
   literal_getproperty, literal_getfield
+using Buffers: Buffer, bufferfrom
 
 using ChainRules: ChainRules, rrule, unthunk, canonicalize
 using IRTools
@@ -17,7 +18,6 @@ export Params, gradient, jacobian, hessian, pullback, pushforward, @code_adjoint
 const Numeric{T<:Number} = Union{T, AbstractArray{<:T}}
 
 include("tools/idset.jl")
-include("tools/buffer.jl")
 include("tools/builtins.jl")
 
 include("forward/Forward.jl")
@@ -34,7 +34,6 @@ include("lib/lib.jl")
 include("lib/number.jl")
 include("lib/base.jl")
 include("lib/array.jl")
-include("lib/buffer.jl")
 include("lib/broadcast.jl")
 include("lib/forward.jl")
 include("lib/utils.jl")
