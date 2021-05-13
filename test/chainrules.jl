@@ -19,6 +19,7 @@ using Zygote, Test, ChainRules
             2 + 10cr_inner_demo(x)
         end
 
+        Zygote.refresh()
 
         @testset "gradient inner" begin
             cr_inner_demo_rrule_hitcount[] = 0
@@ -64,6 +65,8 @@ using Zygote, Test, ChainRules
             return simo(x), simo_pullback
         end
 
+        Zygote.refresh()
+
         simo_outer(x) = sum(simo(x))
 
         @assert simo_rrule_hitcount[] == 0
@@ -86,6 +89,8 @@ using Zygote, Test, ChainRules
             return miso(a, b), miso_pullback
         end
 
+        Zygote.refresh()
+
         miso_outer(x) = miso(100x, 10x)
 
         @assert miso_rrule_hitcount[] == 0
@@ -107,6 +112,8 @@ using Zygote, Test, ChainRules
             end
             return mimo(a, b), mimo_pullback
         end
+
+        Zygote.refresh()
 
         @assert mimo_rrule_hitcount[] == 0
         @assert mimo_pullback_hitcount[] == 0
@@ -135,6 +142,8 @@ using Zygote, Test, ChainRules
             end
             return not_diff_eg(x, i), not_diff_eg_pullback
         end
+
+        Zygote.refresh()
 
         _, pb = Zygote.pullback(not_diff_eg, 10.4, 2)
         @test pb(1.2) === nothing
@@ -184,6 +193,8 @@ using Zygote, Test, ChainRules
             return kwfoo(x; k=k), kwfoo_pullback
         end
 
+        Zygote.refresh()
+
         kwfoo_outer_unused(x) = kwfoo(x)
         kwfoo_outer_used(x) = kwfoo(x; k=-15)
 
@@ -207,6 +218,8 @@ using Zygote, Test, ChainRules
             end
             return not_diff_kw_eg(x, i; kwargs...), not_diff_kw_eg_pullback
         end
+
+        Zygote.refresh()
 
         @test (nothing,) == Zygote.gradient(x->not_diff_kw_eg(x, 2), 10.4)
         @test (nothing,) == Zygote.gradient(x->not_diff_kw_eg(x, 2; kw=2.0), 10.4)
