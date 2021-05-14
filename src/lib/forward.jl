@@ -102,6 +102,7 @@ forwarddiff(f, x) = f(x)
   return y, ȳ -> (nothing, reshape_scalar(x, J*vec_scalar(ȳ)))
 end
 
-# Use this to allow second derivatives
+# Use this to allow second derivatives -- this is forward-over-forward, 
+# see  https://github.com/FluxML/Zygote.jl/issues/769  for a forward-over-reverse proposal
 @adjoint ForwardDiff.gradient(f, x) = pullback(forwarddiff, x -> ForwardDiff.gradient(f, x), x)
 @adjoint ForwardDiff.jacobian(f, x) = pullback(forwarddiff, x -> ForwardDiff.jacobian(f, x), x)
