@@ -106,3 +106,8 @@ end
 # see  https://github.com/FluxML/Zygote.jl/issues/769  for a forward-over-reverse proposal
 @adjoint ForwardDiff.gradient(f, x) = pullback(forwarddiff, x -> ForwardDiff.gradient(f, x), x)
 @adjoint ForwardDiff.jacobian(f, x) = pullback(forwarddiff, x -> ForwardDiff.jacobian(f, x), x)
+
+@adjoint ForwardDiff.derivative(f, x) = pullback(forwarddiff, x -> ForwardDiff.derivative(f, x), x)
+@adjoint ForwardDiff.hessian(f, x) = pullback(forwarddiff, x -> ForwardDiff.hessian(f, x), x)
+
+

@@ -73,6 +73,15 @@ using ForwardDiff
   x2 = rand(5) .+ 1
   @test Zygote.jacobian(f2, x2)[1] ≈ ForwardDiff.jacobian(f2, x2)
 
+  f3(x) = sum(ForwardDiff.hessian(x -> sum(x .^2 .* x'), x)[1:4:end])
+  x3 = rand(3)
+  @test Zygote.gradient(f3, x3)[1] ≈ ForwardDiff.gradient(f3, x3)
+
+  @test gradient(x -> ForwardDiff.derivative(x -> x^4, x), 7) == (4 * 3 * 7^2,)
+
+  f4(x) = ForwardDiff.derivative(x -> [x,x^2,x^3], x)
+  @test Zygote.jacobian(f4, pi)[1] ≈ ForwardDiff.derivative(f4, pi)
+
   # Tests from https://github.com/FluxML/Zygote.jl/issues/769
   f(x) = [2x[1]^2 + x[1],x[2]^2 * x[1]]
   g1(x) = sum(ForwardDiff.jacobian(f,x))
