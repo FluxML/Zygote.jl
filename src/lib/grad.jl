@@ -124,7 +124,7 @@ julia> jacobian((a,d) -> prod(a, dims=d), [1 2; 3 4; 5 6], 2)
 !!! warning
     For arguments of any type except `Number` & `AbstractArray`, the result is `nothing`.
 
-```jldoctest; setup=:(using Zygote)
+```
 julia> jacobian((a,s) -> a.^length(s), [1,2,3], "str")
 ([3 0 0; 0 12 0; 0 0 27], nothing)
 
@@ -132,7 +132,7 @@ julia> jacobian((a,t) -> sum(a .* t[1]) + t[2], [1,2,3], (4,5))
 ([4 4 4], nothing)
 
 julia> gradient((a,t) -> sum(a .* t[1]) + t[2], [1,2,3], (4,5))  # gradient undersands the tuple
-([4, 4, 4], (6, 1))
+(Fill(4, 3), (6, 1))
 ```
 """
 function jacobian(f, args...)
