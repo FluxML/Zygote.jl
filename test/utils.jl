@@ -61,3 +61,41 @@ end
   @test Jxy[ys] ≈ [1 0 0; 0 1 0]
   @test Jxy[xs] ≈ [2 6 4 8; 2 6 4 8]
 end
+
+using ForwardDiff
+
+@testset "adjoints of ForwardDiff functions" begin
+  f1(x) = ForwardDiff.gradient(x -> sum(exp.(x.+1)), x)
+  x1 = randn(3,7)
+  @test Zygote.jacobian(f1, x1)[1] ≈ ForwardDiff.jacobian(f1, x1)
+
+  f2(x) = ForwardDiff.jacobian(x -> log.(x[1:3] .+ x[2:4]), x)
+  x2 = rand(5) .+ 1
+  @test Zygote.jacobian(f2, x2)[1] ≈ ForwardDiff.jacobian(f2, x2)
+
+  f3(x) = sum(ForwardDiff.hessian(x -> sum(x .^2 .* x'), x)[1:4:end])
+  x3 = rand(3)
+  @test Zygote.gradient(f3, x3)[1] ≈ ForwardDiff.gradient(f3, x3)
+
+  @test gradient(x -> ForwardDiff.derivative(x -> x^4, x), 7) == (4 * 3 * 7^2,)
+
+  f4(x) = ForwardDiff.derivative(x -> [x,x^2,x^3], x)
+  @test Zygote.jacobian(f4, pi)[1] ≈ ForwardDiff.derivative(f4, pi)
+
+  # Tests from https://github.com/FluxML/Zygote.jl/issues/769
+  f(x) = [2x[1]^2 + x[1],x[2]^2 * x[1]]
+  g1(x) = sum(ForwardDiff.jacobian(f,x))
+  out,back = Zygote.pullback(g1,[2.0,3.2])
+  stakehouse = back(1.0)[1]
+  @test typeof(stakehouse) <: Vector
+  @test size(stakehouse) == (2,)
+  @test stakehouse ≈ ForwardDiff.gradient(g1,[2.0,3.2])
+
+  g2(x) = prod(ForwardDiff.jacobian(f,x))
+  out,back = Zygote.pullback(g2,[2.0,3.2])
+  @test_skip back(1.0)[1] == ForwardDiff.gradient(g2,[2.0,3.2])  # contains NaN, @adjoint prod isn't careful
+
+  g3(x) = sum(abs2,ForwardDiff.jacobian(f,x))
+  out,back = Zygote.pullback(g3,[2.0,3.2])
+  @test back(1.0)[1] == ForwardDiff.gradient(g3,[2.0,3.2])
+end
