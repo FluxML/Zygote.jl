@@ -24,6 +24,14 @@ end
   
 end
 
+@testset "un-broadcasting *, / with mapreduce" begin
+  cu12 = cu(Float32[1,2])
+  @test gradient((x,y) -> sum(x .* y), cu12, 5) == ([5, 5], 3)
+  @test gradient((x,y) -> sum(x .* y), 5, cu12) == (3, [5, 5])
+  @test gradient((x,y) -> sum(x .* y), cu12, [3 4 5]) == ([12, 12], [3 3 3])
+  @test gradient((x,y) -> sum(x ./ y), cu12, 5) == ([0.2, 0.2], -0.12)
+end
+
 @testset "jacobian" begin
   v1 = cu(collect(1:3f0))
 

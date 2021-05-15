@@ -71,12 +71,27 @@ unbroadcast(x::AbstractArray, x̄::Nothing) = nothing
 @adjoint broadcasted(::typeof(-), x::Numeric, y::Numeric) = x .- y,
   Δ -> (nothing, unbroadcast(x, Δ), -unbroadcast(y, Δ))
 
-@adjoint broadcasted(::typeof(*), x::Numeric, y::Numeric) = x.*y,
-  z̄ -> (nothing, unbroadcast(x, z̄ .* conj.(y)), unbroadcast(y, z̄ .* conj.(x)))
+@adjoint broadcasted(::typeof(*), x::Numeric, y::Numeric) = x .* y,
+  Δ -> (nothing, mul_unbroadcast(x, Δ, y), mul_unbroadcast(y, Δ, x))
+
+mul_unbroadcast(x, Δ, y) = funbroadcast(x, (δ,y₁) -> δ * conj(y₁), Δ, y)
+
+# This optimisation is only safe when all args... have same size:
+funbroadcast(::Number, f, args...) = mapreduce(f, +, args...)
+funbroadcast(x, f, args...) = unbroadcast(x, f.(args...)) # fallback
+
+@adjoint function broadcasted(::typeof(/), x::AbstractArray{<:Number}, y::Number)
+  res = x ./ y
+  res, Δ -> begin
+    Δx = funbroadcast(x, δ -> δ / conj(y), Δ)
+    Δy = funbroadcast(y, (δ,r) -> -δ * conj(r / y), Δ, res)
+    (nothing, Δx, Δy)
+  end
+end
 
 @adjoint function broadcasted(::typeof(/), x::Numeric, y::Numeric)
   res = x ./ y
-  res, Δ -> (nothing, unbroadcast(x, Δ ./ conj.(y)), unbroadcast(y, -Δ .* conj.(res ./ y)))
+  res, Δ -> (nothing, unbroadcast(x, Δ ./ conj.(y)), unbroadcast(y, .-Δ .* conj.(res ./ y)))
 end
 
 @adjoint function broadcasted(::typeof(Base.literal_pow), ::typeof(^), x::Numeric, exp::Val{p}) where p
