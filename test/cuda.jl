@@ -28,8 +28,9 @@ end
   cu12 = cu(Float32[1,2])
   @test gradient((x,y) -> sum(x .* y), cu12, 5) == ([5, 5], 3)
   @test gradient((x,y) -> sum(x .* y), 5, cu12) == (3, [5, 5])
-  @test gradient((x,y) -> sum(x .* y), cu12, [3 4 5]) == ([12, 12], [3 3 3])
-  @test gradient((x,y) -> sum(x ./ y), cu12, 5) == ([0.2, 0.2], -0.12)
+  cu345 = cu(Float32[3 4 5])
+  @test all(gradient((x,y) -> sum(x .* y), cu12, cu345) .≈ ([12, 12], [3 3 3]))
+  @test all(gradient((x,y) -> sum(x ./ y), cu12, 5) .≈ ([0.2, 0.2], -0.12))
 end
 
 @testset "jacobian" begin
