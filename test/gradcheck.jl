@@ -1309,11 +1309,11 @@ end
   @test gradient(x -> sum(x .== 0.5), x1)[1] === nothing
   @test gradient(x -> sum(x .* (x .== maximum(x, dims=1))), x1)[1] == (x1 .== maximum(x1, dims=1))
 
-  # tests for un-broadcasting *, / with mapreduce
-  @test gradient((x,y) -> sum(x .* y), [1,2], 5) == ([5, 5], 3)
-  @test gradient((x,y) -> sum(x .* y), 5, [1,2]) == (3, [5, 5])
-  @test gradient((x,y) -> sum(x .* y), [1,2], [3 4 5]) == ([12, 12], [3 3 3])
-  @test gradient((x,y) -> sum(x ./ y), [1,2], 5) == ([0.2, 0.2], -0.12)
+  # tests for un-broadcasting *, / via scalar rules
+  @test all(gradient((x,y) -> sum(x .* y), [1,2], 5) .≈ ([5, 5], 3))
+  @test all(gradient((x,y) -> sum(x .* y), 5, [1,2]) .≈ (3, [5, 5]))
+  @test all(gradient((x,y) -> sum(x .* y), [1,2], [3 4 5]) .≈ ([12, 12], [3 3 3]))
+  @test all(gradient((x,y) -> sum(x ./ y), [1,2], 5) .≈ ([0.2, 0.2], -0.12))
 end
 
 using Zygote: Buffer

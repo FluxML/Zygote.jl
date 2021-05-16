@@ -24,18 +24,6 @@ end
   
 end
 
-@testset "un-broadcasting .*, ./ with scalars" begin
-  cu12 = cu(Float32[1,2])
-  cu55 = cu(Float32[5,5])
-  @test gradient((x,y) -> sum(x .* y), cu12, 5) == (cu55, 3)
-  @test gradient((x,y) -> sum(x .* y), 5, cu12) == (3, cu55)
-  # @test gradient((x,y) -> sum(z -> z, x .* y), cu12, 5) == (cu55, 3)
-  # @test gradient((x,y) -> sum(z -> z, x .* y), 5, cu12) == (3, cu55)
-  cu345 = cu(Float32[3 4 5])
-  @test gradient((x,y) -> sum(x .* y), cu12, cu345) == (cu([12, 12]), cu([3 3 3]))
-  @test all(gradient((x,y) -> sum(x ./ y), cu12, 5) .≈ (cu([0.2, 0.2]), -0.12))
-end
-
 @testset "jacobian" begin
   v1 = cu(collect(1:3f0))
 
