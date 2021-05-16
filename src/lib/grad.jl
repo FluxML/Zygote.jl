@@ -132,7 +132,7 @@ julia> jacobian((a,t) -> sum(a .* t[1]) + t[2], [1,2,3], (4,5))
 ([4 4 4], nothing)
 
 julia> gradient((a,t) -> sum(a .* t[1]) + t[2], [1,2,3], (4,5))  # gradient undersands the tuple
-(Fill(4, 3), (6, 1))
+([4 4 4], (6, 1))
 ```
 """
 function jacobian(f, args...)
