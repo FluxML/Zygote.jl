@@ -1,4 +1,7 @@
 using CUDA
+using Zygote: Grads
+using Random: randn!
+CUDA.allowscalar(false)
 
 # Test GPU movement inside the call to `gradient`
 @testset "GPU movement" begin
@@ -21,7 +24,6 @@ end
   g_gpu = gradient(x -> w(x), a_gpu)[1]
   @test g_gpu isa CuArray
   @test g_gpu |> collect ≈ g
-  
 end
 
 @testset "jacobian" begin
@@ -36,4 +38,45 @@ end
   j2 = jacobian(() -> v1 ./ sum(v1), Params([v1]))
   @test j2[v1] isa CuArray
   @test j2[v1] ≈ cu(res2)
+end
+
+@testset "gradient algebra" begin
+  w, b = rand(2) |> cu, rand(2) |> cu
+  x1, x2 = rand(2) |> cu, rand(2) |> cu
+ 
+  gs1 = gradient(() -> sum(w .* x1), Params([w])) 
+  gs2 = gradient(() -> sum(w .* x2), Params([w])) 
+
+  @test .- gs1 isa Grads
+  @test gs1 .- gs2 isa Grads 
+  @test .+ gs1 isa Grads
+  @test gs1 .+ gs2 isa Grads 
+  @test 2 .* gs1 isa Grads 
+  @test (2 .* gs1)[w] ≈ 2 * gs1[w]
+  @test gs1 .* 2 isa Grads 
+  @test gs1 ./ 2 isa Grads  
+  @test (gs1 .+ gs2)[w] ≈ gs1[w] .+ gs2[w] 
+
+  gs12 = gs1 .+ gs2
+  gs1 .+= gs2
+  @test gs12[w] ≈ gs1[w] 
+
+  gs3 = gradient(() -> sum(w .* x1), Params([w, b])) # grad nothing with respect to b
+  gs4 = gradient(() -> sum(w .* x2 .+ b), Params([w, b])) 
+
+  @test .- gs3 isa Grads
+  @test gs3 .- gs4 isa Grads 
+  @test .+ gs3 isa Grads
+  @test gs3 .+ gs4 isa Grads 
+  @test 2 .* gs3 isa Grads 
+  @test gs3 .* 2 isa Grads 
+  @test gs3 ./ 2 isa Grads  
+  @test (gs3 .+ gs4)[w] ≈ gs3[w] .+ gs4[w]
+  @test (gs3 .+ gs4)[b] ≈ gs4[b] 
+  
+  @test gs3 .+ IdDict(w => similar(w), b => similar(b)) isa Grads
+  gs3 .+= IdDict(p => randn!(similar(p)) for p in keys(gs3))
+  @test gs3 isa Grads 
+
+  @test_throws ArgumentError gs1 .+ gs4
 end

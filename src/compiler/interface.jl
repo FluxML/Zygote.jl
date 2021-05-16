@@ -80,6 +80,9 @@ end
 
 Base.copy(ps::Params) = union!(Params(), ps)
 Base.union(ps::Params, itrs...) = union!(copy(ps), itrs...)
+Base.issetequal(ps1::Params, ps2::Params) = issetequal(ps1.params, ps2.params)
+Base.issetequal(ps1::Params, x::Base.AbstractSet) = issetequal(ps1.params, x)
+Base.issetequal(x::Base.AbstractSet, ps1::Params) = issetequal(x, ps1.params)
 
 function Base.intersect!(ps::Params, itrs...)
   for itr in itrs
