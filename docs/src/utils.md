@@ -43,6 +43,7 @@ gs = gs1 .+ gs2
 @test gs[b] ≈ gs1[b] + gs2[b] 
 
 # gradients and IdDict interact nicely
+# note that an IdDict must be used for gradient algebra on the GPU
 gs .+= IdDict(p => randn(size(p)) for p in keys(gs)) 
 
 # clip gradients
