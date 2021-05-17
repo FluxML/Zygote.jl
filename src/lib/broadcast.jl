@@ -47,10 +47,12 @@ end
 
 trim(x, Δ) = reshape(Δ, ntuple(i -> size(Δ, i), Val(ndims(x))))
 
-unbroadcast(x::AbstractArray, x̄) =
+function unbroadcast(x::AbstractArray, maybethunked_x̄)
+  x̄ = unthunk_tangent(maybethunked_x̄)
   size(x) == size(x̄) ? x̄ :
   length(x) == length(x̄) ? trim(x, x̄) :
     trim(x, accum_sum(x̄, dims = ntuple(i -> size(x, i) == 1 ? i : ndims(x̄)+1, Val(ndims(x̄)))))
+end
 
 unbroadcast(x::Number, x̄) = accum_sum(x̄)
 unbroadcast(x::Tuple{<:Any}, x̄) = (accum_sum(x̄),)

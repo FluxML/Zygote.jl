@@ -1,3 +1,6 @@
+@inline unthunk_tangent(x::AbstractThunk) = unthunk(x)
+@inline unthunk_tangent(x::AbstractArray{<:AbstractThunk}) = map(unthunk, x)
+
 const chainrules_fallback = which(rrule, Tuple{Any})
 
 """
@@ -38,7 +41,7 @@ is_kwfunc(k, ::Type{<:NamedTuple}, f, args...) = k===Core.kwftype(f)
 
 Convert `x` from the differentials types ChainRules uses to the format Zygote uses internally.
 """
-@inline wrap_chainrules_output(x) = unthunk(x)  # For now we are just not going to deal with thunks
+@inline wrap_chainrules_output(x) = x # Preserve thunks
 @inline wrap_chainrules_output(x::Tuple) = map(wrap_chainrules_output, x)
 # Zygote convention: even if many AbstractZero partials (i.e. multi-input function), make just 1 nothing.
 @inline wrap_chainrules_output(x::Tuple{Vararg{ChainRules.AbstractZero}}) = nothing
@@ -58,7 +61,9 @@ end
 
 Convert `x` from the format Zygote uses internally to differentials types ChainRules uses.
 """
-@inline wrap_chainrules_input(x) = x
+# TODO: Temporary: Unthunk here, rrules are not yet required to be able to handle thunk(s).
+# Remove unthunking here as soon as ChainRulesCore mandates thunk compatibility for rrules:
+@inline wrap_chainrules_input(x) = unthunk_tangent(x)
 @inline wrap_chainrules_input(::Nothing) = ChainRules.Zero()
 @inline function wrap_chainrules_input(xs::Union{Tuple, NamedTuple})
   xp = map(wrap_chainrules_input, xs)
