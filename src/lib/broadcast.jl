@@ -46,6 +46,7 @@ function Base.reducedim_init(::typeof(identity), ::typeof(accum), A::AbstractArr
 end
 
 trim(x, Δ) = reshape(Δ, ntuple(i -> size(Δ, i), Val(ndims(x))))
+trim(x::Tuple, Δ) = ntuple(k -> Δ[k], length(x))
 
 unbroadcast(x::AbstractArray, x̄) =
   size(x) == size(x̄) ? x̄ :
@@ -55,6 +56,7 @@ unbroadcast(x::AbstractArray, x̄) =
 unbroadcast(x::Number, x̄) = accum_sum(x̄)
 unbroadcast(x::Tuple{<:Any}, x̄) = (accum_sum(x̄),)
 unbroadcast(x::Base.RefValue, x̄) = (x=accum_sum(x̄),)
+unbroadcast(x::Tuple, x̄) = trim(x, accum_sum(x̄; dims=2:ndims(x̄))) # case length(x) > 1
 
 unbroadcast(x::AbstractArray, x̄::Nothing) = nothing
 
