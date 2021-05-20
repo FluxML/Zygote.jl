@@ -485,6 +485,7 @@ end
 @testset "tuples & broadcasting" begin
     @test gradient(x -> sum(x .+ ones(2,2)), (1,2)) == ((2,2),)
     @test gradient(x -> sum(x .+ ones(2,2)), (1,)) == ((4,),)
+    @test gradient(x -> sum(x .+ ones(2,1)), (1,2)) == ((1,1),)
 
     # https://github.com/FluxML/Zygote.jl/issues/975
     gt = gradient((x,p) -> prod(x .^ p), [3,4], (1,2))

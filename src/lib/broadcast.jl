@@ -56,7 +56,7 @@ unbroadcast(x::AbstractArray, x̄) =
 unbroadcast(x::Number, x̄) = accum_sum(x̄)
 unbroadcast(x::Tuple{<:Any}, x̄) = (accum_sum(x̄),)
 unbroadcast(x::Base.RefValue, x̄) = (x=accum_sum(x̄),)
-unbroadcast(x::Tuple, x̄) = trim(x, accum_sum(x̄; dims=2:ndims(x̄))) # case length(x) > 1
+unbroadcast(x::Tuple, x̄) = trim(x, length(x) == length(x̄) ? x̄ : accum_sum(x̄; dims=2:ndims(x̄))) # case length(x) > 1
 
 unbroadcast(x::AbstractArray, x̄::Nothing) = nothing
 
