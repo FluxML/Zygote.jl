@@ -43,8 +43,9 @@ gs = gs1 .+ gs2
 @test gs[w] ≈ gs1[w] + gs2[w] 
 @test gs[b] ≈ gs1[b] + gs2[b] 
 
-# gradients and dictionaries interact nicely
-gs .+= Dict(p => randn(size(p)) for p in keys(gs)) 
+# gradients and IdDict interact nicely
+# note that an IdDict must be used for gradient algebra on the GPU
+gs .+= IdDict(p => randn(size(p)) for p in keys(gs)) 
 
 # clip gradients
 map(x -> clamp.(x, -0.1, 0.1), gs)

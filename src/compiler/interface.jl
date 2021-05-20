@@ -43,7 +43,7 @@ end
 
 sensitivity(y::Number) = one(y)
 sensitivity(y::Complex) = error("Output is complex, so the gradient is not defined.")
-sensitivity(y::AbstractArray) = error("output an array, so the gradient is not defined. Perhaps you wanted jacobian.")
+sensitivity(y::AbstractArray) = error("Output is an array, so the gradient is not defined. Perhaps you wanted jacobian.")
 sensitivity(y) = error("Output should be scalar; gradients are not defined for output $(repr(y))")
 
 """
@@ -80,6 +80,9 @@ end
 
 Base.copy(ps::Params) = union!(Params(), ps)
 Base.union(ps::Params, itrs...) = union!(copy(ps), itrs...)
+Base.issetequal(ps1::Params, ps2::Params) = issetequal(ps1.params, ps2.params)
+Base.issetequal(ps1::Params, x::Base.AbstractSet) = issetequal(ps1.params, x)
+Base.issetequal(x::Base.AbstractSet, ps1::Params) = issetequal(x, ps1.params)
 
 function Base.intersect!(ps::Params, itrs...)
   for itr in itrs
