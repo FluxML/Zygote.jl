@@ -72,11 +72,23 @@ unbroadcast(x::AbstractArray, x̄::Nothing) = nothing
   Δ -> (nothing, unbroadcast(x, Δ), -unbroadcast(y, Δ))
 
 @adjoint broadcasted(::typeof(*), x::Numeric, y::Numeric) = x.*y,
-  z̄ -> (nothing, unbroadcast(x, z̄ .* conj.(y)), unbroadcast(y, z̄ .* conj.(x)))
+   Δ -> (nothing, unbroadcast(x, Δ .* conj.(y)), unbroadcast(y, Δ .* conj.(x)))
+@adjoint function broadcasted(::typeof(*), x::Number, y::AbstractArray{<:Number})
+  z, back = pullback(*, x, y)  # this uses dot(y,Δ) instead of Δ .* conj.(y)
+  z, Δ -> (nothing, back(Δ)...)
+end
+@adjoint function broadcasted(::typeof(*), x::AbstractArray{<:Number}, y::Number)
+  z, back = pullback(*, x, y)
+  z, Δ -> (nothing, back(Δ)...)
+end
 
 @adjoint function broadcasted(::typeof(/), x::Numeric, y::Numeric)
   res = x ./ y
-  res, Δ -> (nothing, unbroadcast(x, Δ ./ conj.(y)), unbroadcast(y, -Δ .* conj.(res ./ y)))
+  res, Δ -> (nothing, unbroadcast(x, Δ ./ conj.(y)), unbroadcast(y, .-Δ .* conj.(res ./ y)))
+end
+@adjoint function broadcasted(::typeof(/), x::AbstractArray{<:Number}, y::Number)
+  z, back = pullback(/, x, y)
+  z, Δ -> (nothing, back(Δ)...)
 end
 
 @adjoint function broadcasted(::typeof(Base.literal_pow), ::typeof(^), x::Numeric, exp::Val{p}) where p
