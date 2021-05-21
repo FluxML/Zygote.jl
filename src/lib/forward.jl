@@ -8,6 +8,12 @@ function seed(x, ::Val{N}, offset = 0) where N
     Dual(x, ntuple(j -> j+offset == i, Val(N)))
   end
 end
+function seed!(xplus, x, ::Val{N}, offset) where N
+  @assert size(x) == size(xplus)
+  map!(xplus, x, reshape(1:length(x), size(x))) do x, i
+    Dual(x, ntuple(j -> j+offset == i, Val(N)))
+  end
+end
 
 extract(x::ForwardDiff.Dual) = x.value, [x.partials...]
 
@@ -45,6 +51,35 @@ vec_scalar(x) = vec(x)
 vec_scalar(x::Real) = [x]
 reshape_scalar(x, y) = reshape(y, size(x))
 reshape_scalar(x::Real, y) = y[]
+
+# very similar functions needed for diaghessian:
+
+function extract_diag!(out, offset, xs::AbstractArray{ForwardDiff.Dual{T,V,N}}) where {T,V,N}
+  for j in 1:min(N, length(xs)-offset)
+    out[offset+j] = xs[offset+j].partials.values[j]
+  end
+end
+
+function forward_diag(f, x::AbstractArray{T}, ::Val{N}) where {N,T}
+  xplus = seed(x, Val(N))
+  fx = f(xplus)
+  out = similar(x, ForwardDiff.valtype(eltype(fx)))
+  extract_diag!(out, 0, fx)
+  offset = 0
+  while offset + N < length(x)
+    offset += N
+    extract_diag!(out, offset, f(seed!(xplus, x, Val(N), offset)))
+  end
+  return map(y -> y.value, fx), out
+end
+
+function forward_diag(f, x::AbstractArray)
+  if length(x) < ForwardDiff.DEFAULT_CHUNK_THRESHOLD
+    forward_diag(f, x, Val(length(x)))
+  else
+    forward_diag(f, x, Val(ForwardDiff.DEFAULT_CHUNK_THRESHOLD))
+  end
+end
 
 """
     forwarddiff(f, x) -> f(x)
@@ -109,5 +144,3 @@ end
 
 @adjoint ForwardDiff.derivative(f, x) = pullback(forwarddiff, x -> ForwardDiff.derivative(f, x), x)
 @adjoint ForwardDiff.hessian(f, x) = pullback(forwarddiff, x -> ForwardDiff.hessian(f, x), x)
-
-
