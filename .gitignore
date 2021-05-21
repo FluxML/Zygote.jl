@@ -3,3 +3,4 @@
 *.jl.mem
 docs/build
 Manifest.toml
+dev/
