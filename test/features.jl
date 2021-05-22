@@ -485,6 +485,20 @@ end
   @test gradient(ones(3,5), 1:7) do xs, ys
     sum([x+y for x in xs, y in ys])
   end == (fill(7, 3,5), fill(15, 7))
+
+  @test gradient([2 3; 4 5]) do xs  # Iterators.Product with enumerate
+    sum([x^i+y for (i,x) in enumerate(xs), y in xs]) 
+  end == ([8 112; 36 2004],)
+
+  # https://github.com/FluxML/Zygote.jl/issues/221
+  d = rand(7)
+  @test gradient(rand(11)) do s
+    tot = 0
+    for (a, b) in zip(s, d)
+      tot += 13a + 17b
+    end
+    tot
+  end == ([13, 13, 13, 13, 13, 13, 13, 0, 0, 0, 0],)
 end
 
 # https://github.com/JuliaDiff/ChainRules.jl/issues/257

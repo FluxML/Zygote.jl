@@ -282,7 +282,8 @@ _ndims(x) = Base.IteratorSize(x) isa Base.HasShape ? _ndims(Base.IteratorSize(x)
       nd = _ndims(xs[n])
       dims = ntuple(i -> i<d ? i : i+nd, ndims(dy)-nd)
       d += nd
-      return reshape(sum(StaticGetter{n}(), dy; dims=dims), axes(xs[n]))
+      init = zero.(first(dy)[n]) # allows for tuples, which accum can add:
+      return reshape(mapreduce(StaticGetter{n}(), accum, dy; dims=dims, init=init), axes(xs[n]))
     end
   end
   Iterators.product(xs...), back
