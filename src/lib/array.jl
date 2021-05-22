@@ -199,7 +199,7 @@ _tryreverse(m::typeof(map), x::Union{AbstractVector, Tuple}) = reverse(x)
 # So we keep axes(x) to restore gradient dx to its full length & correct shape.
 _tryaxes(x) = axes(x)
 _tryaxes(x::Tuple) = Val(length(x))
-_restore(dx, ax::Tuple) = axes(dx) == ax ? dx : reshape(vcat(dx, falses(prod(length, ax) -length(dx))), ax)
+_restore(dx, ax::Tuple) = axes(dx) == ax ? dx : reshape(vcat(dx, falses(prod(length, ax) - length(dx))), ax)
 _restore(dx, ::Val{N}) where {N} = length(dx) < N ? ntuple(i -> get(dx,i,nothing), N) : NTuple{N}(dx)
 
 for (mapfunc,∇mapfunc) in [(:map,:∇map),(:pmap,:∇pmap)]
@@ -302,10 +302,11 @@ _ndims(x) = Base.IteratorSize(x) isa Base.HasShape ? _ndims(Base.IteratorSize(x)
 end
 
 @adjoint function Iterators.Zip(xs)
+  axs = map(_tryaxes, xs)  # same function used for map
   back(dy::NamedTuple{(:is,)}) = tuple(dy.is)
   back(dy::AbstractArray) = ntuple(length(xs)) do d
     dx = map(StaticGetter{d}(), dy)
-    length(dx) == length(xs[d]) ? dx : vcat(dx, falses(length(xs[d])-length(dx)))
+    _restore(dx, axs[d])
   end |> tuple
   Iterators.Zip(xs), back
 end

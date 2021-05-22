@@ -1704,7 +1704,7 @@ end
     tot
   end == ([13, 13, 13, 13, 13, 13, 13, 0, 0, 0, 0],)
 
-  @test gradient([1,2,3,4], [1 2; 3 4]) do x, y
+  @test gradient([1,2,3,4], [1 2; 3 4]) do x, y # mismatched shapes
     tot = 0
     for (a,b) in zip(x,y)
       tot += a * b
@@ -1712,13 +1712,13 @@ end
     tot
   end == ([1, 3, 2, 4], [1 3; 2 4]) # Δy is a matrix
 
-  @test gradient([1,2,3], [1 2; 3 4]) do x, y
+  @test gradient((1,2,3), [1 2; 3 4]) do x, y # ... and lengths, and a tuple
     tot = 0
     for (a,b) in zip(x,y)
       tot += a * b
     end
     tot
-  end == ([1, 3, 2], [1 3; 2 0]) # map stops early, Δy reshaped to a matrix
+  end == ((1, 3, 2), [1 3; 2 0]) # map stops early, Δy reshaped to a matrix
 
   # similar for enumertate -- tests NamedTuple adjoint
   @test gradient([2,3,4]) do x
