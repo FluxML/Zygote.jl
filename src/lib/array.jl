@@ -195,6 +195,13 @@ end
 _tryreverse(m, x) = x
 _tryreverse(m::typeof(map), x::Union{AbstractVector, Tuple}) = reverse(x)
 
+# With mismatched lengths, map stops early. With mismatched shapes, it makes a vector.
+# So we keep axes(x) to restore gradient dx to its full length & correct shape.
+_tryaxes(x) = axes(x)
+_tryaxes(x::Tuple) = Val(length(x))
+_restore(dx, ax::Tuple) = axes(dx) == ax ? dx : reshape(vcat(dx, falses(prod(length, ax) -length(dx))), ax)
+_restore(dx, ::Val{N}) where {N} = length(dx) < N ? ntuple(i -> get(dx,i,nothing), N) : NTuple{N}(dx)
+
 for (mapfunc,∇mapfunc) in [(:map,:∇map),(:pmap,:∇pmap)]
   @eval function $∇mapfunc(cx, f, args...)
     ys_and_backs = $mapfunc((args...) -> _pullback(cx, f, args...), args...)
@@ -202,17 +209,14 @@ for (mapfunc,∇mapfunc) in [(:map,:∇map),(:pmap,:∇pmap)]
       ys_and_backs, _ -> nothing
     else
       ys, backs = unzip(ys_and_backs)
-      arg_ax = map(axes, args)
+      arg_ax = map(_tryaxes, args)
       ys, function (Δ)
         isnothing(Δ) && return nothing
         # Apply pullbacks in reverse order. Needed for correctness if `f` is stateful.
         Δf_and_args_zipped = $mapfunc((f, δ) -> f(δ), _tryreverse($mapfunc, backs, Δ)...)
         Δf_and_args = unzip(_tryreverse($mapfunc, Δf_and_args_zipped))
         Δf = reduce(accum, Δf_and_args[1])
-        Δargs = map(Δf_and_args[2:end], arg_ax) do Δa, ax
-          length(Δa) == prod(length, ax) ? reshape(Δa, ax) : 
-            reshape(vcat(Δa, falses(prod(length, ax) - length(Δa))), ax)
-        end
+        Δargs = map(_restore, Δf_and_args[2:end], arg_ax)
         (Δf, Δargs...)
       end
     end
