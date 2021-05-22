@@ -310,6 +310,12 @@ end
   @test gradient(x -> sum(map(f, x)), 1:10) == (10:-1:1,)
 end
 
+@testset "vararg map" begin
+  @test gradient(x -> sum(map(*,x,[1,2,3])), rand(5)) == ([1,2,3,0,0],)
+  @test gradient((x,y) -> sum(map(*,x,y)), [1,2,3], [1 2; 3 4]) == ([1, 3, 2], [1 3; 2 0])
+  @test gradient((x,y) -> sum(map(*,x,y)), [1,2,3,4], [1 2; 3 4]) == ([1,3,2,4], [1 3; 2 4])
+end
+
 @testset "sort" begin
   @test gradtest(sort, 5)
   correct = [
@@ -1677,6 +1683,21 @@ end
     gradient(x->norm(x*[1 1]), 1.23)
     gradient(x->norm(x*[1im, 1]), 1.23)
     gradient(x->norm(x*[1im 1]), 1.23)
+end
+
+@testset "zip & Iterators.product" begin
+  # roughly from https://github.com/FluxML/Zygote.jl/issues/221
+  d = rand(7)
+  @test gradient(rand(11)) do s
+    tot = 0
+    for (a, b) in zip(s, d)
+      tot += 13a + 17b
+    end
+    tot
+  end == ([13, 13, 13, 13, 13, 13, 13, 0, 0, 0, 0],)
+
+  # from https://github.com/FluxML/Zygote.jl/pull/785#issuecomment-740562889
+  @test gradient(A -> sum([A[i,j] for i in 1:3, j in 1:3]), ones(3,3)) == (ones(3,3),)
 end
 
 # https://github.com/FluxML/Zygote.jl/issues/804

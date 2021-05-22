@@ -202,13 +202,18 @@ for (mapfunc,∇mapfunc) in [(:map,:∇map),(:pmap,:∇pmap)]
       ys_and_backs, _ -> nothing
     else
       ys, backs = unzip(ys_and_backs)
+      arg_ax = map(axes, args)
       ys, function (Δ)
         isnothing(Δ) && return nothing
         # Apply pullbacks in reverse order. Needed for correctness if `f` is stateful.
         Δf_and_args_zipped = $mapfunc((f, δ) -> f(δ), _tryreverse($mapfunc, backs, Δ)...)
         Δf_and_args = unzip(_tryreverse($mapfunc, Δf_and_args_zipped))
         Δf = reduce(accum, Δf_and_args[1])
-        (Δf, Δf_and_args[2:end]...)
+        Δargs = map(Δf_and_args[2:end], arg_ax) do Δa, ax
+          length(Δa) == prod(length, ax) ? reshape(Δa, ax) : 
+            reshape(vcat(Δa, falses(prod(length, ax) - length(Δa))), ax)
+        end
+        (Δf, Δargs...)
       end
     end
   end
