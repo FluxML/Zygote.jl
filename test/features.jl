@@ -481,3 +481,15 @@ end
   Zygote.gradient(loss_adjoint,[1.0])
   @test x[1] == x[2]
 end
+
+@testset "tuples & broadcasting" begin
+    @test gradient(x -> sum(x .+ ones(2,2)), (1,2)) == ((2,2),)
+    @test gradient(x -> sum(x .+ ones(2,2)), (1,)) == ((4,),)
+    @test gradient(x -> sum(x .+ ones(2,1)), (1,2)) == ((1,1),)
+
+    # https://github.com/FluxML/Zygote.jl/issues/975
+    gt = gradient((x,p) -> prod(x .^ p), [3,4], (1,2))
+    gv = gradient((x,p) -> prod(x .^ p), [3,4], [1,2])
+    @test gt[1] == gv[1]
+    @test collect(gt[2]) ≈ gv[2]
+end
