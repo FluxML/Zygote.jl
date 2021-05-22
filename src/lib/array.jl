@@ -269,6 +269,7 @@ end
 
 @adjoint function enumerate(xs)
   back(::AbstractArray{Nothing}) = nothing
+  back(dy::NamedTuple{(:itr,)}) = tuple(dy.itr)
   back(diys) = (map(last, diys),)
   enumerate(xs), back
 end
@@ -280,6 +281,7 @@ _ndims(x) = Base.IteratorSize(x) isa Base.HasShape ? _ndims(Base.IteratorSize(x)
 
 @adjoint function Iterators.product(xs...)
   back(::AbstractArray{Nothing}) = nothing
+  back(dy::NamedTuple{(:iterators,)}) = dy.iterators
   function back(dy::AbstractArray)
     d = 1
     ntuple(length(xs)) do n
@@ -288,7 +290,8 @@ _ndims(x) = Base.IteratorSize(x) isa Base.HasShape ? _ndims(Base.IteratorSize(x)
       dims = ntuple(i -> i<d ? i : i+nd, ndims(dy)-nd)
       d += nd
       init = zero.(first(dy)[n]) # allows for tuples, which accum can add:
-      return reshape(mapreduce(StaticGetter{n}(), accum, dy; dims=dims, init=init), axes(xs[n]))
+      red = mapreduce(StaticGetter{n}(), accum, dy; dims=dims, init=init)
+      return reshape(red, axes(xs[n]))
     end
   end
   Iterators.product(xs...), back
@@ -297,7 +300,7 @@ end
 @adjoint function Iterators.Zip(xs)
   back(dy::NamedTuple{(:is,)}) = tuple(dy.is)
   back(dy::AbstractArray) = ntuple(length(xs)) do d
-    dx = map(y->y[d], dy)
+    dx = map(StaticGetter{d}(), dy)
     length(dx) == length(xs[d]) ? dx : vcat(dx, falses(length(xs[d])-length(dx)))
   end |> tuple
   Iterators.Zip(xs), back

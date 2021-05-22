@@ -1696,6 +1696,48 @@ end
     tot
   end == ([13, 13, 13, 13, 13, 13, 13, 0, 0, 0, 0],)
 
+  @test gradient([1,2,3,4], [1 2; 3 4]) do x, y
+    tot = 0
+    for (a,b) in zip(x,y)
+      tot += a * b
+    end
+    tot
+  end == ([1, 3, 2, 4], [1 3; 2 4]) # Δy is a matrix
+
+  @test gradient([1,2,3], [1 2; 3 4]) do x, y
+    tot = 0
+    for (a,b) in zip(x,y)
+      tot += a * b
+    end
+    tot
+  end == ([1, 3, 2], [1 3; 2 0]) # map stops early, Δy reshaped to a matrix
+
+  # similar for enumertate -- tests NamedTuple adjoint
+  @test gradient([2,3,4]) do x
+    tot = 0
+    for (i, x) in enumerate(x)
+      tot += x^i
+    end
+    tot
+  end == ([1, 6, 3 * 4^2],)
+
+  # and for Iterators.product
+  @test gradient([3,4,5], [6,7,8]) do x, y
+    tot = 0
+    for (a,b) in Iterators.product(x, y)
+      tot += a^2 + 10b
+    end
+    tot
+  end == ([18, 24, 30], [30, 30, 30])
+
+  @test gradient([3,4], [1,2,3]) do x, y
+    tot = 0
+    for ab in Iterators.product(x, y)
+      tot += *(ab...)
+    end
+    tot
+  end == ([6,6], [7,7,7])
+
   # from https://github.com/FluxML/Zygote.jl/pull/785#issuecomment-740562889
   @test gradient(A -> sum([A[i,j] for i in 1:3, j in 1:3]), ones(3,3)) == (ones(3,3),)
 end
