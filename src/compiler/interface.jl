@@ -139,8 +139,8 @@ function copy!(ps::Params, x::AbstractVector)
   @assert length(x) == sum(length(p) for p in ps)
   i = 0
   for p in ps
-      p .= reshape(x[i+1:i+length(p)], size(p))
-      i += length(p)
+    p .= reshape(x[i+1:i+length(p)], size(p))
+    i += length(p)
   end
   ps
 end
@@ -149,8 +149,8 @@ function copy!(x::AbstractVector, ps::Params)
   @assert length(x) == sum(length(p) for p in ps)
   i = 0
   for p in ps
-      x[i+1:i+length(p)] .= vec(p)
-      i += length(p)
+    x[i+1:i+length(p)] .= vec(p)
+    i += length(p)
   end
   ps
 end
@@ -196,8 +196,8 @@ length of `x` has to be equal to the sum of the lengths of all gradients.
 function copy!(gs::Grads, x::AbstractVector)
   i = 0
   for p in gs.params
-      gs[p] .= reshape(x[i+1:i+length(p)], size(p))
-      i += length(p)
+    gs[p] .= reshape(x[i+1:i+length(p)], size(p))
+    i += length(p)
   end
   x
 end
@@ -205,8 +205,8 @@ end
 function copy!(x::AbstractVector,  gs::Grads)
   i = 0
   for p in gs.params
-      x[i+1:i+length(p)] .= vec(gs[p])
-      i += length(p)
+    x[i+1:i+length(p)] .= vec(gs[p])
+    i += length(p)
   end
   x
 end
