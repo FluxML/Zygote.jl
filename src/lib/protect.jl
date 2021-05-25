@@ -42,25 +42,20 @@ _pointer(A::AbstractArray) = A===parent(A) ? NaN : _pointer(parent(A)) # not str
 _pointer(A) = nothing  # compares == self
 
 @inline function (s::ZBack)(dy::NoWrite)
-  ptr = _pointer(dy.data)
+  ptr_orig = _pointer(dy.data)
   @debug "unwrapping for chainrules" summary(dy.data) ptr s.back
   dxs = wrap_chainrules_output(s.back(wrap_chainrules_input(dy.data)))
+  dxs === nothing && return
+  ptrs = map(_pointer, dxs)
   map(dxs) do dx
-    if _pointer(dx) == ptr # if the rule retuns dy, a reshape etc. of it, this must still be protected
+    ptr = _pointer(dx)
+    if ptr === nothing
+      dx
+    elseif ptr == ptr_orig
       @debug "re-wrapping for chainrules" summary(dy.data) ptr
       _protect(dx)
-    else
-      dx
-    end
-  end
-end
-
-@inline function (s::ZBack)(dy::DenseArray)
-  ptr = _pointer(dy)
-  dxs = wrap_chainrules_output(s.back(wrap_chainrules_input(dy)))
-  map(dxs) do dx
-    if _pointer(dx) == ptr
-      @debug "wrapping for chainrules" summary(dy) ptr
+    elseif count(isequal(ptr), ptrs) > 1
+      @debug "wrapping for chainrules" summary(dy.data) ptr
       _protect(dx)
     else
       dx

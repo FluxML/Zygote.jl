@@ -202,10 +202,25 @@ Wrapper for a ChainRules pullback `back`, that causes it to follow Zygote conven
 struct ZBack{F} <: Function
   back::F
 end
-@inline (s::ZBack)(dy) = wrap_chainrules_output(s.back(wrap_chainrules_input(dy)))
+# @inline (s::ZBack)(dy) = wrap_chainrules_output(s.back(wrap_chainrules_input(dy)))
 # `nothing->nothing` can be deleted after https://github.com/FluxML/Zygote.jl/issues/603
 # though it might be worth keeping as a performance optimization (benchmarking pending)
 @inline (s::ZBack)(::Nothing) = nothing
+
+function (s::ZBack)(dy)
+  dxs = wrap_chainrules_output(s.back(wrap_chainrules_input(dy)))
+  dxs === nothing && return
+  ptrs = map(_pointer, dxs)
+  map(dxs) do dx
+    ptr = _pointer(dx)
+    if ptr !== nothing && count(isequal(ptr), ptrs) > 1
+      @debug "wrapping for chainrules" summary(dy) ptr
+      _protect(dx)
+    else
+      dx
+    end
+  end
+end
 
 """
     chain_rrule(config, f, args...)
