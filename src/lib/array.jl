@@ -32,8 +32,10 @@ end
 
 @adjoint view(x::AbstractArray, inds...) = view(x, inds...), ∇getindex(x, inds)
 
-∇getindex(x::AbstractArray, inds) = dy -> begin
-  if inds isa  NTuple{<:Any, Integer}
+∇getindex(x::AbstractArray{T,N}, inds) where {T,N} = dy -> begin
+  if inds isa NTuple{N,Int} && T <: Number
+    dx = OneElement(dy, inds, axes(x))
+  elseif inds isa NTuple{<:Any, Integer}
     dx = _zero(x, typeof(dy))
     dx[inds...] = dy
   else
@@ -43,6 +45,22 @@ end
   end
   return (dx, map(_->nothing, inds)...)
 end
+
+"""
+    OneElement(val, ind, axes) <: AbstractArray
+
+Extremely simple `struct` used for the gradient of scalar `getindex`.
+"""
+struct OneElement{T,N,I,A} <: AbstractArray{T,N}
+  val::T
+  ind::I
+  axes::A
+  OneElement(val::T, ind::I, axes::A) where {T<:Number, I<:NTuple{N,Int}, A} where {N} = new{T,N,I,A}(val, ind, axes)
+end
+Base.size(A::OneElement) = map(length, A.axes)
+Base.axes(A::OneElement) = A.axes
+Base.getindex(A::OneElement{T,N}, i::Vararg{Int,N}) where {T,N} = ifelse(i==A.ind, A.val, zero(T))
+
 
 _zero(xs::AbstractArray{<:Number}, T::Type{Nothing}) = fill!(similar(xs), zero(eltype(xs)))
 _zero(xs::AbstractArray{<:Number}, T) = fill!(similar(xs, T), false)

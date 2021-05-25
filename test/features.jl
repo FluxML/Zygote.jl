@@ -482,6 +482,24 @@ end
   @test x[1] == x[2]
 end
 
+@testset "accumulation" begin
+  # from https://github.com/FluxML/Zygote.jl/issues/905
+  function net(x1)
+    x2  = x1
+    x3  = x1 + x2
+    x4  = x1 + x2 + x3
+    x5  = x1 + x2 + x3 + x4
+    x6  = x1 + x2 + x3 + x4 + x5
+    x7  = x1 + x2 + x3 + x4 + x5 + x6
+    x8  = x1 + x2 + x3 + x4 + x5 + x6 + x7
+    x9  = x1 + x2 + x3 + x4 + x5 + x6 + x7 + x8
+    x10 = x1 + x2 + x3 + x4 + x5 + x6 + x7 + x8 + x9
+  end
+  loss(x) = sum(abs2, net(x))
+  @test gradient(loss, ones(10,10))[1] == fill(131072, 10, 10)
+  @test 150_000_000 > @allocated gradient(loss, ones(1000,1000))
+end
+
 @testset "tuples & broadcasting" begin
     @test gradient(x -> sum(x .+ ones(2,2)), (1,2)) == ((2,2),)
     @test gradient(x -> sum(x .+ ones(2,2)), (1,)) == ((4,),)

@@ -12,8 +12,8 @@ accum(x, y) =
 
 accum(x, y, zs...) = accum(accum(x, y), zs...)
 
-accum(x::Tuple, y::Tuple) = accum.(x, y)
-accum(x::AbstractArray, y::AbstractArray) = accum.(x, y)
+accum(x::Tuple, ys::Tuple...) = accum.(x, ys...)
+accum(x::AbstractArray, ys::AbstractArray...) = accum.(x, ys...)
 
 @generated function accum(x::NamedTuple, y::NamedTuple)
   # assumes that y has no keys apart from those also in x
