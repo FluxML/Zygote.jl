@@ -46,6 +46,7 @@ function Base.reducedim_init(::typeof(identity), ::typeof(accum), A::AbstractArr
 end
 
 trim(x, Δ) = reshape(Δ, ntuple(i -> size(Δ, i), Val(ndims(x))))
+trim(x::Tuple, Δ) = ntuple(k -> Δ[k], length(x))
 
 unbroadcast(x::AbstractArray, x̄) =
   size(x) == size(x̄) ? x̄ :
@@ -55,6 +56,7 @@ unbroadcast(x::AbstractArray, x̄) =
 unbroadcast(x::Number, x̄) = accum_sum(x̄)
 unbroadcast(x::Tuple{<:Any}, x̄) = (accum_sum(x̄),)
 unbroadcast(x::Base.RefValue, x̄) = (x=accum_sum(x̄),)
+unbroadcast(x::Tuple, x̄) = trim(x, length(x) == length(x̄) ? x̄ : accum_sum(x̄; dims=2:ndims(x̄))) # case length(x) > 1
 
 unbroadcast(x::AbstractArray, x̄::Nothing) = nothing
 
@@ -72,11 +74,23 @@ unbroadcast(x::AbstractArray, x̄::Nothing) = nothing
   Δ -> (nothing, unbroadcast(x, Δ), -unbroadcast(y, Δ))
 
 @adjoint broadcasted(::typeof(*), x::Numeric, y::Numeric) = x.*y,
-  z̄ -> (nothing, unbroadcast(x, z̄ .* conj.(y)), unbroadcast(y, z̄ .* conj.(x)))
+   Δ -> (nothing, unbroadcast(x, Δ .* conj.(y)), unbroadcast(y, Δ .* conj.(x)))
+@adjoint function broadcasted(::typeof(*), x::Number, y::AbstractArray{<:Number})
+  z, back = pullback(*, x, y)  # this uses dot(y,Δ) instead of Δ .* conj.(y)
+  z, Δ -> (nothing, back(Δ)...)
+end
+@adjoint function broadcasted(::typeof(*), x::AbstractArray{<:Number}, y::Number)
+  z, back = pullback(*, x, y)
+  z, Δ -> (nothing, back(Δ)...)
+end
 
 @adjoint function broadcasted(::typeof(/), x::Numeric, y::Numeric)
   res = x ./ y
-  res, Δ -> (nothing, unbroadcast(x, Δ ./ conj.(y)), unbroadcast(y, -Δ .* conj.(res ./ y)))
+  res, Δ -> (nothing, unbroadcast(x, Δ ./ conj.(y)), unbroadcast(y, .-Δ .* conj.(res ./ y)))
+end
+@adjoint function broadcasted(::typeof(/), x::AbstractArray{<:Number}, y::Number)
+  z, back = pullback(/, x, y)
+  z, Δ -> (nothing, back(Δ)...)
 end
 
 @adjoint function broadcasted(::typeof(Base.literal_pow), ::typeof(^), x::Numeric, exp::Val{p}) where p

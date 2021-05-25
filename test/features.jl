@@ -402,7 +402,7 @@ function pow_simd(x, n)
   return r
 end
 
-@test_broken gradient(pow_simd, 2, 3) == (12,nothing)
+@test gradient(pow_simd, 2, 3) == (12,nothing)
 
 @testset "tuple getindex" begin
   @test gradient(x -> size(x)[2], ones(2,2,2)) == (nothing,)
@@ -500,3 +500,14 @@ end
   @test 150_000_000 > @allocated gradient(loss, ones(1000,1000))
 end
 
+@testset "tuples & broadcasting" begin
+    @test gradient(x -> sum(x .+ ones(2,2)), (1,2)) == ((2,2),)
+    @test gradient(x -> sum(x .+ ones(2,2)), (1,)) == ((4,),)
+    @test gradient(x -> sum(x .+ ones(2,1)), (1,2)) == ((1,1),)
+
+    # https://github.com/FluxML/Zygote.jl/issues/975
+    gt = gradient((x,p) -> prod(x .^ p), [3,4], (1,2))
+    gv = gradient((x,p) -> prod(x .^ p), [3,4], [1,2])
+    @test gt[1] == gv[1]
+    @test collect(gt[2]) ≈ gv[2]
+end

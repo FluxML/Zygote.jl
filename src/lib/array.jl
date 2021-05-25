@@ -286,14 +286,9 @@ end
   sum(xs, dims = dims), Δ -> (nothing,)
 end
 
-_normalize_kws(kws::NamedTuple) = kws
-_normalize_kws(kws) = NamedTuple()
-
-function _pullback(cx::AContext, kwtype, kws, ::typeof(sum), f, xs::AbstractArray)
-  norm_kws = _normalize_kws(kws)
-  @assert !haskey(norm_kws, :init) # TODO add init support (julia 1.6)
-  y, back = pullback(cx, (f, xs) -> sum(f.(xs); norm_kws...), f, xs)
-  y, ȳ -> (nothing, nothing, nothing, back(ȳ)...)
+@adjoint function sum(f, xs::AbstractArray; kws...)
+  @assert !haskey(kws, :init) # TODO add init support (julia 1.6)
+  return pullback(__context__, (f, xs) -> sum(f.(xs); kws...), f, xs)
 end
 
 @adjoint function sum(::typeof(abs2), X::AbstractArray; dims = :)

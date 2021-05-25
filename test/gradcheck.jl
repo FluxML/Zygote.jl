@@ -555,14 +555,14 @@ end
   @testset "Cholesky" begin
     # Check that the forwards pass computes the correct thing.
     f(X, Y) = cholesky(X * X' + I) \ Y
-    @test Zygote.pullback(X -> f(X, Y), X)[1] == cholesky(X * X' + I) \ Y
+    @test Zygote.pullback(X -> f(X, Y), X)[1] ≈ cholesky(X * X' + I) \ Y
     @test gradtest(X -> f(X, Y), X)
     @test gradtest(Y -> f(X, Y), Y)
     @test gradtest(X -> f(X, y), X)
     @test gradtest(y -> f(X, y), y)
     g(X) = cholesky(X * X' + I)
-    @test Zygote.pullback(g, X)[2]((factors=LowerTriangular(X),)) ==
-      Zygote.pullback(g, X)[2]((factors=Matrix(LowerTriangular(X)),))
+    @test Zygote.pullback(g, X)[2]((factors=LowerTriangular(X),))[1] ≈
+      Zygote.pullback(g, X)[2]((factors=Matrix(LowerTriangular(X)),))[1]
     @test_throws PosDefException Zygote.pullback(X -> cholesky(X, check = false), X)[2]((factors=X,))
 
     # https://github.com/FluxML/Zygote.jl/issues/932
@@ -689,8 +689,8 @@ end
   @test gradtest(Diagonal, d)
   y, back = Zygote.pullback(Diagonal, d)
   D̄ = randn(rng, P, P)
-  @test back(D̄) == back(Diagonal(D̄))
-  @test back(D̄) == back((diag=diag(D̄),))
+  @test back(D̄)[1] ≈ back(Diagonal(D̄))[1]
+  @test back(D̄)[1] ≈ back((diag=diag(D̄),))[1]
 end
 
 @testset "dense + UniformScaling" begin
@@ -705,7 +705,7 @@ end
   @testset "cholesky - dense" begin
     rng, N = MersenneTwister(123456), 5
     A = randn(rng, N, N)
-    @test cholesky(A' * A + I) == first(Zygote.pullback(A->cholesky(A' * A + I), A))
+    @test cholesky(A' * A + I).U ≈ first(Zygote.pullback(A->cholesky(A' * A + I), A)).U
     @test gradtest(A->cholesky(A' * A + I).U, A)
     @test gradtest(A->logdet(cholesky(A' * A + I)), A)
     @test gradtest(B->cholesky(Symmetric(B)).U, A * A' + I)
@@ -1308,6 +1308,12 @@ end
   x1 = rand(3, 3)
   @test gradient(x -> sum(x .== 0.5), x1)[1] === nothing
   @test gradient(x -> sum(x .* (x .== maximum(x, dims=1))), x1)[1] == (x1 .== maximum(x1, dims=1))
+
+  # tests for un-broadcasting *, / via scalar rules
+  @test all(gradient((x,y) -> sum(x .* y), [1,2], 5) .≈ ([5, 5], 3))
+  @test all(gradient((x,y) -> sum(x .* y), 5, [1,2]) .≈ (3, [5, 5]))
+  @test all(gradient((x,y) -> sum(x .* y), [1,2], [3 4 5]) .≈ ([12, 12], [3 3 3]))
+  @test all(gradient((x,y) -> sum(x ./ y), [1,2], 5) .≈ ([0.2, 0.2], -0.12))
 end
 
 using Zygote: Buffer
