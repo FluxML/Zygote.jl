@@ -72,7 +72,7 @@ unbroadcast(x::AbstractArray, x̄::Nothing) = nothing
 # right arrays.
 
 @adjoint broadcasted(::typeof(+), xs::Numeric...) =
-  broadcast(+, xs...), ȳ -> (nothing, map(x -> unbroadcast(x, ȳ), xs)...)
+  broadcast(+, xs...), ȳ -> (nothing, map(x -> unbroadcast(x, _protect(ȳ)), xs)...)
 
 @adjoint broadcasted(::typeof(-), x::Numeric, y::Numeric) = x .- y,
   Δ -> (nothing, unbroadcast(x, Δ), _minus(unbroadcast(y, Δ)))

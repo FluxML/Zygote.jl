@@ -766,7 +766,7 @@ end
   return S - A, Δ->((λ=tr(Δ),), -Δ)
 end
 
-@adjoint +(A::AbstractArray, B::AbstractArray) = A + B, Δ->(Δ, Δ)
+@adjoint +(A::AbstractArray, B::AbstractArray) = A + B, Δ->(_protect(Δ), _protect(Δ))
 @adjoint -(A::AbstractArray, B::AbstractArray) = A - B, Δ->(Δ, -Δ)
 @adjoint -(A::AbstractArray) = -A, Δ->(-Δ,)
 
