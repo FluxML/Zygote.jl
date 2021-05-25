@@ -444,7 +444,7 @@ end
 @adjoint function inv(A::Union{Number, AbstractMatrix})
   Ainv = inv(A)
   return Ainv, function (Δ)
-    ∇A = - Ainv' * Δ * Ainv'
+    ∇A = - Ainv' * _unprotect(Δ) * Ainv'
     return (∇A, )
   end
 end
@@ -460,7 +460,10 @@ end
   rtol::Real = (eps(real(float(one(T))))*min(size(A)...))*iszero(atol),
 ) where {T}
   Y = pinv(A)
-  return Y, Δ->(-Y' * Δ * Y' + (I - A * Y) * Δ' * Y * Y' + Y' * Y * Δ' * (I - Y * A),)
+  return Y, _Δ -> begin
+    Δ = _unprotect(_Δ)  
+    (-Y' * Δ * Y' + (I - A * Y) * Δ' * Y * Y' + Y' * Y * Δ' * (I - Y * A),)
+  end
 end
 
 # When `A` is guaranteed to be square, definitely use the simple expression for the adjoint.
@@ -474,7 +477,8 @@ end
   B::AbstractVecOrMat,
 )
   Y = A \ B
-  return Y, function(Ȳ)
+  return Y, function(_Ȳ)
+    Ȳ = _unprotect(_Ȳ)
     B̄ = A' \ Ȳ
     return (-B̄ * Y', B̄)
   end
@@ -482,7 +486,8 @@ end
 
 @adjoint function /(A::AbstractMatrix, B::Union{Diagonal, AbstractTriangular})
   Y = A / B
-  return Y, function(Ȳ)
+  return Y, function(_Ȳ)
+    Ȳ = _unprotect(_Ȳ)
     Ā = Ȳ / B'
     return (Ā, -Y' * Ā)
   end
@@ -490,7 +495,8 @@ end
 
 @adjoint function \(A::AbstractMatrix, B::AbstractVecOrMat)
   Z = A \ B
-  return Z, function(Z̄)
+  return Z, function(_Z̄)
+    Z̄ = _unprotect(_Z̄)
     B̄ = A' \ Z̄
     if size(A, 1) == size(A, 2)
       return (-B̄ * Z', B̄)
@@ -514,7 +520,8 @@ end
 # This is basically a hack while we don't have a working `ldiv!`.
 @adjoint function \(A::Cholesky, B::AbstractVecOrMat)
   Y, back = Zygote.pullback((U, B)->U \ (U' \ B), A.U, B)
-  return Y, function(Ȳ)
+  return Y, function(_Ȳ)
+    Ȳ = _unprotect(_Ȳ)
     Ā_factors, B̄ = back(Ȳ)
     return ((uplo=nothing, info=nothing, factors=Ā_factors), B̄)
   end
@@ -595,7 +602,8 @@ end
 
 @adjoint function lyap(A::AbstractMatrix, C::AbstractMatrix)
   X = lyap(A, C)
-  return X, function (X̄)
+  return X, function (_X̄)
+    X̄ = _unprotect(_X̄)
     C̄ = lyap(collect(A'), X̄)
     Ā = C̄*X' + C̄'*X
     return (Ā, C̄)
@@ -792,14 +800,16 @@ AbstractFFTs.brfft(x::Fill, d, dims...) = AbstractFFTs.brfft(collect(x), d, dims
 end
 
 @adjoint function *(P::AbstractFFTs.Plan, xs)
-  return P * xs, function(Δ)
+  return P * xs, function(_Δ)
+    Δ = _unprotect(_Δ)
     N = prod(size(xs)[[P.region...]])
     return (nothing, N * (P \ Δ))
   end
 end
 
 @adjoint function \(P::AbstractFFTs.Plan, xs)
-  return P \ xs, function(Δ)
+  return P \ xs, function(_Δ)
+    Δ = _unprotect(_Δ)
     N = prod(size(Δ)[[P.region...]])
     return (nothing, (P * Δ)/N)
   end
