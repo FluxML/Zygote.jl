@@ -1,7 +1,11 @@
 
 accum(x::DenseArray, ys::AbstractArray...) = broadcast!(+, x, x, ys...)
-accum(x::DenseArray, y::DenseArray, zs::AbstractArray...) = broadcast!(+, x, x, y, zs...)
-accum(x::AbstractArray, y::DenseArray, zs::AbstractArray...) = broadcast!(+, y, x, y, zs...)
+
+# work around bug fixed in https://github.com/JuliaLang/julia/pull/39859
+accum(x::DenseVector, ys::AbstractArray...) = broadcast!(+, x, vec(x), map(vec, ys)...)
+
+# accum(x::DenseArray, y::DenseArray, zs::AbstractArray...) = broadcast!(+, x, x, y, zs...)
+# accum(x::AbstractArray, y::DenseArray, zs::AbstractArray...) = broadcast!(+, y, x, y, zs...)
 
 """
     NoWrite(Δ::AbstractArray)
