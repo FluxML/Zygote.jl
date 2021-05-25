@@ -87,12 +87,34 @@ end
 
 using AbstractFFTs  # many rules, easier to overload here:
 
-AbstractFFTs.fft(x::NoWrite, dims...) = AbstractFFTs.fft(_unprotect(x), dims...)
-AbstractFFTs.bfft(x::NoWrite, dims...) = AbstractFFTs.bfft(_unprotect(x), dims...)
-AbstractFFTs.ifft(x::NoWrite, dims...) = AbstractFFTs.ifft(_unprotect(x), dims...)
-AbstractFFTs.rfft(x::NoWrite, dims...) = AbstractFFTs.rfft(_unprotect(x), dims...)
-AbstractFFTs.irfft(x::NoWrite, d, dims...) = AbstractFFTs.irfft(_unprotect(x), d, dims...)
-AbstractFFTs.brfft(x::NoWrite, d, dims...) = AbstractFFTs.brfft(_unprotect(x), d, dims...)
-AbstractFFTs.fftshift(x::NoWrite) = AbstractFFTs.fftshift(_unprotect(x))
-AbstractFFTs.ifftshift(x::NoWrite) = AbstractFFTs.ifftshift(_unprotect(x))
+for f in (:fft, :bfft, :ifft, :rfft, :irfft, :brfft, :fftshift, :ifftshift)
+  @eval AbstractFFTs.$f(x::NoWrite, dims...) = AbstractFFTs.$f(_unprotect(x), dims...)
+end
+
+# LinearAlgebra.:\(A::AbstractMatrix, B::NoWriteVecOrMat)
+
+# The dispatch for * is very messy, better just to unwrap by hand. For debugging:
+
+NoWriteVector{T} = NoWrite{T,1}
+NoWriteMatrix{T} = NoWrite{T,2}
+NoWriteVecOrMat{T} = Union{NoWriteVector{T}, NoWriteMatrix{T}}
+
+LinearAlgebra.generic_matvecmul!(C::AbstractVector, tA, A::NoWriteVecOrMat, B::AbstractVector, _add::LinearAlgebra.MulAddMul) = _mulv(C, tA, A, B, _add)
+LinearAlgebra.generic_matvecmul!(C::AbstractVector, tA, A::AbstractVecOrMat, B::NoWriteVector, _add::LinearAlgebra.MulAddMul) = _mulv(C, tA, A, B, _add)
+LinearAlgebra.generic_matvecmul!(C::AbstractVector, tA, A::NoWriteVecOrMat, B::NoWriteVector, _add::LinearAlgebra.MulAddMul) = _mulv(C, tA, A, B, _add)
+
+function _mulv(C, tA, A, B, _add)
+  @debug "generic matrix-vector due to NoWrite" summary(A) summary(B)
+  invoke(LinearAlgebra.generic_matvecmul!, Tuple{AbstractVector, Any, AbstractVecOrMat, AbstractVector, LinearAlgebra.MulAddMul}, C, tA, A, B, _add)
+end
+
+LinearAlgebra.generic_matmatmul!(C::AbstractMatrix, tA, A::NoWriteMatrix, B::AbstractMatrix, _add::LinearAlgebra.MulAddMul) = _mulm(C, tA, A, B, _add)
+LinearAlgebra.generic_matmatmul!(C::AbstractMatrix, tA, A::AbstractMatrix, B::NoWriteMatrix, _add::LinearAlgebra.MulAddMul) = _mulm(C, tA, A, B, _add)
+LinearAlgebra.generic_matmatmul!(C::AbstractMatrix, tA, A::NoWriteMatrix, B::NoWriteMatrix, _add::LinearAlgebra.MulAddMul) = _mulm(C, tA, A, B, _add)
+
+function _mulm(C, tA, A, B, _add)
+  @debug "generic matrix-matrix multiplication due to NoWrite" summary(A) summary(B)
+  invoke(LinearAlgebra.generic_matmatmul!, Tuple{AbstractMatrix, Any, AbstractMatrix, AbstractMatrix, LinearAlgebra.MulAddMul}, C, tA, A, B, _add)
+end
+
 
