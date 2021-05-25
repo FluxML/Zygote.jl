@@ -34,6 +34,9 @@ _maybewrite(A) = false
 _maybewrite(A::DenseArray) = true
 _maybewrite(A::AbstractArray) = A===parent(A) ? false : _maybewrite(parent(A))
 
+##### For Params & Grads, don't accumulate NoWrite objects
+
+Base.setindex!(dict::IdDict, dx::NoWrite, x) = dict[x] = copy(dx.data)
 
 ##### For ChainRules rules, unwrap & re-wrap automatically:
 
