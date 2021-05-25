@@ -46,7 +46,7 @@ _pointer(A) = nothing  # compares == self
 
 @inline function (s::ZBack)(dy::NoWrite)
   ptr_orig = _pointer(dy.data)
-  @debug "unwrapping for chainrules" summary(dy.data) ptr s.back
+  # @debug "unwrapping for chainrules" summary(dy.data) ptr s.back
   dxs = wrap_chainrules_output(s.back(wrap_chainrules_input(dy.data)))
   dxs === nothing && return
   ptrs = map(_pointer, dxs)
@@ -55,10 +55,10 @@ _pointer(A) = nothing  # compares == self
     if ptr === nothing
       dx
     elseif ptr == ptr_orig
-      @debug "re-wrapping for chainrules" summary(dy.data) ptr
+      # @debug "re-wrapping for chainrules" summary(dy.data) ptr
       _protect(dx)
     elseif count(isequal(ptr), ptrs) > 1
-      @debug "wrapping for chainrules" summary(dy.data) ptr
+      # @debug "wrapping for chainrules" summary(dy.data) ptr
       _protect(dx)
     else
       dx
@@ -98,7 +98,7 @@ LinearAlgebra.generic_matvecmul!(C::AbstractVector, tA, A::AbstractVecOrMat, B::
 LinearAlgebra.generic_matvecmul!(C::AbstractVector, tA, A::NoWriteVecOrMat, B::NoWriteVector, _add::LinearAlgebra.MulAddMul) = _mulv(C, tA, A, B, _add)
 
 function _mulv(C, tA, A, B, _add)
-  @debug "generic matrix-vector due to NoWrite" summary(A) summary(B)
+  # @debug "generic matrix-vector due to NoWrite" summary(A) summary(B)
   invoke(LinearAlgebra.generic_matvecmul!, Tuple{AbstractVector, Any, AbstractVecOrMat, AbstractVector, LinearAlgebra.MulAddMul}, C, tA, A, B, _add)
 end
 
@@ -107,7 +107,7 @@ LinearAlgebra.generic_matmatmul!(C::AbstractMatrix, tA, A::AbstractMatrix, B::No
 LinearAlgebra.generic_matmatmul!(C::AbstractMatrix, tA, A::NoWriteMatrix, B::NoWriteMatrix, _add::LinearAlgebra.MulAddMul) = _mulm(C, tA, A, B, _add)
 
 function _mulm(C, tA, A, B, _add)
-  @debug "generic matrix-matrix multiplication due to NoWrite" summary(A) summary(B)
+  # @debug "generic matrix-matrix multiplication due to NoWrite" summary(A) summary(B)
   invoke(LinearAlgebra.generic_matmatmul!, Tuple{AbstractMatrix, Any, AbstractMatrix, AbstractMatrix, LinearAlgebra.MulAddMul}, C, tA, A, B, _add)
 end
 
