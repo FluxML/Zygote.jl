@@ -1,12 +1,4 @@
 
-accum(x::DenseArray, ys::AbstractArray...) = broadcast!(+, x, x, ys...)
-
-# work around bug fixed in https://github.com/JuliaLang/julia/pull/39859
-accum(x::DenseVector, ys::AbstractArray...) = broadcast!(+, x, vec(x), map(vec, ys)...)
-
-# accum(x::DenseArray, y::DenseArray, zs::AbstractArray...) = broadcast!(+, x, x, y, zs...)
-# accum(x::AbstractArray, y::DenseArray, zs::AbstractArray...) = broadcast!(+, y, x, y, zs...)
-
 """
     NoWrite(Δ::AbstractArray)
 
@@ -16,8 +8,8 @@ in rules like `@adjoint +(A,B) = A+B, Δ -> (_protect(Δ), _protect(Δ))`.
 (This will be handled automatically for rules defined via ChainRules.jl.)
 """
 struct NoWrite{T,N,P} <: AbstractArray{T,N}
-    data::P
-    NoWrite(x::P) where {P <: AbstractArray{T,N}} where {T,N} = new{T,N,P}(x)
+  data::P
+  NoWrite(x::P) where {P <: AbstractArray{T,N}} where {T,N} = new{T,N,P}(x)
 end
 
 Base.parent(x::NoWrite) = x.data
@@ -25,7 +17,7 @@ Base.parent(x::NoWrite) = x.data
 Base.@propagate_inbounds Base.getindex(A::NoWrite, i...) = getindex(A.data, i...)
 
 for f in (:size, :axes, :length, :similar, :copy, :IndexStyle, :strides, :pointer, :Tuple, :iterate)
-    @eval Base.$f(x::NoWrite) = Base.$f(x.data)
+  @eval Base.$f(x::NoWrite) = Base.$f(x.data)
 end
 
 Base.showarg(io::IO, x::NoWrite, top) = begin print(io, "NoWrite("); Base.showarg(io, x.data, false); print(io, ")") end
@@ -86,7 +78,7 @@ Base.mapreduce(f, op, A::NoWrite; kw...) = mapreduce(f, op, A.data; kw...)  # al
 # Try to keep NoWrite outside, to maximise chances of sucessful unwrapping:
 Base._reshape(x::NoWrite,  dims::Tuple{Vararg{Int}}) = NoWrite(reshape(x, dims))
 for f in (:transpose, :adjoint, :Transpose, :Adjoint, :Diagonal)
-    @eval LinearAlgebra.$f(x::NoWrite) = NoWrite(LinearAlgebra.$f(x.data))
+  @eval LinearAlgebra.$f(x::NoWrite) = NoWrite(LinearAlgebra.$f(x.data))
 end
 
 using AbstractFFTs  # many rules, easier to overload here:

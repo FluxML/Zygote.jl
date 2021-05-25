@@ -56,6 +56,20 @@ Base.size(A::OneElement) = map(length, A.axes)
 Base.axes(A::OneElement) = A.axes
 Base.getindex(A::OneElement{T,N}, i::Vararg{Int,N}) where {T,N} = ifelse(i==A.ind, A.val, zero(T))
 
+function accum(x::DenseArray, ys::OneElement...)
+  for y in ys
+    x[y.ind...] += y.val
+  end
+  x
+end
+function accum(x::OneElement, ys::OneElement...)
+  z = fill!(similar(x), 0)
+  z[x.ind...] = x.val
+  for y in ys
+    z[y.ind...] += y.val
+  end
+  z
+end
 
 _zero(xs::AbstractArray{<:Number}, T::Type{Nothing}) = fill!(similar(xs), zero(eltype(xs)))
 _zero(xs::AbstractArray{<:Number}, T) = fill!(similar(xs, T), false)
