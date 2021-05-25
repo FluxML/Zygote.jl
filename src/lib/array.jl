@@ -46,15 +46,20 @@ end
   return (dx, map(_->nothing, inds)...)
 end
 
+"""
+    OneElement(val, ind, axes) <: AbstractArray
+
+Extremely simple `struct` used for the gradient of scalar `getindex`.
+"""
 struct OneElement{T,N,I,A} <: AbstractArray{T,N}
   val::T
-  index::I
+  ind::I
   axes::A
-  OneElement(x::T, i::I, a::A) where {T,I<:NTuple{N,Int},A} where {N} = new{T,N,I,A}(x, i, a)
+  OneElement(val::T, ind::I, axes::A) where {T<:Number, I<:NTuple{N,Int}, A} where {N} = new{T,N,I,A}(val, ind, axes)
 end
 Base.size(A::OneElement) = map(length, A.axes)
 Base.axes(A::OneElement) = A.axes
-Base.getindex(A::OneElement{T,N}, i::Vararg{Int,N}) where {T,N} = ifelse(i==A.index, A.val, zero(T))
+Base.getindex(A::OneElement{T,N}, i::Vararg{Int,N}) where {T,N} = ifelse(i==A.ind, A.val, zero(T))
 
 
 _zero(xs::AbstractArray{<:Number}, T::Type{Nothing}) = fill!(similar(xs), zero(eltype(xs)))
