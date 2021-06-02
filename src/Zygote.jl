@@ -13,6 +13,7 @@ using MacroTools: @forward
 
 import Distributed: pmap, CachingPool, workers
 export Params, gradient, jacobian, hessian, diaghessian, pullback, pushforward, @code_adjoint
+export test_gradient
 
 const Numeric{T<:Number} = Union{T, AbstractArray{<:T}}
 
