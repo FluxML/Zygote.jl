@@ -110,3 +110,35 @@ As per [`chain_rrule`](@ref) but with support for kwargs.
   end
   return y, kw_zpullback
 end
+
+"""
+    test_gradient(f, args)
+
+Function with the same API as the `ChainRulesCore.rrule`, used for testing Zygote gradients
+with `ChainRulesTestUtils.test_rrule` functionality.
+"""
+function test_gradient(f, args...)
+    y, pb = pullback(f, args...)
+    return y, Δ -> wrap_chainrules_input(pb(Δ))
+end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
