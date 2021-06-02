@@ -118,9 +118,12 @@ Function with the same API as the `ChainRulesCore.rrule`, used for testing Zygot
 with `ChainRulesTestUtils.test_rrule` functionality.
 """
 function test_gradient(f, args...)
-    y, pb = pullback(f, args...)
-    return y, Δ -> wrap_chainrules_input(pb(Δ))
+    y, pb = _pullback(f, args...)
+    return y, Δ -> (NoTangent(), multizeros(wrap_chainrules_input(pb(Δ)), length(args)))
 end
+
+multizeros(::Nothing, N) = ntuple(_ -> ZeroTangent(), N)
+multizeros(grad, N) = grad
 
 
 
