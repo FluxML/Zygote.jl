@@ -196,7 +196,6 @@ using Zygote, Test, ChainRules
         end
     end
 
-
     @testset "kwarg, with all AbstractZero partials" begin
         # while ChainRules always has a partial for every input, Zygote combined them all
         # to a single `nothing` if they are all zero-like.
@@ -211,6 +210,13 @@ using Zygote, Test, ChainRules
 
         @test (nothing,) == Zygote.gradient(x->not_diff_kw_eg(x, 2), 10.4)
         @test (nothing,) == Zygote.gradient(x->not_diff_kw_eg(x, 2; kw=2.0), 10.4)
+    end
+
+    @testset "zygote_ad_rrule" begin
+        test_rrule(round, 2.2; rrule_f=zygote_ad_rrule)
+        test_rrule(vcat, rand(3), rand(4); rrule_f=zygote_ad_rrule, check_inferred=false)
+        test_rrule(getindex, rand(5), 3; rrule_f=zygote_ad_rrule)
+        test_rrule(identity, Foo(1.0, 2.0); rrule_f=zygote_ad_rrule, check_inferred=false)
     end
 end
 

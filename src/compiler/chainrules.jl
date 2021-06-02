@@ -112,35 +112,67 @@ As per [`chain_rrule`](@ref) but with support for kwargs.
 end
 
 """
-    test_gradient(f, args)
+    zygote_ad_rrule(f, args)
 
 Function with the same API as the `ChainRulesCore.rrule`, used for testing Zygote gradients
 with `ChainRulesTestUtils.test_rrule` functionality.
+
+```
+ChainRulesTestUtils.test_rrule(round, 2.2; rrule_f=zygote_ad_rrule)
+```
 """
-function test_gradient(f, args...)
-    y, pb = _pullback(f, args...)
-    return y, Δ -> (NoTangent(), multizeros(wrap_chainrules_input(pb(Δ)), length(args)))
+function zygote_ad_rrule(f, args...)
+    y, pb = pullback(f, args...)
+    function ad_pullback(Δ)
+        println()
+        @show Δ
+        pbΔ = pb(Δ)
+        @show pbΔ
+        #wci = wrap_chainrules_input.(pbΔ)
+        #@show wci
+        #@show args
+        d = zygote2differential(pbΔ, args)
+        @show d
+        zs = multizeros(d, length(args))
+        @show zs
+        return NoTangent(), zs...
+    end
+    return y, ad_pullback
 end
 
-multizeros(::Nothing, N) = ntuple(_ -> ZeroTangent(), N)
+multizeros(::Nothing, N) = ntuple(_ -> NoTangent(), N)
 multizeros(grad, N) = grad
 
 
 
+"""
+    zygote2differential(x)
 
+Convert input `x` from the Zygote format to the ChainRules differential types.
+"""
+zygote2differential(x, primal) = z2d(x, primal)
+zygote2differential(::Nothing, ::Any) = NoTangent()
+zygote2differential(t::Tuple, primal::Tuple) = map(z2d, t, primal)
+zygote2differential(t::Tuple, primal) = (@warn "primal should be a tuple, not $primal"; return t)
+z2d(x, ::Any) = x
+z2d(::Nothing, ::Any) = NoTangent()
+z2d(a::AbstractArray{<:Number}, primal::AbstractArray{T}) where T = a
+z2d(a::AbstractArray, primal::AbstractArray{T}) where T = z2d.(a, primal)
+z2d(x::Union{AbstractZero, Tangent}, ::Any) = (difftype_warn(x); return x)
+function z2d(t::Tuple, primal::Tuple)
+  tp::Tuple = map(z2d, t, primal)
+  primal_type = typeof(primal)
+  return canonicalize(Tangent{primal_type, typeof(tp)}(tp))
+end
 
-
-
-
-
-
-
-
-
-
-
-
-
+function z2d(t::NamedTuple, primal)
+  primal_type = typeof(primal)
+  fnames = fieldnames(primal_type)
+  complete_t = NamedTuple{fnames}(fn in keys(t) ? t[fn] : nothing for fn in fnames)
+  primals = NamedTuple{fnames}(getfield(primal, fn) for fn in fnames)
+  tp::NamedTuple = map(z2d, complete_t, primals)
+  return canonicalize(Tangent{primal_type, typeof(tp)}(tp))
+end
 
 
 
