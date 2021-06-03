@@ -124,23 +124,14 @@ ChainRulesTestUtils.test_rrule(round, 2.2; rrule_f=zygote_ad_rrule)
 function zygote_ad_rrule(f, args...)
     y, pb = pullback(f, args...)
     function ad_pullback(Δ)
-        println()
-        @show Δ
-        pbΔ = pb(wrap_chainrules_output(Δ))
-        @show pbΔ
-        d = zygote2differential(pbΔ, args)
-        @show d
-        zs = multizeros(d, length(args))
-        @show zs
-        return NoTangent(), zs...
+        d = zygote2differential(pb(wrap_chainrules_output(Δ)), args)
+        return (NoTangent(), multizeros(d, length(args))...)
     end
     return y, ad_pullback
 end
 
 multizeros(::Nothing, N) = ntuple(_ -> NoTangent(), N)
 multizeros(grad, N) = grad
-
-
 
 """
     zygote2differential(x)
@@ -170,7 +161,4 @@ function z2d(t::NamedTuple, primal)
   tp::NamedTuple = map(z2d, complete_t, primals)
   return canonicalize(Tangent{primal_type, typeof(tp)}(tp))
 end
-
-
-
 
