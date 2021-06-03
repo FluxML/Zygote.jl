@@ -213,13 +213,27 @@ using Zygote, Test, ChainRules
     end
 
     @testset "zygote_ad_rrule" begin
+        struct Foo
+            x
+            y
+        end
+        makefoo(a, b) = Foo(a, b)
+        sumfoo(foo) = foo.x + foo.y
+        my_tuple(a, b, c) = (a+b, b+c)
+        my_namedtuple(a, b, c) = (a=a, b=b, c=0.0)
+
         test_rrule(round, 2.2; rrule_f=zygote_ad_rrule)
         test_rrule(vcat, rand(3), rand(4); rrule_f=zygote_ad_rrule, check_inferred=false)
         test_rrule(getindex, rand(5), 3; rrule_f=zygote_ad_rrule)
-        test_rrule(identity, Foo(1.0, 2.0); rrule_f=zygote_ad_rrule, check_inferred=false)
 
-        myfunc(a, b, c) = (a+b, b+c)
-        test_rrule(myfunc, 1., 2., 3.; rrule_f=zygote_ad_rrule)
+        test_rrule(sumfoo, foo; rrule_f=zygote_ad_rrule, check_inferred=false)
+        test_rrule(makefoo, 1.0, 2.0; rrule_f=zygote_ad_rrule, check_inferred=false)
+
+        test_rrule(my_tuple, 1., 2., 3.; rrule_f=zygote_ad_rrule)
+        test_rrule(my_namedtuple, 1., 2., 3.; rrule_f=zygote_ad_rrule)
+        test_rrule(my_namedtuple, 1., (2.0, "str"), 3.; rrule_f=zygote_ad_rrule)
+        test_rrule(sum, (1.0, 2.0, 3.0); rrule_f=zygote_ad_rrule)
+        test_rrule(sum, (a=1.0, b=2.0); rrule_f=zygote_ad_rrule, check_inferred=false)
     end
 end
 
