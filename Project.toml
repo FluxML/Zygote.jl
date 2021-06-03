@@ -6,7 +6,6 @@ version = "0.6.11"
 AbstractFFTs = "621f4979-c628-5d54-868e-fcf4e3e8185c"
 ChainRules = "082447d4-558c-5d27-93f4-14fc19e9eca2"
 ChainRulesCore = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
-ChainRulesTestUtils = "cdddcdb0-9152-4a09-a978-84456f9df70a"
 DiffRules = "b552c78f-8df3-52c6-915a-8e097449b14b"
 Distributed = "8ba89e20-285c-5b6f-9357-94700520ee1b"
 FillArrays = "1a297f60-69ca-5386-bcde-b61e274b549b"
@@ -26,6 +25,7 @@ ZygoteRules = "700de1a5-db45-46bc-99cf-38207098b444"
 AbstractFFTs = "0.5, 1.0"
 ChainRules = "0.7.55, 0.8"
 ChainRulesCore = "0.9.44, 0.10"
+ChainRulesTestUtils = "0.7.1"
 DiffRules = "1.0"
 FillArrays = "0.8, 0.9, 0.10, 0.11"
 ForwardDiff = "0.10"
@@ -39,6 +39,7 @@ ZygoteRules = "0.2.1"
 julia = "1.3"
 
 [extras]
+ChainRulesTestUtils = "cdddcdb0-9152-4a09-a978-84456f9df70a"
 CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
 Distances = "b4f34e82-e78d-54a5-968a-f98e89d6e8f7"
 FFTW = "7a1cc6ca-52ef-59f5-83cd-3a7055c09341"
@@ -48,4 +49,4 @@ StatsFuns = "4c63d2b9-4356-54db-8cca-17b64c39e42c"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["CUDA", "Distances", "FFTW", "FiniteDifferences", "LogExpFunctions", "Test"]
+test = ["ChainRulesTestUtils", "CUDA", "Distances", "FFTW", "FiniteDifferences", "LogExpFunctions", "Test"]
