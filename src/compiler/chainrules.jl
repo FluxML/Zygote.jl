@@ -126,11 +126,8 @@ function zygote_ad_rrule(f, args...)
     function ad_pullback(Δ)
         println()
         @show Δ
-        pbΔ = pb(Δ)
+        pbΔ = pb(wrap_chainrules_output(Δ))
         @show pbΔ
-        #wci = wrap_chainrules_input.(pbΔ)
-        #@show wci
-        #@show args
         d = zygote2differential(pbΔ, args)
         @show d
         zs = multizeros(d, length(args))

@@ -217,6 +217,9 @@ using Zygote, Test, ChainRules
         test_rrule(vcat, rand(3), rand(4); rrule_f=zygote_ad_rrule, check_inferred=false)
         test_rrule(getindex, rand(5), 3; rrule_f=zygote_ad_rrule)
         test_rrule(identity, Foo(1.0, 2.0); rrule_f=zygote_ad_rrule, check_inferred=false)
+
+        myfunc(a, b, c) = (a+b, b+c)
+        test_rrule(myfunc, 1., 2., 3.; rrule_f=zygote_ad_rrule)
     end
 end
 
