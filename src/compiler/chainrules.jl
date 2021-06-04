@@ -121,17 +121,13 @@ with `ChainRulesTestUtils.test_rrule` functionality.
 ChainRulesTestUtils.test_rrule(round, 2.2; rrule_f=zygote_ad_rrule)
 ```
 """
-function zygote_ad_rrule(f, args...)
+function zygote_ad_rrule(f::Function, args...)
     y, pb = pullback(f, args...)
     function ad_pullback(Δ)
-        d = zygote2differential(pb(wrap_chainrules_output(Δ)), args)
-        return (NoTangent(), multizeros(d, length(args))...)
+        return (NoTangent(), zygote2differential(pb(wrap_chainrules_output(Δ)), args)...)
     end
     return y, ad_pullback
 end
-
-multizeros(::Nothing, N) = ntuple(_ -> NoTangent(), N)
-multizeros(grad, N) = grad
 
 """
     zygote2differential(x)
