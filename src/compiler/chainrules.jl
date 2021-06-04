@@ -112,16 +112,16 @@ As per [`chain_rrule`](@ref) but with support for kwargs.
 end
 
 """
-    zygote_ad_rrule(f, args)
+    rrule_via_ad(f, args)
 
 Function with the same API as the `ChainRulesCore.rrule`, used for testing Zygote gradients
 with `ChainRulesTestUtils.test_rrule` functionality.
 
 ```
-ChainRulesTestUtils.test_rrule(round, 2.2; rrule_f=zygote_ad_rrule)
+ChainRulesTestUtils.test_rrule(round, 2.2; rrule_f=rrule_via_ad)
 ```
 """
-function zygote_ad_rrule(f::Function, args...)
+function rrule_via_ad(f::Function, args...)
     y, pb = pullback(f, args...)
     function ad_pullback(Δ)
         return (NoTangent(), zygote2differential(pb(wrap_chainrules_output(Δ)), args)...)
