@@ -212,11 +212,11 @@ using Zygote, Test, ChainRules
         @test (nothing,) == Zygote.gradient(x->not_diff_kw_eg(x, 2; kw=2.0), 10.4)
     end
 
-    @testset "zygote_ad_rrule" begin
+    @testset "rrule_via_ad" begin
         @testset "basic" begin
-            test_rrule(round, 2.2; rrule_f=zygote_ad_rrule)
-            test_rrule(vcat, rand(3), rand(4); rrule_f=zygote_ad_rrule, check_inferred=false)
-            test_rrule(getindex, rand(5), 3; rrule_f=zygote_ad_rrule)
+            test_rrule(round, 2.2; rrule_f=rrule_via_ad)
+            test_rrule(vcat, rand(3), rand(4); rrule_f=rrule_via_ad, check_inferred=false)
+            test_rrule(getindex, rand(5), 3; rrule_f=rrule_via_ad)
         end
 
         @testset "struct" begin
@@ -227,27 +227,27 @@ using Zygote, Test, ChainRules
             makefoo(a, b) = Foo(a, b)
             sumfoo(foo) = foo.x + foo.y
 
-            test_rrule(sumfoo, foo; rrule_f=zygote_ad_rrule, check_inferred=false)
-            test_rrule(makefoo, 1.0, 2.0; rrule_f=zygote_ad_rrule, check_inferred=false)
+            test_rrule(sumfoo, foo; rrule_f=rrule_via_ad, check_inferred=false)
+            test_rrule(makefoo, 1.0, 2.0; rrule_f=rrule_via_ad, check_inferred=false)
         end
 
         @testset "tuples/namedtuples" begin
             my_tuple(a, b, c) = (a+b, b+c)
             my_namedtuple(a, b, c) = (a=a, b=b, c=0.0)
 
-            test_rrule(my_tuple, 1., 2., 3.; rrule_f=zygote_ad_rrule)
-            test_rrule(my_namedtuple, 1., 2., 3.; rrule_f=zygote_ad_rrule)
-            test_rrule(my_namedtuple, 1., (2.0, "str"), 3.; rrule_f=zygote_ad_rrule)
+            test_rrule(my_tuple, 1., 2., 3.; rrule_f=rrule_via_ad)
+            test_rrule(my_namedtuple, 1., 2., 3.; rrule_f=rrule_via_ad)
+            test_rrule(my_namedtuple, 1., (2.0, "str"), 3.; rrule_f=rrule_via_ad)
 
-            test_rrule(sum, (1.0, 2.0, 3.0); rrule_f=zygote_ad_rrule)
-            test_rrule(sum, (a=1.0, b=2.0); rrule_f=zygote_ad_rrule, check_inferred=false)
+            test_rrule(sum, (1.0, 2.0, 3.0); rrule_f=rrule_via_ad)
+            test_rrule(sum, (a=1.0, b=2.0); rrule_f=rrule_via_ad, check_inferred=false)
         end
 
         @testset "arrays" begin
             nada(x, y) = 1.0
-            test_rrule(nada, rand(3), rand(2,3); rrule_f=zygote_ad_rrule)
-            test_rrule(+, rand(3), rand(3); rrule_f=zygote_ad_rrule)
-            test_rrule(*, rand(1, 3), rand(3); rrule_f=zygote_ad_rrule)
+            test_rrule(nada, rand(3), rand(2,3); rrule_f=rrule_via_ad)
+            test_rrule(+, rand(3), rand(3); rrule_f=rrule_via_ad)
+            test_rrule(*, rand(1, 3), rand(3); rrule_f=rrule_via_ad)
         end
     end
 end
