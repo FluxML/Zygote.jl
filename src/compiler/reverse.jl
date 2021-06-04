@@ -26,37 +26,69 @@ end
 unwrapquote(x) = x
 unwrapquote(x::QuoteNode) = x.value
 
-is_literal_getproperty(ex) =
-  (iscall(ex, Base, :getproperty) || iscall(ex, Core, :getfield) || iscall(ex, Base, :getfield)) &&
+is_getproperty(ex) = iscall(ex, Base, :getproperty)
+
+# The initial premise of literal_getproperty was in some ways inherently flawed, because for
+# getproperty it was intended that _pullback falls back to literal_getproperty, but we actually
+# want the opposite to happen, since Zygote should fall back to recursing into the getproperty
+# implementation by default. Users still want to define custom adjoints using only
+# literal_getproperty, though. We can't really have mutually recursive definitions here, so we
+# now always instrument getproperty as literal_getproperty, no matter whether the second
+# argument is a literal or not.
+function instrument_getproperty!(ir, v, ex)
+  if is_getproperty(ex)
+    if ex.args[3] isa Union{QuoteNode,Integer}
+      ir[v] = xcall(Zygote, :literal_getproperty, ex.args[2], Val(unwrapquote(ex.args[3])))
+    else
+      f = insert!(ir, v, :(Val($(ex.args[3]))))
+      ir[v] = xcall(Zygote, :literal_getproperty, ex.args[2], f)
+    end
+  else
+    ex
+  end
+end
+
+is_literal_getfield(ex) =
+  (iscall(ex, Core, :getfield) || iscall(ex, Base, :getfield)) &&
   ex.args[3] isa Union{QuoteNode,Integer}
 
-function instrument_getproperty!(ir, v, ex)
-  is_literal_getproperty(ex) ?
-    (ir[v] = xcall(Zygote, :literal_getproperty, ex.args[2], Val(unwrapquote(ex.args[3])))) :
+# Here, only instrumenting getfield with literals is fine, since users should never have to
+# define custom adjoints for literal_getfield
+function instrument_getfield!(ir, v, ex)
+  if is_literal_getfield(ex)
+    ir[v] = xcall(Zygote, :literal_getfield, ex.args[2], Val(unwrapquote(ex.args[3])))
+  else
     ex
+  end
 end
 
 is_literal_getindex(ex) =
   iscall(ex, Base, :getindex) && length(ex.args) == 3 && ex.args[3] isa Union{Integer,QuoteNode}
 
+# TODO: is this always correct for user defined getindex methods?
 function instrument_getindex!(ir, v, ex)
-  is_literal_getindex(ex) ?
-    (ir[v] = xcall(Zygote, :literal_getindex, ex.args[2], Val(unwrapquote(ex.args[3])))) :
+  if is_literal_getindex(ex)
+    ir[v] = xcall(Zygote, :literal_getindex, ex.args[2], Val(unwrapquote(ex.args[3])))
+  else
     ex
+  end
 end
 
 is_literal_iterate(ex) =
   iscall(ex, Base, :indexed_iterate) && length(ex.args) >= 3 && ex.args[3] isa Union{Integer,QuoteNode}
 
 function instrument_iterate!(ir, v, ex)
-  is_literal_iterate(ex) ?
-    (ir[v] = xcall(Zygote, :literal_indexed_iterate, ex.args[2],
-                   Val(unwrapquote(ex.args[3])), ex.args[4:end]...)) :
+  if is_literal_iterate(ex)
+    ir[v] = xcall(Zygote, :literal_indexed_iterate, ex.args[2],
+                  Val(unwrapquote(ex.args[3])), ex.args[4:end]...)
+  else
     ex
+  end
 end
 
 function instrument_literals!(ir, v, ex)
   ex = instrument_getproperty!(ir, v, ex)
+  ex = instrument_getfield!(ir, v, ex)
   ex = instrument_getindex!(ir, v, ex)
   ex = instrument_iterate!(ir, v, ex)
 end
@@ -243,7 +275,7 @@ function adjoint(pr::Primal)
         end
       elseif ex isa Core.PiNode
         grads[ex.val] = grads[v]
-      elseif isexpr(ex, GlobalRef, :call, :isdefined, :inbounds, :meta)
+      elseif isexpr(ex, GlobalRef, :call, :isdefined, :inbounds, :meta, :loopinfo)
       elseif isexpr(ex)
         push!(rb, stmt(xcall(Base, :error, "Can't differentiate $(ex.head) expression"),
                        line = b[v].line))
@@ -256,7 +288,7 @@ function adjoint(pr::Primal)
       for br in branches(rb)
         br.block == 0 && continue
         br′ = branchfor(pr.ir, br.block=>b.id)
-        br′ == nothing && continue
+        br′ === nothing && continue
         ins = br′.args
         for i = 1:length(br.args)
           ā = [gs[j] for j = 1:length(ins) if ins[j] == sigs[br.block][i]]
@@ -265,7 +297,7 @@ function adjoint(pr::Primal)
       end
     else # Backprop function arguments
       gs = [grad(arg) for arg = arguments(pr.ir)]
-      Δ = push!(rb, pr.varargs == nothing ?
+      Δ = push!(rb, pr.varargs === nothing ?
                       xcall(Zygote, :tuple, gs...) :
                       xcall(Zygote, :tuple_va, Val(pr.varargs), gs...))
       branches(rb)[1].args[1] = Δ

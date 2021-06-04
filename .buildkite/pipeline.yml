@@ -1,0 +1,20 @@
+steps:
+  - label: "GPU integration - julia 1.5"
+    plugins:
+      - JuliaCI/julia#v1:
+          version: "1.5"
+      - JuliaCI/julia-test#v1: ~
+    agents:
+      queue: "juliagpu"
+      cuda: "*"
+    timeout_in_minutes: 60
+
+  - label: "GPU integration - julia 1.6"
+    plugins:
+      - JuliaCI/julia#v1:
+          version: '1.6'
+      - JuliaCI/julia-test#v1: ~
+    agents:
+      queue: "juliagpu"
+      cuda: "*"
+    timeout_in_minutes: 60

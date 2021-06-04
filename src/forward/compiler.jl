@@ -72,7 +72,7 @@ end
 
 @dynamo function _pushforward(_, x...)
   ir = IR(x...)
-  ir == nothing && return :(error("non-differentiable function $(args[2])"))
+  ir === nothing && return :(error("non-differentiable function $(args[2])"))
   ir = Zygote.instrument(ir)
   ir.meta.code.inlineable = true
   return dual(ir)

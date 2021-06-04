@@ -1,5 +1,3 @@
-using InteractiveUtils
-
 function pow(x, n)
   r = 1
   while n > 0

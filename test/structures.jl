@@ -28,10 +28,12 @@ end
 @test gradient(tasks3, 5) == (10,)
 
 tasks4(x) = fetch(@async x^2)
-
 @test gradient(tasks4, 5) == (10,)
 
-VERSION > v"1.3-" && include("threads.jl")
+tasks5(x) = fetch(schedule(Task(() -> x^2)))
+@test gradient(tasks5, 5) == (10,)
+
+include("threads.jl")
 
 @test Zygote.pullback(Array, [1f0])[1] == [1f0]
 
@@ -52,4 +54,14 @@ struct A594 x::Float64 end
   ∇ = gradient(g,X,Y)
   @test ∇[1] == [(x = 2.0,); (x = 2.0,)]
   @test ∇[2] == [1 1; 1 1]
+end
+
+@testset "UnionAll Stackoverflow" begin
+  struct M{T,B}
+    a::T
+    b::B
+  end
+
+  m, b = Zygote._pullback(Zygote.Context(), nameof, M)
+  @test b(m) == (nothing, nothing)
 end

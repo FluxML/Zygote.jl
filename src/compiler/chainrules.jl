@@ -47,8 +47,8 @@ for T_outer in (:Tuple, :NamedTuple)
   # we create separate methods rather than using a `Union` + an `if` so that we avoid a
   # branch that changes output type, because nested AD on that kinda thing makes Zygote less
   # than happy.
-  @eval @inline function wrap_chainrules_output(x::ChainRules.Composite{P, T}) where {P, T<:$T_outer}
-    xp = map(wrap_chainrules_output, x)
+  @eval @inline function wrap_chainrules_output(x::ChainRules.Tangent{P, T}) where {P, T<:$T_outer}
+    xp = map(wrap_chainrules_output, canonicalize(x))
     convert($T_outer, xp)
   end
 end
@@ -59,10 +59,10 @@ end
 Convert `x` from the format Zygote uses internally to differentials types ChainRules uses.
 """
 @inline wrap_chainrules_input(x) = x
-@inline wrap_chainrules_input(::Nothing) = ChainRules.Zero()
+@inline wrap_chainrules_input(::Nothing) = ChainRules.ZeroTangent()
 @inline function wrap_chainrules_input(xs::Union{Tuple, NamedTuple})
   xp = map(wrap_chainrules_input, xs)
-  ChainRules.Composite{Any, typeof(xp)}(xp)
+  ChainRules.Tangent{Any, typeof(xp)}(xp)
 end
 
 """
@@ -99,6 +99,14 @@ As per [`chain_rrule`](@ref) but with support for kwargs.
 """
 @inline function chain_rrule_kw(kwf, kwargs, f, args...)
   y, back = rrule(f, args...; kwargs...)
-  kw_zpullback(dy) = (nothing, nothing, ZBack(back)(dy)...)  # first two nothings are for kwfunc and kwargs
+  function kw_zpullback(dy)
+    dxs = ZBack(back)(dy)
+    if dxs === nothing  # if dxs is nothing, then all partiaols are nothing
+      # Zygote convention is a single nothing no mather how partials, if all are nothing
+      return nothing
+    else
+      return (nothing, nothing, dxs...)  # first two nothings are for kwfunc and kwargs
+    end
+  end
   return y, kw_zpullback
 end

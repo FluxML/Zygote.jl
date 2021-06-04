@@ -14,7 +14,6 @@
 
 using Base.Broadcast
 using Base.Broadcast: Broadcasted, AbstractArrayStyle, broadcasted, materialize
-using NNlib
 
 # There's a saying that debugging code is about twice as hard as writing it in
 # the first place. So if you're as clever as you can be when writing code, how
@@ -47,6 +46,7 @@ function Base.reducedim_init(::typeof(identity), ::typeof(accum), A::AbstractArr
 end
 
 trim(x, Δ) = reshape(Δ, ntuple(i -> size(Δ, i), Val(ndims(x))))
+trim(x::Tuple, Δ) = ntuple(k -> Δ[k], length(x))
 
 unbroadcast(x::AbstractArray, x̄) =
   size(x) == size(x̄) ? x̄ :
@@ -56,6 +56,7 @@ unbroadcast(x::AbstractArray, x̄) =
 unbroadcast(x::Number, x̄) = accum_sum(x̄)
 unbroadcast(x::Tuple{<:Any}, x̄) = (accum_sum(x̄),)
 unbroadcast(x::Base.RefValue, x̄) = (x=accum_sum(x̄),)
+unbroadcast(x::Tuple, x̄) = trim(x, length(x) == length(x̄) ? x̄ : accum_sum(x̄; dims=2:ndims(x̄))) # case length(x) > 1
 
 unbroadcast(x::AbstractArray, x̄::Nothing) = nothing
 
@@ -66,8 +67,6 @@ unbroadcast(x::AbstractArray, x̄::Nothing) = nothing
 # to do CSE, then broadcast-ify the expression so that the closure captures the
 # right arrays.
 
-Numeric{T<:Number} = Union{T,AbstractArray{<:T}}
-
 @adjoint broadcasted(::typeof(+), xs::Numeric...) =
   broadcast(+, xs...), ȳ -> (nothing, map(x -> unbroadcast(x, ȳ), xs)...)
 
@@ -75,11 +74,23 @@ Numeric{T<:Number} = Union{T,AbstractArray{<:T}}
   Δ -> (nothing, unbroadcast(x, Δ), -unbroadcast(y, Δ))
 
 @adjoint broadcasted(::typeof(*), x::Numeric, y::Numeric) = x.*y,
-  z̄ -> (nothing, unbroadcast(x, z̄ .* conj.(y)), unbroadcast(y, z̄ .* conj.(x)))
+   Δ -> (nothing, unbroadcast(x, Δ .* conj.(y)), unbroadcast(y, Δ .* conj.(x)))
+@adjoint function broadcasted(::typeof(*), x::Number, y::AbstractArray{<:Number})
+  z, back = pullback(*, x, y)  # this uses dot(y,Δ) instead of Δ .* conj.(y)
+  z, Δ -> (nothing, back(Δ)...)
+end
+@adjoint function broadcasted(::typeof(*), x::AbstractArray{<:Number}, y::Number)
+  z, back = pullback(*, x, y)
+  z, Δ -> (nothing, back(Δ)...)
+end
 
 @adjoint function broadcasted(::typeof(/), x::Numeric, y::Numeric)
   res = x ./ y
-  res, Δ -> (nothing, unbroadcast(x, Δ ./ conj.(y)), unbroadcast(y, -Δ .* conj.(res ./ y)))
+  res, Δ -> (nothing, unbroadcast(x, Δ ./ conj.(y)), unbroadcast(y, .-Δ .* conj.(res ./ y)))
+end
+@adjoint function broadcasted(::typeof(/), x::AbstractArray{<:Number}, y::Number)
+  z, back = pullback(/, x, y)
+  z, Δ -> (nothing, back(Δ)...)
 end
 
 @adjoint function broadcasted(::typeof(Base.literal_pow), ::typeof(^), x::Numeric, exp::Val{p}) where p
@@ -88,11 +99,6 @@ end
 end
 
 @adjoint broadcasted(::typeof(identity), x::Numeric) = x, Δ -> (nothing, Δ)
-
-@adjoint function broadcasted(::typeof(σ), x::Numeric)
-  y = σ.(x)
-  y, ȳ -> (nothing, ȳ .* conj.(y .* (1 .- y)))
-end
 
 @adjoint function broadcasted(::typeof(tanh), x::Numeric)
   y = tanh.(x)
@@ -107,6 +113,38 @@ end
 
 @adjoint broadcasted(::typeof(imag), x::Numeric) =
   imag.(x), z̄ -> (nothing, im .* real.(z̄))
+
+@adjoint function broadcasted(::typeof(+), a::AbstractArray{<:Number}, b::Bool)
+  y = b === false ? a : a .+ b
+  y, Δ -> (nothing, Δ, nothing)
+end
+@adjoint function broadcasted(::typeof(+), b::Bool, a::AbstractArray{<:Number})
+  y = b === false ? a : b .+ a
+  y, Δ -> (nothing, nothing, Δ)
+end
+
+@adjoint function broadcasted(::typeof(-), a::AbstractArray{<:Number}, b::Bool)
+  y = b === false ? a : a .- b
+  y, Δ -> (nothing, Δ, nothing)
+end
+@adjoint function broadcasted(::typeof(-), b::Bool, a::AbstractArray{<:Number})
+  b .- a, Δ -> (nothing, nothing, .-Δ)
+end
+
+@adjoint function broadcasted(::typeof(*), a::AbstractArray{<:Number}, b::Bool)
+  if b === false
+    zero(a), Δ -> (nothing, zero(Δ), nothing)
+  else
+    a, Δ -> (nothing, Δ, nothing)
+  end
+end
+@adjoint function broadcasted(::typeof(*), b::Bool, a::AbstractArray{<:Number})
+  if b === false
+    zero(a), Δ -> (nothing, nothing, zero(Δ))
+  else
+    a, Δ -> (nothing, nothing, Δ)
+  end
+end
 
 # General Fallback
 # ================
@@ -128,7 +166,7 @@ _broadcast(f::F, x...) where F = materialize(broadcasted(f, x...))
 
 _get(x::Tuple, i) = x[i]
 _get(::Nothing, i) = nothing
-collapse_nothings(xs::Vector{Nothing}) = nothing
+collapse_nothings(xs::AbstractArray{Nothing}) = nothing
 collapse_nothings(xs) = xs
 
 @adjoint function broadcasted(::AbstractArrayStyle, f, args...)
@@ -195,10 +233,17 @@ end
 
 @init @require CUDA="052768ef-5323-5732-b1bb-66c8b64840ba" begin
   const CuArrayStyle = CUDA.CuArrayStyle
-  
-  @adjoint function broadcasted(::CuArrayStyle, f, args...)
-    y, back = broadcast_forward(CUDA.cufunc(f), args...)
-    y, ȳ -> (nothing, nothing, back(ȳ)...)
+
+  if isdefined(CUDA, :cufunc)
+    @eval @adjoint function broadcasted(::CuArrayStyle, f, args...)
+      y, back = broadcast_forward(CUDA.cufunc(f), args...)
+      y, ȳ -> (nothing, nothing, back(ȳ)...)
+    end
+  else # CUDA >= 3.0
+    @eval @adjoint function broadcasted(::CuArrayStyle, f, args...)
+      y, back = broadcast_forward(f, args...)
+      y, ȳ -> (nothing, nothing, back(ȳ)...)
+    end
   end
 
   @adjoint CUDA.CuArray{N,T}(xs::Array) where {N,T} =

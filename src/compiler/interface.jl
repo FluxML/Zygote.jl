@@ -1,12 +1,8 @@
 using InteractiveUtils
 using InteractiveUtils: typesof
 using Core: Typeof
-
-@static if VERSION >= v"1.1"
-  import Base: copy!
-else
-  import Future: copy!
-end
+import Base: copy!
+import Base.Broadcast: broadcasted, materialize!
 
 mutable struct Context <: AContext
   cache::Union{IdDict{Any,Any},Nothing}
@@ -47,8 +43,17 @@ end
 
 sensitivity(y::Number) = one(y)
 sensitivity(y::Complex) = error("Output is complex, so the gradient is not defined.")
+sensitivity(y::AbstractArray) = error("Output is an array, so the gradient is not defined. Perhaps you wanted jacobian.")
 sensitivity(y) = error("Output should be scalar; gradients are not defined for output $(repr(y))")
 
+"""
+    gradient(f, args...)
+
+Returns a tuple containing `∂f/∂x` for each argument `x`,
+the derivative (for scalar x) or the gradient.
+
+`f(args...)` must be a real number, see [`jacobian`](@ref) for array output.
+"""
 function gradient(f, args...)
   y, back = pullback(f, args...)
   return back(sensitivity(y))
@@ -66,6 +71,29 @@ struct Params
 end
 
 @forward Params.order Base.iterate, Base.length, Base.getindex
+@forward Params.params Base.in
+
+function Base.union!(ps::Params, itrs...)
+  foreach(itr -> foreach(x -> push!(ps, x), itr), itrs)
+  return ps
+end
+
+Base.copy(ps::Params) = union!(Params(), ps)
+Base.union(ps::Params, itrs...) = union!(copy(ps), itrs...)
+Base.issetequal(ps1::Params, ps2::Params) = issetequal(ps1.params, ps2.params)
+Base.issetequal(ps1::Params, x::Base.AbstractSet) = issetequal(ps1.params, x)
+Base.issetequal(x::Base.AbstractSet, ps1::Params) = issetequal(x, ps1.params)
+
+function Base.intersect!(ps::Params, itrs...)
+  for itr in itrs
+    for x in collect(ps)
+      x ∉ itr && delete!(ps, x)
+    end
+  end
+  return ps
+end
+
+Base.intersect(ps::Params, itrs...) = intersect!(copy(ps), itrs...)
 
 function Base.push!(ps::Params, x)
   if !(x in ps.params)
@@ -111,8 +139,8 @@ function copy!(ps::Params, x::AbstractVector)
   @assert length(x) == sum(length(p) for p in ps)
   i = 0
   for p in ps
-      p .= reshape(x[i+1:i+length(p)], size(p))
-      i += length(p)
+    p .= reshape(x[i+1:i+length(p)], size(p))
+    i += length(p)
   end
   ps
 end
@@ -121,8 +149,8 @@ function copy!(x::AbstractVector, ps::Params)
   @assert length(x) == sum(length(p) for p in ps)
   i = 0
   for p in ps
-      x[i+1:i+length(p)] .= vec(p)
-      i += length(p)
+    x[i+1:i+length(p)] .= vec(p)
+    i += length(p)
   end
   ps
 end
@@ -136,6 +164,23 @@ end
 Base.show(io::IO, ps::Grads) = print(io, "Grads(...)")
 
 @forward Grads.grads Base.getindex, Base.haskey, Base.iterate, Base.keys
+@forward Grads.grads  Base.setindex!
+@forward Grads.params  Base.length
+
+const ADictOrGrads = Union{AbstractDict, Grads}
+
+# Dictionary interface.
+# Don't use the IdDict directly since it may contain some spurious pairs.
+Base.haskey(gs::Grads, x) = x ∈ gs.params 
+# Base.keys(gs::Grads) = gs.params
+Base.values(gs::Grads) = (gs.grads[p] for p in gs.params)
+
+# function Base.iterate(gs::Grads, state...)
+#   res = iterate(gs.params, state...)
+#   isnothing(res) && return nothing
+#   p, next_state = res
+#   return gs[p], next_state
+# end
 
 function Base.getindex(gs::Grads, x)
   isbits(x) && error("Only reference types can be differentiated with `Params`.")
@@ -152,8 +197,8 @@ length of `x` has to be equal to the sum of the lengths of all gradients.
 function copy!(gs::Grads, x::AbstractVector)
   i = 0
   for p in gs.params
-      gs[p] .= reshape(x[i+1:i+length(p)], size(p))
-      i += length(p)
+    gs[p] .= reshape(x[i+1:i+length(p)], size(p))
+    i += length(p)
   end
   x
 end
@@ -161,10 +206,44 @@ end
 function copy!(x::AbstractVector,  gs::Grads)
   i = 0
   for p in gs.params
-      x[i+1:i+length(p)] .= vec(gs[p])
-      i += length(p)
+    x[i+1:i+length(p)] .= vec(gs[p])
+    i += length(p)
   end
   x
+end
+
+broadcasted(f, gs::Grads, gss::ADictOrGrads...) = map(f, gs, gss...)
+
+broadcasted(f, a::Numeric, gs::Grads) = map(x -> f(a, x), gs)
+broadcasted(f, gs::Grads, a::Numeric) = map(x -> f(x, a), gs)
+
+function materialize!(gs1::Grads, gs2::Grads)
+  issetequal(gs1.params, gs2.params) || 
+    throw(ArgumentError("Expected Grads objects with the same Params."))
+  for p in gs1.params
+    gs1[p] = gs2[p]
+  end
+  return gs1
+end
+
+
+function Base.map(f, gs1::Grads, gss::ADictOrGrads...)
+  gsout = Grads(IdDict{Any,Any}(), Params(gs1.params))
+  return map!(f, gsout, gs1, gss...)
+end
+
+function Base.map!(f, gsout::Grads, gss::ADictOrGrads...)
+  all(issetequal(gsout.params, keys(gs)) for gs in gss) || 
+    throw(ArgumentError("map! expects Grads objects with the same Params."))
+  for p in gsout.params
+    gsout[p] = f((_getformap(gs, p) for gs in gss)...) 
+  end
+  return gsout
+end
+
+function _getformap(gs, p)
+  g = gs[p]
+  isnothing(g) ? fill!(similar(p), 0) : g 
 end
 
 function pullback(f, ps::Params)

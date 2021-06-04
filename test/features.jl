@@ -1,6 +1,100 @@
 using Zygote, Test
 using Zygote: Params, gradient, forwarddiff
 
+@testset "gradient checkpointing" begin
+
+    @testset "checkpointed does not change pullback value" begin
+        for setup in [
+                (f=identity, args = (1.0,), dy=1.0),
+                (f=max, args = (1.0,2, 3), dy=1.0),
+                (f=sum, args = (cos, [1.0, 2.0],), dy=1.0),
+                (f=*, args = (randn(2,2),randn(2,2)), dy=randn(2,2)),
+            ]
+            y_ref, pb_ref = Zygote.pullback(setup.f, setup.args...)
+            y_cp, pb_cp = Zygote.pullback(Zygote.checkpointed, setup.f, setup.args...)
+            @test y_cp == y_ref
+            @test pb_cp(setup.dy) == (nothing, pb_ref(setup.dy)...)
+        end
+    end
+
+    mutable struct CountCalls
+        f
+        ncalls
+    end
+    CountCalls(f=identity) = CountCalls(f, 0)
+    function (o::CountCalls)(x...)
+        o.ncalls += 1
+        o.f(x...)
+    end
+
+    f = CountCalls()
+    g = CountCalls()
+    h = CountCalls()
+
+    y, pb = Zygote.pullback(h ∘ g ∘ f, 4.0)
+    @test y === 4.0
+    @test f.ncalls === g.ncalls === h.ncalls === 1
+    @test pb(1.0) === (1.0,)
+    @test f.ncalls === g.ncalls === h.ncalls === 1
+
+    f = CountCalls()
+    g = CountCalls()
+    h = CountCalls()
+    y,pb = Zygote.pullback(Zygote.checkpointed, h∘g∘f, 4.0)
+    @test f.ncalls === g.ncalls === h.ncalls === 1
+    @test pb(1.0) === (nothing, 1.0,)
+    @test f.ncalls === g.ncalls === h.ncalls === 2
+    @test pb(1.0) === (nothing, 1.0,)
+    @test f.ncalls === g.ncalls === h.ncalls === 3
+
+    f = CountCalls()
+    g = CountCalls()
+    h = CountCalls()
+    function only_some_checkpointed(x)
+        x2 = f(x)
+        Zygote.checkpointed(h∘g, x2)
+    end
+    y,pb = Zygote.pullback(only_some_checkpointed, 4.0)
+    @test f.ncalls === g.ncalls === h.ncalls === 1
+    @test pb(1.0) === (1.0,)
+    @test g.ncalls === h.ncalls === 2
+    @test f.ncalls === 1
+
+    @testset "nested checkpointing" begin
+        f1 = CountCalls(sin)
+        f2 = CountCalls(cos)
+        f3 = CountCalls(max)
+        function nested_checkpoints(x)
+            Zygote.checkpointed() do
+                a = f1(x)
+                Zygote.checkpointed() do
+                    b = f2(a)
+                    Zygote.checkpointed() do
+                        f3(a,b)
+                    end
+                end
+            end
+        end
+        function nested_nocheckpoints(x)
+            a = f1.f(x)
+            b = f2.f(a)
+            f3.f(a,b)
+        end
+        x = randn()
+        y,pb = Zygote.pullback(nested_checkpoints, x)
+        @test f1.ncalls == f2.ncalls == f3.ncalls
+        dy = randn()
+        pb(dy)
+        @test f1.ncalls == 2
+        @test f2.ncalls == 3
+        @test f3.ncalls == 4
+        y_ref, pb_ref = Zygote.pullback(nested_nocheckpoints, x)
+        @test y_ref === y
+        @test pb_ref(dy) == pb(dy)
+    end
+end
+
+
 add(a, b) = a+b
 _relu(x) = x > 0 ? x : 0
 f(a, b...) = +(a, b...)
@@ -167,9 +261,7 @@ D(f, x) = grad(f, x)[1]
 @test D(x -> x*D(y -> x+y, 1), 1) == 1
 @test D(x -> x*D(y -> x*y, 1), 4) == 8
 
-if VERSION >= v"1.1"
-  @test sin'''(1.0) ==  -cos(1.0)
-end
+@test sin'''(1.0) ==  -cos(1.0)
 
 f(x) = throw(DimensionMismatch("fubar"))
 
@@ -218,7 +310,7 @@ end[1] == 1
   return x*5
 end[1] == 5
 
-@test gradient(x -> one(eltype(x)), rand(10))[1] == nothing
+@test gradient(x -> one(eltype(x)), rand(10))[1] === nothing
 
 # Thre-way control flow merge
 @test gradient(1) do x
@@ -310,7 +402,7 @@ function pow_simd(x, n)
   return r
 end
 
-@test_broken gradient(pow_simd, 2, 3) == (12,nothing)
+@test gradient(pow_simd, 2, 3) == (12,nothing)
 
 @testset "tuple getindex" begin
   @test gradient(x -> size(x)[2], ones(2,2,2)) == (nothing,)
@@ -388,4 +480,34 @@ end
   i = 2
   Zygote.gradient(loss_adjoint,[1.0])
   @test x[1] == x[2]
+end
+
+@testset "accumulation" begin
+  # from https://github.com/FluxML/Zygote.jl/issues/905
+  function net(x1)
+    x2  = x1
+    x3  = x1 + x2
+    x4  = x1 + x2 + x3
+    x5  = x1 + x2 + x3 + x4
+    x6  = x1 + x2 + x3 + x4 + x5
+    x7  = x1 + x2 + x3 + x4 + x5 + x6
+    x8  = x1 + x2 + x3 + x4 + x5 + x6 + x7
+    x9  = x1 + x2 + x3 + x4 + x5 + x6 + x7 + x8
+    x10 = x1 + x2 + x3 + x4 + x5 + x6 + x7 + x8 + x9
+  end
+  loss(x) = sum(abs2, net(x))
+  @test gradient(loss, ones(10,10))[1] == fill(131072, 10, 10)
+  @test 150_000_000 > @allocated gradient(loss, ones(1000,1000))
+end
+
+@testset "tuples & broadcasting" begin
+    @test gradient(x -> sum(x .+ ones(2,2)), (1,2)) == ((2,2),)
+    @test gradient(x -> sum(x .+ ones(2,2)), (1,)) == ((4,),)
+    @test gradient(x -> sum(x .+ ones(2,1)), (1,2)) == ((1,1),)
+
+    # https://github.com/FluxML/Zygote.jl/issues/975
+    gt = gradient((x,p) -> prod(x .^ p), [3,4], (1,2))
+    gv = gradient((x,p) -> prod(x .^ p), [3,4], [1,2])
+    @test gt[1] == gv[1]
+    @test collect(gt[2]) ≈ gv[2]
 end
