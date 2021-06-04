@@ -1,5 +1,3 @@
-const chainrules_fallback = which(rrule, Tuple{Any})
-
 """
   has_chain_rrule(T)
 
@@ -11,12 +9,8 @@ such that if a suitable rule is defined later, the generated function will recom
 """
 function has_chain_rrule(T)
   m = meta(Tuple{typeof(rrule),T.parameters...})
-  if m.method === chainrules_fallback
-    # no rule exists
-    return false, m.instance
-  elseif Core.Compiler.return_type(rrule, Tuple{T.parameters...}) === Nothing
-    Core.println("  has_chain_rrule got Nothing")
-    # or we hit a rule telling us to keep digging
+  if Core.Compiler.return_type(rrule, Tuple{T.parameters...}) === Nothing
+    # no rule exists, or we hit a specialisation telling us to keep digging
     return false, m.instance
   else
     # found a rrule, no need to add any edges
