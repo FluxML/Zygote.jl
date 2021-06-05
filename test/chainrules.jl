@@ -249,6 +249,19 @@ using Zygote, Test, ChainRules
         end
     end
 end
+    @testset "take nothing seriously" begin
+        plus10(x) = x + 10
+        cnt_grad = Ref(42)
+        ChainRules.rrule(::typeof(plus10), x) = x+10, dy -> (ChainRules.NO_FIELDS, cnt_grad[]+=1,)
+        @test gradient(plus10, 1) == (43,)
+        @test gradient(plus10, 2.0) == (44,)
+
+        # Now override the rule with a more specific one:
+        ChainRules.rrule(::typeof(plus10), x::Int) = nothing
+        @test gradient(plus10, 3) == (1,)
+        @test gradient(plus10, 4.5) == (45,)
+    end
+
 
 @testset "FastMath support" begin
     @test gradient(2.0) do x
