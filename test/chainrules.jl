@@ -1,8 +1,6 @@
 using Zygote, Test, ChainRules
 
-
-@testset "ChainRules Integration" begin
-    @testset "basic" begin
+    @testset "ChainRules basics" begin
         cr_inner_demo_rrule_hitcount = Ref(0)
         cr_inner_demo_pullback_hitcount = Ref(0)
         cr_inner_demo(x) = 5x
@@ -212,7 +210,7 @@ using Zygote, Test, ChainRules
         @test (nothing,) == Zygote.gradient(x->not_diff_kw_eg(x, 2), 10.4)
         @test (nothing,) == Zygote.gradient(x->not_diff_kw_eg(x, 2; kw=2.0), 10.4)
     end
-end
+
 
 @testset "FastMath support" begin
     @test gradient(2.0) do x
