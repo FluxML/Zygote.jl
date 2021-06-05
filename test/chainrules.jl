@@ -1,8 +1,6 @@
 using Zygote, Test, ChainRules
 
-
-@testset "ChainRules Integration" begin
-    @testset "basic" begin
+    @testset "ChainRules basics" begin
         cr_inner_demo_rrule_hitcount = Ref(0)
         cr_inner_demo_pullback_hitcount = Ref(0)
         cr_inner_demo(x) = 5x
