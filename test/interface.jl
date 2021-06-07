@@ -164,3 +164,27 @@ end
     @test all(abs.(gs[b]) .<= 1e-5) 
   end
 end
+
+@testset "Params nesting" begin
+  struct Dense{F,T,S}
+    W::T
+    b::S
+    σ::F
+  end
+
+  (d::Dense)(x) = d.σ.(d.W * x .+ b)
+  d = Dense(ones(Float32, 3,3), zeros(Float32, 3), identity)
+  ps = Zygote.Params([d.W, d.b, b])
+  r = ones(Float32, 3,3)
+  
+  gs = gradient(ps) do
+    p, pb = pullback(ps) do
+      sum(d(r))
+    end
+    g = pb(p)
+    sum(g[d.W]) # + sum(g[d.b])
+  end
+
+  @test gs[d.W] ≈ fill(81f0, (3,3))
+  @test gs[d.b] == nothing
+end
