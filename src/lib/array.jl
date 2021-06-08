@@ -300,11 +300,6 @@ end
   return sum(abs2, X; dims=dims), Δ::Union{Number, AbstractArray}->(nothing, ((2Δ) .* X))
 end
 
-@adjoint function prod(xs::AbstractArray; dims = :)
-  p = prod(xs; dims = dims)
-  p, Δ -> (p ./ xs .* Δ,)
-end
-
 function _pullback(cx::AContext, ::typeof(prod), f, xs::AbstractArray)
   y, back = pullback(cx, ((f, xs) -> prod(f.(xs))), f, xs)
   y, ȳ -> (nothing, back(ȳ)...)
