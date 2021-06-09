@@ -61,6 +61,8 @@ Base.size(A::OneElement) = map(length, A.axes)
 Base.axes(A::OneElement) = A.axes
 Base.getindex(A::OneElement{T,N}, i::Vararg{Int,N}) where {T,N} = ifelse(i==A.ind, A.val, zero(T))
 
+# Do not store OneElement in Params, as that expects a mutable gradient:
+Base.setindex!(dict::IdDict, dx::OneElement, x) = setindex!(dict, collect(dx), x)
 
 _zero(xs::AbstractArray{<:Number}, T::Type{Nothing}) = fill!(similar(xs), zero(eltype(xs)))
 _zero(xs::AbstractArray{<:Number}, T) = fill!(similar(xs, T), false)

@@ -498,6 +498,12 @@ end
   loss(x) = sum(abs2, net(x))
   @test gradient(loss, ones(10,10))[1] == fill(131072, 10, 10)
   @test 150_000_000 > @allocated gradient(loss, ones(1000,1000))
+
+  # inspired by https://github.com/SciML/Surrogates.jl/pull/279
+  W = rand(3)
+  G = gradient(() -> W[1], Params([W]))
+  @test G[W] == [1,0,0]
+  @test G[W] isa Vector # mutable
 end
 
 @testset "tuples & broadcasting" begin
