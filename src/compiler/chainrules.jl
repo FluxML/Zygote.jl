@@ -1,3 +1,7 @@
+struct ZygoteRuleConfig{CTX<:AContext} <: RuleConfig{Union{HasReverseMode,NoForwardsMode}}
+  context::CTX
+end
+
 """
   has_chain_rrule(T)
 
@@ -7,7 +11,7 @@ The first return value is `true` if the `rrule` exists, `false` otherwise.
 If it does not, then the second argument is a list of edges to attach to the CodeInfo for a generated function,
 such that if a suitable rule is defined later, the generated function will recompile.
 """
-function has_chain_rrule(T)
+function has_chain_rrule(T) # This needs updating to know about  RuleConfig
   m = meta(Tuple{typeof(rrule),T.parameters...})
   if Core.Compiler.return_type(rrule, Tuple{T.parameters...}) === Nothing
     # no rule exists, or we hit a specialisation telling us to keep digging
@@ -15,7 +19,7 @@ function has_chain_rrule(T)
   else
     # found a rrule, no need to add any edges
     return true, nothing
-  end 
+  end
 end
 
 """
@@ -79,25 +83,25 @@ end
 @inline (s::ZBack)(::Nothing) = nothing
 
 """
-    chain_rrule(f, args...)
+    chain_rrule(config, f, args...)
 
 Returns a the (primal) value of `f(args...)` and a pullback, by invoking `ChainRulesCore.rrule(f, args...)`.
 The pullback is appropriately wrapped up to follow Zygote conventions.
 """
-@inline function chain_rrule(f, args...)
-  y, back = rrule(f, args...)
+@inline function chain_rrule(config, f, args...)
+  y, back = rrule(config, f, args...)
   return y, ZBack(back)
 end
 
 
 """
-  chain_rrule_kw(kwf, kwargs, f, args...)
+  chain_rrule_kw(config, kwf, kwargs, f, args...)
 
 As per [`chain_rrule`](@ref) but with support for kwargs.
 `kwf` should be the kwfunc matching to `f`, and `kwargs` are a `NamedTuple` of keyword arguments.
 """
-@inline function chain_rrule_kw(kwf, kwargs, f, args...)
-  y, back = rrule(f, args...; kwargs...)
+@inline function chain_rrule_kw(config, kwf, kwargs, f, args...)
+  y, back = rrule(config, f, args...; kwargs...)
   function kw_zpullback(dy)
     dxs = ZBack(back)(dy)
     if dxs === nothing  # if dxs is nothing, then all partiaols are nothing
@@ -110,21 +114,10 @@ As per [`chain_rrule`](@ref) but with support for kwargs.
   return y, kw_zpullback
 end
 
-"""
-    rrule_via_ad(f, args)
 
-Function with the same API as the `ChainRulesCore.rrule`, used for testing Zygote gradients
-with `ChainRulesTestUtils.test_rrule` functionality.
-
-```
-ChainRulesTestUtils.test_rrule(round, 2.2; rrule_f=rrule_via_ad)
-```
-"""
-function rrule_via_ad(f::Function, args...)
-    y, pb = pullback(f, args...)
-    function ad_pullback(Δ)
-        return (NoTangent(), zygote2differential(pb(wrap_chainrules_output(Δ)), args)...)
-    end
+function ChainRulesCore.rrule_via_ad(config::ZygoteRuleConfig, f, args...)
+    y, pb = _pullback(config.context, f, args...)
+    ad_pullback(Δ) = zygote2differential(pb(wrap_chainrules_output(Δ)), args)
     return y, ad_pullback
 end
 
@@ -156,4 +149,3 @@ function z2d(t::NamedTuple, primal)
   tp::NamedTuple = map(z2d, complete_t, primals)
   return canonicalize(Tangent{primal_type, typeof(tp)}(tp))
 end
-

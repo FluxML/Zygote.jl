@@ -7,7 +7,7 @@ function edge!(m::IRTools.Meta, edge::Core.MethodInstance)
 end
 
 @generated function _pullback(ctx::AContext, f, args...)
-  T = Tuple{f,args...}
+  T = Tuple{ZygoteConfig{ctx}, f,args...}
   ignore_sig(T) && return :(f(args...), Pullback{$T}(()))
 
   iskw = is_kwfunc(f, args...)
@@ -15,7 +15,7 @@ end
   base_T = iskw ? Tuple{args[2:end]...} : T
   hascr, cr_edge = has_chain_rrule(base_T)
   chain_rrule_f = iskw ? :chain_rrule_kw : :chain_rrule
-  hascr && return :($chain_rrule_f(f, args...))
+  hascr && return :($chain_rrule_f(ZygoteRuleConfig(ctx), f, args...))
 
   g = try _lookup_grad(T) catch e e end
   !(g isa Tuple) && return :(f(args...), Pullback{$T}((f,)))
