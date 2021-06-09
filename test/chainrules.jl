@@ -1,8 +1,6 @@
 using Zygote, Test, ChainRules
 
-
-@testset "ChainRules Integration" begin
-    @testset "basic" begin
+    @testset "ChainRules basics" begin
         cr_inner_demo_rrule_hitcount = Ref(0)
         cr_inner_demo_pullback_hitcount = Ref(0)
         cr_inner_demo(x) = 5x
@@ -212,7 +210,20 @@ using Zygote, Test, ChainRules
         @test (nothing,) == Zygote.gradient(x->not_diff_kw_eg(x, 2), 10.4)
         @test (nothing,) == Zygote.gradient(x->not_diff_kw_eg(x, 2; kw=2.0), 10.4)
     end
-end
+
+    @testset "take nothing seriously" begin
+        plus10(x) = x + 10
+        cnt_grad = Ref(42)
+        ChainRules.rrule(::typeof(plus10), x) = x+10, dy -> (ChainRules.NO_FIELDS, cnt_grad[]+=1,)
+        @test gradient(plus10, 1) == (43,)
+        @test gradient(plus10, 2.0) == (44,)
+
+        # Now override the rule with a more specific one:
+        ChainRules.rrule(::typeof(plus10), x::Int) = nothing
+        @test gradient(plus10, 3) == (1,)
+        @test gradient(plus10, 4.5) == (45,)
+    end
+
 
 @testset "FastMath support" begin
     @test gradient(2.0) do x
