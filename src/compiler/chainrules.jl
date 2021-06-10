@@ -11,7 +11,7 @@ The first return value is `true` if the `rrule` exists, `false` otherwise.
 If it does not, then the second argument is a list of edges to attach to the CodeInfo for a generated function,
 such that if a suitable rule is defined later, the generated function will recompile.
 """
-function has_chain_rrule(T) # This needs updating to know about  RuleConfig
+function has_chain_rrule(T)
   m = meta(Tuple{typeof(rrule),T.parameters...})
   if Core.Compiler.return_type(rrule, Tuple{T.parameters...}) === Nothing
     # no rule exists, or we hit a specialisation telling us to keep digging
@@ -117,7 +117,7 @@ end
 
 function ChainRulesCore.rrule_via_ad(config::ZygoteRuleConfig, f, args...)
     y, pb = _pullback(config.context, f, args...)
-    ad_pullback(Δ) = zygote2differential(pb(wrap_chainrules_output(Δ)), args)
+    ad_pullback(Δ) = zygote2differential(pb(wrap_chainrules_output(Δ)), (f, args...))
     return y, ad_pullback
 end
 
