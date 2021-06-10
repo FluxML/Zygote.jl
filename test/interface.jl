@@ -172,9 +172,9 @@ end
     σ::F
   end
 
-  (d::Dense)(x) = d.σ.(d.W * x .+ b)
+  (d::Dense)(x) = d.σ.(d.W * x .+ d.b)
   d = Dense(ones(Float32, 3,3), zeros(Float32, 3), identity)
-  ps = Zygote.Params([d.W, d.b, b])
+  ps = Zygote.Params([d.W, d.b])
   r = ones(Float32, 3,3)
   
   gs = gradient(ps) do
@@ -186,5 +186,11 @@ end
   end
 
   @test gs[d.W] ≈ fill(81f0, (3,3))
-  @test gs[d.b] == nothing
+
+  # Test L2
+  l2g = gradient(ps) do
+    sum(sum(x .^ 2) for x in ps)
+  end
+  @test l2g[d.W] ≈ fill(2.f0, size(d.W))
+  @test l2g[d.b] ≈ fill(0.f0, size(d.b))
 end
