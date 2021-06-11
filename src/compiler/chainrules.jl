@@ -1,6 +1,7 @@
 struct ZygoteRuleConfig{CTX<:AContext} <: RuleConfig{Union{HasReverseMode,NoForwardsMode}}
   context::CTX
 end
+ZygoteRuleConfig()=ZygoteRuleConfig(Context())
 
 """
   has_chain_rrule(T)
@@ -12,9 +13,11 @@ If it does not, then the second argument is a list of edges to attach to the Cod
 such that if a suitable rule is defined later, the generated function will recompile.
 """
 function has_chain_rrule(T)
-  m = meta(Tuple{typeof(rrule),T.parameters...})
-  if Core.Compiler.return_type(rrule, Tuple{T.parameters...}) === Nothing
+  return_type = Core.Compiler.return_type(rrule, T)
+  # Core.println("return_type=", return_type)
+  if return_type === Nothing
     # no rule exists, or we hit a specialisation telling us to keep digging
+    m = meta(Tuple{typeof(rrule),T.parameters...})
     return false, m.instance
   else
     # found a rrule, no need to add any edges
