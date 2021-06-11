@@ -1,5 +1,5 @@
 using Zygote, Test, ChainRules
-
+@testset "ChainRules intergration" begin
     @testset "ChainRules basics" begin
         cr_inner_demo_rrule_hitcount = Ref(0)
         cr_inner_demo_pullback_hitcount = Ref(0)
@@ -64,8 +64,8 @@ using Zygote, Test, ChainRules
 
         simo_outer(x) = sum(simo(x))
 
-        @assert simo_rrule_hitcount[] == 0
-        @assert simo_pullback_hitcount[] == 0
+        simo_rrule_hitcount[] = 0
+        simo_pullback_hitcount[] = 0
         @test (12,) == Zygote.gradient(simo_outer, π)
         @test simo_rrule_hitcount[] == 1
         @test simo_pullback_hitcount[] == 1
@@ -86,8 +86,8 @@ using Zygote, Test, ChainRules
 
         miso_outer(x) = miso(100x, 10x)
 
-        @assert miso_rrule_hitcount[] == 0
-        @assert miso_pullback_hitcount[] == 0
+        miso_rrule_hitcount[] = 0
+        miso_pullback_hitcount[] = 0
         @test (570,) == Zygote.gradient(miso_outer, π)
         @test miso_rrule_hitcount[] == 1
         @test miso_pullback_hitcount[] == 1
