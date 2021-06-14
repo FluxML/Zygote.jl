@@ -43,7 +43,7 @@ end
 
 sensitivity(y::Number) = one(y)
 sensitivity(y::Complex) = error("Output is complex, so the gradient is not defined.")
-sensitivity(y::AbstractArray) = error("output an array, so the gradient is not defined. Perhaps you wanted jacobian.")
+sensitivity(y::AbstractArray) = error("Output is an array, so the gradient is not defined. Perhaps you wanted jacobian.")
 sensitivity(y) = error("Output should be scalar; gradients are not defined for output $(repr(y))")
 
 """
@@ -80,6 +80,9 @@ end
 
 Base.copy(ps::Params) = union!(Params(), ps)
 Base.union(ps::Params, itrs...) = union!(copy(ps), itrs...)
+Base.issetequal(ps1::Params, ps2::Params) = issetequal(ps1.params, ps2.params)
+Base.issetequal(ps1::Params, x::Base.AbstractSet) = issetequal(ps1.params, x)
+Base.issetequal(x::Base.AbstractSet, ps1::Params) = issetequal(x, ps1.params)
 
 function Base.intersect!(ps::Params, itrs...)
   for itr in itrs
@@ -136,8 +139,8 @@ function copy!(ps::Params, x::AbstractVector)
   @assert length(x) == sum(length(p) for p in ps)
   i = 0
   for p in ps
-      p .= reshape(x[i+1:i+length(p)], size(p))
-      i += length(p)
+    p .= reshape(x[i+1:i+length(p)], size(p))
+    i += length(p)
   end
   ps
 end
@@ -146,8 +149,8 @@ function copy!(x::AbstractVector, ps::Params)
   @assert length(x) == sum(length(p) for p in ps)
   i = 0
   for p in ps
-      x[i+1:i+length(p)] .= vec(p)
-      i += length(p)
+    x[i+1:i+length(p)] .= vec(p)
+    i += length(p)
   end
   ps
 end
@@ -193,8 +196,8 @@ length of `x` has to be equal to the sum of the lengths of all gradients.
 function copy!(gs::Grads, x::AbstractVector)
   i = 0
   for p in gs.params
-      gs[p] .= reshape(x[i+1:i+length(p)], size(p))
-      i += length(p)
+    gs[p] .= reshape(x[i+1:i+length(p)], size(p))
+    i += length(p)
   end
   x
 end
@@ -202,8 +205,8 @@ end
 function copy!(x::AbstractVector,  gs::Grads)
   i = 0
   for p in gs.params
-      x[i+1:i+length(p)] .= vec(gs[p])
-      i += length(p)
+    x[i+1:i+length(p)] .= vec(gs[p])
+    i += length(p)
   end
   x
 end

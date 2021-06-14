@@ -12,7 +12,7 @@ using MacroTools, Requires
 using MacroTools: @forward
 
 import Distributed: pmap, CachingPool, workers
-export Params, gradient, jacobian, hessian, pullback, pushforward, @code_adjoint
+export Params, gradient, jacobian, hessian, diaghessian, pullback, pushforward, @code_adjoint
 
 const Numeric{T<:Number} = Union{T, AbstractArray{<:T}}
 
@@ -40,7 +40,7 @@ include("lib/forward.jl")
 include("lib/utils.jl")
 include("lib/range.jl")
 @init @require Distances="b4f34e82-e78d-54a5-968a-f98e89d6e8f7" include("lib/distances.jl")
-@init @require StatsFuns="4c63d2b9-4356-54db-8cca-17b64c39e42c" include("lib/statsfuns.jl")
+@init @require LogExpFunctions="2ab3a3ac-af41-5b50-aa03-7779005ae688" include("lib/logexpfunctions.jl")
 
 # we need to define this late, so that the genfuncs see lib.jl
 # Move using statements out of this file to help with sysimage building

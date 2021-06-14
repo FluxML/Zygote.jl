@@ -47,7 +47,7 @@ for T_outer in (:Tuple, :NamedTuple)
   # we create separate methods rather than using a `Union` + an `if` so that we avoid a
   # branch that changes output type, because nested AD on that kinda thing makes Zygote less
   # than happy.
-  @eval @inline function wrap_chainrules_output(x::ChainRules.Composite{P, T}) where {P, T<:$T_outer}
+  @eval @inline function wrap_chainrules_output(x::ChainRules.Tangent{P, T}) where {P, T<:$T_outer}
     xp = map(wrap_chainrules_output, canonicalize(x))
     convert($T_outer, xp)
   end
@@ -59,10 +59,10 @@ end
 Convert `x` from the format Zygote uses internally to differentials types ChainRules uses.
 """
 @inline wrap_chainrules_input(x) = x
-@inline wrap_chainrules_input(::Nothing) = ChainRules.Zero()
+@inline wrap_chainrules_input(::Nothing) = ChainRules.ZeroTangent()
 @inline function wrap_chainrules_input(xs::Union{Tuple, NamedTuple})
   xp = map(wrap_chainrules_input, xs)
-  ChainRules.Composite{Any, typeof(xp)}(xp)
+  ChainRules.Tangent{Any, typeof(xp)}(xp)
 end
 
 """

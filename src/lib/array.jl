@@ -32,8 +32,10 @@ end
 
 @adjoint view(x::AbstractArray, inds...) = view(x, inds...), ∇getindex(x, inds)
 
-∇getindex(x::AbstractArray, inds) = dy -> begin
-  if inds isa  NTuple{<:Any, Integer}
+∇getindex(x::AbstractArray{T,N}, inds) where {T,N} = dy -> begin
+  if inds isa NTuple{N,Int} && T <: Number
+    dx = OneElement(dy, inds, axes(x))
+  elseif inds isa NTuple{<:Any, Integer}
     dx = _zero(x, typeof(dy))
     dx[inds...] = dy
   else
@@ -43,6 +45,22 @@ end
   end
   return (dx, map(_->nothing, inds)...)
 end
+
+"""
+    OneElement(val, ind, axes) <: AbstractArray
+
+Extremely simple `struct` used for the gradient of scalar `getindex`.
+"""
+struct OneElement{T,N,I,A} <: AbstractArray{T,N}
+  val::T
+  ind::I
+  axes::A
+  OneElement(val::T, ind::I, axes::A) where {T<:Number, I<:NTuple{N,Int}, A} where {N} = new{T,N,I,A}(val, ind, axes)
+end
+Base.size(A::OneElement) = map(length, A.axes)
+Base.axes(A::OneElement) = A.axes
+Base.getindex(A::OneElement{T,N}, i::Vararg{Int,N}) where {T,N} = ifelse(i==A.ind, A.val, zero(T))
+
 
 _zero(xs::AbstractArray{<:Number}, T::Type{Nothing}) = fill!(similar(xs), zero(eltype(xs)))
 _zero(xs::AbstractArray{<:Number}, T) = fill!(similar(xs, T), false)
@@ -203,6 +221,7 @@ for (mapfunc,∇mapfunc) in [(:map,:∇map),(:pmap,:∇pmap)]
     else
       ys, backs = unzip(ys_and_backs)
       ys, function (Δ)
+        isnothing(Δ) && return nothing
         # Apply pullbacks in reverse order. Needed for correctness if `f` is stateful.
         Δf_and_args_zipped = $mapfunc((f, δ) -> f(δ), _tryreverse($mapfunc, backs, Δ)...)
         Δf_and_args = unzip(_tryreverse($mapfunc, Δf_and_args_zipped))
@@ -234,11 +253,13 @@ end
 @nograd workers
 
 function _pullback(cx::AContext, ::typeof(collect), g::Base.Generator)
-  y, back = ∇map(cx, g.f, g.iter)
-  y, function (ȳ)
-    f̄, x̄ = back(ȳ)
+  y, b = ∇map(cx, g.f, g.iter)
+  back(::Nothing) = nothing
+  function back(ȳ)
+    f̄, x̄ = b(ȳ)
     (nothing, (f = f̄, iter = x̄),)
   end
+  y, back
 end
 
 @adjoint iterate(r::UnitRange, i...) = iterate(r, i...), _ -> nothing
@@ -270,23 +291,13 @@ end
   sum(xs, dims = dims), Δ -> (nothing,)
 end
 
-_normalize_kws(kws::NamedTuple) = kws
-_normalize_kws(kws) = NamedTuple()
-
-function _pullback(cx::AContext, kwtype, kws, ::typeof(sum), f, xs::AbstractArray)
-  norm_kws = _normalize_kws(kws)
-  @assert !haskey(norm_kws, :init) # TODO add init support (julia 1.6)
-  y, back = pullback(cx, (f, xs) -> sum(f.(xs); norm_kws...), f, xs)
-  y, ȳ -> (nothing, nothing, nothing, back(ȳ)...)
+@adjoint function sum(f, xs::AbstractArray; kws...)
+  @assert !haskey(kws, :init) # TODO add init support (julia 1.6)
+  return pullback(__context__, (f, xs) -> sum(f.(xs); kws...), f, xs)
 end
 
 @adjoint function sum(::typeof(abs2), X::AbstractArray; dims = :)
   return sum(abs2, X; dims=dims), Δ::Union{Number, AbstractArray}->(nothing, ((2Δ) .* X))
-end
-
-@adjoint function prod(xs::AbstractArray; dims = :)
-  p = prod(xs; dims = dims)
-  p, Δ -> (p ./ xs .* Δ,)
 end
 
 function _pullback(cx::AContext, ::typeof(prod), f, xs::AbstractArray)

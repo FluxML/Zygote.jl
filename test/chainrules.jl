@@ -131,7 +131,7 @@ using Zygote, Test, ChainRules
         not_diff_eg(x, i) = [10, 20][i]
         function ChainRules.rrule(::typeof(not_diff_eg), x, i)
             function not_diff_eg_pullback(Δ)
-                return ChainRules.NO_FIELDS, ChainRules.Zero(), ChainRules.DoesNotExist()
+                return ChainRules.NO_FIELDS, ChainRules.ZeroTangent(), ChainRules.NoTangent()
             end
             return not_diff_eg(x, i), not_diff_eg_pullback
         end
@@ -204,7 +204,7 @@ using Zygote, Test, ChainRules
         not_diff_kw_eg(x, i; kw=1.0) = [10, 20][i]
         function ChainRules.rrule(::typeof(not_diff_kw_eg), x, i; kwargs...)
             function not_diff_kw_eg_pullback(Δ)
-                return ChainRules.NO_FIELDS, ChainRules.Zero(), ChainRules.DoesNotExist()
+                return ChainRules.NO_FIELDS, ChainRules.ZeroTangent(), ChainRules.NoTangent()
             end
             return not_diff_kw_eg(x, i; kwargs...), not_diff_kw_eg_pullback
         end
