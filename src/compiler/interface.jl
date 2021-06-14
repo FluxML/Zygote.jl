@@ -68,7 +68,8 @@ struct Params
 end
 
 Params() = Params(Buffer([], false), IdSet())
-Params(xs) = Params(Buffer(xs, false), IdSet(xs))
+Params(xs::Vector) = Params(Buffer(xs, false), IdSet(xs))
+Params(ps::Params) = ps
 
 @forward Params.order Base.iterate, Base.length, Base.getindex
 @forward Params.params Base.in
