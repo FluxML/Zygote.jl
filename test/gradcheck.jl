@@ -4,7 +4,6 @@ using Zygote: gradient
 using Base.Broadcast: broadcast_shape
 using Distributed: pmap, CachingPool, workers
 import FiniteDifferences
-using BenchmarkTools
 
 function ngradient(f, xs::AbstractArray...)
   grads = zero.(xs)
@@ -1719,6 +1718,7 @@ end
     @test gradcheck(x -> prod(Base.Fix1(+, 1), x), randn(100))
     @test gradcheck(x -> prod(Base.Fix2(+, 1), x), randn(100))
 
+#= regression tests are not included to reduce CI times
     # check the execution times compared with a closure
     # https://github.com/FluxML/Zygote.jl/issues/957
     x = randn(100)
@@ -1727,4 +1727,5 @@ end
     tfix2 = @belapsed(gradient($(x -> prod(Base.Fix2(+, 1), x)), $x))
     @test tfix1 < 2 * tclosure
     @test tfix2 < 2 * tclosure
+=#
 end
