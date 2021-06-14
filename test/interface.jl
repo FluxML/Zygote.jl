@@ -196,7 +196,7 @@ end
     # Can be safely removed - creating Params within
     # gradient calls may break between releases.
     sgs = gradient(ps) do
-      sum(sum(x) for x in Zygote.Params([d.W, d.b, b]))
+      sum(sum(x) for x in Zygote.Params([d.W, d.b]))
     end
     @test sgs[d.W] ≈ fill(1.f0, size(d.W))
     @test sgs[d.b] ≈ fill(1.f0, size(d.b))
