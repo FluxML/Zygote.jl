@@ -233,10 +233,15 @@ end
     @test gradient(plus10, 4.5) == (45,)
 end
 
-@testset "Testing using rrule_via_ad" begin
+@testset "ChainRulesCore.rrule_via_ad" begin
     ZygoteRuleConfig = Zygote.ZygoteRuleConfig
     @testset "basic" begin
-        test_rrule(ZygoteRuleConfig(), round, 2.2; rrule_f=rrule_via_ad)
+        # broken because Zygoye compresses `(NoTangent(), NoTangent())` into just NoTangent()
+        # which ChainRulesTestUtils does not think is valid:
+        @test_broken(rrule_via_ad(ZygoteRuleConfig(), round, 2.2) isa Tuple{NoTangent,NoTangent})
+        # uncomment below when/if above is fixed
+        # test_rrule(ZygoteRuleConfig(), round, 2.2; rrule_f=rrule_via_ad)
+
         test_rrule(ZygoteRuleConfig(), vcat, rand(3), rand(4); rrule_f=rrule_via_ad, check_inferred=false)
         test_rrule(ZygoteRuleConfig(), getindex, rand(5), 3; rrule_f=rrule_via_ad)
     end
@@ -249,8 +254,9 @@ end
         makefoo(a, b) = Foo(a, b)
         sumfoo(foo) = foo.x + foo.y
 
+
         test_rrule(
-            ZygoteRuleConfig(), sumfoo, foo; rrule_f=rrule_via_ad, check_inferred=false
+            ZygoteRuleConfig(), sumfoo, Foo(1.2, 2.3); rrule_f=rrule_via_ad, check_inferred=false
         )
         test_rrule(ZygoteRuleConfig(),
             makefoo, 1.0, 2.0; rrule_f=rrule_via_ad, check_inferred=false
