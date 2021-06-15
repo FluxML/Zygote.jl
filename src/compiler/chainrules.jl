@@ -14,10 +14,11 @@ such that if a suitable rule is defined later, the generated function will recom
 """
 function has_chain_rrule(T)
   return_type = Core.Compiler.return_type(rrule, T)
-  # Core.println("return_type=", return_type)
+  Core.println("T=", T, "; return_type=", return_type)
   if return_type === Nothing
     # no rule exists, or we hit a specialisation telling us to keep digging
     m = meta(Tuple{typeof(rrule),T.parameters...})
+    Core.println("instance=", m.instance)
     return false, m.instance
   else
     # found a rrule, no need to add any edges

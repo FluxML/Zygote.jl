@@ -17,7 +17,7 @@ using Zygote, Test, ChainRules
             2 + 10cr_inner_demo(x)
         end
 
-        Zygote.refresh()
+        #Zygote.refresh()
 
         @testset "gradient inner" begin
             cr_inner_demo_rrule_hitcount[] = 0
@@ -218,7 +218,7 @@ using Zygote, Test, ChainRules
 end
 
 
-@testset "take nothing seriously" begin
+qq@testset "take nothing seriously" begin
     plus10(x) = x + 10
     cnt_grad = Ref(42)
     ChainRules.rrule(::typeof(plus10), x) = x+10, dy -> (ChainRules.NO_FIELDS, cnt_grad[]+=1,)

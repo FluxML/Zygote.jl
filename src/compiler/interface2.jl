@@ -18,10 +18,9 @@ end
     cr_T = Tuple{ZygoteRuleConfig{ctx}, f, args...}
     chain_rrule_f = :chain_rrule
   end
+
   hascr, cr_edge = has_chain_rrule(cr_T)
-#  Core.println("***")
-#  Core.println("cr_T= ", cr_T)
-#  Core.println("hascr= ", hascr)
+
   hascr && return :($chain_rrule_f(ZygoteRuleConfig(ctx), f, args...))
 
   g = try _lookup_grad(T) catch e e end
