@@ -48,8 +48,10 @@ sensitivity(y) = error("Output should be scalar; gradients are not defined for o
 
 """
     gradient(f, args...)
+
 Returns a tuple containing `∂f/∂x` for each argument `x`,
 the derivative (for scalar x) or the gradient.
+
 `f(args...)` must be a real number, see [`jacobian`](@ref) for array output.
 """
 function gradient(f, args...)
@@ -144,6 +146,7 @@ end
 """
     copy!(ps::Params, x::AbstractVector)
     copy!(x::AbstractVector, ps::Params)
+
 Copies the content of array `x` into the parameters `ps` or viceversa.
 The length of `x` has to be equal to the sum of the lengths
 of all parameters.
@@ -202,6 +205,7 @@ end
 """
     copy!(gs::Grads, x::AbstractVector)
     copy!(x::AbstractVector, gs::Grads)
+
 Copies the content of array `x` into the gradient object `gs` or vice versa. The
 length of `x` has to be equal to the sum of the lengths of all gradients.
 """
