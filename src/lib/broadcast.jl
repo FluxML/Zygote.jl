@@ -186,6 +186,7 @@ end
   y, ∂b = _broadcast((x...) -> _pullback(__context__, f, x...), args...)
   y, function (ȳ)
     dxs = ∂b(ȳ)
+    dxs === nothing && return nothing
     (nothing, dxs...)
   end
 end

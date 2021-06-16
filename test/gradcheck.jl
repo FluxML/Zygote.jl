@@ -1713,3 +1713,7 @@ end
     @test s == 0.0
     @test gs == (nothing,)
 end
+
+# https://github.com/FluxML/Zygote.jl/issues/996
+a = rand(3)
+@test Zygote.gradient(x->sum(x .+ rand.()), a) == (ones(3),)
