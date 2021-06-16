@@ -216,7 +216,6 @@
 end
 
 @testset "ChainRulesCore.rrule_via_ad" begin
-    ZygoteRuleConfig = Zygote.ZygoteRuleConfig
     @testset "basic" begin
         # broken because Zygoye compresses `(NoTangent(), NoTangent())` into just NoTangent()
         # which ChainRulesTestUtils does not think is valid:

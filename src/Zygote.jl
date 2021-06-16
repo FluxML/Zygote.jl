@@ -8,7 +8,6 @@ import ZygoteRules: @adjoint, @adjoint!, AContext, adjoint, _pullback, pullback,
 
 using ChainRulesCore
 using ChainRules: ChainRules, rrule, unthunk, canonicalize
-using ChainRulesTestUtils
 using IRTools
 using MacroTools, Requires
 using MacroTools: @forward
