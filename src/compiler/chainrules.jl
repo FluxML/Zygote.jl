@@ -1,7 +1,11 @@
 struct ZygoteRuleConfig{CTX<:AContext} <: RuleConfig{Union{HasReverseMode,NoForwardsMode}}
   context::CTX
 end
-ZygoteRuleConfig()=ZygoteRuleConfig(Context())
+ZygoteRuleConfig() = ZygoteRuleConfig(Context())
+
+
+const rrule_fallback_method = Base.which(rrule, Tuple{Any, Vararg{Any}})
+const rrule_redisatcher_method = Base.which(rrule, Tuple{RuleConfig, Any, Vararg{Any}})
 
 """
   has_chain_rrule(T)
@@ -13,17 +17,20 @@ If it does not, then the second argument is a list of edges to attach to the Cod
 such that if a suitable rule is defined later, the generated function will recompile.
 """
 function has_chain_rrule(T)
-  return_type = Core.Compiler.return_type(rrule, T)
-  Core.println("T=", T, "; return_type=", return_type)
-  if return_type === Nothing
-    # no rule exists, or we hit a specialisation telling us to keep digging
-    m = meta(Tuple{typeof(rrule),T.parameters...})
-    Core.println("instance=", m.instance)
-    return false, m.instance
-  else
-    # found a rrule, no need to add any edges
-    return true, nothing
+  config_T, arg_Ts = Iterators.peel(T.parameters)
+  m_with_config = meta(Tuple{typeof(rrule), config_T, arg_Ts...})
+  if m_with_config.method === rrule_redisatcher_method
+    # it is being redispatched without config, so check it that hits the fallback
+    m_without_config = meta(Tuple{typeof(rrule), arg_Ts...})
+    if m_without_config.method === rrule_fallback_method
+      # no rrule exists, return instance for m_with_config as that will be invalidated 
+      # directly if configured rule added, or indirectly if unconfigured ruleadded
+      return false, m_with_config.instance
+    end
   end
+  # otherwise found a rrule, no need to add any edges, as it will generate code with
+  # natural edges.
+  return true, nothing
 end
 
 """
