@@ -5,7 +5,7 @@ ZygoteRuleConfig() = ZygoteRuleConfig(Context())
 
 
 const rrule_fallback_method = Base.which(rrule, Tuple{Any, Vararg{Any}})
-const rrule_redisatcher_method = Base.which(rrule, Tuple{RuleConfig, Any, Vararg{Any}})
+const rrule_redispatcher_method = Base.which(rrule, Tuple{RuleConfig, Any, Vararg{Any}})
 
 """
   has_chain_rrule(T)
@@ -19,7 +19,7 @@ such that if a suitable rule is defined later, the generated function will recom
 function has_chain_rrule(T)
   config_T, arg_Ts = Iterators.peel(T.parameters)
   m_with_config = meta(Tuple{typeof(rrule), config_T, arg_Ts...})
-  if m_with_config.method === rrule_redisatcher_method
+  if m_with_config.method === rrule_redispatcher_method
     # it is being redispatched without config, so check it that hits the fallback
     m_without_config = meta(Tuple{typeof(rrule), arg_Ts...})
     if m_without_config.method === rrule_fallback_method
