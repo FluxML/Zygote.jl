@@ -3,11 +3,11 @@
         cr_inner_demo_rrule_hitcount = Ref(0)
         cr_inner_demo_pullback_hitcount = Ref(0)
         cr_inner_demo(x) = 5x
-        function ChainRules.rrule(::typeof(cr_inner_demo), x)
+        function ChainRulesCore.rrule(::typeof(cr_inner_demo), x)
             cr_inner_demo_rrule_hitcount[] += 1
             function cr_inner_demo_pullback(Δx)
                 cr_inner_demo_pullback_hitcount[] += 1
-                return ChainRules.NO_FIELDS, 5.0*Δx
+                return NoTangent(), 5.0*Δx
             end
             return cr_inner_demo(x), cr_inner_demo_pullback
         end
@@ -53,11 +53,11 @@
         simo_rrule_hitcount = Ref(0)
         simo_pullback_hitcount = Ref(0)
         simo(x) = (5x, 7x)
-        function ChainRules.rrule(::typeof(simo), x)
+        function ChainRulesCore.rrule(::typeof(simo), x)
             simo_rrule_hitcount[] += 1
             function simo_pullback((Δa, Δb))
                 simo_pullback_hitcount[] += 1
-                return ChainRules.NO_FIELDS, 5*Δa + 7*Δb
+                return NoTangent(), 5*Δa + 7*Δb
             end
             return simo(x), simo_pullback
         end
@@ -75,11 +75,11 @@
         miso_rrule_hitcount = Ref(0)
         miso_pullback_hitcount = Ref(0)
         miso(a, b) = 5a + 7b
-        function ChainRules.rrule(::typeof(miso), a, b)
+        function ChainRulesCore.rrule(::typeof(miso), a, b)
             miso_rrule_hitcount[] += 1
             function miso_pullback(Δy)
                 miso_pullback_hitcount[] += 1
-                return ChainRules.NO_FIELDS, 5Δy , 7Δy
+                return NoTangent(), 5Δy , 7Δy
             end
             return miso(a, b), miso_pullback
         end
@@ -98,11 +98,11 @@
         mimo_rrule_hitcount = Ref(0)
         mimo_pullback_hitcount = Ref(0)
         mimo(a, b) = (5a + 7b, 100a, 10b)
-        function ChainRules.rrule(::typeof(mimo), a, b)
+        function ChainRulesCore.rrule(::typeof(mimo), a, b)
             mimo_rrule_hitcount[] += 1
             function mimo_pullback((Δx, Δy, Δz))
                 mimo_pullback_hitcount[] += 1
-                return ChainRules.NO_FIELDS, 5Δx + 100Δy , 7Δx + 10Δz
+                return NoTangent(), 5Δx + 100Δy , 7Δx + 10Δz
             end
             return mimo(a, b), mimo_pullback
         end
@@ -128,9 +128,9 @@
         # to a single `nothing` if they are all zero-like.
 
         not_diff_eg(x, i) = [10, 20][i]
-        function ChainRules.rrule(::typeof(not_diff_eg), x, i)
+        function ChainRulesCore.rrule(::typeof(not_diff_eg), x, i)
             function not_diff_eg_pullback(Δ)
-                return ChainRules.NO_FIELDS, ChainRules.ZeroTangent(), ChainRules.NoTangent()
+                return NoTangent(), ZeroTangent(), NoTangent()
             end
             return not_diff_eg(x, i), not_diff_eg_pullback
         end
@@ -175,11 +175,11 @@
         kwfoo_rrule_hitcount = Ref(0)
         kwfoo_pullback_hitcount = Ref(0)
         kwfoo(x; k=10) = x + k
-        function ChainRules.rrule(::typeof(kwfoo), x; k=10)
+        function ChainRulesCore.rrule(::typeof(kwfoo), x; k=10)
             kwfoo_rrule_hitcount[] += 1
             function kwfoo_pullback(Δy)
                 kwfoo_pullback_hitcount[] += 1
-                return ChainRules.NO_FIELDS, Δy
+                return NoTangent(), Δy
             end
             return kwfoo(x; k=k), kwfoo_pullback
         end
@@ -202,9 +202,9 @@
         # to a single `nothing` if they are all zero-like.
 
         not_diff_kw_eg(x, i; kw=1.0) = [10, 20][i]
-        function ChainRules.rrule(::typeof(not_diff_kw_eg), x, i; kwargs...)
+        function ChainRulesCore.rrule(::typeof(not_diff_kw_eg), x, i; kwargs...)
             function not_diff_kw_eg_pullback(Δ)
-                return ChainRules.NO_FIELDS, ChainRules.ZeroTangent(), ChainRules.NoTangent()
+                return NoTangent(), ZeroTangent(), NoTangent()
             end
             return not_diff_kw_eg(x, i; kwargs...), not_diff_kw_eg_pullback
         end
