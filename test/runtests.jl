@@ -1,7 +1,6 @@
 using Zygote, Test
-using Zygote: gradient, ZygoteRuleConfig
+using Zygote: gradient
 using CUDA: has_cuda
-using ChainRulesTestUtils
 
 if has_cuda()
   @testset "CUDA tests" begin

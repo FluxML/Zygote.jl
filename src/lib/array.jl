@@ -287,6 +287,11 @@ end
   end
 end
 
+@adjoint function sum(f, xs::AbstractArray{<:AbstractArray}; kws...)
+  @assert !haskey(kws, :init) # TODO add init support (julia 1.6)
+  return pullback(__context__, (f, xs) -> sum(f.(xs); kws...), f, xs)
+end
+
 @adjoint function sum(xs::AbstractArray{Bool}; dims = :)
   sum(xs, dims = dims), Δ -> (nothing,)
 end
