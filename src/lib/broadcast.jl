@@ -174,7 +174,7 @@ collapse_nothings(xs) = xs
   y∂b = _broadcast((x...) -> _pullback(__context__, f, x...), args...)
   y = map(first, y∂b)
   function ∇broadcasted(ȳ)
-    dxs_zip = map((pair, ȳ₁) -> last(pair)(ȳ₁), y∂b, ȳ)
+    dxs_zip = map(((_, pb), ȳ₁) -> pb(ȳ₁), y∂b, ȳ)
     dxs = ntuple(len) do i
       collapse_nothings(map(StaticGetter{i}(), dxs_zip))
     end
