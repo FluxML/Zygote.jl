@@ -24,7 +24,7 @@ end
   hascr && return :($chain_rrule_f(ZygoteRuleConfig(ctx), f, args...))
 
   g = try _lookup_grad(T) catch e e end
-  !(g isa Tuple) && return :(f(args...), Pullback{$T}((f,)))
+  g === nothing && return :(f(args...), Pullback{$T}((f,)))
   meta, forw, _ = g
   argnames!(meta, Symbol("#self#"), :ctx, :f, :args)
   forw = varargs!(meta, forw, 3)
