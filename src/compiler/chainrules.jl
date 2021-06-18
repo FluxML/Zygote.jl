@@ -24,7 +24,7 @@ function has_chain_rrule(T)
     m_without_config = meta(Tuple{typeof(rrule), arg_Ts...})
     if m_without_config.method === rrule_fallback_method
       # no rrule exists, return instance for m_with_config as that will be invalidated 
-      # directly if configured rule added, or indirectly if unconfigured ruleadded
+      # directly if configured rule added, or indirectly if unconfigured rule added
       return false, m_with_config.instance
     end
   end

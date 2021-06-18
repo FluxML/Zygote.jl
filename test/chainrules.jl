@@ -1,4 +1,4 @@
-@testset "ChainRules intergration" begin
+@testset "ChainRules integration" begin
     @testset "ChainRules basics" begin
         cr_inner_demo_rrule_hitcount = Ref(0)
         cr_inner_demo_pullback_hitcount = Ref(0)
@@ -239,8 +239,9 @@ end
         test_rrule(
             ZygoteRuleConfig(), sumfoo, Foo(1.2, 2.3); rrule_f=rrule_via_ad, check_inferred=false
         )
-        test_rrule(ZygoteRuleConfig(),
-            makefoo, 1.0, 2.0; rrule_f=rrule_via_ad, check_inferred=false
+        test_rrule(
+            ZygoteRuleConfig(), makefoo, 1.0, 2.0;
+            rrule_f=rrule_via_ad, check_inferred=false
         )
     end
 
