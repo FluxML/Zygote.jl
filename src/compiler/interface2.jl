@@ -23,7 +23,7 @@ end
 
   hascr && return :($chain_rrule_f(ZygoteRuleConfig(ctx), f, args...))
 
-  g = try _lookup_grad(T) catch e e end
+  g = try _generate_pullback_via_decomposition(T) catch e e end
   g === nothing && return :(f(args...), Pullback{$T}((f,)))
   meta, forw, _ = g
   argnames!(meta, Symbol("#self#"), :ctx, :f, :args)
@@ -37,7 +37,8 @@ end
 
 @generated function (j::Pullback{T})(Δ) where T
   ignore_sig(T) && return :nothing
-  g = try _lookup_grad(T)
+  g = try 
+    _generate_pullback_via_decomposition(T)
   catch e
     rethrow(CompileError(T,e))
   end
