@@ -194,6 +194,7 @@ end
 
 struct StaticGetter{i} end
 (::StaticGetter{i})(v) where {i} = v[i]
+(::StaticGetter{i})(::Nothing) where {i} = nothing
 @generated function _unzip(tuples, ::Val{N}) where {N}
   Expr(:tuple, (:(map($(StaticGetter{i}()), tuples)) for i ∈ 1:N)...)
 end
