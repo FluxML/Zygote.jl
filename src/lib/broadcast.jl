@@ -172,23 +172,25 @@ collapse_nothings(xs) = xs
 @adjoint function broadcasted(::AbstractArrayStyle, f, args...)
   len = inclen(args)
   y∂b = _broadcast((x...) -> _pullback(__context__, f, x...), args...)
-  y = map(x -> x[1], y∂b)
-  ∂b = map(x -> x[2], y∂b)
-  y, function (ȳ)
-    dxs_zip = map((∂b, ȳ) -> ∂b(ȳ), ∂b, ȳ)
-    dxs = collapse_nothings.(ntuple(i -> map(x -> _get(x, i), dxs_zip), len))
+  y = map(first, y∂b)
+  function ∇broadcasted(ȳ)
+    dxs_zip = map((pair, ȳ₁) -> last(pair)(ȳ₁), y∂b, ȳ)
+    dxs = ntuple(len) do i
+      collapse_nothings(map(StaticGetter{i}(), dxs_zip))
+    end
     (nothing, accum_sum(dxs[1]), map(unbroadcast, args, Base.tail(dxs))...)
   end
+  y, ∇broadcasted
 end
 
 @adjoint function broadcasted(::AbstractArrayStyle{0}, f, args...)
-  len = inclen(args)
   y, ∂b = _broadcast((x...) -> _pullback(__context__, f, x...), args...)
-  y, function (ȳ)
+  function ∇broadcasted0(ȳ)
     dxs = ∂b(ȳ)
     dxs === nothing && return nothing
     (nothing, dxs...)
   end
+  y, ∇broadcasted0
 end
 
 # Use the `map` adjoint in this special case, which is the same but applies
