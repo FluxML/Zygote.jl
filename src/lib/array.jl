@@ -287,18 +287,15 @@ end
   end
 end
 
-@adjoint function sum(xs::AbstractArray{Bool}; dims = :)
-  sum(xs, dims = dims), Δ -> (nothing,)
-end
-
-@adjoint function sum(f, xs::AbstractArray; kws...)
+@adjoint function sum(f, xs::AbstractArray{<:AbstractArray}; kws...)
   @assert !haskey(kws, :init) # TODO add init support (julia 1.6)
   return pullback(__context__, (f, xs) -> sum(f.(xs); kws...), f, xs)
 end
 
-@adjoint function sum(::typeof(abs2), X::AbstractArray; dims = :)
-  return sum(abs2, X; dims=dims), Δ::Union{Number, AbstractArray}->(nothing, ((2Δ) .* X))
+@adjoint function sum(xs::AbstractArray{Bool}; dims = :)
+  sum(xs, dims = dims), Δ -> (nothing,)
 end
+
 
 function _pullback(cx::AContext, ::typeof(prod), f, xs::AbstractArray)
   y, back = pullback(cx, ((f, xs) -> prod(f.(xs))), f, xs)

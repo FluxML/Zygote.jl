@@ -179,13 +179,13 @@ end
 
 @test gradient(x -> x.re*x.im, 2+3im) == ((re = 3, im = 2),)
 
-struct Foo{T}
+struct Bar{T}
   a::T
   b::T
 end
 
 function mul_struct(a, b)
-  c = Foo(a, b)
+  c = Bar(a, b)
   c.a * c.b
 end
 
@@ -358,7 +358,7 @@ end
   pop!(stk)
 end == (1,)
 
-@test gradient(x -> [x][1].a, Foo(1, 1)) == ((a=1, b=nothing),)
+@test gradient(x -> [x][1].a, Bar(1, 1)) == ((a=1, b=nothing),)
 
 @test gradient((a, b) -> Zygote.hook(-, a)*b, 2, 3) == (-3, 2)
 

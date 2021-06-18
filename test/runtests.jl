@@ -1,5 +1,5 @@
 using Zygote, Test
-using Zygote: gradient
+using Zygote: gradient, ZygoteRuleConfig
 using CUDA: has_cuda
 
 if has_cuda()
