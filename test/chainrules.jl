@@ -1,3 +1,4 @@
+using ChainRulesCore, ChainRulesTestUtils, Zygote
 @testset "ChainRules integration" begin
     @testset "ChainRules basics" begin
         cr_inner_demo_rrule_hitcount = Ref(0)
