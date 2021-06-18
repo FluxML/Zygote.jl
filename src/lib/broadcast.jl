@@ -229,8 +229,8 @@ end
   out = dual_function(f).(args...)
   eltype(out) <: Dual || return (out, _ -> nothing)
   y = map(x -> x.value, out)
-  _back(ȳ, i) = unbroadcast(args[i], ((a, b) -> a*b.partials[i]).(ȳ, out))
-  back(ȳ) = ntuple(i -> _back(ȳ, i), N)
+  _back(ȳ, geti) = unbroadcast(geti(args), ((a, b) -> a * geti(b.partials)).(ȳ, out))
+  back(ȳ) = ntuple(i -> _back(ȳ, StaticGetter{i}()), N)
   return y, back
 end
 
