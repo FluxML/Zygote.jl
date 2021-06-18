@@ -164,23 +164,21 @@ end
 # Avoid hitting special cases for `Adjoint` etc.
 _broadcast(f::F, x...) where F = materialize(broadcasted(f, x...))
 
-_get(x::Tuple, i) = x[i]
-_get(::Nothing, i) = nothing
 collapse_nothings(xs::AbstractArray{Nothing}) = nothing
 collapse_nothings(xs) = xs
 
-@adjoint function broadcasted(::AbstractArrayStyle, f, args...)
+@adjoint function broadcasted(::AbstractArrayStyle, f::F, args...) where {F}
   len = inclen(args)
   y∂b = _broadcast((x...) -> _pullback(__context__, f, x...), args...)
   y = map(first, y∂b)
-  function ∇broadcasted(ȳ)
+  function ∇broadcasted(ȳ,y∂b::G) where {G}
     dxs_zip = map(((_, pb), ȳ₁) -> pb(ȳ₁), y∂b, ȳ)
     dxs = ntuple(len) do i
       collapse_nothings(map(StaticGetter{i}(), dxs_zip))
     end
     (nothing, accum_sum(dxs[1]), map(unbroadcast, args, Base.tail(dxs))...)
   end
-  y, ∇broadcasted
+  y, Base.Fix2(∇broadcasted,y∂b)
 end
 
 @adjoint function broadcasted(::AbstractArrayStyle{0}, f, args...)
