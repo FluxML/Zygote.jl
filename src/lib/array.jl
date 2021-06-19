@@ -223,10 +223,10 @@ for (mapfunc,∇mapfunc) in [(:map,:∇map),(:pmap,:∇pmap)]
       ys = map(first, ys_and_backs)
       ys, function (Δ)
         isnothing(Δ) && return nothing
-        if _purefun(F) && length(args) == 1
+        if Base.issingletontype(F) && length(args) == 1
           Δarg = $mapfunc(((_,pb), δ) -> last(pb(δ)), ys_and_backs, Δ) # No unzip needed
           (nothing, Δarg)
-        elseif _purefun(F)
+        elseif Base.issingletontype(F) # Ensures `f` is pure: nothing captured & no state
           Δargs = unzip($mapfunc(((_,pb), δ) -> Base.tail(pb(δ)), ys_and_backs, Δ))
           (nothing, Δargs...)
         else
