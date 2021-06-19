@@ -1,4 +1,10 @@
-using Base: RefValue, ismutabletype
+using Base: RefValue
+
+if VERSION > v"1.7.0-DEV.204"
+  using Base: ismutabletype
+else
+  ismutabletype(::Type{T}) where T = T.mutable
+end
 
 # Interfaces
 
