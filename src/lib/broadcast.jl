@@ -167,11 +167,8 @@ _broadcast(f::F, x...) where F = materialize(broadcasted(f, x...))
 collapse_nothings(xs::AbstractArray{Nothing}) = nothing
 collapse_nothings(xs) = xs
 
-_purefun(::Type{F}) where {F<:Function} = isempty(fieldnames(F))
+_purefun(::Type{F}) where {F<:Function} = Base.issingletontype(F)
 _purefun(::Type) = false
-if VERSION >= v"1.6"
-  _purefun(::Type{ComposedFunction{F,G}}) where {F,G} = _purefun(F) && _purefun(G)
-end
 _purefun(::Type{typeof(^)}) = false  # fix @testset "power" & @testset "diagonal hessian"
 
 _dualsafe(x::Numeric{<:Real}) = true
