@@ -179,7 +179,7 @@ _purefun(::Type{typeof(^)}) = false  # fix @testset "power" & @testset "diagonal
   # Avoid generic broadcasting in two easy cases:
   if T == Bool
     return f.(args...), _->nothing
-  elseif T <: Real && _purefun(F) && all(a -> a isa Numeric{<:Real}, args)
+  elseif isconcretetype(T) && T <: Real && _purefun(F) && all(a -> a isa Numeric{<:Real}, args)
     y, back = broadcast_forward(f, args...)
     return y, ȳ -> (nothing, nothing, back(ȳ)...)
   end

@@ -500,14 +500,26 @@ end
   @test 150_000_000 > @allocated gradient(loss, ones(1000,1000))
 end
 
-@testset "tuples & broadcasting" begin
-    @test gradient(x -> sum(x .+ ones(2,2)), (1,2)) == ((2,2),)
-    @test gradient(x -> sum(x .+ ones(2,2)), (1,)) == ((4,),)
-    @test gradient(x -> sum(x .+ ones(2,1)), (1,2)) == ((1,1),)
+@testset "tricky broadcasting" begin
+  @test gradient(x -> sum(x .+ ones(2,2)), (1,2)) == ((2,2),)
+  @test gradient(x -> sum(x .+ ones(2,2)), (1,)) == ((4,),)
+  @test gradient(x -> sum(x .+ ones(2,1)), (1,2)) == ((1,1),)
+  
+  # https://github.com/FluxML/Zygote.jl/issues/975
+  gt = gradient((x,p) -> prod(x .^ p), [3,4], (1,2))
+  gv = gradient((x,p) -> prod(x .^ p), [3,4], [1,2])
+  @test gt[1] == gv[1]
+  @test collect(gt[2]) ≈ gv[2]
 
-    # https://github.com/FluxML/Zygote.jl/issues/975
-    gt = gradient((x,p) -> prod(x .^ p), [3,4], (1,2))
-    gv = gradient((x,p) -> prod(x .^ p), [3,4], [1,2])
-    @test gt[1] == gv[1]
-    @test collect(gt[2]) ≈ gv[2]
+  # closure captures y -- can't use ForwardDiff
+  @test gradient((x,y) -> sum((z->z^2+y[1]).(x)), [1,2,3], [4,5]) == ([2, 4, 6], [3, 0])
+  @test gradient((x,y) -> sum((z->z^2+y[1]), x), [1,2,3], [4,5]) == ([2, 4, 6], [3, 0])
+  @test gradient((x,y) -> sum(map((z->z^2+y[1]), x)), [1,2,3], [4,5]) == ([2, 4, 6], [3, 0])
+  @test gradient((x,y) -> mapreduce((z->z^2+y[1]), +, x), [1,2,3], [4,5]) == ([2, 4, 6], [3, 0])
+
+  # type unstable
+  @test gradient(xs -> sum((x -> x<2 ? false : x^2).(xs)), [1,2,3])[1][2:3] == [4, 6]
+  @test gradient(xs -> sum((x -> x<2 ? false : x^2), xs), [1,2,3])[1][2:3] == [4, 6]
+  @test gradient(xs -> sum(map((x -> x<2 ? false : x^2), xs)), [1,2,3])[1][2:3] == [4, 6]
+  @test gradient(xs -> mapreduce((x -> x<2 ? false : x^2), +, xs), [1,2,3])[1][2:3] == [4, 6]
 end
