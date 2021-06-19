@@ -167,7 +167,13 @@ _broadcast(f::F, x...) where F = materialize(broadcasted(f, x...))
 collapse_nothings(xs::AbstractArray{Nothing}) = nothing
 collapse_nothings(xs) = xs
 
-@adjoint function broadcasted(::AbstractArrayStyle, f, args...)
+@adjoint function broadcasted(::AbstractArrayStyle, f::F, args...) where {F}
+  # When safe, avoid generic broadcast & use ForwardDiff instead, often 100x faster
+  if all(a -> a isa Numeric{<:Real}, args) && Broadcast.combine_eltypes(f, args) <: Real
+    y, back = broadcast_forward(f, args...)
+    return y, ȳ -> (nothing, nothing, back(ȳ)...)
+  end
+
   len = inclen(args)
   y∂b = _broadcast((x...) -> _pullback(__context__, f, x...), args...)
   y = map(first, y∂b)
