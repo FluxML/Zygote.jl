@@ -167,18 +167,18 @@ _broadcast(f::F, x...) where F = materialize(broadcasted(f, x...))
 collapse_nothings(xs::AbstractArray{Nothing}) = nothing
 collapse_nothings(xs) = xs
 
-@adjoint function broadcasted(::AbstractArrayStyle, f::F, args...) where {F}
+@adjoint function broadcasted(::AbstractArrayStyle, f, args...)
   len = inclen(args)
   y∂b = _broadcast((x...) -> _pullback(__context__, f, x...), args...)
   y = map(first, y∂b)
-  function ∇broadcasted(ȳ,y∂b::G) where {G}
+  function ∇broadcasted(ȳ)
     dxs_zip = map(((_, pb), ȳ₁) -> pb(ȳ₁), y∂b, ȳ)
     dxs = ntuple(len) do i
       collapse_nothings(map(StaticGetter{i}(), dxs_zip))
     end
     (nothing, accum_sum(dxs[1]), map(unbroadcast, args, Base.tail(dxs))...)
   end
-  y, Base.Fix2(∇broadcasted,y∂b)
+  y, ∇broadcasted
 end
 
 @adjoint function broadcasted(::AbstractArrayStyle{0}, f, args...)
@@ -227,8 +227,8 @@ end
   out = dual_function(f).(args...)
   eltype(out) <: Dual || return (out, _ -> nothing)
   y = map(x -> x.value, out)
-  _back(ȳ, geti) = unbroadcast(geti(args), ((a, b) -> a * geti(b.partials)).(ȳ, out))
-  back(ȳ) = ntuple(i -> _back(ȳ, StaticGetter{i}()), N)
+  _back(ȳ, i) = unbroadcast(args[i], ((a, b) -> a*b.partials[i]).(ȳ, out))
+  back(ȳ) = ntuple(i -> _back(ȳ, i), N)
   return y, back
 end
 
