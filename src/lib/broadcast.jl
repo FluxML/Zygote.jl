@@ -174,12 +174,19 @@ if VERSION >= v"1.6"
 end
 _purefun(::Type{typeof(^)}) = false  # fix @testset "power" & @testset "diagonal hessian"
 
+_dualsafe(x::Numeric{<:Real}) = true
+_dualsafe(x::Ref{<:Numeric{<:Real}}) = true
+_dualsafe(x::Val) = true
+_dualsafe(x::Type) = true
+_dualsafe(x::Symbol) = true
+_dualsafe(x) = false
+
 @adjoint function broadcasted(::AbstractArrayStyle, f::F, args...) where {F}
   T = Broadcast.combine_eltypes(f, args)
   # Avoid generic broadcasting in two easy cases:
   if T == Bool
     return f.(args...), _->nothing
-  elseif isconcretetype(T) && T <: Real && _purefun(F) && all(a -> a isa Numeric{<:Real}, args)
+  elseif T <: Real && isconcretetype(T) && _purefun(F) && all(_dualsafe, args)
     y, back = broadcast_forward(f, args...)
     return y, ȳ -> (nothing, nothing, back(ȳ)...)
   end

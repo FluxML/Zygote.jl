@@ -522,4 +522,12 @@ end
   @test gradient(xs -> sum((x -> x<2 ? false : x^2), xs), [1,2,3])[1][2:3] == [4, 6]
   @test gradient(xs -> sum(map((x -> x<2 ? false : x^2), xs)), [1,2,3])[1][2:3] == [4, 6]
   @test gradient(xs -> mapreduce((x -> x<2 ? false : x^2), +, xs), [1,2,3])[1][2:3] == [4, 6]
+
+  # with Ref, Val, Symbol
+  @test gradient(x -> sum(x .+ Ref(x[1])), [1,2,3]) == ([4,1,1],)
+  @test gradient(x -> sum(x .+ (x[1],)), [1,2,3]) == ([4,1,1],)
+  @test gradient(x -> sum((first∘tuple).(x, :ignore)), [1,2,3]) == ([1,1,1],)
+  @test gradient(x -> sum((first∘tuple).(x, Symbol)), [1,2,3]) == ([1,1,1],)
+  _f(x,::Val{y}) where {y} = x/y
+  @test gradient(x -> sum(_f.(x, Val(2))), [1,2,3]) == ([0.5, 0.5, 0.5],)
 end
