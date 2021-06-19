@@ -171,6 +171,8 @@ _purefun(::Type{F}) where {F<:Function} = isempty(fieldnames(F))
 _purefun(::Type{ComposedFunction{F,G}}) where {F,G} = _purefun(F) && _purefun(G)
 _purefun(::Type) = false
 
+_purefun(::Type{typeof(^)}) = false  # fix @testset "power" & @testset "diagonal hessian"
+
 @adjoint function broadcasted(::AbstractArrayStyle, f::F, args...) where {F}
   T = Broadcast.combine_eltypes(f, args)
   # Avoid generic broadcasting in two easy cases:
