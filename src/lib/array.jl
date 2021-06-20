@@ -213,6 +213,13 @@ end
 _tryreverse(m, x) = x
 _tryreverse(m::typeof(map), x::Union{AbstractVector, Tuple}) = reverse(x)
 
+# With mismatched lengths, map stops early. With mismatched shapes, it makes a vector.
+# So we keep axes(x) to restore gradient dx to its full length & correct shape.
+_tryaxes(x) = axes(x)
+_tryaxes(x::Tuple) = Val(length(x))
+_restore(dx, ax::Tuple) = axes(dx) == ax ? dx : reshape(vcat(dx, falses(prod(length, ax) - length(dx))), ax)
+_restore(dx, ::Val{N}) where {N} = length(dx) < N ? ntuple(i -> get(dx,i,nothing), N) : NTuple{N}(dx)
+
 for (mapfunc,∇mapfunc) in [(:map,:∇map),(:pmap,:∇pmap)]
   @eval function $∇mapfunc(cx, f, args...)
     ys_and_backs = $mapfunc((args...) -> _pullback(cx, f, args...), args...)
@@ -220,13 +227,15 @@ for (mapfunc,∇mapfunc) in [(:map,:∇map),(:pmap,:∇pmap)]
       ys_and_backs, _ -> nothing
     else
       ys, backs = unzip(ys_and_backs)
+      arg_ax = map(_tryaxes, args)
       ys, function (Δ)
         isnothing(Δ) && return nothing
         # Apply pullbacks in reverse order. Needed for correctness if `f` is stateful.
         Δf_and_args_zipped = $mapfunc((f, δ) -> f(δ), _tryreverse($mapfunc, backs, Δ)...)
         Δf_and_args = unzip(_tryreverse($mapfunc, Δf_and_args_zipped))
         Δf = reduce(accum, Δf_and_args[1])
-        (Δf, Δf_and_args[2:end]...)
+        Δargs = map(_restore, Δf_and_args[2:end], arg_ax)
+        (Δf, Δargs...)
       end
     end
   end
@@ -276,6 +285,48 @@ end
         dx[t] .= Δ
         (nothing, dx)
     end
+end
+
+# Iterators
+
+@adjoint function enumerate(xs)
+  back(::AbstractArray{Nothing}) = nothing
+  back(dy::NamedTuple{(:itr,)}) = tuple(dy.itr)
+  back(diys) = (map(last, diys),)
+  enumerate(xs), back
+end
+
+@adjoint Iterators.Filter(f, x) = pullback(filter, f, collect(x))
+
+_ndims(::Base.HasShape{d}) where {d} = d
+_ndims(x) = Base.IteratorSize(x) isa Base.HasShape ? _ndims(Base.IteratorSize(x)) : 1
+
+@adjoint function Iterators.product(xs...)
+  back(::AbstractArray{Nothing}) = nothing
+  back(dy::NamedTuple{(:iterators,)}) = dy.iterators
+  function back(dy::AbstractArray)
+    d = 1
+    ntuple(length(xs)) do n
+      first(dy)[n] === nothing && return nothing
+      nd = _ndims(xs[n])
+      dims = ntuple(i -> i<d ? i : i+nd, ndims(dy)-nd)
+      d += nd
+      init = zero.(first(dy)[n]) # allows for tuples, which accum can add:
+      red = mapreduce(StaticGetter{n}(), accum, dy; dims=dims, init=init)
+      return reshape(red, axes(xs[n]))
+    end
+  end
+  Iterators.product(xs...), back
+end
+
+@adjoint function Iterators.Zip(xs)
+  axs = map(_tryaxes, xs)  # same function used for map
+  back(dy::NamedTuple{(:is,)}) = tuple(dy.is)
+  back(dy::AbstractArray) = ntuple(length(xs)) do d
+    dx = map(StaticGetter{d}(), dy)
+    _restore(dx, axs[d])
+  end |> tuple
+  Iterators.Zip(xs), back
 end
 
 # Reductions

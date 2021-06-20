@@ -453,6 +453,61 @@ end
     @test (x->10*(x => 2)[2])'(100) === 0
 end
 
+@testset "Iterators" begin
+  # enumerate
+  @test gradient(1:5) do xs
+    sum([x^i for (i,x) in enumerate(xs)])
+  end == ([1, 4, 27, 256, 3125],)
+
+  @test gradient([1,10,100]) do xs
+    sum([xs[i]^i for (i,x) in enumerate(xs)])
+  end == ([1, 2 * 10^1, 3 * 100^2],)
+
+  @test gradient([1,10,100]) do xs
+    sum((xs[i]^i for (i,x) in enumerate(xs))) # same without collect
+  end == ([1, 2 * 10^1, 3 * 100^2],)
+
+  # zip
+  @test gradient(10:14, 1:10) do xs, ys
+    sum([x/y for (x,y) in zip(xs, ys)])
+  end[2] ≈ vcat(.-(10:14) ./ (1:5).^2, zeros(5))
+
+  @test_broken gradient(10:14, 1:10) do xs, ys
+    sum(x/y for (x,y) in zip(xs, ys))   # same without collect
+  end[2] ≈ vcat(.-(10:14) ./ (1:5).^2, zeros(5))
+
+  # Iterators.Filter
+  @test gradient(2:9) do xs
+    sum([x^2 for x in xs if iseven(x)])
+  end == ([4, 0, 8, 0, 12, 0, 16, 0],)
+
+  @test gradient(2:9) do xs
+    sum(x^2 for x in xs if iseven(x)) # same without collect
+  end == ([4, 0, 8, 0, 12, 0, 16, 0],)
+
+  # Iterators.Product
+  @test gradient(1:10, 3:7) do xs, ys
+    sum([x^2+y for x in xs, y in ys])
+  end == (10:10:100, fill(10, 5))
+
+  @test_broken gradient(1:10, 3:7) do xs, ys
+    sum(x^2+y for x in xs, y in ys)  # same without collect
+  end == (10:10:100, fill(10, 5))
+
+  @test gradient(rand(2,3)) do A
+    sum([A[i,j] for i in 1:1, j in 1:2])
+  end == ([1 1 0; 0 0 0],)
+
+  @test gradient(ones(3,5), 1:7) do xs, ys
+    sum([x+y for x in xs, y in ys])
+  end == (fill(7, 3,5), fill(15, 7))
+
+  # Iterators.Product with enumerate
+  @test gradient([2 3; 4 5]) do xs
+    sum([x^i+y for (i,x) in enumerate(xs), y in xs]) 
+  end == ([8 112; 36 2004],)
+end
+
 # https://github.com/JuliaDiff/ChainRules.jl/issues/257
 @testset "Keyword Argument Passing" begin
   struct Type1{VJP}
