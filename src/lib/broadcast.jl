@@ -257,7 +257,7 @@ end
   
   # Make sure sum(f, ::CuArray) uses broadcase through forward-mode defined above
   # Not the ChainRules.rrule which will use the Zygote.Context and thus not be GPU compatible
-  @adjoint function sum(f, xs::CuArray; kws...)
+  @adjoint function sum(f, xs::CUDA.CuArray; kws...)
     @assert !haskey(kws, :init) # TODO add init support (julia 1.6)
     return pullback(__context__, (f, xs) -> sum(f.(xs); kws...), f, xs)
   end
