@@ -27,7 +27,7 @@ end
 end
 
 @testset "sum(f, x)" begin
-  a = Float32.(-4:4)
+  a = Float32.([-1.5, -9.0, 2.4, -1.3, 0.01])
   a_gpu = a |> cu
 
   f(x) = sum(abs, x)
