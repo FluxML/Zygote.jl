@@ -254,7 +254,14 @@ end
     placeholder = similar(xs)
     sum(xs, dims = dims), Δ -> (placeholder .= Δ,)
   end
-
+  
+  # Make sure sum(f, ::CuArray) uses broadcase through forward-mode defined above
+  # Not the ChainRules.rrule which will use the Zygote.Context and thus not be GPU compatible
+  @adjoint function sum(f, xs::CUDA.CuArray; kws...)
+    @assert !haskey(kws, :init) # TODO add init support (julia 1.6)
+    return pullback(__context__, (f, xs) -> sum(f.(xs); kws...), f, xs)
+  end
+  
   @adjoint function Base.convert(::Type{T}, xs::Array)  where {T<:CUDA.CuArray}
     Base.convert(T, xs), Δ -> (nothing, Base.convert(Array, Δ),)
   end
