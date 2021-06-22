@@ -176,22 +176,14 @@ _dual_safearg(x::Ref{<:Numeric{<:Real}}) = true
 _dual_safearg(x::Union{Type,Val,Symbol}) = true  # non-differentiable types
 _dual_safearg(x) = false
 
-# This is Broadcast.combine_eltypes but with dual eltypes:
-_combine_dual_eltypes(f, args::Tuple) =
-  Broadcast.promote_typejoin_union(Base._return_type(f, map(_dual_eltype, args)))
-_dual_eltype(x::Numeric{T}) where {T<:Real} = Dual{Nothing, T, 1} # typeof(Dual(one(T),true))
-_dual_eltype(x) = eltype(x)
-
 @adjoint function broadcasted(::AbstractArrayStyle, f::F, args...) where {F}
-  TD = _combine_dual_eltypes(f, args)
+  T = Broadcast.combine_eltypes(f, args)
   # Avoid generic broadcasting in two easy cases:
-  if TD <: Dual && isconcretetype(TD)
-    if _dual_purefun(F) && all(_dual_safearg, args)
-      y, back = broadcast_forward(f, args...)
-      return y, ȳ -> (nothing, nothing, back(ȳ)...)
-    end
-  elseif TD <: Real && isconcretetype(TD)
-    return f.(args...), _->nothing
+  if T == Bool
+    return f.(args...), _->nothing 
+  elseif T <: Real && isconcretetype(T) && _dual_purefun(F) && all(_dual_safearg, args)
+    y, back = broadcast_forward(f, args...)
+    return y, ȳ -> (nothing, nothing, back(ȳ)...)
   end
   len = inclen(args)
   y∂b = _broadcast((x...) -> _pullback(__context__, f, x...), args...)
