@@ -219,16 +219,13 @@ end
 
 @adjoint! (b::typeof(broadcast))(f, args...) = _pullback(__context__, broadcasted, f, args...)
 
-# Forward Mode (mainly necessary for CUDA)
+# Forward Mode -- necessary for CUDA, also used as a fast path above
 
 import ForwardDiff
 using ForwardDiff: Dual
 
 dual(x, p) = x
 dual(x::Real, p) = Dual(x, p)
-
-dualtype(::Type{Dual{G,T,P}}) where {G,T,P} = T
-dualtype(T) = T
 
 function dual_function(f::F) where F
   function (args::Vararg{Any,N}) where N
