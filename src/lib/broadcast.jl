@@ -167,25 +167,31 @@ _broadcast(f::F, x...) where F = materialize(broadcasted(f, x...))
 collapse_nothings(xs::AbstractArray{Nothing}) = nothing
 collapse_nothings(xs) = xs
 
-_purefun(::Type{F}) where {F<:Function} = Base.issingletontype(F)
-_purefun(::Type) = false
-_purefun(::Type{typeof(^)}) = false  # fix @testset "power" & @testset "diagonal hessian"
+_dual_purefun(::Type{F}) where {F<:Function} = Base.issingletontype(F)
+_dual_purefun(::Type) = false
+_dual_purefun(::Type{typeof(^)}) = false  # avoid DomainError from negative powers
 
-_dualsafe(x::Numeric{<:Real}) = true
-_dualsafe(x::Ref{<:Numeric{<:Real}}) = true
-_dualsafe(x::Val) = true
-_dualsafe(x::Type) = true
-_dualsafe(x::Symbol) = true
-_dualsafe(x) = false
+_dual_safearg(x::Numeric{<:Real}) = true
+_dual_safearg(x::Ref{<:Numeric{<:Real}}) = true
+_dual_safearg(x::Union{Type,Val,Symbol}) = true  # non-differentiable types
+_dual_safearg(x) = false
+
+# This is Broadcast.combine_eltypes but with dual eltypes:
+_combine_dual_eltypes(f, args::Tuple) =
+  Broadcast.promote_typejoin_union(Base._return_type(f, map(_dual_eltype, args)))
+_dual_eltype(x::Numeric{T}) where {T<:Real} = Dual{Nothing, T, 1} # typeof(Dual(one(T),true))
+_dual_eltype(x) = eltype(x)
 
 @adjoint function broadcasted(::AbstractArrayStyle, f::F, args...) where {F}
-  T = Broadcast.combine_eltypes(f, args)
+  TD = _combine_dual_eltypes(f, args)
   # Avoid generic broadcasting in two easy cases:
-  if T == Bool
+  if TD <: Dual && isconcretetype(TD)
+    if _dual_purefun(F) && all(_dual_safearg, args)
+      y, back = broadcast_forward(f, args...)
+      return y, ȳ -> (nothing, nothing, back(ȳ)...)
+    end
+  elseif TD <: Real && isconcretetype(TD)
     return f.(args...), _->nothing
-  elseif T <: Real && isconcretetype(T) && _purefun(F) && all(_dualsafe, args)
-    y, back = broadcast_forward(f, args...)
-    return y, ȳ -> (nothing, nothing, back(ȳ)...)
   end
   len = inclen(args)
   y∂b = _broadcast((x...) -> _pullback(__context__, f, x...), args...)
