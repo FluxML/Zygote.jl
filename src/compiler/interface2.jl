@@ -14,7 +14,6 @@ end
     chain_rrule_f = :chain_rrule_kw
   else
     cr_T = Tuple{ZygoteRuleConfig{ctx}, f, args...}
-    Core.println("cr_T=", cr_T)
     chain_rrule_f = :chain_rrule
   end
 
