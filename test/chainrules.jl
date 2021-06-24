@@ -214,6 +214,24 @@ using ChainRulesCore, ChainRulesTestUtils, Zygote
         @test (nothing,) == Zygote.gradient(x->not_diff_kw_eg(x, 2), 10.4)
         @test (nothing,) == Zygote.gradient(x->not_diff_kw_eg(x, 2; kw=2.0), 10.4)
     end
+
+    @testset "Type only rrule" begin
+        struct StructForTestingTypeOnlyRRules{T}
+            x::T
+        end
+        StructForTestingTypeOnlyRRules() = StructForTestingTypeOnlyRRules(1.0)
+        
+        function ChainRulesCore.rrule(P::Type{<:StructForTestingTypeOnlyRRules})
+            # notice here we mess with the primal doing 2.0 rather than 1.0, this is for testing purposes
+            # and also because apparently people actually want to do this. Weird, but 🤷
+            # https://github.com/SciML/SciMLBase.jl/issues/69#issuecomment-865639754
+            P(2.0),  _ -> (NoTangent(),)
+        end
+
+        @assert StructForTestingTypeOnlyRRules().x == 1.0
+        aug_primal_val, _ = Zygote.pullback(x->StructForTestingTypeOnlyRRules(), 1.2)
+        @test aug_primal_val.x == 2.0
+    end
 end
 
 @testset "ChainRulesCore.rrule_via_ad" begin

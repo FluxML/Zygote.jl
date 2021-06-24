@@ -7,9 +7,7 @@ function edge!(m::IRTools.Meta, edge::Core.MethodInstance)
 end
 
 @generated function _pullback(ctx::AContext, f, args...)
-  T = Tuple{f,args...}
-  ignore_sig(T) && return :(f(args...), Pullback{$T}(()))
-
+  # Try using ChainRulesCore
   if is_kwfunc(f, args...)
     # if it is_kw then `args[1]` are the keyword args, `args[2]` is actual function
     cr_T = Tuple{ZygoteRuleConfig{ctx}, args[2:end]...}
@@ -20,8 +18,11 @@ end
   end
 
   hascr, cr_edge = has_chain_rrule(cr_T)
-
   hascr && return :($chain_rrule_f(ZygoteRuleConfig(ctx), f, args...))
+
+  # No ChainRule, going to have to work it out.
+  T = Tuple{f,args...}
+  ignore_sig(T) && return :(f(args...), Pullback{$T}(()))
 
   g = try _generate_pullback_via_decomposition(T) catch e e end
   g === nothing && return :(f(args...), Pullback{$T}((f,)))
