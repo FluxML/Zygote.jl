@@ -225,7 +225,7 @@ using ChainRulesCore, ChainRulesTestUtils, Zygote
             # notice here we mess with the primal doing 2.0 rather than 1.0, this is for testing purposes
             # and also because apparently people actually want to do this. Weird, but 🤷
             # https://github.com/SciML/SciMLBase.jl/issues/69#issuecomment-865639754
-            P(2.0), _->NoTangent()
+            P(2.0),  _ -> (NoTangent(),)
         end
 
         @assert StructForTestingTypeOnlyRRules().x == 1.0
