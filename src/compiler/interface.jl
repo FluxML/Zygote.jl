@@ -65,10 +65,14 @@ Base.adjoint(f::Function) = x -> gradient(f, x)[1]
 
 # TODO store ids only
 struct Params
-  order::Buffer{Any, Vector{Any}}
+  order::Buffer # {Any, Vector{Any}}
   params::IdSet{Any}
-  Params() = new(Buffer([], false), IdSet())
 end
+
+Params() = Params(Buffer([], false), IdSet())
+Params(xs) = Params(Buffer(xs, false), IdSet(xs))
+Params(ps::Params) = ps
+Params(xs::Tuple) = Params(collect(xs))
 
 @forward Params.order Base.iterate, Base.length, Base.getindex
 @forward Params.params Base.in
@@ -103,6 +107,20 @@ function Base.push!(ps::Params, x)
   return ps
 end
 
+@adjoint! function Base.push!(xs::IdSet, x...)
+  l = length(x)
+  push!(xs, x...), Δ -> begin
+    (Δ, ntuple(_ -> nothing, l)...)
+  end
+end
+
+@adjoint! function Base.push!(xs::Params, x::AbstractArray{T}...) where T
+  sz_x = size.(x)
+  push!(xs, x...), Δ -> begin
+    (Δ, map(x -> Ones{T}(x...), sz_x)...)
+  end
+end
+
 Base.push!(ps::Params, x...) = (foreach(x -> push!(ps, x), x); ps)
 
 function Base.delete!(ps::Params, x)
@@ -113,8 +131,6 @@ function Base.delete!(ps::Params, x)
   end
   return ps
 end
-
-Params(xs) = push!(Params(), xs...)
 
 Base.Broadcast.broadcasted(f, ps::Params) = broadcasted(f, ps.order)
 
