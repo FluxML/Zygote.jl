@@ -206,12 +206,12 @@ end
 # needed for stateful functions.
 # See https://github.com/FluxML/Flux.jl/issues/1209
 # Should be generalized to abstract array, but reverse takes a dims keyword there
-_tryreverse(m, backs, Δ) = backs, Δ
-function _tryreverse(m::typeof(map), backs, Δ::Union{AbstractVector, Tuple})
+_tryreverse(backs, Δ) = backs, Δ
+function _tryreverse(backs, Δ::Union{AbstractVector, Tuple})
   return reverse(backs), reverse(Δ)
 end
-_tryreverse(m, x) = x
-_tryreverse(m::typeof(map), x::Union{AbstractVector, Tuple}) = reverse(x)
+_tryreverse(x) = x
+# _tryreverse(x::Union{AbstractVector, Tuple}) = reverse(x)
 
 for (mapfunc,∇mapfunc) in [(:map,:∇map),(:pmap,:∇pmap)]
   @eval function $∇mapfunc(cx, f, args...)
@@ -223,8 +223,10 @@ for (mapfunc,∇mapfunc) in [(:map,:∇map),(:pmap,:∇pmap)]
       ys, function (Δ)
         isnothing(Δ) && return nothing
         # Apply pullbacks in reverse order. Needed for correctness if `f` is stateful.
-        Δf_and_args_zipped = $mapfunc((f, δ) -> f(δ), _tryreverse($mapfunc, backs, Δ)...)
-        Δf_and_args = unzip(_tryreverse($mapfunc, Δf_and_args_zipped))
+        # Δf_and_args_zipped = $mapfunc((f, δ) -> f(δ), reverse(backs), reverse(Δ)) |> reverse 
+        # Δf_and_args = unzip(Δf_and_args_zipped)
+        Δf_and_args_zipped = $mapfunc((f, δ) -> f(δ), _tryreverse(backs, Δ)...) |> _tryreverse
+        Δf_and_args = unzip(Δf_and_args_zipped)
         Δf = reduce(accum, Δf_and_args[1])
         (Δf, Δf_and_args[2:end]...)
       end
