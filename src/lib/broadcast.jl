@@ -250,19 +250,19 @@ end
   @adjoint CUDA.CuArray{N,T}(xs::Array) where {N,T} =
     CUDA.CuArray{N,T}(xs), Δ -> (convert(Array, Δ), )
 
-  @adjoint function sum(xs::CUDA.DenseCuArray; dims = :)
+  @adjoint function sum(xs::CUDA.AbstractGPUArray; dims = :)
     placeholder = similar(xs)
     sum(xs, dims = dims), Δ -> (placeholder .= Δ,)
   end
   
   # Make sure sum(f, ::CuArray) uses broadcase through forward-mode defined above
   # Not the ChainRules.rrule which will use the Zygote.Context and thus not be GPU compatible
-  @adjoint function sum(f, xs::CUDA.DenseCuArray; kws...)
+  @adjoint function sum(f, xs::CUDA.AbstractGPUArray; kws...)
     @assert !haskey(kws, :init) # TODO add init support (julia 1.6)
     return pullback(__context__, (f, xs) -> sum(f.(xs); kws...), f, xs)
   end
   
-  @adjoint function Base.convert(::Type{T}, xs::Array)  where {T<:CUDA.DenseCuArray}
+  @adjoint function Base.convert(::Type{T}, xs::Array)  where {T<:CUDA.AbstractGPUArray}
     Base.convert(T, xs), Δ -> (nothing, Base.convert(Array, Δ),)
   end
 
