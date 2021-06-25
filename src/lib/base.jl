@@ -51,10 +51,10 @@ end
 grad_mut(ch::Channel) = Channel(ch.sz_max)
 
 @adjoint! function put!(ch::Channel, x)
-  put!(ch, x), function (ȳ)
+  put!(ch, x), function (ȳ)
     x̄ = grad_mut(__context__, ch)
     dx = isopen(x̄) ? take!(x̄) : nothing
-    (nothing, accum(dx, ȳ), nothing)
+    (nothing, accum(dx, ȳ), nothing)
   end
 end
 
@@ -75,10 +75,10 @@ end
   t, _ -> fetch(cache(__context__)[t])
 end
 
-function runadjoint(cx, t, ȳ = nothing)
+function runadjoint(cx, t, ȳ = nothing)
   t̄ = cache(cx)[t]
   f = t̄.code
-  t̄.code = () -> f(ȳ)
+  t̄.code = () -> f(ȳ)
   t̄.sticky = t.sticky
   schedule(t̄)
 end
@@ -88,7 +88,7 @@ end
 end
 
 @adjoint! function fetch(t::Task)
-  fetch(t), ȳ -> (runadjoint(__context__, t, ȳ); nothing)
+  fetch(t), ȳ -> (runadjoint(__context__, t, ȳ); nothing)
 end
 
 @adjoint! function Base.sync_end(refs)
@@ -135,6 +135,11 @@ end
         return (first=f, second=s), nothing
     end
     return getfield(p, i), pair_getfield
+end
+
+@adjoint function Base.Iterators.Zip(is)
+  Zip_pullback(Δ) = (unzip(Δ),)
+  return Base.Iterators.Zip(is), Zip_pullback
 end
 
 @adjoint Base.nameof(x::UnionAll) = nameof(x), _ -> (nothing,)
