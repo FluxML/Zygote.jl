@@ -500,14 +500,45 @@ end
   @test 150_000_000 > @allocated gradient(loss, ones(1000,1000))
 end
 
-@testset "tuples & broadcasting" begin
-    @test gradient(x -> sum(x .+ ones(2,2)), (1,2)) == ((2,2),)
-    @test gradient(x -> sum(x .+ ones(2,2)), (1,)) == ((4,),)
-    @test gradient(x -> sum(x .+ ones(2,1)), (1,2)) == ((1,1),)
+@testset "tricky broadcasting" begin
+  @test gradient(x -> sum(x .+ ones(2,2)), (1,2)) == ((2,2),)
+  @test gradient(x -> sum(x .+ ones(2,2)), (1,)) == ((4,),)
+  @test gradient(x -> sum(x .+ ones(2,1)), (1,2)) == ((1,1),)
+  
+  # https://github.com/FluxML/Zygote.jl/issues/975
+  gt = gradient((x,p) -> prod(x .^ p), [3,4], (1,2))
+  gv = gradient((x,p) -> prod(x .^ p), [3,4], [1,2])
+  @test gt[1] == gv[1]
+  @test collect(gt[2]) ≈ gv[2]
 
-    # https://github.com/FluxML/Zygote.jl/issues/975
-    gt = gradient((x,p) -> prod(x .^ p), [3,4], (1,2))
-    gv = gradient((x,p) -> prod(x .^ p), [3,4], [1,2])
-    @test gt[1] == gv[1]
-    @test collect(gt[2]) ≈ gv[2]
+  # closure captures y -- can't use ForwardDiff
+  @test gradient((x,y) -> sum((z->z^2+y[1]).(x)), [1,2,3], [4,5]) == ([2, 4, 6], [3, 0])
+  @test gradient((x,y) -> sum((z->z^2+y[1]), x), [1,2,3], [4,5]) == ([2, 4, 6], [3, 0])
+  @test gradient((x,y) -> sum(map((z->z^2+y[1]), x)), [1,2,3], [4,5]) == ([2, 4, 6], [3, 0])
+  @test gradient((x,y) -> mapreduce((z->z^2+y[1]), +, x), [1,2,3], [4,5]) == ([2, 4, 6], [3, 0])
+
+  # type unstable
+  @test gradient(xs -> sum((x -> x<2 ? false : x^2).(xs)), [1,2,3])[1][2:3] == [4, 6]
+  @test gradient(xs -> sum((x -> x<2 ? false : x^2), xs), [1,2,3])[1][2:3] == [4, 6]
+  @test gradient(xs -> sum(map((x -> x<2 ? false : x^2), xs)), [1,2,3])[1][2:3] == [4, 6]
+  @test gradient(xs -> mapreduce((x -> x<2 ? false : x^2), +, xs), [1,2,3])[1][2:3] == [4, 6]
+
+  # with Ref, Val, Symbol
+  @test gradient(x -> sum(x .+ Ref(x[1])), [1,2,3]) == ([4,1,1],)
+  @test gradient(x -> sum(x .+ (x[1],)), [1,2,3]) == ([4,1,1],)
+  @test gradient(x -> sum((first∘tuple).(x, :ignore)), [1,2,3]) == ([1,1,1],)
+  @test gradient(x -> sum((first∘tuple).(x, Symbol)), [1,2,3]) == ([1,1,1],)
+  _f(x,::Val{y}=Val(2)) where {y} = x/y
+  @test gradient(x -> sum(_f.(x, Val(2))), [1,2,3]) == ([0.5, 0.5, 0.5],)
+  @test gradient(x -> sum(_f.(x)), [1,2,3]) == ([0.5, 0.5, 0.5],)
+  @test gradient(x -> sum(map(_f, x)), [1,2,3]) == ([0.5, 0.5, 0.5],)
+
+  @test gradient(x -> sum(x ./ [1,2,4]), [1,2,pi]) == ([1.0, 0.5, 0.25],)
+  @test gradient(x -> sum(map(/, x, [1,2,4])), [1,2,pi]) == ([1.0, 0.5, 0.25],)
+
+  # negative powers
+  @test gradient((x,p) -> sum(x .^ p), [1.0,2.0,4.0], [1,-1,2])[1] ≈ [1.0, -0.25, 8.0]
+  @test gradient((x,p) -> sum(x .^ p), [1.0,2.0,4.0], -1)[1] ≈ [-1.0, -0.25, -0.0625]
+  @test gradient((x,p) -> sum(z -> z^p, x), [1.0,2.0,4.0], -1)[1] ≈ [-1.0, -0.25, -0.0625]
+  @test gradient((x,p) -> mapreduce(z -> z^p, +, x), [1.0,2.0,4.0], -1)[1] ≈ [-1.0, -0.25, -0.0625]
 end

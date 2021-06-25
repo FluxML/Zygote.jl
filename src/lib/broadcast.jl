@@ -164,31 +164,48 @@ end
 # Avoid hitting special cases for `Adjoint` etc.
 _broadcast(f::F, x...) where F = materialize(broadcasted(f, x...))
 
-_get(x::Tuple, i) = x[i]
-_get(::Nothing, i) = nothing
 collapse_nothings(xs::AbstractArray{Nothing}) = nothing
 collapse_nothings(xs) = xs
 
-@adjoint function broadcasted(::AbstractArrayStyle, f, args...)
+_dual_purefun(::Type{F}) where {F<:Function} = Base.issingletontype(F)
+_dual_purefun(::Type) = false
+_dual_purefun(::Type{typeof(^)}) = false  # avoid DomainError from negative powers
+
+_dual_safearg(x::Numeric{<:Real}) = true
+_dual_safearg(x::Ref{<:Numeric{<:Real}}) = true
+_dual_safearg(x::Union{Type,Val,Symbol}) = true  # non-differentiable types
+_dual_safearg(x) = false
+
+@adjoint function broadcasted(::AbstractArrayStyle, f::F, args...) where {F}
+  T = Broadcast.combine_eltypes(f, args)
+  # Avoid generic broadcasting in two easy cases:
+  if T == Bool
+    return f.(args...), _->nothing 
+  elseif T <: Real && isconcretetype(T) && _dual_purefun(F) && all(_dual_safearg, args)
+    y, back = broadcast_forward(f, args...)
+    return y, ȳ -> (nothing, nothing, back(ȳ)...)
+  end
   len = inclen(args)
   y∂b = _broadcast((x...) -> _pullback(__context__, f, x...), args...)
-  y = map(x -> x[1], y∂b)
-  ∂b = map(x -> x[2], y∂b)
-  y, function (ȳ)
-    dxs_zip = map((∂b, ȳ) -> ∂b(ȳ), ∂b, ȳ)
-    dxs = collapse_nothings.(ntuple(i -> map(x -> _get(x, i), dxs_zip), len))
+  y = map(first, y∂b)
+  function ∇broadcasted(ȳ)
+    dxs_zip = map(((_, pb), ȳ₁) -> pb(ȳ₁), y∂b, ȳ)
+    dxs = ntuple(len) do i
+      collapse_nothings(map(StaticGetter{i}(), dxs_zip))
+    end
     (nothing, accum_sum(dxs[1]), map(unbroadcast, args, Base.tail(dxs))...)
   end
+  y, ∇broadcasted
 end
 
 @adjoint function broadcasted(::AbstractArrayStyle{0}, f, args...)
-  len = inclen(args)
   y, ∂b = _broadcast((x...) -> _pullback(__context__, f, x...), args...)
-  y, function (ȳ)
+  function ∇broadcasted0(ȳ)
     dxs = ∂b(ȳ)
     dxs === nothing && return nothing
     (nothing, dxs...)
   end
+  y, ∇broadcasted0
 end
 
 # Use the `map` adjoint in this special case, which is the same but applies
@@ -202,16 +219,13 @@ end
 
 @adjoint! (b::typeof(broadcast))(f, args...) = _pullback(__context__, broadcasted, f, args...)
 
-# Forward Mode (mainly necessary for CUDA)
+# Forward Mode -- necessary for CUDA, also used as a fast path above
 
 import ForwardDiff
 using ForwardDiff: Dual
 
 dual(x, p) = x
 dual(x::Real, p) = Dual(x, p)
-
-dualtype(::Type{Dual{G,T,P}}) where {G,T,P} = T
-dualtype(T) = T
 
 function dual_function(f::F) where F
   function (args::Vararg{Any,N}) where N
