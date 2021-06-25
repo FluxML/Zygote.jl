@@ -247,8 +247,8 @@ end
     end
   end
 
-  @adjoint CUDA.DenseCuArray{N,T}(xs::Array) where {N,T} =
-    CUDA.DenseCuArray{N,T}(xs), Δ -> (convert(Array, Δ), )
+  @adjoint CUDA.CuArray{N,T}(xs::Array) where {N,T} =
+    CUDA.CuArray{N,T}(xs), Δ -> (convert(Array, Δ), )
 
   @adjoint function sum(xs::CUDA.DenseCuArray; dims = :)
     placeholder = similar(xs)
