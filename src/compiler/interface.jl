@@ -72,7 +72,7 @@ Returns both the value `f(args...)` and the [`gradient`](@ref),
 `∂f/∂x` for each argument `x`, as a named tuple.
 With imiplicit parameters, the value is `f()`.
 
-```jldoctest
+```jldoctest; setup=:(using Zygote)
 julia> y, ∇ = withgradient(/, 1, 2)
 (val = 0.5, grad = (0.5, -0.25))
 
