@@ -50,12 +50,22 @@ sensitivity(y) = error("Output should be scalar; gradients are not defined for o
     gradient(f, args...)
 
 Returns a tuple containing `∂f/∂x` for each argument `x`,
-the derivative (for scalar x) or the gradient.
+the derivative (for scalar `x`) or the gradient.
 
 `f(args...)` must be a real number, see [`jacobian`](@ref) for array output.
 
 See also [`withgradient`](@ref) to keep the value `f(args...)`,
 and `pullback`](@ref) for value and back-propagator.
+
+```jldoctest; setup=:(using Zygote)
+julia> gradient(*, 2, 3, 5)
+(15, 10, 6)
+
+julia> gradient([7,11,13]) do x
+         sum(abs2, x)
+       end
+([14, 22, 26],)
+```
 """
 function gradient(f, args...)
   y, back = pullback(f, args...)
@@ -68,9 +78,8 @@ Base.adjoint(f::Function) = x -> gradient(f, x)[1]
     withgradient(f, args...)
     withgradient(f, ::Params)
 
-Returns both the value `f(args...)` and the [`gradient`](@ref), 
-`∂f/∂x` for each argument `x`, as a named tuple.
-With imiplicit parameters, the value is `f()`.
+Returns both the value `f(args...)` and the [`gradient`](@ref)
+as a named tuple. With implicit parameters, the value is `f()`.
 
 ```jldoctest; setup=:(using Zygote)
 julia> y, ∇ = withgradient(/, 1, 2)
@@ -88,19 +97,32 @@ end
 # Param-style wrappers
 
 """
-    gradient(() -> loss(), ::Params) -> Grads
+    gradient(() -> loss(), ps::Params) -> Grads
 
-Gradient with implicit parameters. Returns a container, from which
-`grads[W]` extracts the gradient with respect to some array `W`,
-if this is among those being tracked, for example via `Params([W, A, B])`.
+Gradient with implicit parameters. Takes a zero-argument function,
+and returns a dictionary-like container, whose keys are arrays `x in ps`.
+
+```jldoctest; setup=:(using Zygote)
+julia> x = [1 2; 3 4]; y = [5, 6];
+
+julia> g = gradient(Params([x, y])) do
+         sum(x .* y .* y')
+       end
+Grads(...)
+
+julia> g[x]
+2×2 Matrix{Int64}:
+ 25  30
+ 30  36
+```
 """
 gradient
 
 """
-    Params([A, B, C...])
+    Params([A, B, C])
 
-Container for implicit parameters, differentiating a zero-argument
-funtion `() -> loss()` with respect to `A, B, C`.
+Container for implicit parameters, used when differentiating
+a zero-argument funtion `() -> loss()` with respect to `A, B, C`.
 """
 struct Params
   order::Buffer # {Any, Vector{Any}}

@@ -83,6 +83,10 @@ end
   Jxy = jacobian(() -> ys[1:2] .+ sum(xs.^2), Params([xs, ys]))
   @test Jxy[ys] ≈ [1 0 0; 0 1 0]
   @test Jxy[xs] ≈ [2 6 4 8; 2 6 4 8]
+
+  z, grad = withjacobian(() -> ys[1:2] .+ sum(xs.^2), Params([xs, ys]))
+  @test z == [35, 37]
+  @test grad[ys] ≈ [1 0 0; 0 1 0]
 end
 
 using ForwardDiff
