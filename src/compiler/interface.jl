@@ -78,8 +78,8 @@ Base.adjoint(f::Function) = x -> gradient(f, x)[1]
     withgradient(f, args...)
     withgradient(f, ::Params)
 
-Returns both the value `f(args...)` and the [`gradient`](@ref)
-as a named tuple. With implicit parameters, the value is `f()`.
+Returns both the value of the function and the [`gradient`](@ref),
+as a named tuple. 
 
 ```jldoctest; setup=:(using Zygote)
 julia> y, ∇ = withgradient(/, 1, 2)
@@ -103,26 +103,29 @@ Gradient with implicit parameters. Takes a zero-argument function,
 and returns a dictionary-like container, whose keys are arrays `x in ps`.
 
 ```jldoctest; setup=:(using Zygote)
-julia> x = [1 2; 3 4]; y = [5, 6];
+julia> x = [1 2 3; 4 5 6]; y = [7, 8]; z = [1, 10, 100];
 
 julia> g = gradient(Params([x, y])) do
-         sum(x .* y .* y')
+         sum(x .* y .* z')
        end
 Grads(...)
 
 julia> g[x]
-2×2 Matrix{Int64}:
- 25  30
- 30  36
+2×3 Matrix{Int64}:
+ 7  70  700
+ 8  80  800
+
+julia> haskey(g, z)  # only x and y are parameters
+false
 ```
 """
 gradient
 
 """
-    Params([A, B, C])
+    Params([A, B])
 
 Container for implicit parameters, used when differentiating
-a zero-argument funtion `() -> loss()` with respect to `A, B, C`.
+a zero-argument funtion `() -> loss(A, B)` with respect to `A, B`.
 """
 struct Params
   order::Buffer # {Any, Vector{Any}}
