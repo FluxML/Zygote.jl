@@ -105,7 +105,7 @@ This reverse-mode Jacobian needs to evaluate the pullback once for each element 
 Doing so is usually only efficient when `length(y)` is small compared to `length(a)`,
 otherwise forward mode is likely to be better.
 
-See also [`hessian`](@ref), [`hessian_reverse`](@ref).
+See also [`withjacobian`](@ref), `hessian`](@ref), [`hessian_reverse`](@ref).
 
 # Examples
 
@@ -137,7 +137,19 @@ julia> gradient((a,t) -> sum(a .* t[1]) + t[2], [1,2,3], (4,5))  # gradient unde
 ([4 4 4], (6, 1))
 ```
 """
-function jacobian(f, args...)
+jacobian(f, args...) = withjacobian(f, args...).grad
+
+"""
+    withjacobian(f, args...)
+
+Returns both the value `f(args...)` and the [`jacobian`](@ref) as a named tuple.
+
+```jldoctest
+julia> withjacobian(cumsum, [1,2,3])
+(val = [1, 3, 6], grad = ([1 0 0; 1 1 0; 1 1 1],))
+```
+"""
+function withjacobian(f, args...)
   y, back = pullback(_jvec∘f, args...)
   out = map(args) do x
     T = promote_type(eltype(x), eltype(y))
@@ -153,7 +165,7 @@ function jacobian(f, args...)
       _gradcopy!(view(dx,k,:), grad)
     end
   end
-  out
+  (val=y, grad=out)
 end
 
 _jvec(x::AbstractArray) = vec(x)
@@ -197,7 +209,9 @@ julia> Jxy[xs]
  2  6  4  8
 ```
 """
-function jacobian(f, pars::Params)
+jacobian(f, pars::Params) = withjacobian(f, pars::Params).grad
+
+function withjacobian(f, pars::Params)
   y, back = pullback(_jvec∘f, pars)
   out = IdDict()
   for p in pars
@@ -213,7 +227,7 @@ function jacobian(f, pars::Params)
       _gradcopy!(view(out[p],k,:), grads[p])
     end
   end
-  Grads(out, pars)
+  (val=y, grad=Grads(out, pars))
 end
 
 """

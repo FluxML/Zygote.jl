@@ -111,6 +111,7 @@ dx = back(4)
 @test dx == (12, 8)
 
 @test gradient(mul, 2, 3) == (3, 2)
+@test withgradient(mul, 2, 3) == (val = 6, grad = (3, 2))
 
 bool = true
 b(x) = bool ? 2x : x
@@ -287,6 +288,9 @@ y, back = pullback(() -> layer(x), Params([W]))
 @test back([1, 1])[W] == [1 2; 1 2]
 
 @test gradient(() -> sum(W * x), Params([W]))[W] == [1 2; 1 2]
+y, grad = withgradient(() -> sum(W * x), Params([W]))
+@test y == 3
+@test grad[W] == [1 2; 1 2]
 
 let
   p = [1]

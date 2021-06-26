@@ -53,6 +53,9 @@ Returns a tuple containing `∂f/∂x` for each argument `x`,
 the derivative (for scalar x) or the gradient.
 
 `f(args...)` must be a real number, see [`jacobian`](@ref) for array output.
+
+See also [`withgradient`](@ref) to keep the value `f(args...)`,
+and `pullback`](@ref) for value and back-propagator.
 """
 function gradient(f, args...)
   y, back = pullback(f, args...)
@@ -60,6 +63,25 @@ function gradient(f, args...)
 end
 
 Base.adjoint(f::Function) = x -> gradient(f, x)[1]
+
+"""
+    withgradient(f, args...)
+
+Returns both the value `f(args...)` and the [`gradient`](@ref), 
+`∂f/∂x` for each argument `x`, as a named tuple.
+
+```jldoctest
+julia> y, ∇ = withgradient(/, 1, 2)
+(val = 0.5, grad = (0.5, -0.25))
+
+julia> ∇ == gradient(/, 1, 2)
+true
+```
+"""
+function withgradient(f, args...)
+  y, back = pullback(f, args...)
+  (val=y, grad=back(sensitivity(y)))
+end
 
 # Param-style wrappers
 
