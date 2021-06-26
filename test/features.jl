@@ -288,9 +288,9 @@ y, back = pullback(() -> layer(x), Params([W]))
 @test back([1, 1])[W] == [1 2; 1 2]
 
 @test gradient(() -> sum(W * x), Params([W]))[W] == [1 2; 1 2]
-y, grad = withgradient(() -> sum(W * x), Params([W]))
+y, gr = withgradient(() -> sum(W * x), Params([W]))
 @test y == 3
-@test grad[W] == [1 2; 1 2]
+@test gr[W] == [1 2; 1 2]
 
 let
   p = [1]
