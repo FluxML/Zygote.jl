@@ -66,9 +66,11 @@ Base.adjoint(f::Function) = x -> gradient(f, x)[1]
 
 """
     withgradient(f, args...)
+    withgradient(f, ::Params)
 
 Returns both the value `f(args...)` and the [`gradient`](@ref), 
 `∂f/∂x` for each argument `x`, as a named tuple.
+With imiplicit parameters, the value is `f()`.
 
 ```jldoctest
 julia> y, ∇ = withgradient(/, 1, 2)
@@ -85,10 +87,24 @@ end
 
 # Param-style wrappers
 
-# TODO store ids only
+"""
+    gradient(() -> loss(), ::Params) -> Grads
+
+Gradient with implicit parameters. Returns a container, from which
+`grads[W]` extracts the gradient with respect to some array `W`,
+if this is among those being tracked, for example via `Params([W, A, B])`.
+"""
+gradient
+
+"""
+    Params([A, B, C...])
+
+Container for implicit parameters, differentiating a zero-argument
+funtion `() -> loss()` with respect to `A, B, C`.
+"""
 struct Params
   order::Buffer # {Any, Vector{Any}}
-  params::IdSet{Any}
+  params::IdSet{Any} # TODO store ids only
 end
 
 Params() = Params(Buffer([], false), IdSet())
@@ -193,7 +209,13 @@ function copy!(x::AbstractVector, ps::Params)
   ps
 end
 
+"""
+    Grads(...)
 
+Dictionary-like container returned when taking gradients with
+respect to implicit parameters. For an array `W`, appearing 
+within `Params([W, A, B...])`, the gradient is `g[W]`.
+"""
 struct Grads
   grads::IdDict{Any,Any}
   params::Params
