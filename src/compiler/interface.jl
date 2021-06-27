@@ -61,10 +61,14 @@ and [`pullback`](@ref) for value and back-propagator.
 julia> gradient(*, 2, 3, 5)
 (15, 10, 6)
 
-julia> gradient([7,11,13]) do x
-         sum(abs2, x)
-       end
+julia> gradient(x -> sum(abs2,x), [7, 11, 13])
 ([14, 22, 26],)
+
+julia> gradient([7, 11], 0, 1) do x, y, d
+         p = size(x, d)
+         sum(x.^p .+ y)
+       end
+([14.0, 22.0], 2, nothing)
 ```
 """
 function gradient(f, args...)
