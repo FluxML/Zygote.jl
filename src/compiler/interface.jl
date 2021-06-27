@@ -55,7 +55,7 @@ the derivative (for scalar `x`) or the gradient.
 `f(args...)` must be a real number, see [`jacobian`](@ref) for array output.
 
 See also [`withgradient`](@ref) to keep the value `f(args...)`,
-and `pullback`](@ref) for value and back-propagator.
+and [`pullback`](@ref) for value and back-propagator.
 
 ```jldoctest; setup=:(using Zygote)
 julia> gradient(*, 2, 3, 5)
