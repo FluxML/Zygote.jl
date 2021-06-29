@@ -1,5 +1,4 @@
-import .StatsFuns
-using .StatsFuns: xlogx, xlogy, logistic, logit, log1psq, log1pexp,
+using .LogExpFunctions: xlogx, xlogy, logistic, logit, log1psq, log1pexp,
     logsumexp, logaddexp, logsubexp
 using Base.Broadcast: broadcasted
 

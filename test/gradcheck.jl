@@ -72,13 +72,13 @@ end
 @testset "power" begin
   @test gradient(x -> x^2, -2) == (-4,)
   @test gradient(x -> x^10, -1.0) == (-10,) # literal_pow
-  pow = 10
-  @test gradient(x -> x^pow, -1.0) == (-pow,)
+  _pow = 10
+  @test gradient(x -> x^_pow, -1.0) == (-_pow,)
   @test gradient(p -> real(2^p), 2)[1] ≈ 4*log(2)
 
   @test gradient(xs ->sum(xs .^ 2), [2, -1]) == ([4, -2],)
   @test gradient(xs ->sum(xs .^ 10), [3, -1]) == ([10*3^9, -10],)
-  @test gradient(xs ->sum(xs .^ pow), [4, -1]) == ([pow*4^9, -10],)
+  @test gradient(xs ->sum(xs .^ _pow), [4, -1]) == ([_pow*4^9, -10],)
 
   @test gradient(x -> real((1+3im) * x^2), 5+7im) == (-32 - 44im,)
   @test gradient(p -> real((1+3im) * (5+7im)^p), 2)[1] ≈ (-234 + 2im)*log(5 - 7im)
@@ -188,6 +188,22 @@ end
   # https://github.com/FluxML/Zygote.jl/issues/272
   g(x) = view(x,1:2)[1]
   @test gradient(g, ones(3)) == ([1,0,0],)
+end
+
+@testset "eachcol" begin
+    @test gradtest(x -> map(sum, eachcol(x)), (3,4))
+    @test gradtest(x -> map(sum, eachcol(transpose(x))), (3,4))
+
+    @test gradtest(x -> map(norm, eachcol(x)), (3,4))
+    @test gradtest(x -> map(norm, eachrow(x)), (3,4))
+    @test gradtest(x -> map(norm, eachslice(x, dims=3)), (3,4,5))
+
+    # some slices may have gradient nothing
+    @test gradient(x -> sum(y -> rand()>0.5 ? 0 : first(y), eachcol(x)), rand(3,10))[1] isa Matrix
+
+    # strange errors
+    @test_skip gradient(x -> sum(norm, eachcol(x)), [1 2 3; 4 5 6])[1] isa Matrix
+    @test_skip gradient(x -> sum(norm, eachcol(x)), rand(3,400))[1] isa Matrix
 end
 
 @testset "collect" begin
@@ -539,15 +555,21 @@ end
   @testset "Cholesky" begin
     # Check that the forwards pass computes the correct thing.
     f(X, Y) = cholesky(X * X' + I) \ Y
-    @test Zygote.pullback(X -> f(X, Y), X)[1] == cholesky(X * X' + I) \ Y
+    @test Zygote.pullback(X -> f(X, Y), X)[1] ≈ cholesky(X * X' + I) \ Y
     @test gradtest(X -> f(X, Y), X)
     @test gradtest(Y -> f(X, Y), Y)
     @test gradtest(X -> f(X, y), X)
     @test gradtest(y -> f(X, y), y)
     g(X) = cholesky(X * X' + I)
-    @test Zygote.pullback(g, X)[2]((factors=LowerTriangular(X),)) ==
-      Zygote.pullback(g, X)[2]((factors=Matrix(LowerTriangular(X)),))
+    @test Zygote.pullback(g, X)[2]((factors=LowerTriangular(X),))[1] ≈
+      Zygote.pullback(g, X)[2]((factors=Matrix(LowerTriangular(X)),))[1]
     @test_throws PosDefException Zygote.pullback(X -> cholesky(X, check = false), X)[2]((factors=X,))
+
+    # https://github.com/FluxML/Zygote.jl/issues/932
+    @test gradcheck(rand(5, 5), rand(5)) do A, x
+        C = cholesky(Symmetric(A' * A + I))
+        return sum(C \ x) + logdet(C)
+    end
   end
 end
 
@@ -667,8 +689,8 @@ end
   @test gradtest(Diagonal, d)
   y, back = Zygote.pullback(Diagonal, d)
   D̄ = randn(rng, P, P)
-  @test back(D̄) == back(Diagonal(D̄))
-  @test back(D̄) == back((diag=diag(D̄),))
+  @test back(D̄)[1] ≈ back(Diagonal(D̄))[1]
+  @test back(D̄)[1] ≈ back((diag=diag(D̄),))[1]
 end
 
 @testset "dense + UniformScaling" begin
@@ -683,7 +705,7 @@ end
   @testset "cholesky - dense" begin
     rng, N = MersenneTwister(123456), 5
     A = randn(rng, N, N)
-    @test cholesky(A' * A + I) == first(Zygote.pullback(A->cholesky(A' * A + I), A))
+    @test cholesky(A' * A + I).U ≈ first(Zygote.pullback(A->cholesky(A' * A + I), A)).U
     @test gradtest(A->cholesky(A' * A + I).U, A)
     @test gradtest(A->logdet(cholesky(A' * A + I)), A)
     @test gradtest(B->cholesky(Symmetric(B)).U, A * A' + I)
@@ -865,10 +887,17 @@ _randmatseries(rng, ::typeof(atanh), T, n, domain::Type{Complex}) = nothing
 
         @test _gradtest_hermsym(f, ST, A)
 
-        y = Zygote.pullback(f, A)[1]
+        y, back = Zygote.pullback(f, A)
         y2 = f(A)
         @test y ≈ y2
         @test typeof(y) == typeof(y2)
+        ȳ = randn(eltype(y), size(y))
+        if y isa Union{Symmetric,Hermitian}
+            ȳ = typeof(y)(ȳ, y.uplo)
+        end
+        Ā = back(ȳ)[1]
+        @test typeof(Ā) == typeof(A)
+        @test Ā.uplo == A.uplo
 
         @testset "similar eigenvalues" begin
           λ[1] = λ[3] + sqrt(eps(eltype(λ))) / 10
@@ -1033,8 +1062,8 @@ end
         Y = copy(X)
         Δ = randn(P, P)
         Δ_fd = FiniteDifferences.j′vp(
-                  FiniteDifferences.central_fdm(5, 1), 
-                  X -> pairwise(metric, X, Y; dims=2), 
+                  FiniteDifferences.central_fdm(5, 1),
+                  X -> pairwise(metric, X, Y; dims=2),
                   Δ, X)
         _, pb = Zygote.pullback(X -> pairwise(metric, X, Y; dims=2), X)
 
@@ -1143,6 +1172,13 @@ end
   @test gradtest(catdim, rand(2,5,3), rand(2,5,3), rand(2,5,3))
 end
 
+@testset "cat(..., dims = Val($dim))" for dim in 1:5
+  catdim = (x...) -> cat(x..., dims = Val(dim))
+  @test gradtest(catdim, rand(5), rand(5))
+  @test gradtest(catdim, rand(2,5), rand(2,5), rand(2,5))
+  @test gradtest(catdim, rand(2,5,3), rand(2,5,3), rand(2,5,3))
+end
+
 @testset "cat empty" begin
   catdim = (x...) -> cat(x..., dims = (1, 2))
   @test gradtest(catdim, rand(0,5,3), rand(2,5,3), rand(2,5,3))
@@ -1160,44 +1196,44 @@ end
     @test gradcheck(x -> muladd(x[1], x[2], x[3]), [2.0, 3.0, 5.0])
 end
 
-import StatsFuns
+import LogExpFunctions
 
 Zygote.refresh()
 
 @testset "xlogx" begin
-  @test gradcheck(x->2.5 * StatsFuns.xlogx(x[1]), [1.0])
-  @test gradcheck(x->2.5 * StatsFuns.xlogx(x[1]), [2.45])
-  @test gradtest(x -> StatsFuns.xlogx.(x), (3,3))
+  @test gradcheck(x->2.5 * LogExpFunctions.xlogx(x[1]), [1.0])
+  @test gradcheck(x->2.5 * LogExpFunctions.xlogx(x[1]), [2.45])
+  @test gradtest(x -> LogExpFunctions.xlogx.(x), (3,3))
 end
 
 @testset "xlogy" begin
-  @test gradcheck(x -> StatsFuns.xlogy(x[1], x[2]), [1.0, 2.0])
-  @test gradcheck(x -> StatsFuns.xlogy(x[1], x[2]), [0.0, 2.0])
-  @test gradtest((x,y) -> StatsFuns.xlogy.(x,y), (3,3), (3,3))
+  @test gradcheck(x -> LogExpFunctions.xlogy(x[1], x[2]), [1.0, 2.0])
+  @test gradcheck(x -> LogExpFunctions.xlogy(x[1], x[2]), [0.0, 2.0])
+  @test gradtest((x,y) -> LogExpFunctions.xlogy.(x,y), (3,3), (3,3))
 end
 
 @testset "logistic" begin
-  @test gradcheck(x->3.0 * StatsFuns.logistic(x[1]), [-5.0])
-  @test gradcheck(x->3.0 * StatsFuns.logistic(x[1]), [-1.0])
-  @test gradcheck(x->3.0 * StatsFuns.logistic(x[1]), [-eps()])
-  @test gradcheck(x->3.0 * StatsFuns.logistic(x[1]), [0.0])
-  @test gradcheck(x->3.0 * StatsFuns.logistic(x[1]), [eps()])
-  @test gradcheck(x->3.0 * StatsFuns.logistic(x[1]), [1.0])
-  @test gradcheck(x->3.0 * StatsFuns.logistic(x[1]), [5.0])
+  @test gradcheck(x->3.0 * LogExpFunctions.logistic(x[1]), [-5.0])
+  @test gradcheck(x->3.0 * LogExpFunctions.logistic(x[1]), [-1.0])
+  @test gradcheck(x->3.0 * LogExpFunctions.logistic(x[1]), [-eps()])
+  @test gradcheck(x->3.0 * LogExpFunctions.logistic(x[1]), [0.0])
+  @test gradcheck(x->3.0 * LogExpFunctions.logistic(x[1]), [eps()])
+  @test gradcheck(x->3.0 * LogExpFunctions.logistic(x[1]), [1.0])
+  @test gradcheck(x->3.0 * LogExpFunctions.logistic(x[1]), [5.0])
 end
 
 @testset "logit" begin
-  @test gradcheck(x->5.0 * StatsFuns.logit(x[1]), [0.1])
-  @test gradcheck(x->5.0 * StatsFuns.logit(x[1]), [0.3])
-  @test gradcheck(x->5.0 * StatsFuns.logit(x[1]), [0.5])
-  @test gradcheck(x->5.0 * StatsFuns.logit(x[1]), [0.7])
-  @test gradcheck(x->5.0 * StatsFuns.logit(x[1]), [0.9])
+  @test gradcheck(x->5.0 * LogExpFunctions.logit(x[1]), [0.1])
+  @test gradcheck(x->5.0 * LogExpFunctions.logit(x[1]), [0.3])
+  @test gradcheck(x->5.0 * LogExpFunctions.logit(x[1]), [0.5])
+  @test gradcheck(x->5.0 * LogExpFunctions.logit(x[1]), [0.7])
+  @test gradcheck(x->5.0 * LogExpFunctions.logit(x[1]), [0.9])
 end
 
 function test_log1pexp(T, xs)
   y = T(4.3)
   for x in xs
-    @test gradcheck(x->y * StatsFuns.log1pexp(x[1]), [x])
+    @test gradcheck(x->y * LogExpFunctions.log1pexp(x[1]), [x])
   end
 end
 
@@ -1213,43 +1249,43 @@ end
       test_log1pexp(Float64, [33.3, 33.3 + eps(), 100.0])
     end
   end
-  @test gradcheck(x->2.5 * StatsFuns.log1pexp(x[1]), [1.0])
-  @test gradcheck(x->2.5 * StatsFuns.log1pexp(x[1]), [2.45])
-  @test gradtest(x -> StatsFuns.log1pexp.(x), (3,3))
+  @test gradcheck(x->2.5 * LogExpFunctions.log1pexp(x[1]), [1.0])
+  @test gradcheck(x->2.5 * LogExpFunctions.log1pexp(x[1]), [2.45])
+  @test gradtest(x -> LogExpFunctions.log1pexp.(x), (3,3))
 end
 
 @testset "log1psq" begin
   rng = MersenneTwister(123456)
   @testset "Float64" begin
     for x in [-10.0, -5.0, -1.0, -eps(), 0.0, eps(), 1.0, 5.0, 10.0]
-      @test gradcheck(x->5.1 * StatsFuns.log1psq(x[1]), [x])
+      @test gradcheck(x->5.1 * LogExpFunctions.log1psq(x[1]), [x])
     end
   end
 end
 
 @testset "logaddexp" begin
-  @test gradcheck(x -> StatsFuns.logaddexp(x[1], x[2]), [1.0, 2.0])
-  @test gradcheck(x -> StatsFuns.logaddexp(x[1], x[2]), [1.0, -1.0])
-  @test gradcheck(x -> StatsFuns.logaddexp(x[1], x[2]), [-2.0, -3.0])
-  @test gradcheck(x -> StatsFuns.logaddexp(x[1], x[2]), [5.0, 5.0])
-  @test gradtest((x,y) -> StatsFuns.logaddexp.(x,y), (3,3), (3,3))
+  @test gradcheck(x -> LogExpFunctions.logaddexp(x[1], x[2]), [1.0, 2.0])
+  @test gradcheck(x -> LogExpFunctions.logaddexp(x[1], x[2]), [1.0, -1.0])
+  @test gradcheck(x -> LogExpFunctions.logaddexp(x[1], x[2]), [-2.0, -3.0])
+  @test gradcheck(x -> LogExpFunctions.logaddexp(x[1], x[2]), [5.0, 5.0])
+  @test gradtest((x,y) -> LogExpFunctions.logaddexp.(x,y), (3,3), (3,3))
 end
 
 @testset "logsubexp" begin
-  @test gradcheck(x -> StatsFuns.logsubexp(x[1], x[2]), [1.0, 2.0])
-  @test gradcheck(x -> StatsFuns.logsubexp(x[1], x[2]), [1.0, -1.0])
-  @test gradcheck(x -> StatsFuns.logsubexp(x[1], x[2]), [-2.0, -3.0])
-  @test gradtest((x,y) -> StatsFuns.logsubexp.(x,y), (3,3), (3,3))
+  @test gradcheck(x -> LogExpFunctions.logsubexp(x[1], x[2]), [1.0, 2.0])
+  @test gradcheck(x -> LogExpFunctions.logsubexp(x[1], x[2]), [1.0, -1.0])
+  @test gradcheck(x -> LogExpFunctions.logsubexp(x[1], x[2]), [-2.0, -3.0])
+  @test gradtest((x,y) -> LogExpFunctions.logsubexp.(x,y), (3,3), (3,3))
 end
 
 @testset "logsumexp" begin
   rng = MersenneTwister(123456)
   @testset "Float64" begin
-    @test gradtest(StatsFuns.logsumexp, randn(rng, 1))
-    @test gradtest(StatsFuns.logsumexp, randn(rng, 1, 1))
-    @test gradtest(StatsFuns.logsumexp, randn(rng, 3))
-    @test gradtest(StatsFuns.logsumexp, randn(rng, 3, 4, 5))
-    @test gradtest(x -> sum(StatsFuns.logsumexp(x; dims=1)), randn(rng, 4, 4))
+    @test gradtest(LogExpFunctions.logsumexp, randn(rng, 1))
+    @test gradtest(LogExpFunctions.logsumexp, randn(rng, 1, 1))
+    @test gradtest(LogExpFunctions.logsumexp, randn(rng, 3))
+    @test gradtest(LogExpFunctions.logsumexp, randn(rng, 3, 4, 5))
+    @test gradtest(x -> sum(LogExpFunctions.logsumexp(x; dims=1)), randn(rng, 4, 4))
   end
 end
 
@@ -1259,7 +1295,8 @@ end
 end
 
 @testset "broadcast" begin
-  @test gradient(x -> sum(sin.(x)), Diagonal(randn(3)))[1][2] == 1
+  # Before https://github.com/FluxML/Zygote.jl/pull/1001 this gave [1 1 1; 1 0 1; 1 1 -1] 
+  @test gradient(x -> sum(sin.(x)), Diagonal([0,pi/2,pi]))[1] ≈ [1 0 0; 0 0 0; 0 0 -1]
 
   a = rand(3)
   b = rand(2,2)
@@ -1272,6 +1309,12 @@ end
   x1 = rand(3, 3)
   @test gradient(x -> sum(x .== 0.5), x1)[1] === nothing
   @test gradient(x -> sum(x .* (x .== maximum(x, dims=1))), x1)[1] == (x1 .== maximum(x1, dims=1))
+
+  # tests for un-broadcasting *, / via scalar rules
+  @test all(gradient((x,y) -> sum(x .* y), [1,2], 5) .≈ ([5, 5], 3))
+  @test all(gradient((x,y) -> sum(x .* y), 5, [1,2]) .≈ (3, [5, 5]))
+  @test all(gradient((x,y) -> sum(x .* y), [1,2], [3 4 5]) .≈ ([12, 12], [3 3 3]))
+  @test all(gradient((x,y) -> sum(x ./ y), [1,2], 5) .≈ ([0.2, 0.2], -0.12))
 end
 
 using Zygote: Buffer
@@ -1321,6 +1364,23 @@ using Zygote: Buffer
     push!(b, 3)
     prod(copy(b))
   end == (3,)
+
+  @testset "Limited Mutation" begin
+    p = [rand(3,3), rand(3,3)]
+    r = rand(5,5)
+
+    # TODO: ngradient cannot handle Vector{Array}
+    gs = gradient((p,x) -> sum(sum.(push!(p,x))), p, r)
+    @test length(p[end]) == length(gs[1][end])
+    @test gs[1] ≈ map(x -> one.(x), p)
+    @test gs[2] ≈ one.(r)
+
+    p = [rand(3,3), rand(3,3)] # redefine `p` after mutation
+    gs = gradient(x -> sum(pop!(x)), p)
+    @test length(gs[1]) == 2
+    @test gs[1][1] == one.(p[1])
+  end
+
 end
 
 @testset "FillArrays" begin
@@ -1619,3 +1679,42 @@ end
     gradient(x->norm(x*[1im, 1]), 1.23)
     gradient(x->norm(x*[1im 1]), 1.23)
 end
+
+# https://github.com/FluxML/Zygote.jl/issues/804
+@testset "Unused comprehension" begin
+    # Comprehension is used.
+    io = IOBuffer()
+    s = 0.0
+    gs = gradient([1.0, 2.0]) do xs
+        sum([(print(io, x); s += x; s * x) for x in xs])
+    end
+    @test String(take!(io)) == "1.02.0"
+    @test s == 3.0
+    @test gs == ([4.0, 5.0],)
+
+    # Comprehension is not used.
+    io = IOBuffer()
+    s = 0.0
+    gs = gradient([1.0, 2.0]) do xs
+        sum([(print(io, x); s += x; s * x) for x in xs])
+        0.0
+    end
+    @test String(take!(io)) == "1.02.0"
+    @test s == 3.0
+    @test gs == (nothing,)
+
+    # Comprehension is empty and not used.
+    io = IOBuffer()
+    s = 0.0
+    gs = gradient([]) do xs
+        [(print(io, x); s += x; s * x) for x in xs]
+        0.0
+    end
+    @test String(take!(io)) == ""
+    @test s == 0.0
+    @test gs == (nothing,)
+end
+
+# https://github.com/FluxML/Zygote.jl/issues/996
+a = rand(3)
+@test Zygote.gradient(x->sum(x .+ rand.()), a) == (ones(3),)

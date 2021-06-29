@@ -31,11 +31,11 @@ ignore(f) = f()
 Tell Zygote to ignore an expression. Equivalent to `ignore() do (...) end`.
 Example:
 
-```julia-repl	
-julia> f(x) = (y = Zygote.@ignore x; x * y); 
+```julia-repl
+julia> f(x) = (y = Zygote.@ignore x; x * y);
 julia> f'(1)
 1
-```	
+```
 """
 macro ignore(ex)
     return :(Zygote.ignore() do
@@ -100,14 +100,28 @@ macro showgrad(x)
 end
 
 """
-    hessian(f, x)
+   isderiving()
+   isderiving(x)
 
-Construct the Hessian of `f`, where `x` is a real or real array and `f(x)` is
-a real.
+Check whether the current function call is happening while taking the derivative.
 
-    julia> hessian(((a, b),) -> a*b, [2, 3])
-    2×2 Array{Int64,2}:
-     0  1
-     1  0
+
+    julia> function f(x)
+             @show isderiving()
+           end
+
+    f (generic function with 1 method)
+
+    julia> f(3)
+    isderiving() = false
+    false
+
+    julia> gradient(f, 4)
+    isderiving() = true
+    (nothing,)
 """
-hessian(f, x::AbstractArray) = forward_jacobian(x -> gradient(f, x)[1], x)[2]
+isderiving() = false
+isderiving(x) = false
+
+@adjoint isderiving() = true, _ -> nothing
+@adjoint isderiving(x) = true, x -> (nothing,)

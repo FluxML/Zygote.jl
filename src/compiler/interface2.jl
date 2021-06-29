@@ -7,18 +7,25 @@ function edge!(m::IRTools.Meta, edge::Core.MethodInstance)
 end
 
 @generated function _pullback(ctx::AContext, f, args...)
+  # Try using ChainRulesCore
+  if is_kwfunc(f, args...)
+    # if it is_kw then `args[1]` are the keyword args, `args[2]` is actual function
+    cr_T = Tuple{ZygoteRuleConfig{ctx}, args[2:end]...}
+    chain_rrule_f = :chain_rrule_kw
+  else
+    cr_T = Tuple{ZygoteRuleConfig{ctx}, f, args...}
+    chain_rrule_f = :chain_rrule
+  end
+
+  hascr, cr_edge = has_chain_rrule(cr_T)
+  hascr && return :($chain_rrule_f(ZygoteRuleConfig(ctx), f, args...))
+
+  # No ChainRule, going to have to work it out.
   T = Tuple{f,args...}
   ignore_sig(T) && return :(f(args...), Pullback{$T}(()))
 
-  iskw = is_kwfunc(f, args...)
-  # if it is_kw then `args[1]` are the keyword args, `args[2]` is actual function
-  base_T = iskw ? Tuple{args[2:end]...} : T
-  hascr, cr_edge = has_chain_rrule(base_T)
-  chain_rrule_f = iskw ? :chain_rrule_kw : :chain_rrule
-  hascr && return :($chain_rrule_f(f, args...))
-
-  g = try _lookup_grad(T) catch e e end
-  !(g isa Tuple) && return :(f(args...), Pullback{$T}((f,)))
+  g = try _generate_pullback_via_decomposition(T) catch e e end
+  g === nothing && return :(f(args...), Pullback{$T}((f,)))
   meta, forw, _ = g
   argnames!(meta, Symbol("#self#"), :ctx, :f, :args)
   forw = varargs!(meta, forw, 3)
@@ -31,7 +38,8 @@ end
 
 @generated function (j::Pullback{T})(Δ) where T
   ignore_sig(T) && return :nothing
-  g = try _lookup_grad(T)
+  g = try 
+    _generate_pullback_via_decomposition(T)
   catch e
     rethrow(CompileError(T,e))
   end
