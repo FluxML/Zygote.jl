@@ -1295,7 +1295,8 @@ end
 end
 
 @testset "broadcast" begin
-  @test gradient(x -> sum(sin.(x)), Diagonal(randn(3)))[1][2] == 1
+  # Before https://github.com/FluxML/Zygote.jl/pull/1001 this gave [1 1 1; 1 0 1; 1 1 -1] 
+  @test gradient(x -> sum(sin.(x)), Diagonal([0,pi/2,pi]))[1] ≈ [1 0 0; 0 0 0; 0 0 -1]
 
   a = rand(3)
   b = rand(2,2)
