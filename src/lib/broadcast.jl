@@ -247,6 +247,7 @@ end
 end
 
 @init @require CUDA="052768ef-5323-5732-b1bb-66c8b64840ba" begin
+  using CUDA
   const CuArrayStyle = CUDA.CuArrayStyle
 
   if isdefined(CUDA, :cufunc)
@@ -280,5 +281,5 @@ end
     Base.convert(T, xs), Δ -> (nothing, Base.convert(Array, Δ),)
   end
 
-  pull_block_vert(sz, Δ::CUDA.CuArray, A::Number) = CUDA.@allowscalar Δ[sz]
+  @eval pull_block_vert(sz, Δ::CUDA.CuArray, A::Number) = CUDA.@allowscalar Δ[sz]
 end
