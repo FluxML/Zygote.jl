@@ -13,7 +13,7 @@ using MacroTools, Requires
 using MacroTools: @forward
 
 import Distributed: pmap, CachingPool, workers
-export Params, gradient, jacobian, hessian, diaghessian, pullback, pushforward, @code_adjoint
+export Params, withgradient, gradient, withjacobian, jacobian, hessian, diaghessian, pullback, pushforward, @code_adjoint
 export rrule_via_ad
 
 const Numeric{T<:Number} = Union{T, AbstractArray{<:T}}

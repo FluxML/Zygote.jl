@@ -14,6 +14,8 @@ in other words you could have written them easily yourself, but they live in
 Zygote for convenience.
 
 ```@docs
+Zygote.withgradient
+Zygote.withjacobian
 Zygote.@showgrad
 Zygote.hook
 Zygote.dropgrad
