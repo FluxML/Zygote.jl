@@ -42,6 +42,7 @@ end
 
 @testset "jacobian(f, args...)" begin
   @test jacobian(identity, [1,2])[1] == [1 0; 0 1]
+  @test withjacobian(identity, [1,2]) == (val = [1,2], grad = ([1 0; 0 1],))
 
   j1 = jacobian((a,x) -> a.^2 .* x, [1,2,3], 1)
   @test j1[1] ≈ Diagonal([2,4,6])
@@ -82,6 +83,10 @@ end
   Jxy = jacobian(() -> ys[1:2] .+ sum(xs.^2), Params([xs, ys]))
   @test Jxy[ys] ≈ [1 0 0; 0 1 0]
   @test Jxy[xs] ≈ [2 6 4 8; 2 6 4 8]
+
+  z, grad = withjacobian(() -> ys[1:2] .+ sum(xs.^2), Params([xs, ys]))
+  @test z == [35, 37]
+  @test grad[ys] ≈ [1 0 0; 0 1 0]
 end
 
 using ForwardDiff

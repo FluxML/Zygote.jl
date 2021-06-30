@@ -26,6 +26,17 @@ end
   @test g_gpu |> collect ≈ g
 end
 
+@testset "sum(f, x)" begin
+  a = Float32.([-1.5, -9.0, 2.4, -1.3, 0.01])
+  a_gpu = a |> cu
+
+  f(x) = sum(abs, x)
+  g = gradient(f, a)[1]
+  g_gpu = gradient(f, a_gpu)[1]
+  @test g_gpu isa CuArray
+  @test g_gpu |> collect ≈ g
+end
+
 @testset "jacobian" begin
   v1 = cu(collect(1:3f0))
 
@@ -80,3 +91,10 @@ end
 
   @test_throws ArgumentError gs1 .+ gs4
 end
+
+@testset "vcat scalar indexing" begin
+  r = cu(rand(Float32, 3))
+  grads = (cu(ones(Float32, 3)), 1.f0)
+  @test gradient((x,y) -> sum(vcat(x,y)), r, 5) == grads
+end
+

@@ -194,6 +194,7 @@ end
 
 struct StaticGetter{i} end
 (::StaticGetter{i})(v) where {i} = v[i]
+(::StaticGetter{i})(::Nothing) where {i} = nothing
 @generated function _unzip(tuples, ::Val{N}) where {N}
   Expr(:tuple, (:(map($(StaticGetter{i}()), tuples)) for i ∈ 1:N)...)
 end
@@ -214,19 +215,27 @@ _tryreverse(m, x) = x
 _tryreverse(m::typeof(map), x::Union{AbstractVector, Tuple}) = reverse(x)
 
 for (mapfunc,∇mapfunc) in [(:map,:∇map),(:pmap,:∇pmap)]
-  @eval function $∇mapfunc(cx, f, args...)
+  @eval function $∇mapfunc(cx, f::F, args...) where {F}
     ys_and_backs = $mapfunc((args...) -> _pullback(cx, f, args...), args...)
     if isempty(ys_and_backs)
       ys_and_backs, _ -> nothing
     else
-      ys, backs = unzip(ys_and_backs)
+      ys = map(first, ys_and_backs)
       ys, function (Δ)
         isnothing(Δ) && return nothing
-        # Apply pullbacks in reverse order. Needed for correctness if `f` is stateful.
-        Δf_and_args_zipped = $mapfunc((f, δ) -> f(δ), _tryreverse($mapfunc, backs, Δ)...)
-        Δf_and_args = unzip(_tryreverse($mapfunc, Δf_and_args_zipped))
-        Δf = reduce(accum, Δf_and_args[1])
-        (Δf, Δf_and_args[2:end]...)
+        if Base.issingletontype(F) && length(args) == 1
+          Δarg = $mapfunc(((_,pb), δ) -> last(pb(δ)), ys_and_backs, Δ) # No unzip needed
+          (nothing, Δarg)
+        elseif Base.issingletontype(F) # Ensures `f` is pure: nothing captured & no state
+          Δargs = unzip($mapfunc(((_,pb), δ) -> Base.tail(pb(δ)), ys_and_backs, Δ))
+          (nothing, Δargs...)
+        else
+          # Apply pullbacks in reverse order. Needed for correctness if `f` is stateful.
+          Δf_and_args_zipped = $mapfunc(((_,pb), δ) -> pb(δ), _tryreverse($mapfunc, ys_and_backs, Δ)...)
+          Δf_and_args = unzip(_tryreverse($mapfunc, Δf_and_args_zipped))
+          Δf = reduce(accum, Δf_and_args[1])
+          (Δf, Δf_and_args[2:end]...)
+        end
       end
     end
   end
@@ -287,18 +296,15 @@ end
   end
 end
 
-@adjoint function sum(xs::AbstractArray{Bool}; dims = :)
-  sum(xs, dims = dims), Δ -> (nothing,)
-end
-
-@adjoint function sum(f, xs::AbstractArray; kws...)
+@adjoint function sum(f, xs::AbstractArray{<:AbstractArray}; kws...)
   @assert !haskey(kws, :init) # TODO add init support (julia 1.6)
   return pullback(__context__, (f, xs) -> sum(f.(xs); kws...), f, xs)
 end
 
-@adjoint function sum(::typeof(abs2), X::AbstractArray; dims = :)
-  return sum(abs2, X; dims=dims), Δ::Union{Number, AbstractArray}->(nothing, ((2Δ) .* X))
+@adjoint function sum(xs::AbstractArray{Bool}; dims = :)
+  sum(xs, dims = dims), Δ -> (nothing,)
 end
+
 
 function _pullback(cx::AContext, ::typeof(prod), f, xs::AbstractArray)
   y, back = pullback(cx, ((f, xs) -> prod(f.(xs))), f, xs)

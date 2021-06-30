@@ -50,9 +50,26 @@ sensitivity(y) = error("Output should be scalar; gradients are not defined for o
     gradient(f, args...)
 
 Returns a tuple containing `∂f/∂x` for each argument `x`,
-the derivative (for scalar x) or the gradient.
+the derivative (for scalar `x`) or the gradient.
 
 `f(args...)` must be a real number, see [`jacobian`](@ref) for array output.
+
+See also [`withgradient`](@ref) to keep the value `f(args...)`,
+and [`pullback`](@ref) for value and back-propagator.
+
+```jldoctest; setup=:(using Zygote)
+julia> gradient(*, 2, 3, 5)
+(15, 10, 6)
+
+julia> gradient(x -> sum(abs2,x), [7, 11, 13])
+([14, 22, 26],)
+
+julia> gradient([7, 11], 0, 1) do x, y, d
+         p = size(x, d)
+         sum(x.^p .+ y)
+       end
+([14.0, 22.0], 2, nothing)
+```
 """
 function gradient(f, args...)
   y, back = pullback(f, args...)
@@ -61,14 +78,68 @@ end
 
 Base.adjoint(f::Function) = x -> gradient(f, x)[1]
 
+"""
+    withgradient(f, args...)
+    withgradient(f, ::Params)
+
+Returns both the value of the function and the [`gradient`](@ref),
+as a named tuple. 
+
+```jldoctest; setup=:(using Zygote)
+julia> y, ∇ = withgradient(/, 1, 2)
+(val = 0.5, grad = (0.5, -0.25))
+
+julia> ∇ == gradient(/, 1, 2)
+true
+```
+"""
+function withgradient(f, args...)
+  y, back = pullback(f, args...)
+  (val=y, grad=back(sensitivity(y)))
+end
+
 # Param-style wrappers
 
-# TODO store ids only
+"""
+    gradient(() -> loss(), ps::Params) -> Grads
+
+Gradient with implicit parameters. Takes a zero-argument function,
+and returns a dictionary-like container, whose keys are arrays `x in ps`.
+
+```jldoctest; setup=:(using Zygote)
+julia> x = [1 2 3; 4 5 6]; y = [7, 8]; z = [1, 10, 100];
+
+julia> g = gradient(Params([x, y])) do
+         sum(x .* y .* z')
+       end
+Grads(...)
+
+julia> g[x]
+2×3 Matrix{Int64}:
+ 7  70  700
+ 8  80  800
+
+julia> haskey(g, z)  # only x and y are parameters
+false
+```
+"""
+gradient
+
+"""
+    Params([A, B])
+
+Container for implicit parameters, used when differentiating
+a zero-argument funtion `() -> loss(A, B)` with respect to `A, B`.
+"""
 struct Params
-  order::Buffer{Any, Vector{Any}}
-  params::IdSet{Any}
-  Params() = new(Buffer([], false), IdSet())
+  order::Buffer # {Any, Vector{Any}}
+  params::IdSet{Any} # TODO store ids only
 end
+
+Params() = Params(Buffer([], false), IdSet())
+Params(xs) = Params(Buffer(xs, false), IdSet(xs))
+Params(ps::Params) = ps
+Params(xs::Tuple) = Params(collect(xs))
 
 @forward Params.order Base.iterate, Base.length, Base.getindex
 @forward Params.params Base.in
@@ -103,6 +174,20 @@ function Base.push!(ps::Params, x)
   return ps
 end
 
+@adjoint! function Base.push!(xs::IdSet, x...)
+  l = length(x)
+  push!(xs, x...), Δ -> begin
+    (Δ, ntuple(_ -> nothing, l)...)
+  end
+end
+
+@adjoint! function Base.push!(xs::Params, x::AbstractArray{T}...) where T
+  sz_x = size.(x)
+  push!(xs, x...), Δ -> begin
+    (Δ, map(x -> Ones{T}(x...), sz_x)...)
+  end
+end
+
 Base.push!(ps::Params, x...) = (foreach(x -> push!(ps, x), x); ps)
 
 function Base.delete!(ps::Params, x)
@@ -113,8 +198,6 @@ function Base.delete!(ps::Params, x)
   end
   return ps
 end
-
-Params(xs) = push!(Params(), xs...)
 
 Base.Broadcast.broadcasted(f, ps::Params) = broadcasted(f, ps.order)
 
@@ -155,7 +238,13 @@ function copy!(x::AbstractVector, ps::Params)
   ps
 end
 
+"""
+    Grads(...)
 
+Dictionary-like container returned when taking gradients with
+respect to implicit parameters. For an array `W`, appearing 
+within `Params([W, A, B...])`, the gradient is `g[W]`.
+"""
 struct Grads
   grads::IdDict{Any,Any}
   params::Params

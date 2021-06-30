@@ -6,13 +6,15 @@ using LinearAlgebra: copytri!, AbstractTriangular
 import ZygoteRules: @adjoint, @adjoint!, AContext, adjoint, _pullback, pullback,
   literal_getproperty, literal_getfield
 
+using ChainRulesCore
 using ChainRules: ChainRules, rrule, unthunk, canonicalize
 using IRTools
 using MacroTools, Requires
 using MacroTools: @forward
 
 import Distributed: pmap, CachingPool, workers
-export Params, gradient, jacobian, hessian, diaghessian, pullback, pushforward, @code_adjoint
+export Params, withgradient, gradient, withjacobian, jacobian, hessian, diaghessian, pullback, pushforward, @code_adjoint
+export rrule_via_ad
 
 const Numeric{T<:Number} = Union{T, AbstractArray{<:T}}
 

@@ -72,13 +72,13 @@ end
 @testset "power" begin
   @test gradient(x -> x^2, -2) == (-4,)
   @test gradient(x -> x^10, -1.0) == (-10,) # literal_pow
-  pow = 10
-  @test gradient(x -> x^pow, -1.0) == (-pow,)
+  _pow = 10
+  @test gradient(x -> x^_pow, -1.0) == (-_pow,)
   @test gradient(p -> real(2^p), 2)[1] ≈ 4*log(2)
 
   @test gradient(xs ->sum(xs .^ 2), [2, -1]) == ([4, -2],)
   @test gradient(xs ->sum(xs .^ 10), [3, -1]) == ([10*3^9, -10],)
-  @test gradient(xs ->sum(xs .^ pow), [4, -1]) == ([pow*4^9, -10],)
+  @test gradient(xs ->sum(xs .^ _pow), [4, -1]) == ([_pow*4^9, -10],)
 
   @test gradient(x -> real((1+3im) * x^2), 5+7im) == (-32 - 44im,)
   @test gradient(p -> real((1+3im) * (5+7im)^p), 2)[1] ≈ (-234 + 2im)*log(5 - 7im)
@@ -1295,7 +1295,8 @@ end
 end
 
 @testset "broadcast" begin
-  @test gradient(x -> sum(sin.(x)), Diagonal(randn(3)))[1][2] == 1
+  # Before https://github.com/FluxML/Zygote.jl/pull/1001 this gave [1 1 1; 1 0 1; 1 1 -1] 
+  @test gradient(x -> sum(sin.(x)), Diagonal([0,pi/2,pi]))[1] ≈ [1 0 0; 0 0 0; 0 0 -1]
 
   a = rand(3)
   b = rand(2,2)
@@ -1729,3 +1730,7 @@ end
     @test tfix2 < 2 * tclosure
 =#
 end
+
+# https://github.com/FluxML/Zygote.jl/issues/996
+a = rand(3)
+@test Zygote.gradient(x->sum(x .+ rand.()), a) == (ones(3),)
