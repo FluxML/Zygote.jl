@@ -180,18 +180,13 @@ linear (generic function with 2 methods)
 
 julia> grads = gradient(() -> sum(linear(x)), Params([W, b]))
 Grads(...)
-```
-To inspect the `Grads(...)` object returned for implicit parameters, you can access it using the parameters passed to `Params`:
 
-```julia
-# Apply gradients to model parameters
-julia> grads[W], grads[b]
+julia> grads[W], grads[b] # access gradients using arrays as keys
 ([0.652543 … 0.683588], [1.0, 1.0])
 ```
 
 Here `grads` is a dictionary-like object, whose keys are the same parameters we 
-indicated in `Params`. (In fact it contains a dictionary using `objectid(W)`, which 
-does not change if the values in `W` are mutated.) These parameters `W, b` are global 
-variables, but gradients with respect to other global variables are not stored.
+indicated in `Params`. (In fact it wraps a dictionary using `objectid(W)` as keys, which 
+does not change if the values in `W` are mutated).
 
 However, implicit parameters exist mainly for compatibility with Flux's current AD; it's recommended to use the other approaches unless you need this.
