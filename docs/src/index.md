@@ -189,16 +189,9 @@ Grads(...)
 julia> grads[W], grads[b]
 ([0.652543 … 0.683588], [1.0, 1.0])
 ```
-Unlike with explicit gradients, in order to see implicit gradients one needs to do:
+To inspect the `Grads(...)` object returned for implicit parameters, you can index it using the parameters passed to `Params`:
 
 ```julia
-julia> grads.grads
-IdDict{Any, Any} with 5 entries:
-  [0.467471 0.597815 … 0.678126 … => [0.579671 0.215381 … 0.635058 0.623832; 0.579671 0.215381 … …
-  :(Main.x)                       => [1.3377, 0.930234, 0.499161, 1.33827, 1.37791]
-  :(Main.W)                       => [0.579671 0.215381 … 0.635058 0.623832; 0.579671 0.215381 … …
-  [0.106308, 0.705531]            => 2-element Fill{Float64}: entries equal to 1.0
-  :(Main.b)                       => 2-element Fill{Float64}: entries equal to 1.0
-```
+julia> [grads[p] for p in [W, b]]
 
 However, implicit parameters exist mainly for compatibility with Flux's current AD; it's recommended to use the other approaches unless you need this.
