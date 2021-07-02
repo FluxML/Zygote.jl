@@ -185,8 +185,6 @@ julia> grads[W], grads[b] # access gradients using arrays as keys
 ([0.652543 … 0.683588], [1.0, 1.0])
 ```
 
-Here `grads` is a dictionary-like object, whose keys are the same parameters we 
-indicated in `Params`. (In fact it wraps a dictionary using `objectid(W)` as keys, which 
-does not change if the values in `W` are mutated).
+Here `grads` is a dictionary-like object, whose keys are the same parameters we indicated in `Params`. (In fact it wraps a dictionary using `objectid(W)` as keys, which does not change if the values in `W` are mutated).
 
-However, implicit parameters exist mainly for compatibility with Flux's current AD; it's recommended to use the other approaches unless you need this.
+This implicit style is the one presently used by [Flux.jl](https://github.com/FluxML/Flux.jl), a closely related machine learning library. It uses structs like `Linear` above to define layers, and the function `Flux.params(model)` returns a `Params` object containing all the parameters of all layers. See [its documentation](https://fluxml.ai/Flux.jl/stable/models/basics/) for more details. When using Zygote for most other purposes, however, the explicit style is usually preferred.
