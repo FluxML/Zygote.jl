@@ -129,7 +129,7 @@ julia> gradient(colordiff, RGB(1, 0, 0), RGB(0, 1, 0))
 ((r = 0.4590887719632896, g = -9.598786801605689, b = 14.181383399012862), (r = -1.7697549557037275, g = 28.88472330558805, b = -0.044793892637761346))
 ```
 
-## Explicit and implicit parameters of ML models
+## Explicit and Implicit Parameters
 
 It's easy to work with even very large and complex models, and there are few ways to do this. Autograd-style models pass around a collection of weights. There are two ways of passing *explicit* parameters:
 
