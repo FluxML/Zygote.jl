@@ -131,6 +131,8 @@ julia> gradient(colordiff, RGB(1, 0, 0), RGB(0, 1, 0))
 
 ## Gradients of ML models
 
+### Explicit parameters
+
 It's easy to work with even very large and complex models, and there are few ways to do this. Autograd-style models pass around a collection of weights.
 
 ```julia
@@ -170,7 +172,9 @@ julia> dmodel = gradient(model -> sum(model(x)), model)[1]
 (W = [0.652543 … 0.683588], b = [1.0, 1.0])
 ```
 
-Zygote also support one more way to take gradients, via *implicit parameters* – this is a lot like autograd-style gradients, except we don't have to thread the parameter collection through all our code.
+### Implicit parameters
+
+Zygote also support one more way to take gradients, via *implicit parameters* – this is a lot like autograd-style gradients, except we don't have to thread the parameter collection through all our code. When working with Flux models, this is the recommended way of passing the gradients, as it ensures compatibility with Flux's built-in optimizers. 
 
 ```julia
 julia> W = rand(2, 5); b = rand(2);
@@ -181,8 +185,20 @@ linear (generic function with 2 methods)
 julia> grads = gradient(() -> sum(linear(x)), Params([W, b]))
 Grads(...)
 
+# Apply gradients to model parameters
 julia> grads[W], grads[b]
 ([0.652543 … 0.683588], [1.0, 1.0])
+```
+Unlike with explicit gradients, in order to see implicit gradients one needs to do:
+
+```julia
+julia> grads.grads
+IdDict{Any, Any} with 5 entries:
+  [0.467471 0.597815 … 0.678126 … => [0.579671 0.215381 … 0.635058 0.623832; 0.579671 0.215381 … …
+  :(Main.x)                       => [1.3377, 0.930234, 0.499161, 1.33827, 1.37791]
+  :(Main.W)                       => [0.579671 0.215381 … 0.635058 0.623832; 0.579671 0.215381 … …
+  [0.106308, 0.705531]            => 2-element Fill{Float64}: entries equal to 1.0
+  :(Main.b)                       => 2-element Fill{Float64}: entries equal to 1.0
 ```
 
 However, implicit parameters exist mainly for compatibility with Flux's current AD; it's recommended to use the other approaches unless you need this.
