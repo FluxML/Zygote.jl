@@ -129,11 +129,9 @@ julia> gradient(colordiff, RGB(1, 0, 0), RGB(0, 1, 0))
 ((r = 0.4590887719632896, g = -9.598786801605689, b = 14.181383399012862), (r = -1.7697549557037275, g = 28.88472330558805, b = -0.044793892637761346))
 ```
 
-## Gradients of ML models
+## Explicit and implicit parameters of ML models
 
-### Explicit parameters
-
-It's easy to work with even very large and complex models, and there are few ways to do this. Autograd-style models pass around a collection of weights.
+It's easy to work with even very large and complex models, and there are few ways to do this. Autograd-style models pass around a collection of weights. There are two ways of passing *explicit* parameters:
 
 ```julia
 julia> linear(θ, x) = θ[:W] * x .+ θ[:b]
@@ -172,8 +170,6 @@ julia> dmodel = gradient(model -> sum(model(x)), model)[1]
 (W = [0.652543 … 0.683588], b = [1.0, 1.0])
 ```
 
-### Implicit parameters
-
 Zygote also support one more way to take gradients, via *implicit parameters* – this is a lot like autograd-style gradients, except we don't have to thread the parameter collection through all our code. When working with Flux models, this is the recommended way of passing the gradients, as it ensures compatibility with Flux's built-in optimizers. 
 
 ```julia
@@ -184,14 +180,18 @@ linear (generic function with 2 methods)
 
 julia> grads = gradient(() -> sum(linear(x)), Params([W, b]))
 Grads(...)
+```
+To inspect the `Grads(...)` object returned for implicit parameters, you can access it using the parameters passed to `Params`:
 
+```julia
 # Apply gradients to model parameters
 julia> grads[W], grads[b]
 ([0.652543 … 0.683588], [1.0, 1.0])
 ```
-To inspect the `Grads(...)` object returned for implicit parameters, you can index it using the parameters passed to `Params`:
 
-```julia
-julia> [grads[p] for p in [W, b]]
+Here `grads` is a dictionary-like object, whose keys are the same parameters we 
+indicated in `Params`. (In fact it contains a dictionary using `objectid(W)`, which 
+does not change if the values in `W` are mutated.) These parameters `W, b` are global 
+variables, but gradients with respect to other global variables are not stored.
 
 However, implicit parameters exist mainly for compatibility with Flux's current AD; it's recommended to use the other approaches unless you need this.
