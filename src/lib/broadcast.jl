@@ -174,10 +174,9 @@ _dual_safearg(x) = false
   T = Broadcast.combine_eltypes(f, args)
   # Avoid generic broadcasting in two easy cases:
   if T == Bool
-    return f.(args...), _->nothing 
+    return (f.(args...), _ -> nothing) 
   elseif T <: Real && isconcretetype(T) && _dual_purefun(F) && all(_dual_safearg, args)
-    y, back = broadcast_forward(f, args...)
-    return y, ȳ -> (nothing, nothing, back(ȳ)...)
+    return broadcast_forward(f, args...)
   end
   len = inclen(args)
   y∂b = _broadcast((x...) -> _pullback(__context__, f, x...), args...)
@@ -189,7 +188,7 @@ _dual_safearg(x) = false
     end
     (nothing, accum_sum(dxs[1]), map(unbroadcast, args, Base.tail(dxs))...)
   end
-  y, ∇broadcasted
+  return y, ∇broadcasted
 end
 
 @adjoint function broadcasted(::AbstractArrayStyle{0}, f, args...)
@@ -231,28 +230,32 @@ function dual_function(f::F) where F
 end
 
 @inline function broadcast_forward(f, args::Vararg{Any,N}) where N
-  T = Broadcast.combine_eltypes(f, args)
+  valN = Val(N)
   out = dual_function(f).(args...)
   eltype(out) <: Dual || return (out, _ -> nothing)
   y = map(x -> x.value, out)
-  _back(ȳ, i) = unbroadcast(args[i], ((a, b) -> a*b.partials[i]).(ȳ, out))
-  back(ȳ) = ntuple(i -> _back(ȳ, i), N)
-  return y, back
+  function bc_fwd_back(ȳ)
+    dargs = ntuple(valN) do i
+      unbroadcast(args[i], broadcast((y1, o1) -> y1 * o1.partials[i], ȳ, out))
+    end
+    (nothing, nothing, dargs...) # nothings for broadcasted & f
+  end
+  return y, bc_fwd_back
 end
 
 @init @require CUDA="052768ef-5323-5732-b1bb-66c8b64840ba" begin
   const CuArrayStyle = CUDA.AbstractGPUArrayStyle
 
-  if isdefined(CUDA, :cufunc)
-    @eval @adjoint function broadcasted(::CuArrayStyle, f, args...)
-      y, back = broadcast_forward(CUDA.cufunc(f), args...)
-      y, ȳ -> (nothing, nothing, back(ȳ)...)
-    end
+  if isdefined(CUDA, :cufunc)  # CUDA < 3.0
+
+    @eval @adjoint broadcasted(::CuArrayStyle, f, args...) =
+      broadcast_forward(CUDA.cufunc(f), args...)
+
   else # CUDA >= 3.0
-    @eval @adjoint function broadcasted(::CuArrayStyle, f, args...)
-      y, back = broadcast_forward(f, args...)
-      y, ȳ -> (nothing, nothing, back(ȳ)...)
-    end
+  
+    @eval @adjoint function broadcasted(::CuArrayStyle, f, args...) =
+      broadcast_forward(f, args...)
+
   end
 
   @adjoint CUDA.CuArray{N,T}(xs::Array) where {N,T} =
