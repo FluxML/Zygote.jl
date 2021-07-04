@@ -75,23 +75,17 @@ unbroadcast(x::AbstractArray, x̄::Nothing) = nothing
 
 @adjoint broadcasted(::typeof(*), x::Numeric, y::Numeric) = x.*y,
    Δ -> (nothing, unbroadcast(x, Δ .* conj.(y)), unbroadcast(y, Δ .* conj.(x)))
-@adjoint function broadcasted(::typeof(*), x::Number, y::AbstractArray{<:Number})
-  z, back = pullback(*, x, y)  # this uses dot(y,Δ) instead of Δ .* conj.(y)
-  z, Δ -> (nothing, back(Δ)...)
-end
-@adjoint function broadcasted(::typeof(*), x::AbstractArray{<:Number}, y::Number)
-  z, back = pullback(*, x, y)
-  z, Δ -> (nothing, back(Δ)...)
-end
+@adjoint broadcasted(::typeof(*), x::Number, y::AbstractArray{<:Number}) =
+  _pullback(*, x, y)  # this uses dot(y,Δ) instead of sum(Δ .* conj.(y))
+@adjoint broadcasted(::typeof(*), x::AbstractArray{<:Number}, y::Number) = 
+  _pullback(*, x, y)
 
 @adjoint function broadcasted(::typeof(/), x::Numeric, y::Numeric)
   res = x ./ y
   res, Δ -> (nothing, unbroadcast(x, Δ ./ conj.(y)), unbroadcast(y, .-Δ .* conj.(res ./ y)))
 end
-@adjoint function broadcasted(::typeof(/), x::AbstractArray{<:Number}, y::Number)
-  z, back = pullback(/, x, y)
-  z, Δ -> (nothing, back(Δ)...)
-end
+@adjoint broadcasted(::typeof(/), x::AbstractArray{<:Number}, y::Number) =
+  _pullback(/, x, y)
 
 @adjoint function broadcasted(::typeof(Base.literal_pow), ::typeof(^), x::Numeric, exp::Val{p}) where p
   y = Base.literal_pow.(^, x, exp)
