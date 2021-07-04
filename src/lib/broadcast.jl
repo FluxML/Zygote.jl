@@ -251,10 +251,10 @@ end
     @eval @adjoint broadcasted(::CuArrayStyle, f, args...) =
       broadcast_forward(CUDA.cufunc(f), args...)
 
-  else # CUDA >= 3.0
-  
-    @eval @adjoint function broadcasted(::CuArrayStyle, f, args...) =
-      broadcast_forward(f, args...)
+  # else CUDA >= 3.0 -- don't need cufunc(f), and ordinary broadcasting calls broadcast_forward when safe
+
+    # @eval @adjoint function broadcasted(::CuArrayStyle, f, args...) =
+    #   broadcast_forward(f, args...)
 
   end
 
