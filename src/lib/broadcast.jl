@@ -45,18 +45,18 @@ function Base.reducedim_init(::typeof(identity), ::typeof(accum), A::AbstractArr
   Base.reducedim_initarray(A, region, nothing, Union{Nothing,eltype(A)})
 end
 
-trim(x, Δ) = reshape(Δ, ntuple(i -> size(Δ, i), Val(ndims(x))))
-trim(x::Tuple, Δ) = ntuple(k -> Δ[k], length(x))
+_trim(x, Δ) = reshape(Δ, ntuple(i -> size(Δ, i), Val(ndims(x))))
+_trim(x::Tuple, Δ) = NTuple{length(x)}(Δ)
 
 unbroadcast(x::AbstractArray, x̄) =
   size(x) == size(x̄) ? x̄ :
-  length(x) == length(x̄) ? trim(x, x̄) :
-    trim(x, accum_sum(x̄, dims = ntuple(i -> size(x, i) == 1 ? i : ndims(x̄)+1, Val(ndims(x̄)))))
+  length(x) == length(x̄) ? _trim(x, x̄) :
+    _trim(x, accum_sum(x̄, dims = ntuple(i -> size(x, i) == 1 ? i : ndims(x̄)+1, Val(ndims(x̄)))))
 
 unbroadcast(x::Number, x̄) = accum_sum(x̄)
 unbroadcast(x::Tuple{<:Any}, x̄) = (accum_sum(x̄),)
 unbroadcast(x::Base.RefValue, x̄) = (x=accum_sum(x̄),)
-unbroadcast(x::Tuple, x̄) = trim(x, length(x) == length(x̄) ? x̄ : accum_sum(x̄; dims=2:ndims(x̄))) # case length(x) > 1
+unbroadcast(x::Tuple, x̄) = _trim(x, length(x) == length(x̄) ? x̄ : accum_sum(x̄; dims=2:ndims(x̄))) # case length(x) > 1
 
 unbroadcast(x::AbstractArray, x̄::Nothing) = nothing
 
@@ -244,6 +244,7 @@ end
 end
 
 @init @require CUDA="052768ef-5323-5732-b1bb-66c8b64840ba" begin
+
   const CuArrayStyle = CUDA.AbstractGPUArrayStyle
 
   if isdefined(CUDA, :cufunc)  # CUDA < 3.0
