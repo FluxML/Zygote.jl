@@ -225,7 +225,7 @@ end
 @adjoint function literal_getfield(x, ::Val{f}) where f
   val = getfield(x, f)
   function back(Δ)
-    accum_param(__context__, val, Δ) === nothing && return
+    accum_param(__context__, val, Δ) # === nothing && return
     if isimmutable(x)
       ((; nt_nothing(x)..., pair(Val(f), Δ, x)...), nothing)
     else

@@ -29,6 +29,10 @@ end
   include("lib/array.jl")
 end
 
+@testset "lib/base" begin
+  include("lib/base.jl")
+end
+
 @testset "Features" begin
   include("features.jl")
 end
