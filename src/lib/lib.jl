@@ -62,6 +62,13 @@ end
   end
 end
 
+function accum_param(cx::Context, x::Vector{<:AbstractArray}, Δ)
+  for (p,g) in zip(x, Δ)
+    haskey(cache(cx), p) && (cache(cx)[p] = accum(cache(cx)[p],g))
+  end
+  nothing
+end
+
 function accum_global(cx::Context, ref, x̄)
   (x̄ === nothing || isconst(ref.mod, ref.name)) && return
   gs = cache(cx)
