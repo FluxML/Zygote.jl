@@ -1,6 +1,7 @@
 using Random, FillArrays, AbstractFFTs
 using FillArrays: AbstractFill, getindex_value
 using Base.Broadcast: broadcasted, broadcast_shape
+using SparseArrays
 using Distributed: pmap, AbstractWorkerPool
 
 @adjoint (::Type{T})(::UndefInitializer, args...) where T<:Array = T(undef, args...), Δ -> nothing
@@ -923,3 +924,32 @@ end
   back(Δ::AbstractArray) = (nothing, getindex.(_back.(Δ), 1))
   return Fill(y, size(r)), back
 end
+
+# Sparse Arrays
+
+@adjoint function SparseMatrixCSC{T,N}(arr) where {T,N}
+  SparseMatrixCSC{T,N}(arr), Δ -> (collect(Δ),)
+end
+
+@adjoint function SparseVector{T,N}(v) where {T,N}
+  SparseVector{T,N}(v), Δ -> (collect(Δ),)
+end
+
+@adjoint diagm(x::AbstractSparseArray) = diagm(x), Δ -> (diag(Δ), )
+
+@adjoint function Broadcast.broadcasted(::Type{Float32}, a::AbstractSparseArray{T,N}) where {T,N}
+  Float32.(a), Δ -> (nothing, T.(Δ), )
+end
+
+@adjoint Matrix(a::AbstractSparseArray) = Matrix(a), Δ -> (Δ,)
+
+@adjoint function SparseArrays.spdiagm(x::Pair...)
+  ks = first.(x)
+  SparseArrays.spdiagm(x...), Δ -> begin
+    tuple((k => diag(Δ, k) for k in ks)...)
+  end
+end
+
+@adjoint Pair(x,y) = Pair(x,y), Δ -> (nothing, Δ.second)
+
+@nograd issymmetric

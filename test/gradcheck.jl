@@ -2,6 +2,8 @@ using Zygote, Test, Random, LinearAlgebra, Statistics, FillArrays,
     AbstractFFTs, FFTW, Distances
 using Zygote: gradient
 using Base.Broadcast: broadcast_shape
+using Distributed: pmap
+using SparseArrays
 using Distributed: pmap, CachingPool, workers
 import FiniteDifferences
 
@@ -1629,6 +1631,12 @@ end
     @test gradient(x -> sum(randexp(Random.default_rng(), Float32, 1,1)), 1) == (nothing,)
     @test gradient(x -> sum(randexp(Random.default_rng(), Float32, (1,1))), 1) == (nothing,)
   end
+end
+
+@testset "Sparse" begin
+  @test gradtest(x -> sum(sparse(x)), rand(Float32, 3,3))
+  @test gradtest(x -> sum(sparse(x)), rand(Float32, 3)) # test vectors also
+  @test gradcheck(x -> sum(diagm(x)), sparse(rand(3)))
 end
 
 @testset "broadcasted($op, Array, Bool)" for op in (+,-,*)
