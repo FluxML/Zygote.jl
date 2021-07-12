@@ -1372,12 +1372,17 @@ using Zygote: Buffer
     @test gradient((xs, y) -> sum(abs2, push!(xs, y)[3]), [[1,2], [3,4]], [5,6]) == ([nothing, nothing], [10, 12])
 
     # multiple arguments
-    gradient((xs, y, z) -> 3 * sum(push!(xs, y, z)[1]), [ones(2,2)], ones(2,2), ones(2,2)) == ([fill(3,2,2)], nothing, nothing)
-    gradient((xs, y, z) -> 4 * sum(push!(xs, y, z)[2]), [ones(2,2)], ones(2,2), ones(2,2)) == ([nothing], fill(4,2,2), nothing)
-    gradient((xs, y, z) -> 5 * sum(push!(xs, y, z)[3]), [ones(2,2)], ones(2,2), ones(2,2)) == ([nothing], nothing, fill(5,2,2))
+    @test gradient((xs, y, z) -> 3 * sum(push!(xs, y, z)[1]), [ones(2,2)], ones(2,2), ones(2,2)) == ([fill(3,2,2)], nothing, nothing)
+    @test gradient((xs, y, z) -> 4 * sum(push!(xs, y, z)[2]), [ones(2,2)], ones(2,2), ones(2,2)) == ([nothing], fill(4,2,2), nothing)
+    @test gradient((xs, y, z) -> 5 * sum(push!(xs, y, z)[3]), [ones(2,2)], ones(2,2), ones(2,2)) == ([nothing], nothing, fill(5,2,2))
+
+    # Vector{Any}
+    @test gradient(x -> sum(abs2, only(push!([], x))), [1 2; 3 4]) == ([2 4; 6 8],)
+    @test_throws ErrorException gradient(x -> sum(abs2, push!([], x)), 1)
 
     # pop! of vectors of arrays -- it returns only the removed element
     @test gradient(xs -> sum(abs2, pop!(xs)), [[1,2], [3,4]]) == ([nothing, [6, 8]],)
+    @test_throws ErrorException gradient(xs -> pop!(xs), [1,2,3])
   end
 
 end
