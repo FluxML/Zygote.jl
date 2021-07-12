@@ -397,6 +397,7 @@ function pow_try(x)
 end
 
 @test_broken gradient(pow_try, 1) == (2,)
+@test_throws Zygote.CompileError gradient(pow_try, 1)
 
 function pow_simd(x, n)
   r = 1
@@ -508,7 +509,7 @@ end
   @test gradient(x -> sum(x .+ ones(2,2)), (1,2)) == ((2,2),)
   @test gradient(x -> sum(x .+ ones(2,2)), (1,)) == ((4,),)
   @test gradient(x -> sum(x .+ ones(2,1)), (1,2)) == ((1,1),)
-  
+
   # https://github.com/FluxML/Zygote.jl/issues/975
   gt = gradient((x,p) -> prod(x .^ p), [3,4], (1,2))
   gv = gradient((x,p) -> prod(x .^ p), [3,4], [1,2])

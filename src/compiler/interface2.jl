@@ -24,7 +24,11 @@ end
   T = Tuple{f,args...}
   ignore_sig(T) && return :(f(args...), Pullback{$T}(()))
 
-  g = try _generate_pullback_via_decomposition(T) catch e e end
+  g = try
+    _generate_pullback_via_decomposition(T)
+  catch e
+    rethrow(CompileError(T,e))
+  end
   g === nothing && return :(f(args...), Pullback{$T}((f,)))
   meta, forw, _ = g
   argnames!(meta, Symbol("#self#"), :ctx, :f, :args)
@@ -38,7 +42,7 @@ end
 
 @generated function (j::Pullback{T})(Δ) where T
   ignore_sig(T) && return :nothing
-  g = try 
+  g = try
     _generate_pullback_via_decomposition(T)
   catch e
     rethrow(CompileError(T,e))
