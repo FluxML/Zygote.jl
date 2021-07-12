@@ -100,10 +100,10 @@ end
 end
 
 @adjoint broadcasted(::typeof(conj), x::Numeric) =
-  conj.(x), z̄ -> (nothing, conj.(z̄))
+  conj(x), z̄ -> (nothing, conj(z̄))
 
 @adjoint broadcasted(::typeof(real), x::Numeric) =
-  real.(x), z̄ -> (nothing, real.(z̄))
+  real(x), z̄ -> (nothing, real(z̄))
 
 @adjoint broadcasted(::typeof(imag), x::Numeric) =
   imag.(x), z̄ -> (nothing, im .* real.(z̄))
