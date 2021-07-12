@@ -186,14 +186,18 @@ end
 @adjoint! function Base.push!(xs::IdSet, x...)
   l = length(x)
   push!(xs, x...), Δ -> begin
+    Δ == nothing && return nothing
+    println("got nontrivial gradient for push!(::IdSet, ...): Δ = ", Δ) 
     (Δ, ntuple(_ -> nothing, l)...)
   end
 end
 
-@adjoint! function Base.push!(xs::Params, x::AbstractArray{T}...) where T
+@adjoint! function Base.push!(xs::Params, x::AbstractArray...)
   sz_x = size.(x)
   push!(xs, x...), Δ -> begin
-    (Δ, map(x -> Ones{T}(x...), sz_x)...)
+    Δ == nothing && return nothing
+    println("got nontrivial gradient for push!(::Params, ...): Δ = ", Δ) 
+    # (Δ, map(x -> Ones{T}(x...), sz_x)...) # don't think this is correct
   end
 end
 
