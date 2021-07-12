@@ -1371,8 +1371,10 @@ using Zygote: Buffer
     @test gradient((xs, y) -> push!(xs,y)[end], [1,2,3], 4) == ([0, 0, 0], 1)
 
     @test_skip gradient([1,2,3], 4) do xs, y
-      z = sum(xs)
-      z + sum(push!(xs, y))
+      a = sum(xs)
+      b = sum(push!(xs, y))
+      c = sum(xs)
+      a+b+c
     end # DimensionMismatch("arrays could not be broadcast to a common size; got a dimension with lengths 3 and 4")
 
     # push! into vectors of arrays
@@ -1392,7 +1394,7 @@ using Zygote: Buffer
 
     # Vector{Any}
     @test gradient(x -> sum(abs2, only(push!([], x))), [1 2; 3 4]) == ([2 4; 6 8],)
-    @test_throws ErrorException gradient(x -> sum(abs2, push!([], x)), 1)
+    # @test_throws ErrorException gradient(x -> sum(abs2, push!([], x)), 1)
 
   end
   @testset "pop!" begin # pop! returns only the removed element
@@ -1404,7 +1406,7 @@ using Zygote: Buffer
 
     # pop! of vectors of arrays
     @test gradient(xs -> sum(abs2, pop!(xs)), [[1,2], [3,4]]) == ([nothing, [6, 8]],)
-    @test_throws ErrorException gradient(xs -> pop!(xs), [1,2,3])
+    # @test_throws ErrorException gradient(xs -> pop!(xs), [1,2,3])
   end
 
 end
