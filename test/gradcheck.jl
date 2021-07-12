@@ -1365,20 +1365,19 @@ using Zygote: Buffer
     prod(copy(b))
   end == (3,)
 
-  @testset "Limited Mutation" begin
-    p = [rand(3,3), rand(3,3)]
-    r = rand(5,5)
+  @testset "limited mutation" begin
+    # push! into vectors of arrays -- it returns the whole new vector
+    @test gradient((xs, y) -> sum(abs2, push!(xs, y)[1]), [[1,2], [3,4]], [5,6]) == ([[2, 4], nothing], nothing)
+    @test gradient((xs, y) -> sum(abs2, push!(xs, y)[2]), [[1,2], [3,4]], [5,6]) == ([nothing, [6, 8]], nothing)
+    @test gradient((xs, y) -> sum(abs2, push!(xs, y)[3]), [[1,2], [3,4]], [5,6]) == ([nothing, nothing], [10, 12])
 
-    # TODO: ngradient cannot handle Vector{Array}
-    gs = gradient((p,x) -> sum(sum.(push!(p,x))), p, r)
-    @test length(p[end]) == length(gs[1][end])
-    @test gs[1] ≈ map(x -> one.(x), p)
-    @test gs[2] ≈ one.(r)
+    # multiple arguments
+    gradient((xs, y, z) -> 3 * sum(push!(xs, y, z)[1]), [ones(2,2)], ones(2,2), ones(2,2)) == ([fill(3,2,2)], nothing, nothing)
+    gradient((xs, y, z) -> 4 * sum(push!(xs, y, z)[2]), [ones(2,2)], ones(2,2), ones(2,2)) == ([nothing], fill(4,2,2), nothing)
+    gradient((xs, y, z) -> 5 * sum(push!(xs, y, z)[3]), [ones(2,2)], ones(2,2), ones(2,2)) == ([nothing], nothing, fill(5,2,2))
 
-    # p = [rand(3,3), rand(3,3)] # redefine `p` after mutation
-    # gs = gradient(x -> sum(pop!(x)), p)
-    # @test length(gs[1]) == 2
-    # @test gs[1][1] == one.(p[1])
+    # pop! of vectors of arrays -- it returns only the removed element
+    @test gradient(xs -> sum(abs2, pop!(xs)), [[1,2], [3,4]]) == ([nothing, [6, 8]],)
   end
 
 end

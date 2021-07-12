@@ -78,24 +78,42 @@ for f in [push!, pop!, pushfirst!, popfirst!]
     _ -> error("Mutating arrays is not supported -- called $($f)(::$(typeof(xs)), _...)")
 end
 
-# This is kind of bad, but at least we don't materialize the whole
-# array. Prefer to use `Buffer`
-# function _pullback(cx::Context, ::typeof(push!), xs::AbstractVector{<:AbstractArray}, x::AbstractArray{T}...) where T
-@adjoint! function push!(xs::AbstractVector{<:AbstractArray}, x::AbstractArray{T}...) where T
-  sz_xs = size.(xs)
-  sz_x = size.(x)
-  push!(xs, x...), Δ -> begin
-    (Δ, map(x -> Ones{T}(x...), sz_x)...)
+# Exceptions:
+@adjoint! function push!(dst::AbstractVector{<:AbstractArray}, xs::AbstractArray...)
+  num_xs = length(xs)
+  push!(dst, xs...), Δ -> begin
+    (Δ[1:end-num_xs], Δ[end-num_xs+1:end]...)
   end
 end
 
-@adjoint! function pop!(xs::AbstractVector{<:AbstractArray{T}}) where T
-  sz_xs = size.(xs)
-  op = pop!(xs)
-  op, Δ -> begin
-    ([Ones{T}(sz...) for sz in sz_xs], )
-  end
+@adjoint! function pop!(src::AbstractVector{<:AbstractArray{T}}) where T
+  zs = fill(nothing, length(src)-1)
+  pop!(src), Δ -> (vcat(zs, [Δ]),)
 end
+
+#=
+
+
+julia> gradient((xs, y) -> sum(abs2, push!(xs, y)[1]), [[1,2], [3,4]], [5,6])
+([[2, 4], nothing, nothing], 2-element Ones{Int64})
+([[2, 4], nothing], nothing)  # correct
+
+julia> gradient((xs, y) -> sum(abs2, push!(xs, y)[2]), [[1,2], [3,4]], [5,6])
+([nothing, [6, 8], nothing], 2-element Ones{Int64})
+([nothing, [6, 8]], nothing)  # correct
+
+julia> gradient((xs, y) -> sum(abs2, push!(xs, y)[3]), [[1,2], [3,4]], [5,6])
+([nothing, nothing, [10, 12]], 2-element Ones{Int64})
+([nothing, nothing], [10, 12])  # correct
+
+(jl_aA0cjy) pkg> st Zygote
+      Status `/private/var/folders/yq/4p2zwd614y59gszh7y9ypyhh0000gn/T/jl_aA0cjy/Project.toml`
+  [e88e6eb3] Zygote v0.6.14
+
+julia> gradient(xs -> sum(abs2, pop!(xs)), [[1,2], [3,4]])
+(Union{Nothing, Vector{Int64}}[nothing, nothing, [6, 8]],)
+
+=#
 
 # General
 
