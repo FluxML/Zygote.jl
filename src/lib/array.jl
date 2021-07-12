@@ -79,17 +79,25 @@ for f in [push!, pop!, pushfirst!, popfirst!]
 end
 
 # Exceptions:
-@adjoint! function push!(dst::AbstractVector, xs::AbstractArray...)
-  num_xs = length(xs)
+@adjoint! function push!(dst::AbstractVector, xs...)
+  # num_xs = length(xs)
+  n = length(xs)
+  valn = Val(n)
   push!(dst, xs...), Δ -> begin
-    (Δ[1:end-num_xs], Δ[end-num_xs+1:end]...)
+    # (Δ[1:end-num_xs], Δ[end-num_xs+1:end]...)
+    (Δ[1:end-n], ntuple(i -> Δ[end-n+i], valn)...)
   end
 end
 
-@adjoint! function pop!(src::AbstractVector{<:AbstractArray})
+@adjoint! function pop!(src::AbstractVector)
   zs = fill(nothing, length(src)-1)
   pop!(src), Δ -> (vcat(zs, [Δ]),)
 end
+@adjoint! function pop!(src::AbstractVector{<:Number})
+  zs = falses(length(src)-1)
+  pop!(src), Δ -> (vcat(zs, Δ),)
+end
+
 
 # General
 
