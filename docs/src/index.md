@@ -153,7 +153,9 @@ Dict{Any,Any} with 2 entries:
   :W => [0.628998 … 0.433006]
 ```
 
-An extension of this is the Flux-style model in which we use call overloading to combine the weight object with the pullback pass (equivalent to a closure).
+We can combine the role of the dictionary and the function here by making a callable struct which
+contains the parameters, equivalent to a closure. Passed explicitly to `gradient`, we get a named tuple
+with the same field names:
 
 ```julia
 julia> struct Linear
@@ -170,7 +172,7 @@ julia> dmodel = gradient(model -> sum(model(x)), model)[1]
 (W = [0.652543 … 0.683588], b = [1.0, 1.0])
 ```
 
-Zygote also support another way to take gradients, via *implicit parameters*. Here the loss function takes zero arguments, but the variables of interest are indicated by a special `Params` object. The function `linear` which depends on `W` and `b` is executed when the loss function `() -> sum(linear(x))` is called, and hence this dependence is visible to Zygote:
+Zygote also supports another way to take gradients, via *implicit parameters*. Here the loss function takes zero arguments, but the variables of interest are indicated by a special `Params` object. The function `linear` which depends on `W` and `b` is executed when the loss function `() -> sum(linear(x))` is called, and hence this dependence is visible to Zygote:
 
 ```julia
 julia> W = rand(2, 5); b = rand(2);
