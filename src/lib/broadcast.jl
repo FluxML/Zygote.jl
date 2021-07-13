@@ -45,18 +45,18 @@ function Base.reducedim_init(::typeof(identity), ::typeof(accum), A::AbstractArr
   Base.reducedim_initarray(A, region, nothing, Union{Nothing,eltype(A)})
 end
 
-trim(x, Δ) = reshape(Δ, ntuple(i -> size(Δ, i), Val(ndims(x))))
-trim(x::Tuple, Δ) = ntuple(k -> Δ[k], length(x))
+_trim(x, Δ) = reshape(Δ, ntuple(i -> size(Δ, i), Val(ndims(x))))
+_trim(x::Tuple, Δ) = NTuple{length(x)}(Δ)
 
 unbroadcast(x::AbstractArray, x̄) =
   size(x) == size(x̄) ? x̄ :
-  length(x) == length(x̄) ? trim(x, x̄) :
-    trim(x, accum_sum(x̄, dims = ntuple(i -> size(x, i) == 1 ? i : ndims(x̄)+1, Val(ndims(x̄)))))
+  length(x) == length(x̄) ? _trim(x, x̄) :
+    _trim(x, accum_sum(x̄, dims = ntuple(i -> size(x, i) == 1 ? i : ndims(x̄)+1, Val(ndims(x̄)))))
 
 unbroadcast(x::Number, x̄) = accum_sum(x̄)
 unbroadcast(x::Tuple{<:Any}, x̄) = (accum_sum(x̄),)
 unbroadcast(x::Base.RefValue, x̄) = (x=accum_sum(x̄),)
-unbroadcast(x::Tuple, x̄) = trim(x, length(x) == length(x̄) ? x̄ : accum_sum(x̄; dims=2:ndims(x̄))) # case length(x) > 1
+unbroadcast(x::Tuple, x̄) = _trim(x, length(x) == length(x̄) ? x̄ : accum_sum(x̄; dims=2:ndims(x̄))) # case length(x) > 1
 
 unbroadcast(x::AbstractArray, x̄::Nothing) = nothing
 
@@ -75,23 +75,17 @@ unbroadcast(x::AbstractArray, x̄::Nothing) = nothing
 
 @adjoint broadcasted(::typeof(*), x::Numeric, y::Numeric) = x.*y,
    Δ -> (nothing, unbroadcast(x, Δ .* conj.(y)), unbroadcast(y, Δ .* conj.(x)))
-@adjoint function broadcasted(::typeof(*), x::Number, y::AbstractArray{<:Number})
-  z, back = pullback(*, x, y)  # this uses dot(y,Δ) instead of Δ .* conj.(y)
-  z, Δ -> (nothing, back(Δ)...)
-end
-@adjoint function broadcasted(::typeof(*), x::AbstractArray{<:Number}, y::Number)
-  z, back = pullback(*, x, y)
-  z, Δ -> (nothing, back(Δ)...)
-end
+@adjoint broadcasted(::typeof(*), x::Number, y::AbstractArray{<:Number}) =
+  _pullback(*, x, y)  # this uses dot(y,Δ) instead of sum(Δ .* conj.(y))
+@adjoint broadcasted(::typeof(*), x::AbstractArray{<:Number}, y::Number) = 
+  _pullback(*, x, y)
 
 @adjoint function broadcasted(::typeof(/), x::Numeric, y::Numeric)
   res = x ./ y
   res, Δ -> (nothing, unbroadcast(x, Δ ./ conj.(y)), unbroadcast(y, .-Δ .* conj.(res ./ y)))
 end
-@adjoint function broadcasted(::typeof(/), x::AbstractArray{<:Number}, y::Number)
-  z, back = pullback(/, x, y)
-  z, Δ -> (nothing, back(Δ)...)
-end
+@adjoint broadcasted(::typeof(/), x::AbstractArray{<:Number}, y::Number) =
+  _pullback(/, x, y)
 
 @adjoint function broadcasted(::typeof(Base.literal_pow), ::typeof(^), x::Numeric, exp::Val{p}) where p
   y = Base.literal_pow.(^, x, exp)
@@ -106,10 +100,10 @@ end
 end
 
 @adjoint broadcasted(::typeof(conj), x::Numeric) =
-  conj.(x), z̄ -> (nothing, conj.(z̄))
+  conj(x), z̄ -> (nothing, conj(z̄))
 
 @adjoint broadcasted(::typeof(real), x::Numeric) =
-  real.(x), z̄ -> (nothing, real.(z̄))
+  real(x), z̄ -> (nothing, real(z̄))
 
 @adjoint broadcasted(::typeof(imag), x::Numeric) =
   imag.(x), z̄ -> (nothing, im .* real.(z̄))
@@ -180,10 +174,9 @@ _dual_safearg(x) = false
   T = Broadcast.combine_eltypes(f, args)
   # Avoid generic broadcasting in two easy cases:
   if T == Bool
-    return f.(args...), _->nothing 
+    return (f.(args...), _ -> nothing) 
   elseif T <: Real && isconcretetype(T) && _dual_purefun(F) && all(_dual_safearg, args)
-    y, back = broadcast_forward(f, args...)
-    return y, ȳ -> (nothing, nothing, back(ȳ)...)
+    return broadcast_forward(f, args...)
   end
   len = inclen(args)
   y∂b = _broadcast((x...) -> _pullback(__context__, f, x...), args...)
@@ -195,7 +188,7 @@ _dual_safearg(x) = false
     end
     (nothing, accum_sum(dxs[1]), map(unbroadcast, args, Base.tail(dxs))...)
   end
-  y, ∇broadcasted
+  return y, ∇broadcasted
 end
 
 @adjoint function broadcasted(::AbstractArrayStyle{0}, f, args...)
@@ -237,29 +230,33 @@ function dual_function(f::F) where F
 end
 
 @inline function broadcast_forward(f, args::Vararg{Any,N}) where N
-  T = Broadcast.combine_eltypes(f, args)
+  valN = Val(N)
   out = dual_function(f).(args...)
   eltype(out) <: Dual || return (out, _ -> nothing)
   y = map(x -> x.value, out)
-  _back(ȳ, i) = unbroadcast(args[i], ((a, b) -> a*b.partials[i]).(ȳ, out))
-  back(ȳ) = ntuple(i -> _back(ȳ, i), N)
-  return y, back
+  function bc_fwd_back(ȳ)
+    dargs = ntuple(valN) do i
+      unbroadcast(args[i], broadcast((y1, o1) -> y1 * o1.partials[i], ȳ, out))
+    end
+    (nothing, nothing, dargs...) # nothings for broadcasted & f
+  end
+  return y, bc_fwd_back
 end
 
 @init @require CUDA="052768ef-5323-5732-b1bb-66c8b64840ba" begin
-  using CUDA
+  using .CUDA
   const CuArrayStyle = CUDA.AbstractGPUArrayStyle
 
-  if isdefined(CUDA, :cufunc)
-    @eval @adjoint function broadcasted(::CuArrayStyle, f, args...)
-      y, back = broadcast_forward(CUDA.cufunc(f), args...)
-      y, ȳ -> (nothing, nothing, back(ȳ)...)
-    end
-  else # CUDA >= 3.0
-    @eval @adjoint function broadcasted(::CuArrayStyle, f, args...)
-      y, back = broadcast_forward(f, args...)
-      y, ȳ -> (nothing, nothing, back(ȳ)...)
-    end
+  if isdefined(CUDA, :cufunc)  # CUDA < 3.0
+
+    @eval @adjoint broadcasted(::CuArrayStyle, f, args...) =
+      broadcast_forward(CUDA.cufunc(f), args...)
+
+  # else CUDA >= 3.0 -- don't need cufunc(f), and ordinary broadcasting calls broadcast_forward when safe
+
+    # @eval @adjoint function broadcasted(::CuArrayStyle, f, args...) =
+    #   broadcast_forward(f, args...)
+
   end
 
   @adjoint CUDA.CuArray{N,T}(xs::Array) where {N,T} =
