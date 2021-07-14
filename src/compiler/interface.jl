@@ -256,6 +256,7 @@ end
 
 Base.show(io::IO, ps::Grads) = print(io, "Grads(...)")
 
+@forward Grads.grads Base.getindex, Base.haskey, Base.iterate, Base.keys
 @forward Grads.grads  Base.setindex!
 @forward Grads.params  Base.length
 
@@ -264,15 +265,15 @@ const ADictOrGrads = Union{AbstractDict, Grads}
 # Dictionary interface.
 # Don't use the IdDict directly since it may contain some spurious pairs.
 Base.haskey(gs::Grads, x) = x ∈ gs.params 
-Base.keys(gs::Grads) = gs.params
+# Base.keys(gs::Grads) = gs.params
 Base.values(gs::Grads) = (gs.grads[p] for p in gs.params)
 
-function Base.iterate(gs::Grads, state...)
-  res = iterate(gs.params, state...)
-  isnothing(res) && return nothing
-  p, next_state = res
-  return gs[p], next_state
-end
+# function Base.iterate(gs::Grads, state...)
+#   res = iterate(gs.params, state...)
+#   isnothing(res) && return nothing
+#   p, next_state = res
+#   return gs[p], next_state
+# end
 
 function Base.getindex(gs::Grads, x)
   isbits(x) && error("Only reference types can be differentiated with `Params`.")

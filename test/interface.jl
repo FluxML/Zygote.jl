@@ -207,3 +207,33 @@ end
 
 
 end
+
+@testset "Params nesting" begin
+  struct Dense{F,T,S}
+    W::T
+    b::S
+    σ::F
+  end
+
+  (d::Dense)(x) = d.σ.(d.W * x .+ d.b)
+  d = Dense(ones(Float32, 3,3), zeros(Float32, 3), identity)
+  ps = Zygote.Params([d.W, d.b])
+  r = ones(Float32, 3,3)
+  
+  gs = gradient(ps) do
+    p, pb = pullback(ps) do
+      sum(d(r))
+    end
+    g = pb(p)
+    sum(g[d.W]) # + sum(g[d.b])
+  end
+
+  @test gs[d.W] ≈ fill(81f0, (3,3))
+
+  # Test L2
+  l2g = gradient(ps) do
+    sum(sum(x .^ 2) for x in ps)
+  end
+  @test l2g[d.W] ≈ fill(2.f0, size(d.W))
+  @test l2g[d.b] ≈ fill(0.f0, size(d.b))
+end

@@ -553,6 +553,7 @@ end
 
 @adjoint convert(::Type{R}, A::LinearAlgebra.HermOrSym{T,S}) where {T,S,R<:Array} = convert(R, A),
   Δ -> (nothing, convert(S, Δ),)
+
 @adjoint Matrix(A::LinearAlgebra.HermOrSym{T,S}) where {T,S} = Matrix(A),
   Δ -> (convert(S, Δ),)
 
@@ -732,7 +733,6 @@ end
     return ((uplo=nothing, info=nothing, factors=Δ_factors),)
   end
 end
-
 @adjoint function logdet(C::Cholesky)
   return logdet(C), function(Δ)
     return ((uplo=nothing, info=nothing, factors=Diagonal(2 .* Δ ./ diag(C.factors))),)
@@ -757,14 +757,11 @@ end
 @adjoint function -(S::UniformScaling, A::AbstractMatrix)
   return S - A, Δ->((λ=tr(Δ),), -Δ)
 end
-
 @adjoint +(A::AbstractArray, B::AbstractArray) = A + B, Δ->(Δ, Δ)
 @adjoint -(A::AbstractArray, B::AbstractArray) = A - B, Δ->(Δ, -Δ)
 @adjoint -(A::AbstractArray) = -A, Δ->(-Δ,)
-
 # Abstract FFT
 # ===================
-
 # AbstractFFTs functions do not work with FillArrays, which are needed
 # for some functionality of Zygote. To make it work with FillArrays
 # as well, overload the relevant functions
@@ -774,7 +771,6 @@ AbstractFFTs.ifft(x::Fill, dims...) = AbstractFFTs.ifft(collect(x), dims...)
 AbstractFFTs.rfft(x::Fill, dims...) = AbstractFFTs.rfft(collect(x), dims...)
 AbstractFFTs.irfft(x::Fill, d, dims...) = AbstractFFTs.irfft(collect(x), d, dims...)
 AbstractFFTs.brfft(x::Fill, d, dims...) = AbstractFFTs.brfft(collect(x), d, dims...)
-
 # the adjoint jacobian of an FFT with respect to its input is the reverse FFT of the
 # gradient of its inputs, but with different normalization factor
 @adjoint function fft(xs)
@@ -782,21 +778,18 @@ AbstractFFTs.brfft(x::Fill, d, dims...) = AbstractFFTs.brfft(collect(x), d, dims
     return (AbstractFFTs.bfft(Δ),)
   end
 end
-
 @adjoint function *(P::AbstractFFTs.Plan, xs)
   return P * xs, function(Δ)
     N = prod(size(xs)[[P.region...]])
     return (nothing, N * (P \ Δ))
   end
 end
-
 @adjoint function \(P::AbstractFFTs.Plan, xs)
   return P \ xs, function(Δ)
     N = prod(size(Δ)[[P.region...]])
     return (nothing, (P * Δ)/N)
   end
 end
-
 # all of the plans normalize their inverse, while we need the unnormalized one.
 @adjoint function ifft(xs)
   return AbstractFFTs.ifft(xs), function(Δ)
@@ -804,26 +797,21 @@ end
     return (AbstractFFTs.fft(Δ)/N,)
   end
 end
-
 @adjoint function bfft(xs)
   return AbstractFFTs.bfft(xs), function(Δ)
     return (AbstractFFTs.fft(Δ),)
   end
 end
-
 @adjoint function fftshift(x)
     return fftshift(x), function(Δ)
         return (ifftshift(Δ),)
     end
 end
-
 @adjoint function ifftshift(x)
     return ifftshift(x), function(Δ)
         return (fftshift(Δ),)
     end
 end
-
-
 # to actually use rfft, one needs to insure that everything
 # that happens in the Fourier domain could've been done in
 # the space domain with real numbers. This means enforcing

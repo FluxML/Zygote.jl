@@ -44,6 +44,27 @@ end
   end
 end
 
+@adjoint function Base._oidd_nextind(a, i)
+  Base._oidd_nextind(a, i), Δ -> begin
+    (nothing, nothing)
+  end
+end
+@adjoint! function get(d::AbstractDict, k, default)
+  hk = Ref{Bool}()
+  val = if haskey(d, k)
+    hk[] = true
+    d[k]
+  else
+    hk[] = false
+    d[k] = default
+  end
+  function back(Δ)
+    Δ2 = setindex!(grad_mut(__context__, d), Δ, k)
+    (Δ2, nothing, nothing)
+  end
+  val, back
+end
+
 # Channels
 
 @nograd Channel
