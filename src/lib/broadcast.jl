@@ -247,7 +247,6 @@ end
 end
 
 @init @require CUDA="052768ef-5323-5732-b1bb-66c8b64840ba" begin
-  using CUDA
   const CuArrayStyle = CUDA.AbstractGPUArrayStyle
 
   if isdefined(CUDA, :cufunc)
