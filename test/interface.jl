@@ -38,7 +38,10 @@ using Zygote: Grads
     x, y = [1,2], [1]
     ps = Params([x, y])
     @test length.(ps) == length.([x, y]) # 617
+    @test size.(ps, 1) == [2, 1]
     @test all(Params([[1,1]]) .== Params([[1,1]]))
+
+    @test_throws ArgumentError gradient(() -> sum(sum.(ps)), ps)
   end
 
   @testset "indexing" begin

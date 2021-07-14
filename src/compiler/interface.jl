@@ -201,6 +201,10 @@ end
 
 Base.Broadcast.broadcasted(f, ps::Params) = broadcasted(f, ps.order)
 
+@adjoint function Broadcast.broadcasted(f::Function, ps::Params)
+  f.(ps), _ -> throw(ArgumentError("Zygote.Params does not support broadcasting within gradients, try iteration `for p in ps`"))
+end
+
 Base.:(==)(x::Params, y::Params) = x.order.data == y.order.data
 
 function Base.show(io::IO, ps::Params)
