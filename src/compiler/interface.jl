@@ -183,18 +183,6 @@ function Base.push!(ps::Params, x)
   return ps
 end
 
-@adjoint! function Base.push!(xs::IdSet, x...)
-  back(::Nothing) = nothing
-  back(Δ) = error("can't handle nontrivial gradient for push!(::IdSet, ...): Δ = " * repr(Δ)) 
-  push!(xs, x...), back
-end
-
-@adjoint! function Base.push!(xs::Params, x::AbstractArray...)
-  back(::Nothing) = nothing
-  back(Δ) = error("can't handle nontrivial gradient for push!(::Params, ...): Δ = " * repr(Δ)) 
-  push!(xs, x...), back
-end
-
 Base.push!(ps::Params, x...) = (foreach(x -> push!(ps, x), x); ps)
 
 function Base.delete!(ps::Params, x)
