@@ -1365,50 +1365,6 @@ using Zygote: Buffer
     prod(copy(b))
   end == (3,)
 
-  @testset "push!" begin # push! returns the whole new vector
-    # vector of numbers
-    @test gradient((xs, y) -> push!(xs,y)[1], [1,2,3], 4) == ([1, 0, 0], 0)
-    @test gradient((xs, y) -> push!(xs,y)[end], [1,2,3], 4) == ([0, 0, 0], 1)
-
-    @test_skip gradient([1,2,3], 4) do xs, y
-      a = sum(xs)
-      b = sum(push!(xs, y))
-      c = sum(xs)
-      a+b+c
-    end # DimensionMismatch("arrays could not be broadcast to a common size; got a dimension with lengths 3 and 4")
-
-    # push! into vectors of arrays
-    @test gradient((xs, y) -> sum(abs2, push!(xs, y)[1]), [[1,2], [3,4]], [5,6]) == ([[2, 4], nothing], nothing)
-    @test gradient((xs, y) -> sum(abs2, push!(xs, y)[2]), [[1,2], [3,4]], [5,6]) == ([nothing, [6, 8]], nothing)
-    @test gradient((xs, y) -> sum(abs2, push!(xs, y)[3]), [[1,2], [3,4]], [5,6]) == ([nothing, nothing], [10, 12])
-
-    @test_skip gradient([[1,2], [3,4]], [5,6]) do xs, y
-      z = sum(sum(abs2, x) for x in xs)
-      z + sum(sum, push!(xs, y))
-    end  # DimensionMismatch("arrays could not be broadcast to a common size; got a dimension with lengths 2 and 3")
-
-    # multiple arguments
-    @test gradient((xs, y, z) -> 3 * sum(push!(xs, y, z)[1]), [ones(2,2)], ones(2,2), ones(2,2)) == ([fill(3,2,2)], nothing, nothing)
-    @test gradient((xs, y, z) -> 4 * sum(push!(xs, y, z)[2]), [ones(2,2)], ones(2,2), ones(2,2)) == ([nothing], fill(4,2,2), nothing)
-    @test gradient((xs, y, z) -> 5 * sum(push!(xs, y, z)[3]), [ones(2,2)], ones(2,2), ones(2,2)) == ([nothing], nothing, fill(5,2,2))
-
-    # Vector{Any}
-    @test gradient(x -> sum(abs2, only(push!([], x))), [1 2; 3 4]) == ([2 4; 6 8],)
-    # @test_throws ErrorException gradient(x -> sum(abs2, push!([], x)), 1)
-
-  end
-  @testset "pop!" begin # pop! returns only the removed element
-    @test gradient(xs -> pop!(xs)^2, [1,2,3]) == ([0,0,6],)
-    @test_skip gradient([1,2,3], 4) do xs, y
-      z = pop!(xs) + y^2
-      z + sum(abs2, xs)
-    end # DimensionMismatch("arrays could not be broadcast to a common size; got a dimension with lengths 2 and 3")
-
-    # pop! of vectors of arrays
-    @test gradient(xs -> sum(abs2, pop!(xs)), [[1,2], [3,4]]) == ([nothing, [6, 8]],)
-    # @test_throws ErrorException gradient(xs -> pop!(xs), [1,2,3])
-  end
-
 end
 
 @testset "FillArrays" begin
