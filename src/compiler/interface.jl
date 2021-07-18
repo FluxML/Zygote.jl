@@ -184,21 +184,15 @@ function Base.push!(ps::Params, x)
 end
 
 @adjoint! function Base.push!(xs::IdSet, x...)
-  l = length(x)
-  push!(xs, x...), Δ -> begin
-    Δ == nothing && return nothing
-    println("got nontrivial gradient for push!(::IdSet, ...): Δ = ", Δ) 
-    (Δ, ntuple(_ -> nothing, l)...)
-  end
+  back(::Nothing) = nothing
+  back(Δ) = error("can't handle nontrivial gradient for push!(::IdSet, ...): Δ = " * repr(Δ)) 
+  push!(xs, x...), back
 end
 
 @adjoint! function Base.push!(xs::Params, x::AbstractArray...)
-  sz_x = size.(x)
-  push!(xs, x...), Δ -> begin
-    Δ == nothing && return nothing
-    println("got nontrivial gradient for push!(::Params, ...): Δ = ", Δ) 
-    # (Δ, map(x -> Ones{T}(x...), sz_x)...) # don't think this is correct
-  end
+  back(::Nothing) = nothing
+  back(Δ) = error("can't handle nontrivial gradient for push!(::Params, ...): Δ = " * repr(Δ)) 
+  push!(xs, x...), back
 end
 
 Base.push!(ps::Params, x...) = (foreach(x -> push!(ps, x), x); ps)
