@@ -7,7 +7,7 @@ IdSet(xs) = IdSet{eltype(xs)}(xs)
 
 IdSet() = IdSet{Any}()
 
-IdSet{T}(xs) = isempty(xs) ? IdSet{T}() : push!(IdSet{T}(), xs...)
+IdSet{T}(xs) where T = isempty(xs) ? IdSet{T}() : push!(IdSet{T}(), xs...)
 
 Base.push!(s::IdSet{T}, x::T) where T = (s.dict[x] = nothing; s)
 Base.delete!(s::IdSet{T}, x::T) where T = (delete!(s.dict, x); s)
