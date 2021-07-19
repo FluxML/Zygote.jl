@@ -86,6 +86,7 @@ using Zygote: Grads
   @testset "constructor with empty args" begin
     @test length(Params()) == 0
     @test length(Params(())) == 0
+    @test length(Params([])) == 0
   end
 end
 
