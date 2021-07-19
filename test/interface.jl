@@ -82,6 +82,12 @@ using Zygote: Grads
     @test ps isa Params
     @test issetequal(ps, Set([y]))
   end
+
+  @testset "constructor with empty args" begin
+    @test length(Params()) == 0
+    @test length(Params(())) == 0
+    @test length(Params([])) == 0
+  end
 end
 
 @testset "Grads" begin
