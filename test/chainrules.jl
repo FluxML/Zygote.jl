@@ -232,6 +232,36 @@ using ChainRulesCore, ChainRulesTestUtils, Zygote
         aug_primal_val, _ = Zygote.pullback(x->StructForTestingTypeOnlyRRules(), 1.2)
         @test aug_primal_val.x == 2.0
     end
+
+    @testset "@opt_out" begin
+        oa_id(x) = x
+        oa_id_rrule_hitcount = Ref(0)
+        function ChainRulesCore.rrule(::typeof(oa_id), x::Any)
+            oa_id_rrule_hitcount[] += 1
+            oa_id_pullback(ȳ) = (NoTangent(), ȳ)
+            return oa_id(x), oa_id_pullback
+        end
+
+        @opt_out ChainRulesCore.rrule(::typeof(oa_id), x::AbstractArray)
+
+        # Hit one we haven't opted out
+        oa_id_rrule_hitcount[] = 0
+        oa_id_outer(x) = sum(oa_id(x))
+        @test (1.0,) == Zygote.gradient(oa_id_outer, π)
+        @test oa_id_rrule_hitcount[] == 1
+
+        # make sure don't hit the one we have opted out
+        oa_id_rrule_hitcount[] = 0
+        @test ([1.0],) == Zygote.gradient(oa_id_outer, [π])
+        @test oa_id_rrule_hitcount[] == 0
+
+        # Now try opting out After we have already used it 
+        @opt_out ChainRulesCore.rrule(::typeof(oa_id), x::Real)
+        oa_id_rrule_hitcount[] = 0
+        oa_id_outer(x) = sum(oa_id(x))
+        @test (1.0,) == Zygote.gradient(oa_id_outer, π)
+        @test oa_id_rrule_hitcount[] == 0
+    end
 end
 
 @testset "ChainRulesCore.rrule_via_ad" begin

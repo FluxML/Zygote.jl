@@ -4,8 +4,7 @@ end
 ZygoteRuleConfig() = ZygoteRuleConfig(Context())
 
 
-const rrule_fallback_method = Base.which(rrule, Tuple{Any, Vararg{Any}})
-const rrule_redispatcher_method = Base.which(rrule, Tuple{RuleConfig, Any, Vararg{Any}})
+_is_rrule_redispatcher(m::Method) = m.sig == Tuple{typeof(rrule), RuleConfig, Vararg}
 
 """
   has_chain_rrule(T)
@@ -18,19 +17,45 @@ such that if a suitable rule is defined later, the generated function will recom
 """
 function has_chain_rrule(T)
   config_T, arg_Ts = Iterators.peel(T.parameters)
-  m_with_config = meta(Tuple{typeof(rrule), config_T, arg_Ts...})
-  if m_with_config.method === rrule_redispatcher_method
-    # it is being redispatched without config, so check it that hits the fallback
-    m_without_config = meta(Tuple{typeof(rrule), arg_Ts...})
-    if m_without_config.method === rrule_fallback_method
-      # no rrule exists, return instance for m_with_config as that will be invalidated 
-      # directly if configured rule added, or indirectly if unconfigured rule added
-      return false, m_with_config.instance
-    end
+  configured_rrule_m = meta(Tuple{typeof(rrule), config_T, arg_Ts...})
+  if _is_rrule_redispatcher(configured_rrule_m.method)
+    # it is being redispatched without config, so get the method it redispatches to
+    rrule_m = meta(Tuple{typeof(rrule), arg_Ts...})
+    no_rrule_m = meta(Tuple{typeof(ChainRulesCore.no_rrule), arg_Ts...})
+  else
+    # Not being redispatched
+    rrule_m = configured_rrule_m
+    no_rrule_m = meta(Tuple{typeof(ChainRulesCore.no_rrule), config_T, arg_Ts...})
   end
-  # otherwise found a rrule, no need to add any edges, as it will generate code with
-  # natural edges.
-  return true, nothing
+
+  do_not_use_rrule = matching_cr_sig(no_rrule_m, rrule_m)
+  if do_not_use_rrule
+    # return instance for configured_rrule_m as that will be invalidated 
+    # directly if configured rule added, or indirectly if unconfigured rule added
+    # Do not need an edge for `no_rrule` as no addition of methods to that can cause this
+    # decision to need to be revisited (only changes to `rrule`), since we are already not
+    # using the rrule, so not using more rules wouldn't change anything
+    return false, configured_rrule_m.instance
+  else
+    # otherwise found a rrule, no need to add any edges for `rrule`, as it will generate 
+    # code with natural edges if a new method is defined there.
+    # We also do not need an edge to `no_rrule`, as any time a method is added to `no_rrule`
+    # a corresponding method is added to `rrule` (to return `nothing`), thus we will already
+    # be revisiting this decision when a new opt-out is added
+    return true, nothing
+  end
+end
+
+matching_cr_sig(t, s) = matching_cr_sig(t.method.sig, s.method.sig)
+matching_cr_sig(::DataType, ::UnionAll) = false
+matching_cr_sig(::UnionAll, ::DataType) = false
+matching_cr_sig(t::Type, s::Type) = type_tuple_tail(t) == type_tuple_tail(s)
+ 
+type_tuple_tail(d::DataType) = Tuple{d.parameters[2:end]...}
+function type_tuple_tail(d::UnionAll)
+    body = Base.unwrap_unionall(d)
+    body_tt = type_tuple_tail(body)
+    return Base.rewrap_unionall(body_tt, d)
 end
 
 """
