@@ -19,29 +19,52 @@ function has_chain_rrule(T)
   config_T, arg_Ts = Iterators.peel(T.parameters)
   configured_rrule_m = meta(Tuple{typeof(rrule), config_T, arg_Ts...})
   if _is_rrule_redispatcher(configured_rrule_m.method)
-    # it is being redispatched without config, so get the method it redispatches to
+    # The config is not being used:
+    # it is being redispatched without config, so we need the method it redispatches to
     rrule_m = meta(Tuple{typeof(rrule), arg_Ts...})
+    # Thus any no_rrule that might apply must also not have a config because if there was a
+    # no_rrule with a config that applied then there would also be a rrule with config that applied
     no_rrule_m = meta(Tuple{typeof(ChainRulesCore.no_rrule), arg_Ts...})
   else
-    # Not being redispatched
+    # Not being redispatched: it does have a config
     rrule_m = configured_rrule_m
+     # Thus any no_rrule that might apply must also have a config because if it applied
+     # it will be identical, and if it doesn't we don't care what it is.
     no_rrule_m = meta(Tuple{typeof(ChainRulesCore.no_rrule), config_T, arg_Ts...})
   end
 
+  # To understand why we only need to check if the sigs match between no_rrule_m and rrule_m
+  # in order to decide if to use, one must consider the following facts:
+  # - for every method in `no_rrule` there is a identical one in `rrule` that returns nothing
+  # - this includes the general fallback `rrule(::Any...)=nothing`.
+  # - a configured rrule/no_rrule is always more specific than a otherwise equivalent unconfigured rrule/no_rrule
+  #  
+  # Consider the following truth table, for what can occur:
+  # rrule: fallback, no_rrule: fallback =>  matches => do not use rrule.
+  # rrule: specific, no_rrule: fallback => !matches => do use rrule, as haven't opted out.
+  # rrule: fallback, no_rrule: specific =>  IMPOSSIBLE, every no_rule us identical to some rrule
+  # rrule: specific, no_rrule: specific =>  matches => do not use rrule as opted out
+  # rrule: specific, no_rrule: general  => !matches => do use rrule as a more specific rrule takes preciedent over more general opted out
+  # rrule: general , no_rrule: specific =>  IMPOSSIBLE, every no_rule us identical to some rrule so can't have a more general rrule being hit, as the specific one would hit first
+  #
+  # Note that the fallback  cases are the same outcome as the general cases as fallback is just most general.
+  # It can be seen that checking if it matches is the correct way to decide if we should ue the rrule or not.
+
+
   do_not_use_rrule = matching_cr_sig(no_rrule_m, rrule_m)
   if do_not_use_rrule
-    # return instance for configured_rrule_m as that will be invalidated 
+    # Return instance for configured_rrule_m as that will be invalidated 
     # directly if configured rule added, or indirectly if unconfigured rule added
     # Do not need an edge for `no_rrule` as no addition of methods to that can cause this
     # decision to need to be revisited (only changes to `rrule`), since we are already not
-    # using the rrule, so not using more rules wouldn't change anything
+    # using the rrule, so not using more rules wouldn't change anything.
     return false, configured_rrule_m.instance
   else
-    # otherwise found a rrule, no need to add any edges for `rrule`, as it will generate 
+    # Otherwise found a rrule, no need to add any edges for `rrule`, as it will generate 
     # code with natural edges if a new method is defined there.
     # We also do not need an edge to `no_rrule`, as any time a method is added to `no_rrule`
     # a corresponding method is added to `rrule` (to return `nothing`), thus we will already
-    # be revisiting this decision when a new opt-out is added
+    # be revisiting this decision when a new opt-out is added.
     return true, nothing
   end
 end
