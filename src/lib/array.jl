@@ -75,7 +75,7 @@ _droplike(dy::Union{LinearAlgebra.Adjoint, LinearAlgebra.Transpose}, dxv::Abstra
 @adjoint! setindex!(xs::AbstractArray, x...) = setindex!(xs, x...),
   _ -> error("Mutating arrays is not supported -- called setindex!(::$(typeof(xs)), _...)")
 
-@adjoint! copyto!(args...) = copyto!(args...),
+@adjoint! copyto!(xs, args...) = copyto!(xs, args...),
   _ -> error("Mutating arrays is not supported -- called copyto!(::$(typeof(xs)), _...)")
 
 for f in [push!, pop!, pushfirst!, popfirst!]
