@@ -18,7 +18,7 @@ using Zygote, Test, LinearAlgebra
 @test gradient(x -> real(logabsdet(x)[1]), [1 2im; 3im 4])[1] ≈ [4 3im; 2im 1]/10
 
 # https://github.com/FluxML/Zygote.jl/issues/705
-@test gradient(x -> imag(sum(exp, x)), [1,2,3])[1] ≈ im .* exp.(1:3)
+@test gradient(x -> imag(sum(exp, x)), [1,2,3])[1] ≈ real(im .* exp.(1:3))
 @test gradient(x -> imag(sum(exp, x)), [1+0im,2,3])[1] ≈ im .* exp.(1:3)
 
 fs_C_to_R = (real,
