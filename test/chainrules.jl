@@ -234,33 +234,32 @@ using ChainRulesCore, ChainRulesTestUtils, Zygote
     end
 
     @testset "@opt_out" begin
-        oa_id(x) = x
-        oa_id_rrule_hitcount = Ref(0)
-        function ChainRulesCore.rrule(::typeof(oa_id), x::Any)
-            oa_id_rrule_hitcount[] += 1
-            oa_id_pullback(ȳ) = (NoTangent(), ȳ)
-            return oa_id(x), oa_id_pullback
+        oout_id(x) = x
+        oout_id_rrule_hitcount = Ref(0)
+        function ChainRulesCore.rrule(::typeof(oout_id), x::Any)
+            oout_id_rrule_hitcount[] += 1
+            oout_id_pullback(ȳ) = (NoTangent(), ȳ)
+            return oout_id(x), oout_id_pullback
         end
 
-        @opt_out ChainRulesCore.rrule(::typeof(oa_id), x::AbstractArray)
+        @opt_out ChainRulesCore.rrule(::typeof(oout_id), x::AbstractArray)
 
         # Hit one we haven't opted out
-        oa_id_rrule_hitcount[] = 0
-        oa_id_outer(x) = sum(oa_id(x))
-        @test (1.0,) == Zygote.gradient(oa_id_outer, π)
-        @test oa_id_rrule_hitcount[] == 1
+        oout_id_rrule_hitcount[] = 0
+        oout_id_outer(x) = sum(oout_id(x))
+        @test (1.0,) == Zygote.gradient(oout_id_outer, π)
+        @test oout_id_rrule_hitcount[] == 1
 
         # make sure don't hit the one we have opted out
-        oa_id_rrule_hitcount[] = 0
-        @test ([1.0],) == Zygote.gradient(oa_id_outer, [π])
-        @test oa_id_rrule_hitcount[] == 0
+        oout_id_rrule_hitcount[] = 0
+        @test ([1.0],) == Zygote.gradient(oout_id_outer, [π])
+        @test oout_id_rrule_hitcount[] == 0
 
         # Now try opting out After we have already used it 
-        @opt_out ChainRulesCore.rrule(::typeof(oa_id), x::Real)
-        oa_id_rrule_hitcount[] = 0
-        oa_id_outer(x) = sum(oa_id(x))
-        @test (1.0,) == Zygote.gradient(oa_id_outer, π)
-        @test oa_id_rrule_hitcount[] == 0
+        @opt_out ChainRulesCore.rrule(::typeof(oout_id), x::Real)
+        oout_id_rrule_hitcount[] = 0
+        @test (1.0,) == Zygote.gradient(oout_id_outer, π)
+        @test oout_id_rrule_hitcount[] == 0
     end
 end
 
