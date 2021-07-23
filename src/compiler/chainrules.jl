@@ -111,7 +111,7 @@ for T_outer in (:Tuple, :NamedTuple)
   # than happy.
   @eval @inline function wrap_chainrules_output(x::ChainRules.Tangent{P, T}) where {P, T<:$T_outer}
     xp = map(wrap_chainrules_output, canonicalize(x))
-    convert($T_outer, xp)
+    ChainRulesCore.backing(xp)
   end
 end
 
