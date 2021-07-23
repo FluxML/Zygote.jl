@@ -81,7 +81,7 @@ end
   @test gradient(xs ->sum(xs .^ _pow), [4, -1]) == ([_pow*4^9, -10],)
 
   @test gradient(x -> real((1+3im) * x^2), 5+7im) == (-32 - 44im,)
-  @test gradient(p -> real((1+3im) * (5+7im)^p), 2)[1] ≈ (-234 + 2im)*log(5 - 7im)
+  @test gradient(p -> real((1+3im) * (5+7im)^p), 2)[1] ≈ real((-234 + 2im)*log(5 - 7im))
   # D[(1+3I)x^p, p] /. {x->5+7I, p->2} // Conjugate
 end
 
@@ -160,7 +160,7 @@ end
 
   # https://github.com/FluxML/Zygote.jl/issues/376
   _, back = Zygote._pullback(x->x[1]*im, randn(2))
-  @test back(1.0)[2] == [-im, 0]
+  @test back(1.0)[2] == real([-im, 0])
 
   # _droplike
   @test gradient(x -> sum(inv, x[1, :]'), ones(2, 2)) == ([-1 -1; 0 0],)
