@@ -111,7 +111,7 @@ for T_outer in (:Tuple, :NamedTuple)
   # than happy.
   @eval @inline function wrap_chainrules_output(x::ChainRules.Tangent{P, T}) where {P, T<:$T_outer}
     xp = map(wrap_chainrules_output, canonicalize(x))
-    ChainRulesCore.backing(xp)
+    ChainRulesCore.backing(xp)  # this is accessing ChainRulesCore internals, but it is prob safe enough, and it is fastest
   end
 end
 
