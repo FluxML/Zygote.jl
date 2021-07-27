@@ -25,7 +25,7 @@ end
   xs, y = randn(2,3), rand()
   f34(xs, y) = xs[1] * (sum(xs .^ (1:3)') + y^4)  # non-diagonal Hessian, two arguments
 
-  # Follow is should work ones we workout what ForwardDiff should do when `Float64` is called on a `Dual`
+  # Following should work once we workout what ForwardDiff should do when `Float64` is called on a `Dual`
   # https://github.com/JuliaDiff/ForwardDiff.jl/pull/538
   # else might need a custom overload of `(;;ChainRulesCore.ProjectTo)(::Dual)`
   # When fixed uncomment  the below and delete the broken function
