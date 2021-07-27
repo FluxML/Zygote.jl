@@ -27,8 +27,8 @@ end
 
   # https://github.com/FluxML/Zygote.jl/issues/1027
   @test gradient(x -> sum(x .!= 0), a_gpu) == (nothing,)
-  g3 = gradient(x -> sum(x .^ 3) ./ count(x .> 3), a)[1]
-  @test cu(g3) ≈ gradient(x -> sum(x .^ 3) ./ sum(x .> 3), a_gpu)[1]
+  g3 = gradient(x -> sum(x .^ 3) / count(x .> 3), a)[1]
+  @test cu(g3) ≈ gradient(x -> sum(x .^ 3) / sum(x .> 3), a_gpu)[1]
 end
 
 @testset "sum(f, x)" begin
