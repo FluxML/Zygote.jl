@@ -125,7 +125,15 @@ julia> haskey(g, z)  # only x and y are parameters
 false
 ```
 """
-gradient
+function gradient(f, ps::Params)
+  y, back = pullback(f, ps)
+  back(sensitivity(y))
+end
+
+function withgradient(f, ps::Params)
+  y, back = pullback(f, ps)
+  (val = y, grad = back(sensitivity(y)))
+end
 
 """
     Params([A, B])
