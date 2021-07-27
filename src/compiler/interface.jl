@@ -103,6 +103,25 @@ end
 # Param-style wrappers
 
 """
+    Params([A, B])
+
+Container for implicit parameters, used when differentiating
+a zero-argument funtion `() -> loss(A, B)` with respect to `A, B`.
+"""
+struct Params
+  order::Buffer # {Any, Vector{Any}}
+  params::IdSet{Any} # TODO store ids only
+end
+
+Params() = Params(Buffer([], false), IdSet())
+Params(xs) = Params(Buffer(xs, false), IdSet(xs))
+Params(ps::Params) = ps
+Params(xs::Tuple) = Params(collect(xs))
+
+@forward Params.order Base.iterate, Base.length, Base.getindex
+@forward Params.params Base.in
+
+"""
     gradient(() -> loss(), ps::Params) -> Grads
 
 Gradient with implicit parameters. Takes a zero-argument function,
@@ -134,25 +153,6 @@ function withgradient(f, ps::Params)
   y, back = pullback(f, ps)
   (val = y, grad = back(sensitivity(y)))
 end
-
-"""
-    Params([A, B])
-
-Container for implicit parameters, used when differentiating
-a zero-argument funtion `() -> loss(A, B)` with respect to `A, B`.
-"""
-struct Params
-  order::Buffer # {Any, Vector{Any}}
-  params::IdSet{Any} # TODO store ids only
-end
-
-Params() = Params(Buffer([], false), IdSet())
-Params(xs) = Params(Buffer(xs, false), IdSet(xs))
-Params(ps::Params) = ps
-Params(xs::Tuple) = Params(collect(xs))
-
-@forward Params.order Base.iterate, Base.length, Base.getindex
-@forward Params.params Base.in
 
 function Base.union!(ps::Params, itrs...)
   foreach(itr -> foreach(x -> push!(ps, x), itr), itrs)
