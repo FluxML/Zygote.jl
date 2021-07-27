@@ -42,13 +42,13 @@ function has_chain_rrule(T)
   # Consider the following truth table, for what can occur:
   # rrule: fallback, no_rrule: fallback =>  matches => do not use rrule.
   # rrule: specific, no_rrule: fallback => !matches => do use rrule, as haven't opted out.
-  # rrule: fallback, no_rrule: specific =>  IMPOSSIBLE, every no_rule us identical to some rrule
+  # rrule: fallback, no_rrule: specific =>  IMPOSSIBLE, every no_rule is identical to some rrule
   # rrule: specific, no_rrule: specific =>  matches => do not use rrule as opted out
   # rrule: specific, no_rrule: general  => !matches => do use rrule as a more specific rrule takes preciedent over more general opted out
   # rrule: general , no_rrule: specific =>  IMPOSSIBLE, every no_rule us identical to some rrule so can't have a more general rrule being hit, as the specific one would hit first
   #
-  # Note that the fallback  cases are the same outcome as the general cases as fallback is just most general.
-  # It can be seen that checking if it matches is the correct way to decide if we should ue the rrule or not.
+  # Note that the fallback cases are the same outcome as the general cases as fallback is just most general.
+  # It can be seen that checking if it matches is the correct way to decide if we should use the rrule or not.
 
 
   do_not_use_rrule = matching_cr_sig(no_rrule_m, rrule_m)
