@@ -219,6 +219,7 @@ using ForwardDiff: Dual
 
 dual(x, p) = x
 dual(x::Real, p) = Dual(x, p)
+dual(x::Bool, p) = x
 
 function dual_function(f::F) where F
   function (args::Vararg{Any,N}) where N
