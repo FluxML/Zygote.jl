@@ -58,11 +58,11 @@ See also [`withgradient`](@ref) to keep the value `f(args...)`,
 and [`pullback`](@ref) for value and back-propagator.
 
 ```jldoctest; setup=:(using Zygote)
-julia> gradient(*, 2, 3, 5)
-(15, 10, 6)
+julia> gradient(*, 2.0, 3.0, 5.0)
+(15.0, 10.0, 6.0)
 
-julia> gradient(x -> sum(abs2,x), [7, 11, 13])
-([14, 22, 26],)
+julia> gradient(x -> sum(abs2,x), [7.0, 11.0, 13.0])
+([14.0, 22.0, 26.0],)
 
 julia> gradient([7, 11], 0, 1) do x, y, d
          p = size(x, d)

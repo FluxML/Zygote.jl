@@ -24,6 +24,7 @@ end
 
   xs, y = randn(2,3), rand()
   f34(xs, y) = xs[1] * (sum(xs .^ (1:3)') + y^4)  # non-diagonal Hessian, two arguments
+
   dx, dy = diaghessian(f34, xs, y)
   @test size(dx) == size(xs)
   @test vec(dx) ≈ diag(hessian(x -> f34(x,y), xs))
