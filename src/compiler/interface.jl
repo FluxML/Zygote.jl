@@ -73,7 +73,8 @@ julia> gradient([7, 11], 0, 1) do x, y, d
 """
 function gradient(f, args...)
   y, back = pullback(f, args...)
-  return back(sensitivity(y))
+  grad = back(sensitivity(y))
+  map(_project, args, grad)
 end
 
 Base.adjoint(f::Function) = x -> gradient(f, x)[1]
@@ -95,7 +96,8 @@ true
 """
 function withgradient(f, args...)
   y, back = pullback(f, args...)
-  (val = y, grad = back(sensitivity(y)))
+  grad = back(sensitivity(y))
+  (val = y, grad = map(_project, args, grad))
 end
 
 # Param-style wrappers

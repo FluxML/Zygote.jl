@@ -38,7 +38,7 @@ end
     dxv = view(dx, inds...)
     dxv .= accum.(dxv, _droplike(dy, dxv))
   end
-  return (dx, map(_->nothing, inds)...)
+  return (_project(x, dx), map(_->nothing, inds)...)
 end
 
 """

@@ -129,6 +129,20 @@ Convert `x` from the format Zygote uses internally to differentials types ChainR
 end
 
 """
+  _project(x)(dx)
+  _project(x, dx)
+
+The function `_project(x)` returns a projector, which standardises the gradient `dx` for type & shape.
+Uses `ChainRulesCore.ProjectTo`, but is safe to apply to arbitrary input.
+The two-argument `_project(x, dx)` applies this immediately.
+"""
+@inline _project(x) = identity  # fallback: do nothing!
+@inline _project(x::Numeric) = wrap_chainrules_output ∘ ProjectTo(x)
+@inline _project(x::Ref{<:Numeric}) = wrap_chainrules_output ∘ ProjectTo(x)
+
+@inline _project(x, dx) = _project(x)(dx)
+
+"""
   ZBack{F}(back) <: Function
 
 Wrapper for a ChainRules pullback `back`, that causes it to follow Zygote conventions.
