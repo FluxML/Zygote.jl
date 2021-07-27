@@ -28,8 +28,8 @@ function has_chain_rrule(T)
   else
     # Not being redispatched: it does have a config
     rrule_m = configured_rrule_m
-     # Thus any no_rrule that might apply must also have a config because if it applied
-     # it will be identical, and if it doesn't we don't care what it is.
+    # Thus any no_rrule that might apply must also have a config because if it applied
+    # it will be identical, and if it doesn't we don't care what it is.
     no_rrule_m = meta(Tuple{typeof(ChainRulesCore.no_rrule), config_T, arg_Ts...})
   end
 
