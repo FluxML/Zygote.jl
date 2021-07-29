@@ -194,7 +194,10 @@ z2d(x, ::Any) = x
 z2d(::Nothing, ::Any) = NoTangent()
 z2d(a::AbstractArray{<:Number}, primal::AbstractArray{T}) where T = a
 z2d(a::AbstractArray, primal::AbstractArray{T}) where T = z2d.(a, primal)
-z2d(x::Union{AbstractZero, Tangent}, ::Any) = (difftype_warn(x); return x)
+# Note: this should never be hit if we are converting things right, but it seems to be
+# happening in the wild for sufficiently weird functions/types.
+# This fixes most (all?) cases, but it would be good to find what we miss.
+z2d(x::Union{AbstractZero, Tangent}, ::Any) = return x
 function z2d(t::Tuple, primal::Tuple)
   tp::Tuple = map(z2d, t, primal)
   primal_type = typeof(primal)
