@@ -60,6 +60,10 @@ end
   @nograd Colors.ColorTypes._parameter_upper_bound
 end
 
+@init @require RandomNumbers="e6cf234a-135c-5ec9-84dd-332b85af5143" begin
+  @nograd Xorshifts.Xoroshiro128Plus
+end
+
 using InteractiveUtils
 precompile() = Requires.@include("precompile.jl")
 
