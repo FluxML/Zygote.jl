@@ -48,10 +48,10 @@ end
 function unbroadcast(x::AbstractArray, x̄)
   N = ndims(x̄)
   if length(x) == length(x̄)
-    _project(x, x̄)  # ProjectTo handles reshape, offsets, structured matrices
+    _project(x, x̄)  # ProjectTo handles reshape, offsets, structured matrices, row vectors
   else
-    tup = filter(d -> !(d isa Nothing), ntuple(i -> size(x, i) == 1 ? i : nothing, N))
-    dims = tup isa Tuple{Int} ? only(tup) : tup  # avoid sum(xbar, dims=(1,)) as e.g. sum(SA[1 2; 3 4], dims=(1,)) fails
+    tup = filter(d -> size(x, d) == 1, ntuple(identity, N))
+    dims = length(tup) == 1 ? only(tup) : tup  # avoid sum(xbar, dims=(1,)) as e.g. sum(SA[1 2; 3 4], dims=(1,)) fails
     _project(x, accum_sum(x̄; dims = dims))
   end
 end
