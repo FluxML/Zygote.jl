@@ -9,7 +9,7 @@ CUDA.allowscalar(false)
   @test gradient(x -> sum(cu(x)), r)[1] isa Array{Float32, 2}
 end
 
-@testset "basic bcasting" begin
+@testset "broadcasting" begin
   a = Float32.(1:9)
   a_gpu = a |> cu
 
@@ -24,6 +24,13 @@ end
   g_gpu = gradient(x -> w(x), a_gpu)[1]
   @test g_gpu isa CuArray
   @test g_gpu |> collect ≈ g
+
+  # https://github.com/FluxML/Zygote.jl/issues/1027                  # status on Zygote v0.6.14, CUDA v3.3.0 in comments:
+  @test gradient(x -> sum(x .!= 0), a_gpu) == (nothing,)             # was MethodError: no method matching iterate(::Nothing)
+  @test gradient(x -> sum(x .> 3), a_gpu) == (nothing,)
+  g3 = gradient(x -> sum(x .^ 3) / count(x .> 3), a)[1]              # was Can't differentiate gc_preserve_end expression
+  @test_skip cu(g3) ≈ gradient(x -> sum(x .^ 3) / sum(x .> 3), a_gpu)[1]  # was KernelException -- not fixed by PR #1018
+  @test cu(g3) ≈ gradient(x -> sum(x .^ 3) / count(x .> 3), a_gpu)[1] 
 end
 
 @testset "sum(f, x)" begin
