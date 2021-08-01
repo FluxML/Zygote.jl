@@ -253,7 +253,10 @@ end
     @eval @adjoint broadcasted(::CuArrayStyle, f, args...) =
       broadcast_forward(CUDA.cufunc(f), args...)
 
-  else # CUDA >= 3.0 -- don't need cufunc(f), and ordinary broadcasting calls broadcast_forward when safe
+  else # CUDA >= 3.0 -- don't need cufunc(f). 
+       # Ordinary broadcasting calls broadcast_forward anyway when certain its' safe,
+       # so perhaps this can be deleted? Possible edge case here:
+       # https://github.com/FluxML/Zygote.jl/pull/1018#issuecomment-873629415
 
     @eval @adjoint broadcasted(::CuArrayStyle, f, args...) =
       broadcast_forward(f, args...)

@@ -26,9 +26,9 @@ end
   @test g_gpu |> collect ≈ g
 
   # https://github.com/FluxML/Zygote.jl/issues/1027
-  @test gradient(x -> sum(x .!= 0), a_gpu) == (nothing,)
-  g3 = gradient(x -> sum(x .^ 3) / count(x .> 3), a)[1]
-  @test cu(g3) ≈ gradient(x -> sum(x .^ 3) / sum(x .> 3), a_gpu)[1]
+  @test gradient(x -> sum(x .!= 0), a_gpu) == (nothing,)             # was MethodError: no method matching iterate(::Nothing)
+  g3 = gradient(x -> sum(x .^ 3) / count(x .> 3), a)[1]              # was Can't differentiate gc_preserve_end expression
+  @test cu(g3) ≈ gradient(x -> sum(x .^ 3) / sum(x .> 3), a_gpu)[1]  # was KernelException -- Zygote v0.6.14, CUDA v3.3.0
 end
 
 @testset "sum(f, x)" begin
