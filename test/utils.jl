@@ -66,7 +66,8 @@ end
 
   j5 = jacobian((x,y) -> hcat(x[1], y), fill(pi), exp(1))  # zero-array
   @test j5[1] isa Matrix
-  @test vec(j5[1]) == [1, 0]
+  @test_broken vec(j5[1]) == [1, 0]  # bug, https://github.com/JuliaDiff/ChainRulesCore.jl/issues/423
+  @test j5[2] == [0, 1]
 
   @test_throws ArgumentError jacobian(identity, [1,2,3+im])
   @test_throws ArgumentError jacobian(sum, [1,2,3+im])  # scalar, complex
