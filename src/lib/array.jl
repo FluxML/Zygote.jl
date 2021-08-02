@@ -101,17 +101,6 @@ end
 
 @adjoint collect(x::Array) = collect(x), Δ -> (Δ,)
 
-@adjoint fill(x::Real, dims...) = fill(x, dims...), Δ->(sum(Δ), map(_->nothing, dims)...)
-
-@adjoint function circshift(A, shifts)
-  circshift(A, shifts), Δ -> (circshift(Δ, map(-, shifts)), nothing)
-end
-
-@adjoint function reverse(x::AbstractArray, args...; kwargs...)
-  _reverse(t) = reverse(t, args...; kwargs...)
-  _reverse(x), Δ->(_reverse(Δ), map(_->nothing, args)...)
-end
-
 @adjoint permutedims(xs) = permutedims(xs), Δ -> (permutedims(Δ),)
 
 @adjoint permutedims(xs::AbstractVector) = permutedims(xs), Δ -> (vec(permutedims(Δ)),)
