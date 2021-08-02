@@ -3,14 +3,10 @@ using FillArrays: AbstractFill, getindex_value
 using Base.Broadcast: broadcasted, broadcast_shape
 using Distributed: pmap, AbstractWorkerPool
 
-@adjoint (::Type{T})(::UndefInitializer, args...) where T<:Array = T(undef, args...), Δ -> nothing
-
 @adjoint Array(xs::AbstractArray) = Array(xs), ȳ -> (ȳ,)
 @adjoint Array(xs::Array) = Array(xs), ȳ -> (ȳ,)
 
 @nograd ones, zeros, Base.OneTo, Colon(), one, zero, sizehint!, count
-
-@adjoint Base.vect(xs...) = Base.vect(xs...), Δ -> (Δ...,)
 
 @adjoint copy(x::AbstractArray) = copy(x), ȳ -> (ȳ,)
 
@@ -18,7 +14,6 @@ using Distributed: pmap, AbstractWorkerPool
 @adjoint collect(x::AbstractArray) = collect(x), dy -> (dy,)
 
 # Array Constructors
-@adjoint (::Type{T})(x::T) where T<:Array = T(x), ȳ -> (ȳ,)
 @adjoint function (::Type{T})(x::Number, sz) where {T <: Fill}
     back(Δ::AbstractArray) = (sum(Δ), nothing)
     back(Δ::NamedTuple) = (Δ.value, nothing)
