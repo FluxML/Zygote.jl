@@ -314,7 +314,7 @@ end[1] == 1
   return x*5
 end[1] == 5
 
-@test_skip gradient(x -> one(eltype(x)), rand(10))[1] === nothing  # no method matching (::ProjectTo{AbstractArray, ...})(::Nothing)
+@test gradient(x -> one(eltype(x)), rand(10))[1] === nothing
 
 # Thre-way control flow merge
 @test gradient(1) do x
@@ -407,7 +407,7 @@ function pow_simd(x, n)
   return r
 end
 
-@test_broken gradient(pow_simd, 2, 3) == (12,nothing) # no method matching (::ProjectTo{Float64, NamedTuple{(), Tuple{}}})(::Nothing)
+@test gradient(pow_simd, 2, 3) == (12,nothing)
 
 @testset "tuple getindex" begin
   @test gradient(x -> size(x)[2], ones(2,2,2)) == (nothing,)
