@@ -74,6 +74,7 @@ julia> gradient([7, 11], 0, 1) do x, y, d
 function gradient(f, args...)
   y, back = pullback(f, args...)
   grad = back(sensitivity(y))
+  isnothing(grad) && return nothing
   map(_project, args, grad)
 end
 
@@ -97,6 +98,7 @@ true
 function withgradient(f, args...)
   y, back = pullback(f, args...)
   grad = back(sensitivity(y))
+  isnothing(grad) && return (val=y, grad=nothing)
   (val = y, grad = map(_project, args, grad))
 end
 
