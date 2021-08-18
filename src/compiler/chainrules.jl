@@ -137,8 +137,8 @@ Uses `ChainRulesCore.ProjectTo`, but is safe to apply to arbitrary input.
 The two-argument `_project(x, dx)` applies this immediately.
 """
 @inline _project(x) = identity  # fallback: do nothing!
-@inline _project(x::Numeric) = wrap_chainrules_output ∘ ProjectTo(x)
-@inline _project(x::Ref{<:Numeric}) = wrap_chainrules_output ∘ ProjectTo(x)
+@inline _project(x::Numeric) = wrap_chainrules_output ∘ ProjectTo(x) ∘ wrap_chainrules_input
+@inline _project(x::Ref{<:Numeric}) = wrap_chainrules_output ∘ ProjectTo(x) ∘ wrap_chainrules_input
 
 @inline _project(x, dx) = _project(x)(dx)
 
