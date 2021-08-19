@@ -175,8 +175,9 @@ As per [`chain_rrule`](@ref) but with support for kwargs.
 end
 
 
-function ChainRulesCore.rrule_via_ad(config::ZygoteRuleConfig, f, args...)
-    y, pb = _pullback(config.context, f, args...)
+function ChainRulesCore.rrule_via_ad(config::ZygoteRuleConfig, f, args...; kwargs...)
+    kwf(args...) = f(args...; kwargs...)
+    y, pb = _pullback(config.context, kwf, args...)
     ad_pullback(Δ) = zygote2differential(pb(wrap_chainrules_output(Δ)), (f, args...))
     return y, ad_pullback
 end
