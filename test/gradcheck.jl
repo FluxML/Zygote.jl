@@ -1407,8 +1407,8 @@ end
   # Many of these tests check a complex gradient to a function with real input. This is now
   # clamped to real by ProjectTo, but to run the old tests, use here the old gradient function:
   function oldgradient(f, args...)
-    y, back = pullback(f, args...)
-    back(sensitivity(y))
+    y, back = Zygote.pullback(f, args...)
+    back(Zygote.sensitivity(y))
   end
   # Eventually these rules and tests will be moved to ChainRules.jl, at which point the tests
   # can be updated to use real / complex consistently.
