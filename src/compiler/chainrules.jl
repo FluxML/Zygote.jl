@@ -177,9 +177,19 @@ end
 
 function ChainRulesCore.rrule_via_ad(config::ZygoteRuleConfig, f, args...; kwargs...)
     kwf(args...) = f(args...; kwargs...)
-    y, pb = _pullback(config.context, kwf, args...)
+    y, _pb = _pullback(config.context, kwf, args...)
+    pb = _isclosure(f) ? _unwrap_closure ∘ _pb : _pb
     ad_pullback(Δ) = zygote2differential(pb(wrap_chainrules_output(Δ)), (f, args...))
     return y, ad_pullback
+end
+
+function _isclosure(f)
+    f isa Type && return false # constructor
+    return fieldcount(typeof(f)) > 0 ? true : false
+end
+function _unwrap_closure(pbres)
+    # take :f of first element to extract the tangent of the inner closure
+    return ntuple(i -> i==1 ? pbres[i][:f] : pbres[i], length(pbres))
 end
 
 """
