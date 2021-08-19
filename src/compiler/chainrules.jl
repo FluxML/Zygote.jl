@@ -155,6 +155,9 @@ The two-argument `_project(x, dx)` applies this immediately.
 # 
 # But the original case was an array of Union{Int,Nothing}
 
+# Solve some ambiguity:
+(::ProjectTo{ChainRulesCore.NoTangent})(::ChainRulesCore.AbstractZero) = NoTangent()
+
 """
   ZBack{F}(back) <: Function
 

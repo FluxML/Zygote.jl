@@ -1678,7 +1678,7 @@ end
     # check that type is not unnecessarily promoted
     # https://github.com/FluxML/Zygote.jl/issues/663
     @test gradient(norm, randn(Float32, 2, 2)) isa Tuple{Matrix{Float32}}
-    @test gradient(norm, randn(Float32, 2, 2), 3) isa Tuple{Matrix{Float32},Float32}
+    @test gradient(norm, randn(Float32, 2, 2), 3) isa Tuple{Matrix{Float32},Float64}
     @test gradient(norm, randn(Float32, 2, 2), 3f0) isa Tuple{Matrix{Float32},Float32}
     @test gradient(norm, randn(ComplexF32, 2, 2), 3.5f0) isa Tuple{Matrix{ComplexF32},Float32}
 
