@@ -11,6 +11,7 @@ using ChainRules: ChainRules, rrule, unthunk, canonicalize
 using IRTools
 using MacroTools, Requires
 using MacroTools: @forward
+using Compat  # for Julia 1.3, need Compat 2.2
 
 import Distributed: pmap, CachingPool, workers
 export Params, withgradient, gradient, withjacobian, jacobian, hessian, diaghessian, pullback, pushforward, @code_adjoint
