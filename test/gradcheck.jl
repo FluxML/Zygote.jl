@@ -332,9 +332,9 @@ end
   @test gradient(x -> sum(log, filter(iseven, x)), 1:10) ==
     (map(x -> iseven(x) ? 1/x : 0, 1:10),)
   @test gradient(x -> sum(abs2, im .+ filter(iseven, x)), 1:10) ==
-    (map(x -> iseven(x) ? 2x+2im : 0, 1:10),)
+    (map(x -> iseven(x) ? 2x : 0, 1:10),)
+    # (map(x -> iseven(x) ? 2x+2im : 0, 1:10),)
 end
-
 
 @testset "mean" begin
   @test gradtest(mean, rand(2, 3))

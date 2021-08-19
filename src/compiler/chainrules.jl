@@ -158,6 +158,9 @@ The two-argument `_project(x, dx)` applies this immediately.
 # Solve some ambiguity:
 (::ProjectTo{ChainRulesCore.NoTangent})(::ChainRulesCore.AbstractZero) = NoTangent()
 
+# some splat?
+(project::ProjectTo{AbstractArray})(dx::ChainRulesCore.Tangent{<:Any, <:Tuple}) = project(collect(ChainRulesCore.backing(dx)))
+
 """
   ZBack{F}(back) <: Function
 
