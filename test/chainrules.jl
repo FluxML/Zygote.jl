@@ -275,6 +275,13 @@ end
         test_rrule(ZygoteRuleConfig(), getindex, rand(5), 3; rrule_f=rrule_via_ad)
     end
 
+    @testset "kwargs" begin
+        test_rrule(
+            ZygoteRuleConfig(), sum, [1.0 2; 3 4];
+            rrule_f=rrule_via_ad, check_inferred=false, fkwargs=(;dims=1)
+        )
+    end
+
     @testset "struct" begin
         struct Foo
             x

@@ -174,10 +174,18 @@ As per [`chain_rrule`](@ref) but with support for kwargs.
   return y, kw_zpullback
 end
 
+function ChainRulesCore.rrule_via_ad(config::ZygoteRuleConfig, f_args...; kwargs...)
+    # create a closure to work around _pullback not accepting kwargs
+    # but avoid creating a closure unnecessarily (pullbacks of closures do not infer)
+    y, pb = if !isempty(kwargs)
+        kwf() = first(f_args)(Base.tail(f_args)...; kwargs...)
+        _y, _pb = _pullback(config.context, kwf)
+        _y, Δ -> first(_pb(Δ)).f_args  # `first` should be `only`
+    else
+        _pullback(config.context, f_args...)
+    end
 
-function ChainRulesCore.rrule_via_ad(config::ZygoteRuleConfig, f, args...)
-    y, pb = _pullback(config.context, f, args...)
-    ad_pullback(Δ) = zygote2differential(pb(wrap_chainrules_output(Δ)), (f, args...))
+    ad_pullback(Δ) = zygote2differential(pb(wrap_chainrules_output(Δ)), f_args)
     return y, ad_pullback
 end
 
