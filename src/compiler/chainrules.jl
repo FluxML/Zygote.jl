@@ -180,7 +180,7 @@ function ChainRulesCore.rrule_via_ad(config::ZygoteRuleConfig, f_args...; kwargs
     y, pb = if !isempty(kwargs)
         kwf() = first(f_args)(Base.tail(f_args)...; kwargs...)
         _y, _pb = _pullback(config.context, kwf)
-        _y, Δ -> only(_pb(Δ)).f_args
+        _y, Δ -> first(_pb(Δ)).f_args  # `first` should be `only`
     else
         _pullback(config.context, f_args...)
     end
