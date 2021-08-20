@@ -174,22 +174,16 @@ As per [`chain_rrule`](@ref) but with support for kwargs.
   return y, kw_zpullback
 end
 
-function ChainRulesCore.rrule_via_ad(config::ZygoteRuleConfig, f, args...; kwargs...)
-    kwf(args...) = f(args...; kwargs...)
-    y, pb = _pullback(config.context, kwf, args...)
+
+function ChainRulesCore.rrule_via_ad(config::ZygoteRuleConfig, f_args...; kwargs...)
+    kwf() = first(f_args)(Base.tail(f_args)...; kwargs...)
+    y, pb = _pullback(config.context, kwf)
     function ad_pullback(Δ)
-        Δfargs = _unwrap_kwf_pullback(pb(wrap_chainrules_output(Δ)))
-        return zygote2differential(Δfargs, (f, args...))
+        pbres = only(pb(wrap_chainrules_output(Δ))).f_args
+        return zygote2differential(pbres, f_args)
     end
     return y, ad_pullback
 end
-
-# `kwf` is a closure, and its tangent is a NamedTuple for each of the closed-over objects.
-# If `f` is also a closure, we extract that field and ignore the kwargs.
-# If `f` is not a closure, all the NamedTuple fields are `nothing`s and Zygote collapses
-# them into a single `nothing`.
-_unwrap_kwf_pullback(Δ::Tuple{Nothing, Vararg}) = Δ
-_unwrap_kwf_pullback(Δ::Tuple{NamedTuple, Vararg}) = (first(Δ).f, Base.tail(Δ)...)
 
 """
     zygote2differential(x)
