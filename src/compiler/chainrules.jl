@@ -174,22 +174,22 @@ As per [`chain_rrule`](@ref) but with support for kwargs.
   return y, kw_zpullback
 end
 
-function ChainRulesCore.rrule_via_ad(config::ZygoteRuleConfig, f, args...; kwargs...)
-    kwf(args...) = f(args...; kwargs...)
-    y, pb = _pullback(config.context, kwf, args...)
+function ChainRulesCore.rrule_via_ad(config::ZygoteRuleConfig, f_args...; kwargs...)
+    # create a closure to work around _pullback not accepting kwargs
+    # but avoid creating a closure unnecessarily (pullbacks of closures do not infer)
+    y, pb = if !isempty(kwargs)
+        kwf() = first(f_args)(Base.tail(f_args)...; kwargs...)
+        _y, _pb = _pullback(config.context, kwf)
+        _y, Δ -> only(_pb(Δ)).f_args
+    else
+        _pullback(config.context, f_args...)
+    end
+
     function ad_pullback(Δ)
-        Δfargs = _unwrap_kwf_pullback(pb(wrap_chainrules_output(Δ)))
-        return zygote2differential(Δfargs, (f, args...))
+        return zygote2differential(pb(wrap_chainrules_output(Δ)), f_args)
     end
     return y, ad_pullback
 end
-
-# `kwf` is a closure, and its tangent is a NamedTuple for each of the closed-over objects.
-# If `f` is also a closure, we extract that field and ignore the kwargs.
-# If `f` is not a closure, all the NamedTuple fields are `nothing`s and Zygote collapses
-# them into a single `nothing`.
-_unwrap_kwf_pullback(Δ::Tuple{Nothing, Vararg}) = Δ
-_unwrap_kwf_pullback(Δ::Tuple{NamedTuple, Vararg}) = (first(Δ).f, Base.tail(Δ)...)
 
 """
     zygote2differential(x)
