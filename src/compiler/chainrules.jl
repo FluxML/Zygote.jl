@@ -185,9 +185,7 @@ function ChainRulesCore.rrule_via_ad(config::ZygoteRuleConfig, f_args...; kwargs
         _pullback(config.context, f_args...)
     end
 
-    function ad_pullback(Δ)
-        return zygote2differential(pb(wrap_chainrules_output(Δ)), f_args)
-    end
+    ad_pullback(Δ) = zygote2differential(pb(wrap_chainrules_output(Δ)), f_args)
     return y, ad_pullback
 end
 
