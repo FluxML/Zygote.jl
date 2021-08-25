@@ -123,8 +123,8 @@ Wrapper for a ChainRules pullback `back`, that causes it to follow Zygote conven
 (A functor here is used rather than a closure to avoid boxing issues);
 """
 struct ZBack{F,P} <: Function
-  primals::P
   back::F
+  primals::P
 end
 @inline (s::ZBack)(dy) = wrap_chainrules_output(s.back(zygote2differential(dy, s.primals)))
 # `nothing->nothing` can be deleted after https://github.com/FluxML/Zygote.jl/issues/603
@@ -139,7 +139,7 @@ The pullback is appropriately wrapped up to follow Zygote conventions.
 """
 @inline function chain_rrule(config, f, args...)
   y, back = rrule(config, f, args...)
-  return y, ZBack(back, args...)
+  return y, ZBack(back, args)
 end
 
 
@@ -152,7 +152,7 @@ As per [`chain_rrule`](@ref) but with support for kwargs.
 @inline function chain_rrule_kw(config, kwf, kwargs, f, args...)
   y, back = rrule(config, f, args...; kwargs...)
   function kw_zpullback(dy)
-    dxs = ZBack(back)(dy)
+    dxs = ZBack(back, args)(dy)
     if dxs === nothing  # if dxs is nothing, then all partiaols are nothing
       # Zygote convention is a single nothing no mather how partials, if all are nothing
       return nothing
