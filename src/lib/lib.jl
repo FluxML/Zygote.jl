@@ -55,8 +55,7 @@ end
   quote
     if haskey(cache(cx), x)
       cache(cx)[x] = accum(cache(cx)[x],Δ)
-      @show cache(cx)[x]
-      return cache(cx)[x]
+      return
     else
       return Δ
     end
@@ -106,6 +105,16 @@ using Base: tail
   function back(Δ)
     accum_param(__context__, val, Δ) === nothing && return
     return ntuple(j -> i == j ? Δ : nothing, Val(N)), nothing
+  end
+  val, back
+end
+
+@adjoint function literal_getindex(xs::Dict, ::Val{k}) where k
+  val = xs[k]
+  ks = keys(xs)
+  function back(Δ)
+    accum_param(__context__, val, Δ) === nothing && return
+    return Dict(k_ => k_ == k ? Δ : nothing for k_ in ks), nothing
   end
   val, back
 end
