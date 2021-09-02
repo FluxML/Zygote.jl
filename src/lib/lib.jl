@@ -138,15 +138,6 @@ end
   val, back
 end
 
-# @adjoint function getindex(d::Dict, k)
-#   val = d[k]
-#   ks = keys(d)
-#   function back(Δ)
-#     
-#     (d, nothing)
-#   end
-# end
-
 function _pullback(cx::AContext, ::typeof(literal_indexed_iterate), xs::Tuple, ::Val{i}) where i
   y, b = _pullback(cx, literal_getindex, xs, Val(i))
   back(::Nothing) = nothing
