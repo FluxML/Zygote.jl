@@ -55,7 +55,8 @@ end
   quote
     if haskey(cache(cx), x)
       cache(cx)[x] = accum(cache(cx)[x],Δ)
-      return
+      @show cache(cx)[x]
+      return cache(cx)[x]
     else
       return Δ
     end
@@ -136,6 +137,15 @@ end
   end
   val, back
 end
+
+# @adjoint function getindex(d::Dict, k)
+#   val = d[k]
+#   ks = keys(d)
+#   function back(Δ)
+#     
+#     (d, nothing)
+#   end
+# end
 
 function _pullback(cx::AContext, ::typeof(literal_indexed_iterate), xs::Tuple, ::Val{i}) where i
   y, b = _pullback(cx, literal_getindex, xs, Val(i))
