@@ -118,17 +118,18 @@ end
 
 # named tuple
 @adjoint function pairs(t::NamedTuple{N}) where N
-
-  pairs_namedtuple_pullback(dx::NamedTuple) = (dx.data,)
   
+  pairs_namedtuple_pullback(dx::NamedTuple) = (dx.data,)
+
   function pairs_namedtuple_pullback(Δ::Dict)
     t0 = map(zero, t)
     for (idx, v) in Δ
-      t0 = NamedTuple{N}(Base.setindex((t0...,), v, idx))
+      ii = idx isa Integer ? idx : findfirst(==(idx), keys(t))
+      t0 = NamedTuple{N}(Base.setindex((t0...,), v, ii))
     end
     return (t0,)
   end
-  
+
   return pairs(t), pairs_namedtuple_pullback
 end
 
