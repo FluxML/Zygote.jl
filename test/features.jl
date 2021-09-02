@@ -467,9 +467,7 @@ end
   g(; kwargs...) = kwargs[:x] * kwargs[:z]
   h(somedata) = g(; somedata...)
   @test gradient(h, (; x=3.0, y=4.0, z=2.3)) == ((x = 2.3, y = 0.0, z = 3.0),)
-
-  # Currently broken because we fallback to ADing the `merge(::NamedTuple, itr)` which uses `push!`.
-  @test_broken gradient(h, Dict(:x=>3.0, :y=>4.0, :z=>2.3)) isa Any
+  @test gradient(h, Dict(:x=>3.0, :y=>4.0, :z=>2.3)) == ((y = 0.0, z = 3.0, x = 2.3),)
 end
 
 # https://github.com/JuliaDiff/ChainRules.jl/issues/257

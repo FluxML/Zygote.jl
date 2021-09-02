@@ -133,6 +133,15 @@ end
   return pairs(t), pairs_namedtuple_pullback
 end
 
+# For merge between NamedTuple and Dict, we will just convert the Dict to a NamedTuple.
+# and then call `pullback`, which should overall be pretty efficient code generated,
+# and it avoids trying to AD the problematic generic `merge(::NamedTuple, ::iter)` method which uses `push!`.
+if VERSION >= v"1.6"
+  @adjoint merge(nt::NamedTuple, dict::Dict) = pullback(merge, nt, NamedTuple(dict))
+else
+  @adjoint merge(nt::NamedTuple, dict::Dict) = pullback(merge, nt, (;dict...))
+end
+
 @adjoint function Base.getfield(p::Pair, i::Int)
     function pair_getfield_pullback(Δ)
         f, s = i == 1 ? (Δ, nothing) : (nothing, Δ)
