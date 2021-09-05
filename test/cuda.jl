@@ -6,7 +6,11 @@ CUDA.allowscalar(false)
 # Test GPU movement inside the call to `gradient`
 @testset "GPU movement" begin
   r = rand(Float32, 3,3)
-  @test_broken gradient(x -> sum(cu(x)), r)[1] isa Array{Float32, 2}
+  if VERSION < v"1.6"
+    @test gradient(x -> sum(cu(x)), r)[1] isa Matrix{Float32}
+  else
+    @test_broken gradient(x -> sum(cu(x)), r)[1] isa Matrix{Float32}
+  end
 end
 
 @testset "broadcasting" begin
