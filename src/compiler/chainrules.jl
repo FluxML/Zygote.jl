@@ -139,7 +139,7 @@ Safe to apply to arbitrary input.
 @inline function _project(x::Union{Numeric, Ref{<:Numeric}}, dx)
   wrap_chainrules_output(ProjectTo(x)(wrap_chainrules_input(dx)))
 end
-_project(x::AbstractArray, dx) = reshape(dx, axes(x))
+_project(x::AbstractArray, dx) = dx isa AbstractArray ? reshape(dx, axes(x)) : dx
 _project(x, dx) = dx
 
 # Restore splatted arrays
