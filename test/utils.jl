@@ -36,8 +36,10 @@ end
   f713(zs) = sum(vec(zs)' .* exp.(vec(zs)))
   @test vec(diaghessian(f713, zs)[1]) ≈ diag(hessian(f713, zs))
 
-  @test_throws Exception diaghessian(sin, im*pi)
-  @test_throws Exception diaghessian(x -> x+im, pi)
+  if VERSION >= v"1.6-"
+    @test_throws Exception diaghessian(sin, im*pi)
+    @test_throws Exception diaghessian(x -> x+im, pi)
+  end
   @test_throws Exception diaghessian(identity, randn(2))
 end
 
