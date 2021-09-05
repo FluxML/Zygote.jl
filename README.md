@@ -18,7 +18,7 @@ julia> using Zygote
 julia> f(x) = 5x + 3
 
 julia> f(10), f'(10)
-(53, 5)
+(53, 5.0)
 
 julia> @code_llvm f'(10)
 define i64 @"julia_#625_38792"(i64) {

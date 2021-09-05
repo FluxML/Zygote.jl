@@ -68,14 +68,13 @@ julia> gradient([7, 11], 0, 1) do x, y, d
          p = size(x, d)
          sum(x.^p .+ y)
        end
-([14.0, 22.0], 2, nothing)
+([14.0, 22.0], 2.0, nothing)
 ```
 """
 function gradient(f, args...)
   y, back = pullback(f, args...)
   grad = back(sensitivity(y))
-  isnothing(grad) && return nothing
-  map(_project, args, grad)
+  isnothing(grad) ? nothing : map(_project, args, grad)
 end
 
 Base.adjoint(f::Function) = x -> gradient(f, x)[1]
@@ -98,11 +97,36 @@ true
 function withgradient(f, args...)
   y, back = pullback(f, args...)
   grad = back(sensitivity(y))
-  isnothing(grad) && return (val=y, grad=nothing)
-  (val = y, grad = map(_project, args, grad))
+  results = isnothing(grad) ? map(_ -> nothing, args) : map(_project, args, grad)
+  (val=y, grad=results)
 end
 
 # Param-style wrappers
+
+"""
+    gradient(() -> loss(), ps::Params) -> Grads
+
+Gradient with implicit parameters. Takes a zero-argument function,
+and returns a dictionary-like container, whose keys are arrays `x in ps`.
+
+```jldoctest; setup=:(using Zygote)
+julia> x = [1 2 3; 4 5 6]; y = [7, 8]; z = [1, 10, 100];
+
+julia> g = gradient(Params([x, y])) do
+         sum(x .* y .* z')
+       end
+Grads(...)
+
+julia> g[x]
+2×3 Matrix{Float64}:
+ 7.0  70.0  700.0
+ 8.0  80.0  800.0
+
+julia> haskey(g, z)  # only x and y are parameters
+false
+```
+"""
+gradient
 
 """
     Params([A, B])
@@ -123,38 +147,7 @@ Params(xs::Tuple) = Params(collect(xs))
 @forward Params.order Base.iterate, Base.length, Base.getindex
 @forward Params.params Base.in
 
-"""
-    gradient(() -> loss(), ps::Params) -> Grads
-
-Gradient with implicit parameters. Takes a zero-argument function,
-and returns a dictionary-like container, whose keys are arrays `x in ps`.
-
-```jldoctest; setup=:(using Zygote)
-julia> x = [1 2 3; 4 5 6]; y = [7, 8]; z = [1, 10, 100];
-
-julia> g = gradient(Params([x, y])) do
-         sum(x .* y .* z')
-       end
-Grads(...)
-
-julia> g[x]
-2×3 Matrix{Int64}:
- 7  70  700
- 8  80  800
-
-julia> haskey(g, z)  # only x and y are parameters
-false
-```
-"""
-function gradient(f, ps::Params)
-  y, back = pullback(f, ps)
-  back(sensitivity(y))
-end
-
-function withgradient(f, ps::Params)
-  y, back = pullback(f, ps)
-  (val = y, grad = back(sensitivity(y)))
-end
+Base.map(::typeof(_project), args::Tuple{Params}, grad) = grad  # skip _project in gradient(f, ::Params)
 
 function Base.union!(ps::Params, itrs...)
   foreach(itr -> foreach(x -> push!(ps, x), itr), itrs)

@@ -51,7 +51,7 @@ function unbroadcast(x::AbstractArray, x̄)
     _project(x, x̄)  # ProjectTo handles reshape, offsets, structured matrices, row vectors
   else
     tup = filter(d -> size(x, d) == 1, ntuple(identity, N))
-    dims = length(tup) == 1 ? only(tup) : tup  # avoid sum(xbar, dims=(1,)) as e.g. sum(SA[1 2; 3 4], dims=(1,)) fails
+    dims = length(tup) == 1 ? first(tup) : tup  # avoid sum(xbar, dims=(1,)) as e.g. sum(SA[1 2; 3 4], dims=(1,)) fails
     _project(x, accum_sum(x̄; dims = dims))
   end
 end
