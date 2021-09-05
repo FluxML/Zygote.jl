@@ -133,12 +133,14 @@ end
   _project(x, dx)
 
 Uses `ChainRulesCore.ProjectTo` to standardise the gradient `dx` for type & shape.
+Also handles some Zygote-specific corrections, such as `x::Array, dx::Tuple`.
 Safe to apply to arbitrary input.
 """
-@inline _project(x, dx) = dx  # fallback: do nothing!
 @inline function _project(x::Union{Numeric, Ref{<:Numeric}}, dx)
   wrap_chainrules_output(ProjectTo(x)(wrap_chainrules_input(dx)))
 end
+_project(x::AbstractArray, dx) = reshape(dx, axes(x))
+_project(x, dx) = dx
 
 # Restore splatted arrays
 _project(x::AbstractArray{<:Number}, dx::Tuple) = _project(x, reshape(collect(dx), axes(x)))
