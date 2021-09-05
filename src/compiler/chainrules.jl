@@ -123,6 +123,7 @@ Convert `x` from the format Zygote uses internally to differentials types ChainR
 """
 @inline wrap_chainrules_input(x) = x
 @inline wrap_chainrules_input(::Nothing) = ChainRules.ZeroTangent()
+@inline wrap_chainrules_input(::AbstractArray{Nothing}) = ChainRules.ZeroTangent()
 @inline function wrap_chainrules_input(xs::Union{Tuple, NamedTuple})
   xp = map(wrap_chainrules_input, xs)
   ChainRules.Tangent{Any, typeof(xp)}(xp)
@@ -143,7 +144,7 @@ The two-argument `_project(x, dx)` applies this immediately.
 @inline _project(x, dx) = _project(x)(dx)
 
 # PIRACY -- some tests hit a matrix of nothings, which doesn't seem to be handled?
-(::ChainRulesCore.ProjectTo)(nothing) = ChainRulesCore.NoTangent()
+# (::ChainRulesCore.ProjectTo)(nothing) = ChainRulesCore.NoTangent()
 
 # julia> Zygote.wrap_chainrules_input(nothing)
 # ChainRulesCore.ZeroTangent()
@@ -159,7 +160,7 @@ The two-argument `_project(x, dx)` applies this immediately.
 (project::ProjectTo{<:Complex})(dx::Tangent) = project(Complex(dx.re, dx.im))
 
 # Solve some ambiguity:
-(::ProjectTo{ChainRulesCore.NoTangent})(::ChainRulesCore.AbstractZero) = NoTangent()
+# (::ProjectTo{ChainRulesCore.NoTangent})(::ChainRulesCore.AbstractZero) = NoTangent()
 
 # some splat?
 (project::ProjectTo{AbstractArray})(dx::ChainRulesCore.Tangent{<:Any, <:Tuple}) = project(collect(ChainRulesCore.backing(dx)))
