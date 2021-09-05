@@ -143,26 +143,14 @@ The two-argument `_project(x, dx)` applies this immediately.
 
 @inline _project(x, dx) = _project(x)(dx)
 
-# PIRACY -- some tests hit a matrix of nothings, which doesn't seem to be handled?
-# (::ChainRulesCore.ProjectTo)(nothing) = ChainRulesCore.NoTangent()
-
-# julia> Zygote.wrap_chainrules_input(nothing)
-# ChainRulesCore.ZeroTangent()
-#
-# julia> Zygote.wrap_chainrules_input([nothing, nothing])
-# 2-element Vector{Nothing}:
-#  nothing
-#  nothing
-# 
-# But the original case was an array of Union{Int,Nothing}
+# Piracy:
+# wrap_chainrules_input doesn't handle array of Union{Int,Nothing}
+(::ChainRulesCore.ProjectTo)(nothing) = ChainRulesCore.NoTangent()
 
 # CRC likes Tangent{<:Complex}, but Zygote makes Tangent{Any}
 (project::ProjectTo{<:Complex})(dx::Tangent) = project(Complex(dx.re, dx.im))
 
-# Solve some ambiguity:
-# (::ProjectTo{ChainRulesCore.NoTangent})(::ChainRulesCore.AbstractZero) = NoTangent()
-
-# some splat?
+# Restore some splatted arrays
 (project::ProjectTo{AbstractArray})(dx::ChainRulesCore.Tangent{<:Any, <:Tuple}) = project(collect(ChainRulesCore.backing(dx)))
 
 """
