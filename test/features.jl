@@ -504,6 +504,9 @@ end
   @test gradient(x -> max(x...), [1,2,3])[1] == [0,0,1]
   @test gradient(x -> min(x...), (1,2,3))[1] === (1.0, 0.0, 0.0)
 
+  @test gradient(x -> max(x...), [1 2; 3 4])[1] == [0 0; 0 1]
+  @test gradient(x -> max(x...), [1,2,3]')[1] == [0 0 1]
+
   # https://github.com/FluxML/Zygote.jl/issues/599
   @test gradient(w -> sum([w...]), [1,1])[1] isa AbstractVector
 

@@ -130,18 +130,18 @@ Convert `x` from the format Zygote uses internally to differentials types ChainR
 end
 
 """
-  _project(x)(dx)
   _project(x, dx)
 
-The function `_project(x)` returns a projector, which standardises the gradient `dx` for type & shape.
-Uses `ChainRulesCore.ProjectTo`, but is safe to apply to arbitrary input.
-The two-argument `_project(x, dx)` applies this immediately.
+Uses `ChainRulesCore.ProjectTo` to standardise the gradient `dx` for type & shape.
+Safe to apply to arbitrary input.
 """
-@inline _project(x) = identity  # fallback: do nothing!
-@inline _project(x::Numeric) = wrap_chainrules_output ∘ ProjectTo(x) ∘ wrap_chainrules_input
-@inline _project(x::Ref{<:Numeric}) = wrap_chainrules_output ∘ ProjectTo(x) ∘ wrap_chainrules_input
+@inline _project(x, dx) = dx  # fallback: do nothing!
+@inline function _project(x::Union{Numeric, Ref{<:Numeric}}, dx)
+  wrap_chainrules_output(ProjectTo(x)(wrap_chainrules_input(dx)))
+end
 
-@inline _project(x, dx) = _project(x)(dx)
+# Restore splatted arrays
+_project(x::AbstractArray{<:Number}, dx::Tuple) = _project(x, reshape(collect(dx), axes(x)))
 
 # Piracy:
 # wrap_chainrules_input doesn't handle array of Union{Int,Nothing}
@@ -149,9 +149,6 @@ The two-argument `_project(x, dx)` applies this immediately.
 
 # CRC likes Tangent{<:Complex}, but Zygote makes Tangent{Any}
 (project::ProjectTo{<:Complex})(dx::Tangent) = project(Complex(dx.re, dx.im))
-
-# Restore some splatted arrays
-(project::ProjectTo{AbstractArray})(dx::ChainRulesCore.Tangent{<:Any, <:Tuple}) = project(collect(ChainRulesCore.backing(dx)))
 
 """
   ZBack{F}(back) <: Function
