@@ -155,6 +155,9 @@ The two-argument `_project(x, dx)` applies this immediately.
 # 
 # But the original case was an array of Union{Int,Nothing}
 
+# CRC likes Tangent{<:Complex}, but Zygote makes Tangent{Any}
+(project::ProjectTo{<:Complex})(dx::Tangent) = project(Complex(dx.re, dx.im))
+
 # Solve some ambiguity:
 (::ProjectTo{ChainRulesCore.NoTangent})(::ChainRulesCore.AbstractZero) = NoTangent()
 
