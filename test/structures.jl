@@ -52,7 +52,7 @@ struct A594 x::Float64 end
   X = A594.(randn(2))
   Y = randn(2,2)
   ∇ = gradient(g,X,Y)
-  @test_broken ∇[1] == [(x = 2.0,); (x = 2.0,)]  # it's producing a 1-col Matrix, why?
+  @test ∇[1] == [(x = 2.0,); (x = 2.0,)]
   @test vec(∇[1]) == [(x = 2.0,); (x = 2.0,)]
   @test ∇[2] == [1 1; 1 1]
 end
