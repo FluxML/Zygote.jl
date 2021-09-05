@@ -500,6 +500,22 @@ end
   @test x[1] == x[2]
 end
 
+@testset "splats" begin
+  @test gradient(x -> max(x...), [1,2,3])[1] == [0,0,1]
+  @test gradient(x -> min(x...), (1,2,3))[1] === (1.0, 0.0, 0.0)
+
+  # https://github.com/FluxML/Zygote.jl/issues/599
+  @test gradient(w -> sum([w...]), [1,1])[1] isa AbstractVector
+
+  # https://github.com/FluxML/Zygote.jl/issues/866
+  f866(x) = reshape(x, fill(2, 2)...)
+  @test gradient(x->sum(f866(x)), rand(4))[1] == [1,1,1,1]
+
+  # https://github.com/FluxML/Zygote.jl/issues/731
+  f731(x) = sum([x' * x, x...])
+  @test_broken gradient(f731, ones(3)) # MethodError: no method matching +(::Tuple{Float64, Float64, Float64}, ::Vector{Float64})
+end
+
 @testset "accumulation" begin
   # from https://github.com/FluxML/Zygote.jl/issues/905
   function net(x1)
