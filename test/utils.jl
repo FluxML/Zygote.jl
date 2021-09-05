@@ -20,19 +20,20 @@ using Zygote: hessian_dual, hessian_reverse
 end
 
 VERSION > v"1.6-" && @testset "diagonal hessian" begin
-# Avoiding this error on Julia 1.3 CI, not sure the exact test which causes it:
-# julia> log(Dual(1,0) + 0im)
-# ERROR: StackOverflowError:
-
   @test diaghessian(x -> x[1]*x[2]^2, [1, pi]) == ([0, 2],)
 
-  xs, y = randn(2,3), rand()
-  f34(xs, y) = xs[1] * (sum(xs .^ (1:3)') + y^4)  # non-diagonal Hessian, two arguments
+  if VERSION > v"1.6-"
+    # Gradient of ^ may contain log(complex(...)), which interacts badly with Dual below Julia 1.6:
+    # julia> log(ForwardDiff.Dual(1,0) + 0im)
+    # ERROR: StackOverflowError:
+    xs, y = randn(2,3), rand()
+    f34(xs, y) = xs[1] * (sum(xs .^ (1:3)') + y^4)  # non-diagonal Hessian, two arguments
 
-  dx, dy = diaghessian(f34, xs, y)
-  @test size(dx) == size(xs)
-  @test vec(dx) ≈ diag(hessian(x -> f34(x,y), xs))
-  @test dy ≈ hessian(y -> f34(xs,y), y)
+    dx, dy = diaghessian(f34, xs, y)
+    @test size(dx) == size(xs)
+    @test vec(dx) ≈ diag(hessian(x -> f34(x,y), xs))
+    @test dy ≈ hessian(y -> f34(xs,y), y)
+  end
 
   zs = randn(7,13)  # test chunk mode
   @test length(zs) > ForwardDiff.DEFAULT_CHUNK_THRESHOLD
