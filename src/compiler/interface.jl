@@ -77,7 +77,11 @@ function gradient(f, args...)
   isnothing(grad) ? nothing : map(_project, args, grad)
 end
 
-Base.adjoint(f::Function) = x -> gradient(f, x)[1]
+# Base.adjoint(f::Function) = x -> gradient(f, x)[1]  # piracy!
+Base.adjoint(f::Function) = x -> begin  # still piracy! avoids projection for legacy reasons
+  y, back = pullback(f, x)
+  back(sensitivity(y))[1]
+end
 
 """
     withgradient(f, args...)
