@@ -263,8 +263,8 @@ end
 
   end
 
-  @adjoint CUDA.CuArray{N,T}(xs::Array) where {N,T} =
-    CUDA.CuArray{N,T}(xs), Δ -> (convert(Array, Δ), )
+  @adjoint CUDA.CuArray{N,T,B}(xs::Array) where {N,T,B} =
+    CUDA.CuArray{N,T,B}(xs), Δ -> (convert(Array, Δ), )
 
   @adjoint function sum(xs::CUDA.AbstractGPUArray; dims = :)
     placeholder = similar(xs)
