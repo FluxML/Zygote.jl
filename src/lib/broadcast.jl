@@ -263,7 +263,7 @@ end
 
   end
 
-  @adjoint (::Type{T})(xs::Array) where {T<:CUDA.CuArray} =
+  @adjoint (::Type{T})(xs::Array) where {T <: CUDA.CuArray} =
     T(xs), Δ -> (convert(Array, Δ), )
 
   @adjoint function sum(xs::CUDA.AbstractGPUArray; dims = :)
