@@ -424,17 +424,17 @@ end
 end
 
 mutable struct MyMutable
-    value::Float64
+  value::Float64
 end
 
 function foo!(m::MyMutable, x)
-    m.value = x
+  m.value = x
 end
 
 function baz(args)
-    m = MyMutable(0.)
-    foo!(m, args...)
-    m.value
+  m = MyMutable(0.)
+  foo!(m, args...)
+  m.value
 end
 
 let
@@ -449,13 +449,18 @@ end
 @test pullback(type_test)[1] == Complex{<:Real}
 
 @testset "Pairs" begin
-    @test (x->10*pairs((a=x, b=2))[1])'(100) === 10.0
-    @test (x->10*pairs((a=x, b=2))[2])'(100) === 0
-    foo(;kw...) = 1
-    @test gradient(() -> foo(a=1,b=2.0)) === ()
+  @test (x->10*pairs((a=x, b=2))[1])'(100) === 10.0
+  @test (x->10*pairs((a=x, b=2))[2])'(100) === 0
+  foo(;kw...) = 1
+  @test gradient(() -> foo(a=1,b=2.0)) === ()
 
-    @test (x->10*(x => 2)[1])'(100) === 10.0
-    @test (x->10*(x => 2)[2])'(100) === 0
+  @test (x->10*(x => 2)[1])'(100) === 10.0
+  @test (x->10*(x => 2)[2])'(100) === 0
+
+  @test gradient(x-> (:x => x)[2], 17) == (1,)
+    
+  d = Dict(:x=>1.0, :y=>3.0);
+  @test gradient(d -> Dict(:x => d[:x])[:x], d) == (Dict(:x => 1),)
 end
 
 # https://github.com/JuliaDiff/ChainRules.jl/issues/257

@@ -118,23 +118,26 @@ end
 
 # named tuple
 @adjoint function pairs(t::NamedTuple{N}) where N
-    pairs_namedtuple(dx::NamedTuple) = (dx.data,)
-    function pairs_namedtuple(Δ::Dict)
-        t0 = map(zero, t)
-        for (idx, v) in Δ
-            t0 = NamedTuple{N}(Base.setindex((t0...,), v, idx))
-        end
-        return (t0,)
+
+  pairs_namedtuple_pullback(dx::NamedTuple) = (dx.data,)
+  
+  function pairs_namedtuple_pullback(Δ::Dict)
+    t0 = map(zero, t)
+    for (idx, v) in Δ
+      t0 = NamedTuple{N}(Base.setindex((t0...,), v, idx))
     end
-    return pairs(t), pairs_namedtuple
+    return (t0,)
+  end
+  
+  return pairs(t), pairs_namedtuple_pullback
 end
 
 @adjoint function Base.getfield(p::Pair, i::Int)
-    function pair_getfield(Δ)
-        f, s = i == 1 ? (Δ, zero(p[2])) : (zero(p[1]), Δ)
+    function pair_getfield_pullback(Δ)
+        f, s = i == 1 ? (Δ, nothing) : (nothing, Δ)
         return (first=f, second=s), nothing
     end
-    return getfield(p, i), pair_getfield
+    return getfield(p, i), pair_getfield_pullback
 end
 
 @adjoint Base.nameof(x::UnionAll) = nameof(x), _ -> (nothing,)
