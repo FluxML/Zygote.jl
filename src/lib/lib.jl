@@ -163,6 +163,15 @@ end
   first(xs), Δ -> ((Δ, drest...),)
 end
 
+@adjoint function Base.first(xs::AbstractDict)
+  _keys = collect(keys(xs))
+  function first_dict_pullback(Δ)
+    # TODO empty dict 
+    (Dict{Any,Any}(_keys[1] => isnothing(Δ) ? nothing : Δ[2], (k => nothing for k in _keys[2:end])...),)
+  end
+  first(xs), first_dict_pullback
+end
+
 @adjoint Base.tail(xs::Tuple) = tail(xs), x̄s -> ((nothing, x̄s...),)
 
 _empty(x) = length(x)
@@ -222,9 +231,11 @@ end
 @generated pair(::Val{k}, v, _=nothing) where k = :($k = v,)
 @generated pair(::Val{k}, v, ::NamedTuple{keys}) where {k,keys} = k isa Int ? :($(getfield(keys, k)) = v,) : :($k = v,)
 
+# @adjoint literal_getfield(x::AbstractDict, ::Val{f}) where f = getfield(x, f), _ -> nothing
+
 @adjoint function literal_getfield(x, ::Val{f}) where f
   val = getfield(x, f)
-  function back(Δ)
+  function literal_getfield_pullback(Δ)
     accum_param(__context__, val, Δ) === nothing && return
     if isimmutable(x)
       dx = (; nt_nothing(x)..., pair(Val(f), Δ, x)...)
@@ -235,7 +246,7 @@ end
       return (dx,nothing)
     end
   end
-  unwrap(val), back
+  unwrap(val), literal_getfield_pullback
 end
 
 _pullback(cx::AContext, ::typeof(getfield), x, field_name::Symbol) =

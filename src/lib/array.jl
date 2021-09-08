@@ -10,8 +10,26 @@ using Distributed: pmap, AbstractWorkerPool
 
 @adjoint copy(x::AbstractArray) = copy(x), ȳ -> (ȳ,)
 
-@adjoint collect(x::Tuple) = collect(x), dy -> (Tuple(dy),)
-@adjoint collect(x::AbstractArray) = collect(x), dy -> (dy,)
+@adjoint function collect(x::Tuple)
+  collect_tuple_pullback(dy) = (Tuple(dy),) 
+  collect(x), collect_tuple_pullback
+end
+
+@adjoint function collect(x::NamedTuple{names}) where names
+  collect_namedtuple_pullback(dy) = (NamedTuple{names}(Tuple(dy)),) 
+  collect(x), collect_namedtuple_pullback
+end
+
+@adjoint function collect(x::AbstractArray)
+  collect_array_pullback(dy) = (dy,)
+  collect(x), collect_array_pullback
+end
+
+@adjoint function collect(d::AbstractDict)
+  _keys = collect(keys(d))
+  collect_dict_pullback(Δ) = (reconstruct_if_dict(Δ, _keys),)
+  collect(d), collect_dict_pullback
+end
 
 # Array Constructors
 @adjoint function (::Type{T})(x::Number, sz) where {T <: Fill}
@@ -70,8 +88,10 @@ _droplike(dy::Union{LinearAlgebra.Adjoint, LinearAlgebra.Transpose}, dxv::Abstra
 @adjoint! setindex!(xs::AbstractArray, x...) = setindex!(xs, x...),
   _ -> error("Mutating arrays is not supported -- called setindex!(::$(typeof(xs)), _...)")
 
-@adjoint! copyto!(xs, args...) = copyto!(xs, args...),
-  _ -> error("Mutating arrays is not supported -- called copyto!(::$(typeof(xs)), _...)")
+@adjoint! function copyto!(xs, args...)
+  copyto!_pullback(Δ) = error("Mutating arrays is not supported -- called copyto!(::$(typeof(xs)), _...)")
+  copyto!(xs, args...), copyto!_pullback
+end
 
 for f in [push!, pop!, pushfirst!, popfirst!]
   @eval @adjoint! $f(x::AbstractVector, ys...) = $f(x, ys...), 
@@ -240,16 +260,17 @@ for t in subtypes(AbstractWorkerPool)
 end
 @nograd workers
 
-collect_if_dict(x::Dict) = [x for x in x], collect(keys(x))
+collect_if_dict(x::Dict) = collect(values(x)), collect(keys(x))
 collect_if_dict(x) = x, nothing
 
 reconstruct_if_dict(x̄, _keys::Nothing) = x̄
 
 function reconstruct_if_dict(x̄, _keys)
-  @assert x̄ isa Vector{<:NamedTuple{(:first,:second)}}
+  # This reverses `collect_if_dict`, which returns `_keys::Nothing` if x is not a Dict
+  @assert x̄ isa AbstractVector{<:Union{Nothing, NamedTuple{(:first,:second)}}}
   # we don't compute gradients with respect to keys 
-  # @assert all(x -> x[1] == 0 || x[1] === nothing, x̄)
-  d̄ = Dict(k => x[2] for (x, k) in zip(x̄, _keys))
+  # @assert all(x -> x === nothing || x[1] == 0 || x[1] === nothing, x̄)
+  d̄ = Dict(k => isnothing(x) ? nothing : x[2] for (x, k) in zip(x̄, _keys))
   return d̄ 
 end
 
