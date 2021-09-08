@@ -240,14 +240,32 @@ for t in subtypes(AbstractWorkerPool)
 end
 @nograd workers
 
+collect_if_dict(x::Dict) = [x for x in x], collect(keys(x))
+collect_if_dict(x) = x, nothing
+
+reconstruct_if_dict(x̄, _keys::Nothing) = x̄
+
+function reconstruct_if_dict(x̄, _keys)
+  @assert x̄ isa Vector{<:NamedTuple{(:first,:second)}}
+  # we don't compute gradients with respect to keys 
+  # @assert all(x -> x[1] == 0 || x[1] === nothing, x̄)
+  d̄ = Dict(k => x[2] for (x, k) in zip(x̄, _keys))
+  return d̄ 
+end
+
 function _pullback(cx::AContext, ::typeof(collect), g::Base.Generator)
-  y, b = ∇map(cx, g.f, g.iter)
-  back(::Nothing) = nothing
-  function back(ȳ)
-    f̄, x̄ = b(ȳ)
+  giter, _keys = collect_if_dict(g.iter) # map is not defined for dictionaries
+  y, map_pullback = ∇map(cx, g.f, giter)
+  
+  collect_pullback(::Nothing) = nothing
+  
+  function collect_pullback(ȳ)
+    f̄, x̄ = map_pullback(ȳ)
+    x̄ = reconstruct_if_dict(x̄, _keys) # return a dictionary if needed
     (nothing, (f = f̄, iter = x̄),)
   end
-  y, back
+
+  y, collect_pullback
 end
 
 @adjoint iterate(r::UnitRange, i...) = iterate(r, i...), _ -> nothing
