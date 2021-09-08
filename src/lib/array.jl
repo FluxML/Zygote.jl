@@ -10,12 +10,23 @@ using Distributed: pmap, AbstractWorkerPool
 
 @adjoint copy(x::AbstractArray) = copy(x), ȳ -> (ȳ,)
 
-@adjoint collect(x::Tuple) = collect(x), dy -> (Tuple(dy),)
-@adjoint collect(x::NamedTuple{names}) where names = collect(x), dy -> (NamedTuple{names}(Tuple(dy)),)
-@adjoint collect(x::AbstractArray) = collect(x), dy -> (dy,)
-@adjoint function collect(d::Dict)
-  _keys = collect(keys(d))
+@adjoint function collect(x::Tuple)
+  collect_tuple_pullback(dy) = (Tuple(dy),) 
+  collect(x), collect_tuple_pullback
+end
 
+@adjoint function collect(x::NamedTuple{names}) where names
+  collect_namedtuple_pullback(dy) = (NamedTuple{names}(Tuple(dy)),) 
+  collect(x), collect_tuple_pullback
+end
+
+@adjoint function collect(x::AbstractArray)
+  collect_array_pullback(dy) = (dy,)
+  collect(x), collect_tuple_pullback
+end
+
+@adjoint function collect(d::AbstractDict)
+  _keys = collect(keys(d))
   collect_dict_pullback(Δ) = (reconstruct_if_dict(Δ, _keys),)
   collect(d), collect_dict_pullback
 end
