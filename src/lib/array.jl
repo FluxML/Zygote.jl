@@ -246,6 +246,7 @@ end
 @nograd workers
 
 function _pullback(cx::AContext, ::typeof(collect), g::Base.Generator)
+  @show g.f g.iter
   y, b = ∇map(cx, g.f, g.iter)
   back(::Nothing) = nothing
   function back(ȳ)
