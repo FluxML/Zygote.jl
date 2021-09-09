@@ -334,8 +334,6 @@ end
         # but x -> cbrt(x) has no rule, so will be done by Zygote
         test_rrule(ZygoteRuleConfig(), sum, x -> cbrt(x), randn(5))
         test_rrule(ZygoteRuleConfig(), sum, x -> cbrt(x), randn(5); rrule_f=rrule_via_ad)
-
-        test_rrule(ZygoteRuleConfig(), identity∘sum, x -> cbrt(x), randn(5); rrule_f=rrule_via_ad, check_inferred=false)
     end
 end
 
