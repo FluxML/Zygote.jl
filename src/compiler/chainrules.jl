@@ -175,6 +175,10 @@ As per [`chain_rrule`](@ref) but with support for kwargs.
 end
 
 function ChainRulesCore.rrule_via_ad(config::ZygoteRuleConfig, f_args...; kwargs...)
+    # first check whether there is an `rrule` which handles this directly
+    direcct = rrule(config, f_args...; kwargs...)
+    direcct === nothing || return direcct
+
     # create a closure to work around _pullback not accepting kwargs
     # but avoid creating a closure unnecessarily (pullbacks of closures do not infer)
     y, pb = if !isempty(kwargs)
