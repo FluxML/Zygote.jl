@@ -1412,6 +1412,7 @@ end
   end
   # Eventually these rules and tests will be moved to ChainRules.jl, at which point the tests
   # can be updated to use real / complex consistently.
+  # https://github.com/JuliaMath/AbstractFFTs.jl/pull/58
 
   findicateMat(i,j,n1,n2) = [(k==i) && (l==j) ? 1.0 : 0.0 for k=1:n1,
                              l=1:n2]

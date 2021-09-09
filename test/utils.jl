@@ -24,8 +24,8 @@ VERSION > v"1.6-" && @testset "diagonal hessian" begin
 
   if VERSION > v"1.6-"
     # Gradient of ^ may contain log(complex(...)), which interacts badly with Dual below Julia 1.6:
-    # julia> log(ForwardDiff.Dual(1,0) + 0im)
-    # ERROR: StackOverflowError:
+    # julia> log(ForwardDiff.Dual(1,0) + 0im) # ERROR: StackOverflowError:
+    # https://github.com/JuliaDiff/ChainRules.jl/issues/525
     xs, y = randn(2,3), rand()
     f34(xs, y) = xs[1] * (sum(xs .^ (1:3)') + y^4)  # non-diagonal Hessian, two arguments
 
