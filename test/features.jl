@@ -463,6 +463,13 @@ end
   @test gradient(d -> Dict(:x => d[:x])[:x], d) == (Dict(:x => 1),)
 end
 
+@testset "kwarg splatting, pass in object" begin
+  g(; kwargs...) = kwargs[:x] * kwargs[:z]
+  h(somedata) = g(; somedata...)
+  @test gradient(h, (; x=3.0, y=4.0, z=2.3)) == ((x = 2.3, y = 0.0, z = 3.0),)
+  @test gradient(h, Dict(:x=>3.0, :y=>4.0, :z=>2.3)) == ((y = 0.0, z = 3.0, x = 2.3),)
+end
+
 # https://github.com/JuliaDiff/ChainRules.jl/issues/257
 @testset "Keyword Argument Passing" begin
   struct Type1{VJP}
