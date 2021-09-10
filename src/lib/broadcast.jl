@@ -175,7 +175,7 @@ _dual_safearg(x) = false
   # Avoid generic broadcasting in two easy cases:
   if T == Bool
     return (f.(args...), _ -> nothing) 
-  elseif T <: Real && isconcretetype(T) && _dual_purefun(F) && all(_dual_safearg, args)
+  elseif T <: Real && isconcretetype(T) && _dual_purefun(F) && all(_dual_safearg, args) && !isderiving()
     return broadcast_forward(f, args...)
   end
   len = inclen(args)
