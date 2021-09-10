@@ -325,6 +325,16 @@ end
         test_rrule(ZygoteRuleConfig(), +, rand(3), rand(3); rrule_f=rrule_via_ad)
         test_rrule(ZygoteRuleConfig(), *, rand(1, 3), rand(3); rrule_f=rrule_via_ad)
     end
+
+    @testset "rules which call rrule_via_ad" begin
+        # since cbrt has a rule, this will test the shortcut:
+        test_rrule(ZygoteRuleConfig(), sum, cbrt, randn(5))
+        test_rrule(ZygoteRuleConfig(), sum, cbrt, randn(5); rrule_f=rrule_via_ad)
+
+        # but x -> cbrt(x) has no rule, so will be done by Zygote
+        test_rrule(ZygoteRuleConfig(), sum, x -> cbrt(x), randn(5))
+        test_rrule(ZygoteRuleConfig(), sum, x -> cbrt(x), randn(5); rrule_f=rrule_via_ad)
+    end
 end
 
 @testset "FastMath support" begin
