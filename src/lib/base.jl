@@ -142,6 +142,24 @@ else
   @adjoint merge(nt::NamedTuple, dict::Dict) = pullback(merge, nt, (;dict...))
 end
 
+@adjoint function Dict(g::Base.Generator)
+  ys, backs = Zygote.unzip([Zygote.pullback(g.f, args) for args in g.iter])
+  Dict(ys...), Δ -> begin
+    dd = Dict(k => b(Δ)[1].second for (b,(k,v)) in zip(backs, pairs(Δ)))
+    ((x for x in dd),)
+  end
+end
+
+@adjoint function Base.Generator(f, args)
+  Base.Generator(f, args), Δ -> (nothing, Δ)
+end
+
+@adjoint function Pair(k, v)
+  Pair(k, v), Δ -> begin
+    (nothing, Δ[k])
+  end
+end
+
 @adjoint function Base.getfield(p::Pair, i::Int)
     function pair_getfield_pullback(Δ)
         f, s = i == 1 ? (Δ, nothing) : (nothing, Δ)
