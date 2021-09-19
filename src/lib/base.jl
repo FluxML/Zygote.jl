@@ -156,7 +156,10 @@ end
 
 @adjoint function Pair(k, v)
   Pair(k, v), Δ -> begin
-    (nothing, Δ[k])
+    @show k, v, Δ
+    back(::NamedTuple) = Δ.second
+    back(d::Dict) = d[k]
+    (nothing, back(Δ))
   end
 end
 
