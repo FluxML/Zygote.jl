@@ -123,10 +123,32 @@ Convert `x` from the format Zygote uses internally to differentials types ChainR
 """
 @inline wrap_chainrules_input(x) = x
 @inline wrap_chainrules_input(::Nothing) = ChainRules.ZeroTangent()
+@inline wrap_chainrules_input(::AbstractArray{Nothing}) = ChainRules.ZeroTangent()
 @inline function wrap_chainrules_input(xs::Union{Tuple, NamedTuple})
   xp = map(wrap_chainrules_input, xs)
   ChainRules.Tangent{Any, typeof(xp)}(xp)
 end
+
+"""
+  _project(x, dx)
+
+Uses `ChainRulesCore.ProjectTo` to standardise the gradient `dx` for type & shape.
+Also handles some Zygote-specific corrections, such as `x::Array, dx::Tuple`.
+Safe to apply to arbitrary input.
+"""
+@inline function _project(x, dx)
+  wrap_chainrules_output(ProjectTo(x)(wrap_chainrules_input(dx)))
+end
+
+# Restore splatted arrays
+_project(x::AbstractArray, dx::Tuple) = _project(x, reshape(collect(dx), axes(x)))
+
+# Piracy:
+# wrap_chainrules_input doesn't handle array of Union{Int,Nothing}
+(::ChainRulesCore.ProjectTo)(::Nothing) = ChainRulesCore.NoTangent()
+
+# CRC likes Tangent{<:Complex}, but Zygote makes Tangent{Any}
+(project::ProjectTo{<:Complex})(dx::Tangent) = project(Complex(dx.re, dx.im))
 
 """
   ZBack{F}(back) <: Function

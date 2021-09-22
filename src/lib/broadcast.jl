@@ -45,18 +45,19 @@ function Base.reducedim_init(::typeof(identity), ::typeof(accum), A::AbstractArr
   Base.reducedim_initarray(A, region, nothing, Union{Nothing,eltype(A)})
 end
 
-trim(x, Δ) = reshape(Δ, ntuple(i -> size(Δ, i), Val(ndims(x))))
-trim(x::Tuple, Δ) = NTuple{length(x)}(Δ)
-
-unbroadcast(x::AbstractArray, x̄) =
-  size(x) == size(x̄) ? x̄ :
-  length(x) == length(x̄) ? trim(x, x̄) :
-    trim(x, accum_sum(x̄, dims = ntuple(i -> size(x, i) == 1 ? i : ndims(x̄)+1, Val(ndims(x̄)))))
-
+function unbroadcast(x::AbstractArray, x̄)
+  N = ndims(x̄)
+  if length(x) == length(x̄)
+    _project(x, x̄)  # ProjectTo handles reshape, offsets, structured matrices, row vectors
+  else
+    dims = ntuple(d -> size(x, d) == 1 ? d : ndims(x̄)+1, ndims(x̄))
+    _project(x, accum_sum(x̄; dims = dims))
+  end
+end
 unbroadcast(x::Number, x̄) = accum_sum(x̄)
 unbroadcast(x::Tuple{<:Any}, x̄) = (accum_sum(x̄),)
 unbroadcast(x::Base.RefValue, x̄) = (x=accum_sum(x̄),)
-unbroadcast(x::Tuple, x̄) = trim(x, length(x) == length(x̄) ? x̄ : accum_sum(x̄; dims=2:ndims(x̄))) # case length(x) > 1
+unbroadcast(x::Tuple, x̄) =  NTuple{length(x)}(length(x) == length(x̄) ? x̄ : accum_sum(x̄; dims=2:ndims(x̄))) # case length(x) > 1
 
 unbroadcast(x::AbstractArray, x̄::Nothing) = nothing
 

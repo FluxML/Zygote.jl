@@ -176,9 +176,9 @@ end
 
 @test gradient(t -> t[1]*t[2], (2, 3)) == ((3, 2),)
 
-@test gradient(x -> x.re, 2+3im) == ((re = 1, im = nothing),)
+@test gradient(x -> x.re, 2+3im) === (1.0 + 0.0im,)
 
-@test gradient(x -> x.re*x.im, 2+3im) == ((re = 3, im = 2),)
+@test gradient(x -> x.re*x.im, 2+3im) == (3.0 + 2.0im,)
 
 struct Bar{T}
   a::T
@@ -262,6 +262,7 @@ D(f, x) = grad(f, x)[1]
 @test D(x -> x*D(y -> x+y, 1), 1) == 1
 @test D(x -> x*D(y -> x*y, 1), 4) == 8
 
+@test sin''(1.0) ==  -sin(1.0)
 @test sin'''(1.0) ==  -cos(1.0)
 
 f(x) = throw(DimensionMismatch("fubar"))
@@ -497,6 +498,25 @@ end
   i = 2
   Zygote.gradient(loss_adjoint,[1.0])
   @test x[1] == x[2]
+end
+
+@testset "splats" begin
+  @test gradient(x -> max(x...), [1,2,3])[1] == [0,0,1]
+  @test gradient(x -> min(x...), (1,2,3))[1] === (1.0, 0.0, 0.0)
+
+  @test gradient(x -> max(x...), [1 2; 3 4])[1] == [0 0; 0 1]
+  @test gradient(x -> max(x...), [1,2,3]')[1] == [0 0 1]
+
+  # https://github.com/FluxML/Zygote.jl/issues/599
+  @test gradient(w -> sum([w...]), [1,1])[1] isa AbstractVector
+
+  # https://github.com/FluxML/Zygote.jl/issues/866
+  f866(x) = reshape(x, fill(2, 2)...)
+  @test gradient(x->sum(f866(x)), rand(4))[1] == [1,1,1,1]
+
+  # https://github.com/FluxML/Zygote.jl/issues/731
+  f731(x) = sum([x' * x, x...])
+  @test_broken gradient(f731, ones(3)) # MethodError: no method matching +(::Tuple{Float64, Float64, Float64}, ::Vector{Float64})
 end
 
 @testset "accumulation" begin
