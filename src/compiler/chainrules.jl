@@ -145,7 +145,7 @@ _project(x::AbstractArray, dx::Tuple) = _project(x, reshape(collect(dx), axes(x)
 
 # Piracy:
 # wrap_chainrules_input doesn't handle array of Union{Int,Nothing}
-(::ChainRulesCore.ProjectTo)(::Nothing) = ChainRulesCore.NoTangent()
+(::ChainRulesCore.ProjectTo)(::Nothing) = nothing # ChainRulesCore.NoTangent()
 
 # CRC likes Tangent{<:Complex}, but Zygote makes Tangent{Any}
 (project::ProjectTo{<:Complex})(dx::Tangent) = project(Complex(dx.re, dx.im))
