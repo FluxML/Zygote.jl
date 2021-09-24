@@ -29,7 +29,7 @@ top:
 
 "Source-to-source" means that Zygote hooks into Julia's compiler, and generates the backwards pass for you – as if you had written it by hand.
 
-Without compromising on performance, Zygote supports the full flexibility and dynamism of the Julia language, including control flow, recursion, closures, structs, dictionaries, and more.
+Zygote supports the full flexibility and dynamism of the Julia language, including control flow, recursion, closures, structs, dictionaries, and more.
 
 ```julia
 julia> fs = Dict("sin" => sin, "cos" => cos, "tan" => tan);
