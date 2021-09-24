@@ -336,6 +336,7 @@ end
         test_rrule(ZygoteRuleConfig(), sum, x -> cbrt(x), randn(5); rrule_f=rrule_via_ad)
     end
 
+    # See https://github.com/FluxML/Zygote.jl/issues/1078
     @testset "ProjectTo{AbstractArray}(::Tangent{Any})" begin
         X = UpperHessenberg(randn(5, 5))
         dX = Tangent{Any}(element=randn(5, 5))
