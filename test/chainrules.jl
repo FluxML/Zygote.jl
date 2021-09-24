@@ -335,6 +335,12 @@ end
         test_rrule(ZygoteRuleConfig(), sum, x -> cbrt(x), randn(5))
         test_rrule(ZygoteRuleConfig(), sum, x -> cbrt(x), randn(5); rrule_f=rrule_via_ad)
     end
+
+    @testset "ProjectTo{AbstractArray}(::Tangent{Any})" begin
+        X = UpperHessenberg(randn(5, 5))
+        dX = Tangent{Any}(element=randn(5, 5))
+        @test ProjectTo(X)(dX) === dX
+    end
 end
 
 @testset "FastMath support" begin

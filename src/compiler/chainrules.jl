@@ -150,6 +150,9 @@ _project(x::AbstractArray, dx::Tuple) = _project(x, reshape(collect(dx), axes(x)
 # CRC likes Tangent{<:Complex}, but Zygote makes Tangent{Any}
 (project::ProjectTo{<:Complex})(dx::Tangent) = project(Complex(dx.re, dx.im))
 
+# CRC likes Tangent{AbstractArray}, but Zygote makes Tangent{Any}
+(project::ProjectTo{AbstractArray})(dx::Tangent) = dx
+
 """
   ZBack{F}(back) <: Function
 
