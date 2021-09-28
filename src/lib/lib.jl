@@ -13,7 +13,7 @@ end
 
 accum() = nothing
 accum(x) = x
-accum(x::AbstractArray{<:Complex}) = real(x)
+# accum(x::AbstractArray{<:Complex}) = real(x)
 
 accum(x, y) =
   x === nothing ? y :
@@ -28,9 +28,9 @@ function accum(x::T, ys::AbstractArray...) where {T <: AbstractArray}
   accum.(convert.(T, (x, ys...))...)
 end
 
-function accum(x::AbstractArray, ys::AbstractArray{<:Complex}...)
-  accum.(real(x), real.(ys)...)
-end
+# function accum(x::AbstractArray, ys::AbstractArray{<:Complex}...)
+#   accum.(real(x), real.(ys)...)
+# end
 @generated function accum(x::NamedTuple, y::NamedTuple)
   # assumes that y has no keys apart from those also in x
   fieldnames(y) ⊆ fieldnames(x) || throw(ArgumentError("$y keys must be a subset of $x keys"))

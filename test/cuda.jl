@@ -39,15 +39,25 @@ end
   g3 = gradient(x -> sum(x .^ 3) / count(x .> 3), a)[1]              # was Can't differentiate gc_preserve_end expression
   @test_skip cu(g3) ≈ gradient(x -> sum(x .^ 3) / sum(x .> 3), a_gpu)[1]  # was KernelException -- not fixed by PR #1018
   @test cu(g3) ≈ gradient(x -> sum(x .^ 3) / count(x .> 3), a_gpu)[1] 
+end
 
+@testset "Projection" begin
   # Projection: eltype preservation:
   @test gradient(x -> 2.3 * sum(x.^4), a_gpu)[1] isa CuArray{Float32}
   @test_skip gradient(x -> sum(x .* 5.6), a_gpu)[1] isa CUDA.CuArray{Float32} # dot(x::CuArray{Float64}, y::CuArray{Float32}) fallback
   # structure restoration:
-  @test gradient(x -> sum(sqrt.(x)), a_gpu')[1] isa Adjoint  # previously a matrix
-  @test gradient(x -> sum(exp.(x)), Diagonal(a_gpu))[1] isa Diagonal
+  adj_gs = gradient(x -> sum(sqrt.(x)), a_gpu')
+  adj_p = Zygote.project((a_gpu',), adj_gs)
+  @test adj_p[1] isa Adjoint  # previously a matrix
+
+  diag_gs = gradient(x -> sum(exp.(x)), Diagonal(a_gpu))
+  diag_p = Zygote.project((Diagonal(a_gpu),), diag_gs)
+  @test diag_p isa Diagonal
+
   # non-differentiables
-  @test gradient((x,y) -> sum(x.^2 .+ y'), a_gpu, a_gpu .> 0)[2] === nothing
+  gs = gradient((x,y) -> sum(x.^2 .+ y'), a_gpu, a_gpu .> 0)
+  p = Zygote.project((a_gpu, a_gpu .> 0), gs)
+  @test p[2] === nothing
 end
 
 @testset "sum(f, x)" begin
@@ -65,11 +75,18 @@ end
   g2_gpu = gradient(f2, a_gpu)[1]
   @test g2_gpu isa CuArray
   @test g2_gpu |> collect ≈ g2
+end
 
-  f3(x) = sum(y->y^3, x')  # anonymous function
-  g3 = gradient(f3, a')[1]
-  g3_gpu = gradient(f3, a_gpu')[1]
-  @test g3_gpu isa Adjoint{Float32, <:CuArray{Float32, 1}}  # preserves structure
+@testset "Projection: sums" begin
+  a = Float32[-1.5, -9.0, 2.4, -1.3, 0.01]
+  a_gpu = a |> cu
+
+  f(x) = sum(y -> y ^ 3, x')  # anonymous function
+  g3 = gradient(f, a')[1]
+  g3_gpu = gradient(f, a_gpu')[1]
+
+  g3_gpu_p = Zygote.project((a_gpu',), (g3,))
+  @test g3_gpu_p[1] isa Adjoint{Float32, <:CuArray{Float32, 1}}  # preserves structure with projection
   @test g3_gpu |> collect ≈ g3
 end
 
@@ -133,10 +150,17 @@ end
   grads = (cu(ones(Float32, 3)), 1.f0)
   @test gradient((x,y) -> sum(vcat(x,y)), r, 5) == grads
 
-  @test gradient((x,y) -> sum(vcat(x,y)), r, Float64(5))[1] isa CUDA.CuArray{Float32}
-  @test gradient((x,y) -> sum(vcat(x,y)), r, Float64(5))[2] isa Float64  # projection
+  # Projection
+  @testset "Projection" begin
+    r = cu(rand(Float32, 3))
 
-  @test_skip gradient((x,y) -> sum(vcat(x,y)), 5f0, r)[2] isa CUDA.CuArray{Float32}  # wrong order
-  @test_skip gradient((x,y) -> sum(vcat(x,y)), 1f0, r, 2f0, r)[2] isa CUDA.CuArray{Float32}
+    gs = gradient((x,y) -> sum(vcat(x,y)), r, Float64(5))
+    gs_p = Zygote.project((r, 5.), gs)
+    @test gs_p[1] isa CUDA.CuArray{Float32}
+    @test gs_p[2] isa Float64  # projection
+
+    @test_skip gradient((x,y) -> sum(vcat(x,y)), 5f0, r)[2] isa CUDA.CuArray{Float32}  # wrong order
+    @test_skip gradient((x, y...) -> sum(vcat(x, y...)), 1f0, r, 2f0, r)[2] isa CUDA.CuArray{Float32}
+  end
 end
 
