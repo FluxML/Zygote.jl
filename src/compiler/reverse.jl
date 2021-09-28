@@ -248,7 +248,7 @@ branchfor(ir, (from,to)) =
   get(filter(br -> br.block == to, branches(block(ir, from))), 1, nothing)
 
 xaccum(ir) = nothing
-xaccum(ir, x) = x
+# xaccum(ir, x) = x
 xaccum(ir, xs...) = push!(ir, xcall(Zygote, :accum, xs...))
 
 function adjoint(pr::Primal)
