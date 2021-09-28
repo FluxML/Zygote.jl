@@ -120,7 +120,8 @@ end
 @adjoint function pairs(t::NamedTuple{N}) where N
   
   pairs_namedtuple_pullback(dx::NamedTuple) = (dx.data,)
-  pairs_namedtuple_pullback(dx::Tuple) = (dx.data,)
+  
+  pairs_namedtuple_pullback(dx::Tuple) = isempty(dx) ? (dx,) : (dx[1],)
 
   function pairs_namedtuple_pullback(Δ::Dict)
     t0 = map(zero, t)
