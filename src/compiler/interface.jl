@@ -57,7 +57,7 @@ the derivative (for scalar `x`) or the gradient.
 See also [`withgradient`](@ref) to keep the value `f(args...)`,
 and [`pullback`](@ref) for value and back-propagator.
 
-```jldoctest; setup=:(using Zygote)
+```jldoctest; setup = :(using Zygote)
 julia> gradient(*, 2.0, 3.0, 5.0)
 (15.0, 10.0, 6.0)
 
@@ -74,14 +74,9 @@ julia> gradient([7, 11], 0, 1) do x, y, d
 function gradient(f, args...)
   y, back = pullback(f, args...)
   grad = back(sensitivity(y))
-  isnothing(grad) ? nothing : map(_project, args, grad)
 end
 
-# Base.adjoint(f::Function) = x -> gradient(f, x)[1]  # piracy!
-Base.adjoint(f::Function) = x -> begin  # still piracy! avoids projection for legacy reasons
-  y, back = pullback(f, x)
-  back(sensitivity(y))[1]
-end
+Base.adjoint(f::Function) = x -> gradient(f, x)[1]  # piracy!
 
 """
     withgradient(f, args...)
@@ -101,8 +96,7 @@ true
 function withgradient(f, args...)
   y, back = pullback(f, args...)
   grad = back(sensitivity(y))
-  results = isnothing(grad) ? map(_ -> nothing, args) : map(_project, args, grad)
-  (val=y, grad=results)
+  (val = y, grad = grad)
 end
 
 # Param-style wrappers

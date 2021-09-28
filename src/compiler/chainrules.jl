@@ -130,15 +130,23 @@ Convert `x` from the format Zygote uses internally to differentials types ChainR
 end
 
 """
-  _project(x, dx)
+  project(x, dx)
 
 Uses `ChainRulesCore.ProjectTo` to standardise the gradient `dx` for type & shape.
 Also handles some Zygote-specific corrections, such as `x::Array, dx::Tuple`.
 Safe to apply to arbitrary input.
 """
+function project(x, dx)
+  map(_project, x, dx)
+end
+
+project(x, ::Union{AbstractZero,Nothing}) = nothing
+
 @inline function _project(x, dx)
   wrap_chainrules_output(ProjectTo(x)(wrap_chainrules_input(dx)))
 end
+
+_project(x, ::Union{AbstractZero,Nothing}) = NoTangent()
 
 # Restore splatted arrays
 _project(x::AbstractArray, dx::Tuple) = _project(x, reshape(collect(dx), axes(x)))
@@ -148,13 +156,13 @@ _project(x::AbstractArray, dx::Tuple) = _project(x, reshape(collect(dx), axes(x)
 (::ChainRulesCore.ProjectTo)(::Nothing) = ChainRulesCore.NoTangent()
 
 # CRC likes Tangent{<:Complex}, but Zygote makes Tangent{Any}
-(project::ProjectTo{<:Complex})(dx::Tangent) = project(Complex(dx.re, dx.im))
+(proj::ProjectTo{<:Complex})(dx::Tangent) = proj(Complex(dx.re, dx.im))
 
 # CRC likes Tangent{AbstractArray}, but Zygote makes Tangent{Any}
 # in particular this would hit https://github.com/JuliaDiff/ChainRulesCore.jl/blob/2ec2549b73b22bc08f554dae864fb650cfb9c3d7/src/projection.jl#L139
 # if we were not losing track of the Primal in the Tangent
 # This type piracy is just giving up that safety check.
-(project::ProjectTo{AbstractArray})(dx::Tangent) = dx
+(proj::ProjectTo{AbstractArray})(dx::Tangent) = dx
 
 """
   ZBack{F}(back) <: Function
