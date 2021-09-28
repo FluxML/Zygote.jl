@@ -183,20 +183,6 @@ function Base.push!(ps::Params, x)
   return ps
 end
 
-@adjoint! function Base.push!(xs::IdSet, x...)
-  l = length(x)
-  push!(xs, x...), Δ -> begin
-    (Δ, ntuple(_ -> nothing, l)...)
-  end
-end
-
-@adjoint! function Base.push!(xs::Params, x::AbstractArray{T}...) where T
-  sz_x = size.(x)
-  push!(xs, x...), Δ -> begin
-    (Δ, map(x -> Ones{T}(x...), sz_x)...)
-  end
-end
-
 Base.push!(ps::Params, x...) = (foreach(x -> push!(ps, x), x); ps)
 
 function Base.delete!(ps::Params, x)

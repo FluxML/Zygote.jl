@@ -74,27 +74,8 @@ _droplike(dy::Union{LinearAlgebra.Adjoint, LinearAlgebra.Transpose}, dxv::Abstra
   _ -> error("Mutating arrays is not supported -- called copyto!(::$(typeof(xs)), _...)")
 
 for f in [push!, pop!, pushfirst!, popfirst!]
-  @eval @adjoint! $f(xs, x...) = $f(xs, x...), 
-    _ -> error("Mutating arrays is not supported -- called $($f)(::$(typeof(xs)), _...)")
-end
-
-# This is kind of bad, but at least we don't materialize the whole
-# array. Prefer to use `Buffer`
-# function _pullback(cx::Context, ::typeof(push!), xs::AbstractVector{<:AbstractArray}, x::AbstractArray{T}...) where T
-@adjoint! function push!(xs::AbstractVector{<:AbstractArray}, x::AbstractArray{T}...) where T
-  sz_xs = size.(xs)
-  sz_x = size.(x)
-  push!(xs, x...), Δ -> begin
-    (Δ, map(x -> Ones{T}(x...), sz_x)...)
-  end
-end
-
-@adjoint! function pop!(xs::AbstractVector{<:AbstractArray{T}}) where T
-  sz_xs = size.(xs)
-  op = pop!(xs)
-  op, Δ -> begin
-    ([Ones{T}(sz...) for sz in sz_xs], )
-  end
+  @eval @adjoint! $f(x::AbstractVector, ys...) = $f(x, ys...), 
+    _ -> error("Mutating arrays is not supported -- called $($f)(::$(typeof(x)), _...)")
 end
 
 # General
