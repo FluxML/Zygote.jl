@@ -42,7 +42,7 @@ function pullback(f, args...)
 end
 
 sensitivity(y::Number) = one(y)
-sensitivity(y::Complex) = error("Output is complex, so the gradient is not defined.")
+# sensitivity(y::Complex) = error("Output is complex, so the gradient is not defined.")
 sensitivity(y::AbstractArray) = error("Output is an array, so the gradient is not defined. Perhaps you wanted jacobian.")
 sensitivity(y) = error("Output should be scalar; gradients are not defined for output $(repr(y))")
 
