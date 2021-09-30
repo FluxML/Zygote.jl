@@ -122,10 +122,7 @@ end
   pairs_namedtuple_pullback(dx::NamedTuple) = (dx.data,)
 
   function pairs_namedtuple_pullback(dx::Tuple) 
-    t0 = map(zero, t)
-    for (i, v) in enumerate(dx)
-      t0 = NamedTuple{N}(Base.setindex((t0...,), v, i))
-    end
+    t0 = isempty(dx) ? () : NamedTuple{N}(values(dx))
     return (t0,)
   end
 
