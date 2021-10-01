@@ -288,6 +288,28 @@ for mapfunc in [map,pmap]
     Δy = randn(3)
     @test first(pb((Δy..., ))) ≈ first(pb(Δy))
   end
+
+  @testset "empty tuples" begin
+    out, pb = Zygote.pullback(map, -, ())
+    @test pb(out) === (nothing, ())
+
+    out, pb = Zygote.pullback(map, +, (), ())
+    @test pb(()) === (nothing, (), ())
+
+    function build_foo(z)
+      foo(x) = x * z
+      return foo
+    end
+    out, pb = Zygote.pullback(map, build_foo(5.0), ())
+    @test pb(()) === (nothing, ())
+  end
+end
+
+# Check that map infers correctly. pmap still doesn't infer.
+@testset "map inference" begin
+  @inferred Zygote._pullback(Zygote.Context(), map, sin, Float64[])
+  out, pb = Zygote._pullback(Zygote.Context(), map, sin, Float64[])
+  @inferred pb(Float64[])
 end
 
 @testset "Alternative Pmap Dispatch" begin
