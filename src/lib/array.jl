@@ -179,6 +179,12 @@ end
 _tryreverse(m, x) = x
 _tryreverse(m::typeof(map), x::Union{AbstractVector, Tuple}) = reverse(x)
 
+# Sometimes a pullback doesn't return a full vector of nothings, but rather returns only a
+# single nothing to say "all arguments have zero cotangent". This function is needed to
+# account for that inside the pullback for map.
+last_or_nothing(::Nothing) = nothing
+last_or_nothing(x) = last(x)
+
 for (mapfunc,∇mapfunc) in [(:map,:∇map),(:pmap,:∇pmap)]
   @eval function $∇mapfunc(cx, f::F, args::Vararg{Any, N}) where {F, N}
     ys_and_backs = $mapfunc((args...) -> _pullback(cx, f, args...), args...)
@@ -186,10 +192,10 @@ for (mapfunc,∇mapfunc) in [(:map,:∇map),(:pmap,:∇pmap)]
     ys, function (Δ)
       isnothing(Δ) && return nothing
       if Base.issingletontype(F) && length(args) == 1
-        Δarg = $mapfunc(((_,pb), δ) -> last(pb(δ)), ys_and_backs, Δ) # No unzip needed
+        Δarg = $mapfunc(((_,pb), δ) -> last_or_nothing(pb(δ)), ys_and_backs, Δ) # No unzip needed
         (nothing, Δarg)
       elseif Base.issingletontype(F) # Ensures `f` is pure: nothing captured & no state
-        Δargs = _unzip($mapfunc(((_,pb), δ) -> Base.tail(pb(δ)), ys_and_backs, Δ), Val(N))
+        Δargs = _unzip($mapfunc(((_,pb), δ) -> tailmemaybe(pb(δ)), ys_and_backs, Δ), Val(N))
         (nothing, Δargs...)
       else
         # Apply pullbacks in reverse order. Needed for correctness if `f` is stateful.

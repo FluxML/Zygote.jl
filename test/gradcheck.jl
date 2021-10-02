@@ -303,13 +303,34 @@ for mapfunc in [map,pmap]
     out, pb = Zygote.pullback(map, build_foo(5.0), ())
     @test pb(()) === (nothing, ())
   end
+
+  @testset "Vector{Nothing} cotangent" begin
+    out, pb = Zygote.pullback(map, -, randn(5))
+    Δ = Vector{Nothing}(nothing, 5)
+    @test pb(Δ)[2] isa Vector{Nothing}
+
+    out, pb = Zygote.pullback(map, +, randn(5), randn(5))
+    @test pb(Δ)[2] isa Vector{Nothing}
+    @test pb(Δ)[3] isa Vector{Nothing}
+  end
 end
 
 # Check that map infers correctly. pmap still doesn't infer.
 @testset "map inference" begin
-  @inferred Zygote._pullback(Zygote.Context(), map, sin, Float64[])
-  out, pb = Zygote._pullback(Zygote.Context(), map, sin, Float64[])
-  @inferred pb(Float64[])
+  @testset "$name" for (name, f, ȳ, xs) in [
+    ("unary empty vector", sin, Float64[], (Float64[], )),
+    ("unary vector", sin, randn(3), (randn(3), )),
+    ("unary empty tuple", sin, (), ((), )),
+    ("unary tuple", sin, (randn(), randn()), ((randn(), randn()), )),
+    ("binary empty vector", +, Float64[], (Float64[], Float64[])),
+    ("binary vector", +, randn(2), (randn(2), randn(2))),
+    ("binary empty tuple", +, (), ((), ())),
+    ("binary tuple", +, (randn(), randn()), ((randn(), randn()), (randn(), randn()))),
+  ]
+    @inferred Zygote._pullback(Zygote.Context(), map, f, xs...)
+    y, pb = Zygote._pullback(Zygote.Context(), map, f, xs...)
+    @inferred pb(ȳ)
+  end
 end
 
 @testset "Alternative Pmap Dispatch" begin
