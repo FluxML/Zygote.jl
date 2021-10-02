@@ -305,13 +305,24 @@ for mapfunc in [map,pmap]
   end
 
   @testset "Vector{Nothing} cotangent" begin
-    out, pb = Zygote.pullback(map, -, randn(5))
     Δ = Vector{Nothing}(nothing, 5)
+
+    # Unary stateless
+    out, pb = Zygote.pullback(map, -, randn(5))
     @test pb(Δ)[2] isa Vector{Nothing}
 
+    # Binary stateless
     out, pb = Zygote.pullback(map, +, randn(5), randn(5))
     @test pb(Δ)[2] isa Vector{Nothing}
     @test pb(Δ)[3] isa Vector{Nothing}
+
+    # Stateful
+    function build_foo(z)
+      foo(x) = x * z
+      return foo
+    end
+    out, pb = Zygote.pullback(map, build_foo(5.0), randn(5))
+    @test pb(Δ)[2] isa Vector{Nothing}
   end
 end
 
