@@ -15,7 +15,9 @@ makedocs(
         "Complex Differentiation" => "complex.md",
         "Profiling" => "profiling.md",
         "Internals" => "internals.md",
-        "Glossary" => "glossary.md"],
+        "Glossary" => "glossary.md",
+        "Performance Tips" => "performance_tips.md",
+  ],
   format = Documenter.HTML(prettyurls = haskey(ENV, "CI"), analytics = "UA-36890222-9"))
 
 deploydocs(
