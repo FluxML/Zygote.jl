@@ -237,10 +237,6 @@ end
   unwrap(val), back
 end
 
-function pullback_for_default_literal_getproperty(cx::AContext, x, ::Val{f}) where {f}
-  return _pullback(cx, literal_getfield, x, Val{f}())
-end
-
 _pullback(cx::AContext, ::typeof(getfield), x, field_name::Symbol) =
   _pullback(cx, literal_getfield, x, Val(field_name))
 
@@ -248,7 +244,6 @@ function _pullback(cx::AContext, ::typeof(literal_getproperty), x::NamedTuple,
                    ::Val{property_name}) where {property_name}
   return _pullback(cx, literal_getfield, x, Val(property_name))
 end
-
 function _pullback(cx::AContext, ::typeof(literal_getindex), x::NamedTuple,
                    ::Val{key}) where {key}
   return _pullback(cx, literal_getfield, x, Val(key))
