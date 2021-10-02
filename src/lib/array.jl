@@ -179,7 +179,7 @@ end
 _tryreverse(m, x) = x
 _tryreverse(m::typeof(map), x::Union{AbstractVector, Tuple}) = reverse(x)
 
-# Sometimes a pullback doesn't return a full vector of nothings, but rather returns only a
+# Sometimes a pullback doesn't return a Tuple, but rather returns only a
 # single nothing to say "all arguments have zero cotangent". This function is needed to
 # account for that inside the pullback for map.
 last_or_nothing(::Nothing) = nothing
