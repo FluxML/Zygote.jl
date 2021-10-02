@@ -56,3 +56,7 @@ end
 @testset "Compiler" begin
   include("compiler.jl")
 end
+
+@testset "getproperty_performance_workaround" begin
+  include("getproperty_performance_workaround.jl")
+end
