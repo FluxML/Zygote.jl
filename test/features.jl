@@ -570,6 +570,11 @@ end
   @test gradient(x -> sum(_f.(x)), [1,2,3]) == ([0.5, 0.5, 0.5],)
   @test gradient(x -> sum(map(_f, x)), [1,2,3]) == ([0.5, 0.5, 0.5],)
 
+  # with Bool
+  @test gradient(x -> sum(1 .- (x .> 0)), randn(5)) == (nothing,)
+  @test gradient(x -> sum((y->1-y).(x .> 0)), randn(5)) == (nothing,)
+  @test gradient(x -> sum(x .- (x .> 0)), randn(5)) == ([1,1,1,1,1],)
+
   @test gradient(x -> sum(x ./ [1,2,4]), [1,2,pi]) == ([1.0, 0.5, 0.25],)
   @test gradient(x -> sum(map(/, x, [1,2,4])), [1,2,pi]) == ([1.0, 0.5, 0.25],)
 

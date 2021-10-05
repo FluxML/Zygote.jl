@@ -72,7 +72,9 @@ unbroadcast(x::AbstractArray, x̄::Nothing) = nothing
   broadcast(+, xs...), ȳ -> (nothing, map(x -> unbroadcast(x, ȳ), xs)...)
 
 @adjoint broadcasted(::typeof(-), x::Numeric, y::Numeric) = x .- y,
-  Δ -> (nothing, unbroadcast(x, Δ), -unbroadcast(y, Δ))
+  Δ -> (nothing, unbroadcast(x, Δ), _minus(unbroadcast(y, Δ)))
+_minus(Δ) = -Δ
+_minus(::Nothing) = nothing
 
 @adjoint broadcasted(::typeof(*), x::Numeric, y::Numeric) = x.*y,
    Δ -> (nothing, unbroadcast(x, Δ .* conj.(y)), unbroadcast(y, Δ .* conj.(x)))

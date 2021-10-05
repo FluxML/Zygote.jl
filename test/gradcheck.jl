@@ -288,6 +288,60 @@ for mapfunc in [map,pmap]
     Δy = randn(3)
     @test first(pb((Δy..., ))) ≈ first(pb(Δy))
   end
+
+  @testset "empty tuples" begin
+    out, pb = Zygote.pullback(map, -, ())
+    @test pb(out) === (nothing, ())
+
+    out, pb = Zygote.pullback(map, +, (), ())
+    @test pb(()) === (nothing, (), ())
+
+    function build_foo(z)
+      foo(x) = x * z
+      return foo
+    end
+    out, pb = Zygote.pullback(map, build_foo(5.0), ())
+    @test pb(()) === (nothing, ())
+  end
+
+  @testset "Vector{Nothing} cotangent" begin
+    Δ = Vector{Nothing}(nothing, 5)
+
+    # Unary stateless
+    out, pb = Zygote.pullback(map, -, randn(5))
+    @test pb(Δ)[2] isa Vector{Nothing}
+
+    # Binary stateless
+    out, pb = Zygote.pullback(map, +, randn(5), randn(5))
+    @test pb(Δ)[2] isa Vector{Nothing}
+    @test pb(Δ)[3] isa Vector{Nothing}
+
+    # Stateful
+    function build_foo(z)
+      foo(x) = x * z
+      return foo
+    end
+    out, pb = Zygote.pullback(map, build_foo(5.0), randn(5))
+    @test pb(Δ)[2] isa Vector{Nothing}
+  end
+end
+
+# Check that map infers correctly. pmap still doesn't infer.
+@testset "map inference" begin
+  @testset "$name" for (name, f, ȳ, xs) in [
+    ("unary empty vector", sin, Float64[], (Float64[], )),
+    ("unary vector", sin, randn(3), (randn(3), )),
+    ("unary empty tuple", sin, (), ((), )),
+    ("unary tuple", sin, (randn(), randn()), ((randn(), randn()), )),
+    ("binary empty vector", +, Float64[], (Float64[], Float64[])),
+    ("binary vector", +, randn(2), (randn(2), randn(2))),
+    ("binary empty tuple", +, (), ((), ())),
+    ("binary tuple", +, (randn(), randn()), ((randn(), randn()), (randn(), randn()))),
+  ]
+    @inferred Zygote._pullback(Zygote.Context(), map, f, xs...)
+    y, pb = Zygote._pullback(Zygote.Context(), map, f, xs...)
+    @inferred pb(ȳ)
+  end
 end
 
 @testset "Alternative Pmap Dispatch" begin
@@ -1364,22 +1418,6 @@ using Zygote: Buffer
     push!(b, 3)
     prod(copy(b))
   end == (3,)
-
-  @testset "Limited Mutation" begin
-    p = [rand(3,3), rand(3,3)]
-    r = rand(5,5)
-
-    # TODO: ngradient cannot handle Vector{Array}
-    gs = gradient((p,x) -> sum(sum.(push!(p,x))), p, r)
-    @test length(p[end]) == length(gs[1][end])
-    @test gs[1] ≈ map(x -> one.(x), p)
-    @test gs[2] ≈ one.(r)
-
-    # p = [rand(3,3), rand(3,3)] # redefine `p` after mutation
-    # gs = gradient(x -> sum(pop!(x)), p)
-    # @test length(gs[1]) == 2
-    # @test gs[1][1] == one.(p[1])
-  end
 
 end
 
