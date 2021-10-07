@@ -28,7 +28,9 @@ end
 @adjoint view(x::AbstractArray, inds...) = view(x, inds...), ∇getindex(x, inds)
 
 ∇getindex(x::AbstractArray{T,N}, inds) where {T,N} = dy -> begin
-  if inds isa NTuple{N,Int} && T <: Number
+  if N == 0
+    dx = dy
+  elseif inds isa NTuple{N,Int} && T <: Number
     dx = OneElement(dy, inds, axes(x))
   elseif inds isa NTuple{<:Any, Integer}
     dx = _zero(x, typeof(dy))
