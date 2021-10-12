@@ -121,6 +121,8 @@ end
   
   pairs_namedtuple_pullback(dx::NamedTuple) = (dx.data,)
 
+  pairs_namedtuple_pullback(dx::Tuple{}) = (NamedTuple(),)
+  
   function pairs_namedtuple_pullback(Δ::Dict)
     t0 = map(zero, t)
     for (idx, v) in Δ
