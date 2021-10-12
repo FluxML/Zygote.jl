@@ -283,4 +283,6 @@ end
   end
 
   @eval pull_block_vert(sz, Δ::CUDA.CuArray, A::Number) = CUDA.@allowscalar Δ[sz]
+
+  @nograd CUDA.task_local_storage
 end
