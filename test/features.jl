@@ -443,6 +443,20 @@ let
   @test back(1.) == ((1.0,),)
 end
 
+@testset "mutable struct, including Ref" begin
+  # Zygote's representation is Base.RefValue{Any}((value = 7.0,)), but the
+  # map to ChainRules types and back normalises to (value = 7.0,) same as struct:
+  @test gradient(x -> x.value^2 + x.value, MyMutable(3)) === ((value = 7.0,),)
+
+  # Same for Ref. This doesn't seem to affect `pow_mut` test in this file.
+  @test gradient(x -> x.x^2 + x.x, Ref(3)) === ((x = 7.0,),)
+  @test gradient(x -> real(x.x^2 + im * x.x), Ref(4)) === ((x = 8.0,),)
+
+  # Broadcasting over Ref is handled specially. Tested elsehwere too.
+  @test gradient(x -> sum(sum, x .* [1,2,3]), Ref([4,5])) == ((x = [6.0, 6.0],),)
+  @test gradient(x -> sum(sum, Ref(x) .* [1,2,3]), [4,5]) == ([6.0, 6.0],)
+end
+
 function type_test()
    Complex{<:Real}
 end

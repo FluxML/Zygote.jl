@@ -128,6 +128,8 @@ Convert `x` from the format Zygote uses internally to differentials types ChainR
   xp = map(wrap_chainrules_input, xs)
   ChainRules.Tangent{Any, typeof(xp)}(xp)
 end
+# For mutable types, including x=Ref(1), Zygote makes Ref{Any}(::NamedTuple)
+@inline wrap_chainrules_input(x::Ref) = wrap_chainrules_input(x[])
 
 """
   _project(x, dx)
