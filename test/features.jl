@@ -452,6 +452,10 @@ end
   @test gradient(x -> x.x^2 + x.x, Ref(3)) === ((x = 7.0,),)
   @test gradient(x -> real(x.x^2 + im * x.x), Ref(4)) === ((x = 8.0,),)
 
+  # Array of mutables:
+  @test gradient(x -> sum(getindex.(x).^2), Ref.(1:3))[1] == [(;x=2i) for i in 1:3]
+  @test_broken gradient(x -> sum(abs2∘getindex, x), Ref.(1:3))[1] == [(;x=2i) for i in 1:3]
+
   # Broadcasting over Ref is handled specially. Tested elsehwere too.
   @test gradient(x -> sum(sum, x .* [1,2,3]), Ref([4,5])) == ((x = [6.0, 6.0],),)
   @test gradient(x -> sum(sum, Ref(x) .* [1,2,3]), [4,5]) == ([6.0, 6.0],)

@@ -115,6 +115,7 @@ for T_outer in (:Tuple, :NamedTuple)
     ChainRulesCore.backing(xp)  # this is accessing ChainRulesCore internals, but it is prob safe enough, and it is fastest
   end
 end
+@inline wrap_chainrules_output(xs::AbstractArray{<:ChainRules.Tangent}) = wrap_chainrules_output.(xs)
 
 """
     wrap_chainrules_input(x)
@@ -130,6 +131,8 @@ Convert `x` from the format Zygote uses internally to differentials types ChainR
 end
 # For mutable types, including x=Ref(1), Zygote makes Ref{Any}(::NamedTuple)
 @inline wrap_chainrules_input(x::Ref) = wrap_chainrules_input(x[])
+@inline wrap_chainrules_input(xs::AbstractArray{<:Ref}) = wrap_chainrules_input.(xs)
+@inline wrap_chainrules_input(xs::AbstractArray{<:NamedTuple}) = wrap_chainrules_input.(xs)
 
 """
   _project(x, dx)
