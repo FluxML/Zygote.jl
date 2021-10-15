@@ -257,3 +257,4 @@ function z2d(t::NamedTuple, primal)
   tp::NamedTuple = map(z2d, complete_t, primals)
   return canonicalize(Tangent{primal_type, typeof(tp)}(tp))
 end
+z2d(dx::Ref, primal) = z2d(dx[], primal)  # mutable structs
