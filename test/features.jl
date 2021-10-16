@@ -176,9 +176,13 @@ end
 
 @test gradient(t -> t[1]*t[2], (2, 3)) == ((3, 2),)
 
-@test gradient(x -> x.re, 2+3im) === (1.0 + 0.0im,)
+@test gradient(x -> x.re, 2+3im) === (1.0 + 0.0im,)  # one NamedTuple
+@test gradient(x -> x.re*x.im, 2+3im) == (3.0 + 2.0im,)  # two, different fields
+@test gradient(x -> x.re*x.im + x.re, 2+3im) == (4.0 + 2.0im,)  # three, with accumulation
 
-@test gradient(x -> x.re*x.im, 2+3im) == (3.0 + 2.0im,)
+@test gradient(x -> abs2(x * x.re), 4+5im) == (456.0 + 160.0im,)   # gradient participates
+@test gradient(x -> abs2(x * real(x)), 4+5im) == (456.0 + 160.0im,)   # function not getproperty
+@test gradient(x -> abs2(x * getfield(x, :re)), 4+5im) == (456.0 + 160.0im,)
 
 struct Bar{T}
   a::T
@@ -692,4 +696,10 @@ end
   @test gradient(x -> sum(gradient(y -> sum(y.^2), x)[1]), [1, 2])[1] ≈ [2, 2]
   @test gradient(x -> sum(gradient(y -> sum(sin.(y)), x)[1]), [1, 2])[1] ≈ [-0.8414709848078965, -0.9092974268256817]
   @test gradient(x -> sum(abs, gradient(y -> sum(log.(2 .* exp.(y)) .^ 2), x)[1]), [1, 2])[1] ≈ [2,2]
+
+  # getproperty, Tangents, etc
+  @test gradient(xs -> sum((x->x.im^2).(xs)), [1+2im,3])[1] == [4im, 0]
+  @test gradient(xs -> sum((x->x.im^2), xs), [1+2im,3])[1] == [4im, 0]
+  @test gradient(xs -> sum(map(x->x.im^2, xs)), [1+2im,3])[1] == [4im, 0]
+  @test gradient(xs -> mapreduce(x->x.im^2, +, xs), [1+2im,3])[1] == [4im, 0]
 end
