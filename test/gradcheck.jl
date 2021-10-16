@@ -245,6 +245,11 @@ end
   @test gradtest(x->fill(first(x), N), randn(rng, 1))
   @test gradtest(x->fill(first(x), N, M), randn(rng, 1))
   @test gradtest(x->fill(first(x), N, M, P), randn(rng, 1))
+
+  # fill(struct, ...) handled by ChainRules after
+  # https://github.com/FluxML/Zygote.jl/pull/1051
+  @test gradient(x -> fill(x, 3)[1][1], (1,2)) === ((1.0, nothing),)
+  @test_broken gradient(x -> fill(x, 3)[1].a, (a=1, b=2)) === ((a=1.0, b=nothing),)
 end
 
 @testset "circshift" begin
@@ -342,6 +347,20 @@ end
     y, pb = Zygote._pullback(Zygote.Context(), map, f, xs...)
     @inferred pb(ȳ)
   end
+end
+
+@testset "map and tuples" begin
+  # arrays of tuples, ChainRules's Tangent should not escape
+  @test gradient(x -> sum(map(first, x)), [(1,2), (3,4)]) == ([(1.0, nothing), (1.0, nothing)],)
+  @test gradient(x -> sum(first, x), [(1,2), (3,4)]) == ([(1.0, nothing), (1.0, nothing)],)
+
+  @test gradient(x -> map(+, x, (1,2,3))[1], (4,5,6)) == ((1.0, nothing, nothing),)
+  @test gradient(x -> map(+, x, [1,2,3])[1], (4,5,6)) == ((1.0, 0.0, 0.0),)
+  @test_broken gradient(x -> map(+, x, (1,2,3))[1], [4,5,6]) == ([1,0,0],)
+
+  # mismatched lengths, should zip
+  @test_broken gradient(x -> map(+, x, [1,2,3,99])[1], (4,5,6)) == ((1.0, 0.0, 0.0),)
+  @test_broken gradient(x -> map(+, x, [1,2,3])[1], (4,5,6,99)) == ((1.0, 0.0, 0.0, nothing),)
 end
 
 @testset "Alternative Pmap Dispatch" begin
