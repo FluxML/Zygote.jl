@@ -115,6 +115,8 @@ for T_outer in (:Tuple, :NamedTuple)
     ChainRulesCore.backing(xp)  # this is accessing ChainRulesCore internals, but it is prob safe enough, and it is fastest
   end
 end
+# Could `reinterpret` instead of broadcasting here -- TODO
+@inline wrap_chainrules_output(xs::AbstractArray{<:ChainRules.Tangent}) = wrap_chainrules_output.(xs)
 
 """
     wrap_chainrules_input(x)
@@ -130,6 +132,11 @@ Convert `x` from the format Zygote uses internally to differentials types ChainR
 end
 # For mutable types, including x=Ref(1), Zygote makes Ref{Any}(::NamedTuple)
 @inline wrap_chainrules_input(x::Ref) = wrap_chainrules_input(x[])
+# Could `reinterpret` instead of broadcasting here -- TODO
+@inline wrap_chainrules_input(xs::AbstractArray{<:Ref}) = wrap_chainrules_input.(xs)
+@inline wrap_chainrules_input(xs::AbstractArray{<:Union{Nothing, <:Ref}}) = wrap_chainrules_input.(xs) # no test invented for this
+@inline wrap_chainrules_input(xs::AbstractArray{<:NamedTuple}) = wrap_chainrules_input.(xs)
+@inline wrap_chainrules_input(xs::AbstractArray{<:Union{Nothing, <:NamedTuple}}) = wrap_chainrules_input.(xs)
 
 """
   _project(x, dx)
@@ -139,6 +146,8 @@ Also handles some Zygote-specific corrections, such as `x::Array, dx::Tuple`.
 Safe to apply to arbitrary input.
 """
 @inline function _project(x, dx)
+  # Note that this use of `wrap_chainrules_input` has the primal `x`, so could
+  # avoid making `Tangent{Any}`, perhaps via `zygote2differential` -- TODO.
   wrap_chainrules_output(ProjectTo(x)(wrap_chainrules_input(dx)))
 end
 
@@ -224,9 +233,9 @@ function ChainRulesCore.rrule_via_ad(config::ZygoteRuleConfig, f_args...; kwargs
 end
 
 """
-    zygote2differential(x)
+    zygote2differential(dx, primal)
 
-Convert input `x` from the Zygote format to the ChainRules differential types.
+Convert input `dx` from the Zygote format to the ChainRules differential types.
 """
 zygote2differential(x, primal) = z2d(x, primal)
 zygote2differential(::Nothing, ::Any) = NoTangent()
@@ -235,6 +244,7 @@ zygote2differential(t::Tuple, primal) = (@warn "primal should be a tuple, not $p
 z2d(x, ::Any) = x
 z2d(::Nothing, ::Any) = NoTangent()
 z2d(a::AbstractArray{<:Number}, primal::AbstractArray{T}) where T = a
+# Could probably `reinterpret` instead of broadcasting here -- TODO
 z2d(a::AbstractArray, primal::AbstractArray{T}) where T = z2d.(a, primal)
 # Note: this should never be hit if we are converting things right, but it seems to be
 # happening in the wild for sufficiently weird functions/types.
@@ -254,3 +264,4 @@ function z2d(t::NamedTuple, primal)
   tp::NamedTuple = map(z2d, complete_t, primals)
   return canonicalize(Tangent{primal_type, typeof(tp)}(tp))
 end
+z2d(dx::Ref, primal) = z2d(dx[], primal)  # mutable structs

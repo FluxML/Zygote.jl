@@ -245,6 +245,11 @@ end
   @test gradtest(x->fill(first(x), N), randn(rng, 1))
   @test gradtest(x->fill(first(x), N, M), randn(rng, 1))
   @test gradtest(x->fill(first(x), N, M, P), randn(rng, 1))
+
+  # fill(struct, ...) handled by ChainRules after
+  # https://github.com/FluxML/Zygote.jl/pull/1051
+  @test gradient(x -> fill(x, 3)[1][1], (1,2)) === ((1.0, nothing),)
+  @test gradient(x -> fill(x, 3)[1].a, (a=1, b=2)) == ((a=1.0, b=nothing),)  # 1 not 1.0
 end
 
 @testset "circshift" begin
@@ -342,6 +347,20 @@ end
     y, pb = Zygote._pullback(Zygote.Context(), map, f, xs...)
     @inferred pb(ȳ)
   end
+end
+
+@testset "map and tuples" begin
+  # arrays of tuples, ChainRules's Tangent should not escape
+  @test gradient(x -> sum(map(first, x)), [(1,2), (3,4)]) == ([(1.0, nothing), (1.0, nothing)],)
+  @test gradient(x -> sum(first, x), [(1,2), (3,4)]) == ([(1.0, nothing), (1.0, nothing)],)
+
+  @test gradient(x -> map(+, x, (1,2,3))[1], (4,5,6)) == ((1.0, nothing, nothing),)
+  @test gradient(x -> map(+, x, [1,2,3])[1], (4,5,6)) == ((1.0, 0.0, 0.0),)
+  @test_broken gradient(x -> map(+, x, (1,2,3))[1], [4,5,6]) == ([1,0,0],)  # Gradient [1.0, 0.0, 0.0] should be a tuple, since v0.6.0 at least
+
+  # mismatched lengths, should zip
+  @test_broken gradient(x -> map(+, x, [1,2,3,99])[1], (4,5,6)) == ((1.0, 0.0, 0.0),)  # BoundsError: attempt to access 3-element Vector{Float64} at index [4]
+  @test_broken gradient(x -> map(+, x, [1,2,3])[1], (4,5,6,99)) == ((1.0, 0.0, 0.0, nothing),)  # DimensionMismatch("variable with size(x) == (4,) cannot have a gradient with size(dx) == (3,)
 end
 
 @testset "Alternative Pmap Dispatch" begin
@@ -1783,3 +1802,58 @@ end
 # https://github.com/FluxML/Zygote.jl/issues/996
 a = rand(3)
 @test Zygote.gradient(x->sum(x .+ rand.()), a) == (ones(3),)
+
+@testset "CRC issue 440" begin
+  # https://github.com/JuliaDiff/ChainRulesCore.jl/issues/440
+  f(x,y) = sum(sum, [[x[i],y[i]] for i=1:length(x)])
+  g(x,y) = sum(sum, [(x[i],y[i]) for i=1:length(x)])
+  @test gradient(f, rand(3), rand(3)) == ([1.0, 1.0, 1.0], [1.0, 1.0, 1.0])
+  @test gradient(g, rand(3), rand(3)) == ([1.0, 1.0, 1.0], [1.0, 1.0, 1.0])
+end
+
+@testset "CR issue 537" begin
+  # https://github.com/JuliaDiff/ChainRules.jl/issues/537
+  struct BV{F,T}
+    A::F
+    α::T
+  end
+  function Base.:*(c, km::BV)
+      new_A = c*km.A
+      other_params = getfield.([km], propertynames(km))[2:end]
+      BV(new_A, other_params...)
+  end
+  function (bv::BV)(V_app, ox::Bool; kT::Real = 0.026)
+      local exp_arg
+      if ox
+          exp_arg = (bv.α .* V_app) ./ kT
+      else
+          exp_arg = -((1 .- bv.α) .* V_app) ./ kT
+      end
+      bv.A .* exp.(exp_arg)
+  end
+  Zygote.@adjoint function BV{T,S}(A, α) where {T,S}
+    BV(A, α), Δ -> begin
+      (Δ.A, Δ.α)
+    end
+  end
+  bv = BV(1.0, 0.1)
+  I_vals, V = rand(81), rand(81)
+
+  g2 = gradient(V, bv) do V, bv
+    res = fill(bv, length(V))
+    r1 = map((m,v) -> m(v, true), res, V)
+    r2 = map((m,v) -> m(v, false), res, V)
+    sum(r1 .- r2)
+  end
+  @test size(g2[1]) == size(V)
+  @test g2[2] isa NamedTuple
+  @test g2[2].A isa Number
+
+  g1 = gradient(bv, V) do bv, V
+    res = map(x -> x * bv, V)
+    sum(x -> x.A, res)
+  end
+  @test g1[1] isa NamedTuple
+  @test g1[1].A isa Number
+  @test size(g1[2]) == size(V)
+end
