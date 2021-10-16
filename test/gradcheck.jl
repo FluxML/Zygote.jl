@@ -249,7 +249,7 @@ end
   # fill(struct, ...) handled by ChainRules after
   # https://github.com/FluxML/Zygote.jl/pull/1051
   @test gradient(x -> fill(x, 3)[1][1], (1,2)) === ((1.0, nothing),)
-  @test_broken gradient(x -> fill(x, 3)[1].a, (a=1, b=2)) === ((a=1.0, b=nothing),)
+  @test gradient(x -> fill(x, 3)[1].a, (a=1, b=2)) == ((a=1.0, b=nothing),)  # 1 not 1.0
 end
 
 @testset "circshift" begin

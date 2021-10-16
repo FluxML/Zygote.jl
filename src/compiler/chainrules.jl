@@ -132,7 +132,9 @@ end
 # For mutable types, including x=Ref(1), Zygote makes Ref{Any}(::NamedTuple)
 @inline wrap_chainrules_input(x::Ref) = wrap_chainrules_input(x[])
 @inline wrap_chainrules_input(xs::AbstractArray{<:Ref}) = wrap_chainrules_input.(xs)
+@inline wrap_chainrules_input(xs::AbstractArray{<:Union{Nothing, <:Ref}}) = wrap_chainrules_input.(xs) # no test invented for this
 @inline wrap_chainrules_input(xs::AbstractArray{<:NamedTuple}) = wrap_chainrules_input.(xs)
+@inline wrap_chainrules_input(xs::AbstractArray{<:Union{Nothing, <:NamedTuple}}) = wrap_chainrules_input.(xs)
 
 """
   _project(x, dx)
