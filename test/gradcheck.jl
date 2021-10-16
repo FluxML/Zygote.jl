@@ -356,11 +356,11 @@ end
 
   @test gradient(x -> map(+, x, (1,2,3))[1], (4,5,6)) == ((1.0, nothing, nothing),)
   @test gradient(x -> map(+, x, [1,2,3])[1], (4,5,6)) == ((1.0, 0.0, 0.0),)
-  @test_broken gradient(x -> map(+, x, (1,2,3))[1], [4,5,6]) == ([1,0,0],)
+  @test_broken gradient(x -> map(+, x, (1,2,3))[1], [4,5,6]) == ([1,0,0],)  # Gradient [1.0, 0.0, 0.0] should be a tuple, since v0.6.0 at least
 
   # mismatched lengths, should zip
-  @test_broken gradient(x -> map(+, x, [1,2,3,99])[1], (4,5,6)) == ((1.0, 0.0, 0.0),)
-  @test_broken gradient(x -> map(+, x, [1,2,3])[1], (4,5,6,99)) == ((1.0, 0.0, 0.0, nothing),)
+  @test_broken gradient(x -> map(+, x, [1,2,3,99])[1], (4,5,6)) == ((1.0, 0.0, 0.0),)  # BoundsError: attempt to access 3-element Vector{Float64} at index [4]
+  @test_broken gradient(x -> map(+, x, [1,2,3])[1], (4,5,6,99)) == ((1.0, 0.0, 0.0, nothing),)  # DimensionMismatch("variable with size(x) == (4,) cannot have a gradient with size(dx) == (3,)
 end
 
 @testset "Alternative Pmap Dispatch" begin
