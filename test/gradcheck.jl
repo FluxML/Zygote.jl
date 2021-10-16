@@ -1791,3 +1791,50 @@ a = rand(3)
   @test gradient(f, rand(3), rand(3)) == ([1.0, 1.0, 1.0], [1.0, 1.0, 1.0])
   @test gradient(g, rand(3), rand(3)) == ([1.0, 1.0, 1.0], [1.0, 1.0, 1.0])
 end
+
+@testset "CR issue 537" begin
+  # https://github.com/JuliaDiff/ChainRules.jl/issues/537
+  struct BV{F,T}
+    A::F
+    α::T
+  end
+  function Base.:*(c, km::BV)
+      new_A = c*km.A
+      other_params = getfield.([km], propertynames(km))[2:end]
+      BV(new_A, other_params...)
+  end
+  function (bv::BV)(V_app, ox::Bool; kT::Real = 0.026)
+      local exp_arg
+      if ox
+          exp_arg = (bv.α .* V_app) ./ kT
+      else
+          exp_arg = -((1 .- bv.α) .* V_app) ./ kT
+      end
+      bv.A .* exp.(exp_arg)
+  end
+  Zygote.@adjoint function BV{T,S}(A, α) where {T,S}
+    BV(A, α), Δ -> begin
+      (Δ.A, Δ.α)
+    end
+  end
+  bv = BV(1.0, 0.1)
+  I_vals, V = rand(81), rand(81)
+
+  g2 = gradient(V, bv) do V, bv
+    res = fill(bv, length(V))
+    r1 = map((m,v) -> m(v, true), res, V)
+    r2 = map((m,v) -> m(v, false), res, V)
+    sum(r1 .- r2)
+  end
+  @test size(g2[1]) == size(V)
+  @test g2[2] isa NamedTuple
+  @test g2[2].A isa Number
+
+  g1 = gradient(bv, V) do bv, V
+    res = map(x -> x * bv, V)
+    sum(x -> x.A, res)
+  end
+  @test g1[1] isa NamedTuple
+  @test g1[1].A isa Number
+  @test size(g1[2]) == size(V)
+end
