@@ -1783,3 +1783,11 @@ end
 # https://github.com/FluxML/Zygote.jl/issues/996
 a = rand(3)
 @test Zygote.gradient(x->sum(x .+ rand.()), a) == (ones(3),)
+
+@testset "CRC issue 440" begin
+  # https://github.com/JuliaDiff/ChainRulesCore.jl/issues/440
+  f(x,y) = sum(sum, [[x[i],y[i]] for i=1:length(x)])
+  g(x,y) = sum(sum, [(x[i],y[i]) for i=1:length(x)])
+  @test gradient(f, rand(3), rand(3)) == ([1.0, 1.0, 1.0], [1.0, 1.0, 1.0])
+  @test gradient(g, rand(3), rand(3)) == ([1.0, 1.0, 1.0], [1.0, 1.0, 1.0])
+end
