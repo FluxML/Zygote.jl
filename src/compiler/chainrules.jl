@@ -146,9 +146,8 @@ Also handles some Zygote-specific corrections, such as `x::Array, dx::Tuple`.
 Safe to apply to arbitrary input.
 """
 @inline function _project(x, dx)
-  # Note that this use of `wrap_chainrules_input` has the primal `x`, so could
-  # avoid making `Tangent{Any}`, perhaps via `zygote2differential` -- TODO.
-  wrap_chainrules_output(ProjectTo(x)(wrap_chainrules_input(dx)))
+  # wrap_chainrules_output(ProjectTo(x)(wrap_chainrules_input(dx)))
+  wrap_chainrules_output(ProjectTo(x)(zygote2differential(dx, x)))
 end
 
 # Restore splatted arrays
@@ -159,7 +158,7 @@ _project(x::AbstractArray, dx::Tuple) = _project(x, reshape(collect(dx), axes(x)
 (::ChainRulesCore.ProjectTo)(::Nothing) = ChainRulesCore.NoTangent()
 
 # CRC likes Tangent{<:Complex}, but Zygote makes Tangent{Any}
-(project::ProjectTo{<:Complex})(dx::Tangent) = project(Complex(dx.re, dx.im))
+# (project::ProjectTo{<:Complex})(dx::Tangent) = project(Complex(dx.re, dx.im))
 
 # CRC likes Tangent{AbstractArray}, but Zygote makes Tangent{Any}
 # in particular this would hit https://github.com/JuliaDiff/ChainRulesCore.jl/blob/2ec2549b73b22bc08f554dae864fb650cfb9c3d7/src/projection.jl#L139
