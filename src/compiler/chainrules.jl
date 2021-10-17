@@ -272,7 +272,14 @@ end
 z2d(dx::NamedTuple{L,S}, primal::AbstractDict) where {L,S<:Tuple{Vararg{Union{Number,Nothing}}}} = dx
 @generated function z2d(delta::NamedTuple{L,S}, primal::T) where {L,S<:Tuple{Vararg{Union{Number,Nothing}}}, T}
   fnames = fieldnames(T)
-  deltas = map(n -> Base.sym_in(n, L) ? :(delta.$n) : nothing, fnames)
+  deltas = map(fnames) do n
+    i = findfirst(isequal(n), L)
+    if i == nothing || S.parameters[i] == Nothing
+      :(NoTangent())
+    else
+      :(delta.$n)
+    end
+  end
   return quote
     backing = NamedTuple{$fnames}(($(deltas...),))
     Tangent{$T, typeof(backing)}(backing)
