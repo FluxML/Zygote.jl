@@ -244,7 +244,8 @@ zygote2differential(t::Tuple, primal::Tuple) = map(z2d, t, primal)
 zygote2differential(t::Tuple, primal) = (@warn "primal should be a tuple, not $primal"; return t)
 
 z2d(::Nothing, ::Any) = NoTangent()
-z2d(dx, ::Any) = dx  # numbers, Dict, etc.
+z2d(dx, ::Any) = dx
+z2d(dx::NamedTuple, primal::Dict) = dx  # uses a NamedTuple but not for fields!
 z2d(dx::AbstractArray{<:Number}, primal::AbstractArray) = dx
 z2d(dx::AbstractArray{<:AbstractArray}, primal::AbstractArray) = dx
 z2d(dx::AbstractArray, primal::AbstractArray) = z2d.(dx, primal)
