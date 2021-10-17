@@ -350,11 +350,9 @@ end
     end == (4.0,)
 end
 
-@testset "zygote2differential inference" begin
+VERSION > v"1.7-" && @testset "zygote2differential inference" begin
     @test @inferred(Zygote.z2d(1.0, 2.0)) isa Real
     @test @inferred(Zygote.z2d([1,2,3], [4,5,6])) isa Vector
-    if VERSION > v"1.7-"
-        @test @inferred(Zygote.z2d((1, 2.0, 3+4im), (5, 6.0, 7+8im))) isa Tangent{<:Tuple}
-    end
+    @test @inferred(Zygote.z2d((1, 2.0, 3+4im), (5, 6.0, 7+8im))) isa Tangent{<:Tuple}
     @test @inferred(Zygote.z2d((re=1,), 3.0+im)) isa Tangent{ComplexF64}
 end
