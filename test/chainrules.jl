@@ -354,5 +354,16 @@ VERSION > v"1.7-" && @testset "zygote2differential inference" begin
     @test @inferred(Zygote.z2d(1.0, 2.0)) isa Real
     @test @inferred(Zygote.z2d([1,2,3], [4,5,6])) isa Vector
     @test @inferred(Zygote.z2d((1, 2.0, 3+4im), (5, 6.0, 7+8im))) isa Tangent{<:Tuple}
+
+    # Below Julia 1.7, these need a @generated version to be inferred:
     @test @inferred(Zygote.z2d((re=1,), 3.0+im)) isa Tangent{ComplexF64}
+    @test @inferred(Zygote.z2d((re=1, im=nothing), 3.0+im)) isa Tangent{ComplexF64}
+
+    # To test the generic case, we need a struct within a struct. 
+    nested = Tangent{Base.RefValue{ComplexF64}}(x = Tangent{ComplexF64}(re = 1, im = nothing),)
+    if VERSION > v"1.7-"
+        @test @inferred(Zygote.z2d((; x=(; re=1)), Ref(3.0+im))) == nested
+    else
+        @test Zygote.z2d((; x=(; re=1)), Ref(3.0+im)) == nested
+    end
 end

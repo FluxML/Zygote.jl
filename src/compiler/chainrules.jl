@@ -245,7 +245,6 @@ zygote2differential(t::Tuple, primal) = (@warn "primal should be a tuple, not $p
 
 z2d(::Nothing, ::Any) = NoTangent()
 z2d(dx, ::Any) = dx
-z2d(dx::NamedTuple, primal::Dict) = dx  # uses a NamedTuple but not for fields!
 z2d(dx::AbstractArray{<:Number}, primal::AbstractArray) = dx
 z2d(dx::AbstractArray{<:AbstractArray}, primal::AbstractArray) = dx
 z2d(dx::AbstractArray, primal::AbstractArray) = z2d.(dx, primal)
@@ -259,12 +258,25 @@ function z2d(delta::Tuple, primal::Tuple)
   backing = map(z2d, delta, primal)
   return canonicalize(Tangent{typeof(primal), typeof(backing)}(backing))
 end
+
+z2d(dx::NamedTuple, primal::AbstractDict) = dx  # uses a NamedTuple but not for fields!
 function z2d(delta::NamedTuple, primal::T) where T  # arbitrart struct
   fnames = fieldnames(T)
   deltas = map(n -> get(delta, n, nothing), fnames)
   primals = map(n -> getfield(primal, n), fnames)
   backing = NamedTuple{fnames}(map(z2d, deltas, primals))  # recurse into fields
   return canonicalize(Tangent{T, typeof(backing)}(backing))
+end
+# On Julia <= 1.6, this fixes easy cases which do not require recursion into fields, e.g.
+# @inferred Zygote.z2d((re=1, im=nothing), 3.0+im)
+z2d(dx::NamedTuple{L,S}, primal::AbstractDict) where {L,S<:Tuple{Vararg{Union{Number,Nothing}}}} = dx
+@generated function z2d(delta::NamedTuple{L,S}, primal::T) where {L,S<:Tuple{Vararg{Union{Number,Nothing}}}, T}
+  fnames = fieldnames(T)
+  deltas = map(n -> Base.sym_in(n, L) ? :(delta.$n) : nothing, fnames)
+  return quote
+    backing = NamedTuple{$fnames}(($(deltas...),))
+    Tangent{$T, typeof(backing)}(backing)
+  end
 end
 
 z2d(dx::Ref, primal) = z2d(dx[], primal)  # mutable structs
