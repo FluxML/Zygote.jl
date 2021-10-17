@@ -235,32 +235,35 @@ end
     zygote2differential(dx, primal)
 
 Convert input `dx` from the Zygote format to the ChainRules differential types.
+This is similar to `wrap_chainrules_input(dx)`, but because it gets `primal::T`,
+it can turn `NamedTuple`s into `Tangent{T}(...)` not `Tangent{Any}(...)`.
 """
 zygote2differential(x, primal) = z2d(x, primal)
 zygote2differential(::Nothing, ::Any) = NoTangent()
 zygote2differential(t::Tuple, primal::Tuple) = map(z2d, t, primal)
 zygote2differential(t::Tuple, primal) = (@warn "primal should be a tuple, not $primal"; return t)
-z2d(x, ::Any) = x
+
 z2d(::Nothing, ::Any) = NoTangent()
-z2d(a::AbstractArray{<:Number}, primal::AbstractArray{T}) where T = a
-# Could probably `reinterpret` instead of broadcasting here -- TODO
-z2d(a::AbstractArray, primal::AbstractArray{T}) where T = z2d.(a, primal)
+z2d(dx, ::Any) = dx  # numbers, Dict, etc.
+z2d(dx::AbstractArray{<:Number}, primal::AbstractArray) = dx
+z2d(dx::AbstractArray{<:AbstractArray}, primal::AbstractArray) = dx
+z2d(dx::AbstractArray, primal::AbstractArray) = z2d.(dx, primal)
+
 # Note: this should never be hit if we are converting things right, but it seems to be
 # happening in the wild for sufficiently weird functions/types.
 # This fixes most (all?) cases, but it would be good to find what we miss.
 z2d(x::Union{AbstractZero, Tangent}, ::Any) = return x
-function z2d(t::Tuple, primal::Tuple)
-  tp::Tuple = map(z2d, t, primal)
-  primal_type = typeof(primal)
-  return canonicalize(Tangent{primal_type, typeof(tp)}(tp))
+
+function z2d(delta::Tuple, primal::Tuple)
+  backing = map(z2d, delta, primal)
+  return canonicalize(Tangent{typeof(primal), typeof(backing)}(backing))
+end
+function z2d(delta::NamedTuple, primal::T) where T  # arbitrart struct
+  fnames = fieldnames(T)
+  deltas = map(n -> get(delta, n, nothing), fnames)
+  primals = map(n -> getfield(primal, n), fnames)
+  backing = NamedTuple{fnames}(map(z2d, deltas, primals))  # recurse into fields
+  return canonicalize(Tangent{T, typeof(backing)}(backing))
 end
 
-function z2d(t::NamedTuple, primal)
-  primal_type = typeof(primal)
-  fnames = fieldnames(primal_type)
-  complete_t = NamedTuple{fnames}(fn in keys(t) ? t[fn] : nothing for fn in fnames)
-  primals = NamedTuple{fnames}(getfield(primal, fn) for fn in fnames)
-  tp::NamedTuple = map(z2d, complete_t, primals)
-  return canonicalize(Tangent{primal_type, typeof(tp)}(tp))
-end
 z2d(dx::Ref, primal) = z2d(dx[], primal)  # mutable structs
