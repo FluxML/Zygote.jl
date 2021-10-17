@@ -163,7 +163,9 @@ end
     y, back = @inferred pullback(x -> x.m, g)
     @test y == getfield(g, :m)
     # This type instability is due to the handling of non-bitstypes in `accum_param`
-    @test Base.return_types(back, Tuple{Vector{Float64}}) == Any[Union{Tuple{Nothing}, typeof(((m = [1.0, 0.0, 0.0], P = nothing),))}]
+    if VERSION > v"1.7-"
+      @test Base.return_types(back, Tuple{Vector{Float64}}) == Any[Union{Tuple{Nothing}, typeof(((m = [1.0, 0.0, 0.0], P = nothing),))}]
+    end
     @test back([1., 0, 0]) == ((m = [1.0, 0.0, 0.0], P = nothing),)
 
     Base.getproperty(g::Gaussian, s::Symbol) = 2getfield(g, s)
