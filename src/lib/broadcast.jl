@@ -53,8 +53,7 @@ function Base.reducedim_init(::typeof(identity), ::typeof(accum), A::AbstractArr
   Base.reducedim_initarray(A, region, nothing, Union{Nothing,eltype(A)})
 end
 
-function unbroadcast(x::AbstractArray, maybethunked_x̄)
-  x̄ = unthunk_tangent(maybethunked_x̄)
+function unbroadcast(x::AbstractArray, x̄)
   N = ndims(x̄)
   if length(x) == length(x̄)
     _project(x, x̄)  # ProjectTo handles reshape, offsets, structured matrices, row vectors
