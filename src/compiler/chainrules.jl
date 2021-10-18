@@ -1,5 +1,5 @@
 @inline unthunk_tangent(x::AbstractThunk) = wrap_chainrules_output(unthunk(x))
-@inline unthunk_tangent(x::AbstractArray{<:AbstractThunk}) = wrap_chainrules_output(map(unthunk, x))
+@inline unthunk_tangent(x::AbstractArray{<:AbstractThunk}) = map(unthunk_tangent, x)
 
 struct ZygoteRuleConfig{CTX<:AContext} <: RuleConfig{Union{HasReverseMode,NoForwardsMode}}
   context::CTX
