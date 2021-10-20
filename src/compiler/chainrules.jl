@@ -136,7 +136,7 @@ end
 # For arrays, whitelist the safe ones, but always look inside Any[]:
 @inline wrap_chainrules_input(dxs::AbstractArray{<:Number}) = dxs
 @inline wrap_chainrules_input(dxs::AbstractArray{<:AbstractArray{<:Number}}) = dxs
-@inline wrap_chainrules_input(dxs::AbstractArray) = map(wrap_chainrules_input, xs)
+@inline wrap_chainrules_input(dxs::AbstractArray) = map(wrap_chainrules_input, dxs)
 # Could `reinterpret` instead of broadcasting here -- TODO
 # One easy case:
 # @inline wrap_chainrules_input(xs::Base.ReinterpretArray{<:NamedTuple, <:Tangent}) = parent(@show xs)
