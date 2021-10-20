@@ -3,6 +3,8 @@ using Zygote: gradient, ZygoteRuleConfig
 using CUDA
 using CUDA: has_cuda
 
+@testset "all" begin  # Overall testset ensures it keeps running after failure
+
 if has_cuda()
   @testset "CUDA tests" begin
     include("cuda.jl")
@@ -56,3 +58,5 @@ end
 @testset "Compiler" begin
   include("compiler.jl")
 end
+
+end # @testset "all"
