@@ -705,11 +705,8 @@ end
 
   # second order
   @test gradient(x -> sum(gradient(y -> sum(y.^2), x)[1]), [1, 2])[1] ≈ [2, 2]
-
-  # Need an adjoint for constructor Zygote.ZBack{ChainRules.var"#sin_pullback#1133"{Float64}}. 
-  #     Gradient is of type Tangent{Zygote.ZBack{ChainRules.var"#sin_pullback#1133"{Float64}}, NamedTuple{(:back,), Tuple{Tangent{ChainRules.var"#sin_pullback#1133"{Float64}, NamedTuple{(:cosx,), Tuple{Float64}}}}}}
-  # @test gradient(x -> sum(gradient(y -> sum(sin.(y)), x)[1]), [1, 2])[1] ≈ [-0.8414709848078965, -0.9092974268256817]
-  # @test gradient(x -> sum(abs, gradient(y -> sum(log.(2 .* exp.(y)) .^ 2), x)[1]), [1, 2])[1] ≈ [2,2]
+  @test gradient(x -> sum(gradient(y -> sum(sin.(y)), x)[1]), [1, 2])[1] ≈ [-0.8414709848078965, -0.9092974268256817]
+  @test gradient(x -> sum(abs, gradient(y -> sum(log.(2 .* exp.(y)) .^ 2), x)[1]), [1, 2])[1] ≈ [2,2]
 
   # getproperty, Tangents, etc
   @test gradient(xs -> sum((x->x.im^2).(xs)), [1+2im,3])[1] == [4im, 0]
