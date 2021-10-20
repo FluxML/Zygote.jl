@@ -159,16 +159,13 @@ _project(x::AbstractArray, dx::Tuple) = _project(x, reshape(collect(dx), axes(x)
 
 # Piracy:
 # wrap_chainrules_input doesn't handle array of Union{Int,Nothing}
-(::ChainRulesCore.ProjectTo)(::Nothing) = ChainRulesCore.NoTangent()
-
-# CRC likes Tangent{<:Complex}, but Zygote makes Tangent{Any}
-# (project::ProjectTo{<:Complex})(dx::Tangent) = project(Complex(dx.re, dx.im))
+# (::ChainRulesCore.ProjectTo)(::Nothing) = ChainRulesCore.NoTangent()
 
 # CRC likes Tangent{AbstractArray}, but Zygote makes Tangent{Any}
 # in particular this would hit https://github.com/JuliaDiff/ChainRulesCore.jl/blob/2ec2549b73b22bc08f554dae864fb650cfb9c3d7/src/projection.jl#L139
 # if we were not losing track of the Primal in the Tangent
 # This type piracy is just giving up that safety check.
-(project::ProjectTo{AbstractArray})(dx::Tangent) = dx
+# (project::ProjectTo{AbstractArray})(dx::Tangent) = dx
 
 """
   ZBack{F}(back) <: Function
