@@ -118,7 +118,7 @@ end
 wrap_chainrules_output(dxs::AbstractArray{<:Number}) = dxs
 wrap_chainrules_output(dxs::AbstractArray{<:AbstractArray{<:Number}}) = dxs
 wrap_chainrules_output(dxs::AbstractArray) = map(wrap_chainrules_output, dxs)
-
+#=
 # As an optimisation, we can convert by `reinterpret` for bitstypes, e.g. arrays of tuples of numbers
 @inline function wrap_chainrules_output(dxs::AbstractArray{<:ChainRules.Tangent{<:Any, B}}) where {B}
   if isbitstype(B)
@@ -134,7 +134,7 @@ wrap_chainrules_output(::Type{NamedTuple{L,T}}) where {L,T} = NamedTuple{L,wrap_
   inner = map(wrap_chainrules_output, T.parameters)
   :(Tuple{$(inner...)})
 end
-
+=#
 
 """
     wrap_chainrules_input(dx)
@@ -156,8 +156,18 @@ end
 @inline wrap_chainrules_input(dxs::AbstractArray{<:AbstractArray{<:Number}}) = dxs
 @inline wrap_chainrules_input(dxs::AbstractArray) = map(wrap_chainrules_input, dxs)
 # Could `reinterpret` instead of broadcasting here -- TODO
-# One easy case:
+# One easy case, but can this go wrong?
 # @inline wrap_chainrules_input(xs::Base.ReinterpretArray{<:NamedTuple, <:Tangent}) = parent(@show xs)
+
+#=
+# This is for `z2d` reinterpret below:
+wrap_chainrules_input(::Type{Nothing}) = NoTangent
+wrap_chainrules_input(::Type{NamedTuple{L,T}}) where {L,T} = NamedTuple{L,wrap_chainrules_input(T)}
+@generated function wrap_chainrules_input(::Type{T}) where T<:Tuple
+  inner = map(wrap_chainrules_input, T.parameters)
+  :(Tuple{$(inner...)})
+end
+=#
 
 """
   _project(x, dx)
@@ -262,6 +272,17 @@ z2d(dx, ::Any) = dx
 z2d(dx::AbstractArray{<:Number}, primal::AbstractArray) = dx
 z2d(dx::AbstractArray{<:AbstractArray{<:Number}}, primal::AbstractArray) = dx
 z2d(dx::AbstractArray, primal::AbstractArray) = map(z2d, dx, primal)
+#=
+# As an optimisation, we can convert by `reinterpret` for bitstypes, e.g. arrays of tuples of numbers
+function z2d(dx::AbstractArray{S}, primal::AbstractArray{P}) where {S,P}
+  if isbitstype(S)
+    T = wrap_chainrules_input(S)
+    reinterpret(Tangent{P,T}, dx)
+  else
+    map(z2d, dx, primal)
+  end
+end
+=#
 
 # Note: this should never be hit if we are converting things right, but it seems to be
 # happening in the wild for sufficiently weird functions/types.
