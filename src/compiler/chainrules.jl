@@ -119,6 +119,23 @@ wrap_chainrules_output(dxs::AbstractArray{<:Number}) = dxs
 wrap_chainrules_output(dxs::AbstractArray{<:AbstractArray{<:Number}}) = dxs
 wrap_chainrules_output(dxs::AbstractArray) = map(wrap_chainrules_output, dxs)
 
+# As an optimisation, we can convert by `reinterpret` for bitstypes, e.g. arrays of tuples of numbers
+@inline function wrap_chainrules_output(dxs::AbstractArray{<:ChainRules.Tangent{<:Any, B}}) where {B}
+  if isbitstype(B)
+    # B is the backing type. It still contains NoTangent etc, which need converting to Nothing
+    reinterpret(wrap_chainrules_output(B), dxs)
+  else
+    map(wrap_chainrules_output, dxs)
+  end
+end
+wrap_chainrules_output(::Type{<:AbstractZero}) = Nothing
+wrap_chainrules_output(::Type{NamedTuple{L,T}}) where {L,T} = NamedTuple{L,wrap_chainrules_output(T)}
+@generated function wrap_chainrules_output(::Type{T}) where T<:Tuple
+  inner = map(wrap_chainrules_output, T.parameters)
+  :(Tuple{$(inner...)})
+end
+
+
 """
     wrap_chainrules_input(dx)
 
