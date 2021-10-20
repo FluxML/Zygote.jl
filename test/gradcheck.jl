@@ -1878,6 +1878,18 @@ end
 a = rand(3)
 @test Zygote.gradient(x->sum(x .+ rand.()), a) == (ones(3),)
 
+@testset "Zygote 660" begin
+  # https://github.com/FluxML/Zygote.jl/pull/660
+  function example(x,N)
+      ax = axes(x)
+      extraAxe = ax[2+N:end]
+      filledLoc = fill(1, N)
+      return x[:, filledLoc..., extraAxe...]
+  end
+  y, back = pullback(example, randn(5,3,4,3), 2)
+  @test back(zero(y).=1) isa Tuple{Array{Float64,4}, Nothing}
+end
+
 @testset "CRC issue 440" begin
   # https://github.com/JuliaDiff/ChainRulesCore.jl/issues/440
   f(x,y) = sum(sum, [[x[i],y[i]] for i=1:length(x)])
