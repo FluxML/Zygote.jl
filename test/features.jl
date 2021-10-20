@@ -468,6 +468,17 @@ end
   @test gradient(x -> sum(sum, Ref(x) .* [1,2,3]), [4,5]) == ([6.0, 6.0],)
 end
 
+@testset "NamedTuples" begin
+  @test gradient(x -> x.a, (a=1, b=2)) == ((a = 1, b = nothing),)
+  @test gradient(x -> x[1].a, [(a=1, b=2)]) == ([(a = 1, b = nothing)],)
+  @test gradient(x -> x[1].a, [(a=1, b=2), (a=3, b=4)]) == ([(a = 1, b = nothing), nothing],)
+
+  # Mix with Ref
+  @test gradient(x -> x[].a, Ref((a=1, b=2))) == ((x = (a = 1, b = nothing),),)
+  @test gradient(x -> x[1][].a, [Ref((a=1, b=2)), Ref((a=3, b=4))]) == ([(x = (a = 1, b = nothing),), nothing],)
+  @test gradient(x -> x[1].a, [(a=1, b=2), "three"]) == ([(a = 1, b = nothing), nothing],)
+end
+
 function type_test()
    Complex{<:Real}
 end

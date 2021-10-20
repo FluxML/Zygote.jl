@@ -115,8 +115,9 @@ for T_outer in (:Tuple, :NamedTuple)
     ChainRulesCore.backing(xp)  # this is accessing ChainRulesCore internals, but it is prob safe enough, and it is fastest
   end
 end
-# Could `reinterpret` instead of broadcasting here -- TODO
-@inline wrap_chainrules_output(xs::AbstractArray{<:ChainRules.Tangent}) = wrap_chainrules_output.(xs)
+wrap_chainrules_output(dxs::AbstractArray{<:Number}) = dxs
+wrap_chainrules_output(dxs::AbstractArray{<:AbstractArray{<:Number}}) = dxs
+wrap_chainrules_output(dxs::AbstractArray) = map(wrap_chainrules_output, dxs)
 
 """
     wrap_chainrules_input(x)
