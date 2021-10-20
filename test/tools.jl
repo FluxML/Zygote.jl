@@ -48,17 +48,16 @@ end
   end
 
   function Tester(p)
-      @show Zygote.isderiving(p)
+      # @show Zygote.isderiving(p)
       cpu_offload = Zygote.isderiving(p) ? 0.0 : 0.2
       Tester(cpu_offload)
   end
 
-  function f(p)
+  function f56(p)
     sum(Tester(p).cpu_offload .* p)
   end
 
-  p = [1.0]
-  gs = gradient(f, p)
-  @test gs[1] == [0.]
+  gs56 = gradient(f56, [1.0])
+  @test gs56[1] == [0.]
 
 end
