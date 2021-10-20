@@ -120,19 +120,20 @@ wrap_chainrules_output(dxs::AbstractArray{<:AbstractArray{<:Number}}) = dxs
 wrap_chainrules_output(dxs::AbstractArray) = map(wrap_chainrules_output, dxs)
 
 """
-    wrap_chainrules_input(x)
+    wrap_chainrules_input(dx)
 
-Convert `x` from the format Zygote uses internally to differentials types ChainRules uses.
+Convert `dx` from the format Zygote uses internally to differentials types ChainRules uses.
 """
-@inline wrap_chainrules_input(x) = x
+@inline wrap_chainrules_input(dx) = dx
 @inline wrap_chainrules_input(::Nothing) = ChainRules.ZeroTangent()
 @inline wrap_chainrules_input(::AbstractArray{Nothing}) = ChainRules.ZeroTangent()
-@inline function wrap_chainrules_input(xs::Union{Tuple, NamedTuple})
-  xp = map(wrap_chainrules_input, xs)
-  ChainRules.Tangent{Any, typeof(xp)}(xp)
+@inline function wrap_chainrules_input(dxs::Union{Tuple, NamedTuple})
+  xp = map(wrap_chainrules_input, dxs)
+  # This produces Tangent{Any} since it does not get to see the primal, `x`.
+  ChainRulesCore.Tangent{Any, typeof(xp)}(xp)
 end
 # For mutable types, including x=Ref(1), Zygote makes Ref{Any}(::NamedTuple)
-@inline wrap_chainrules_input(x::Ref) = wrap_chainrules_input(x[])
+@inline wrap_chainrules_input(dx::Ref) = wrap_chainrules_input(dx[])
 # For arrays, whitelist the safe ones, but always look inside Any[]:
 @inline wrap_chainrules_input(dxs::AbstractArray{<:Number}) = dxs
 @inline wrap_chainrules_input(dxs::AbstractArray{<:AbstractArray{<:Number}}) = dxs
