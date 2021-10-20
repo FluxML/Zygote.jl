@@ -133,11 +133,13 @@ Convert `x` from the format Zygote uses internally to differentials types ChainR
 end
 # For mutable types, including x=Ref(1), Zygote makes Ref{Any}(::NamedTuple)
 @inline wrap_chainrules_input(x::Ref) = wrap_chainrules_input(x[])
+# For arrays, whitelist the safe ones, but always look inside Any[]:
+@inline wrap_chainrules_input(dxs::AbstractArray{<:Number}) = dxs
+@inline wrap_chainrules_input(dxs::AbstractArray{<:AbstractArray{<:Number}}) = dxs
+@inline wrap_chainrules_input(dxs::AbstractArray) = map(wrap_chainrules_input, xs)
 # Could `reinterpret` instead of broadcasting here -- TODO
-@inline wrap_chainrules_input(xs::AbstractArray{<:Ref}) = wrap_chainrules_input.(xs)
-@inline wrap_chainrules_input(xs::AbstractArray{<:Union{Nothing, <:Ref}}) = wrap_chainrules_input.(xs) # no test invented for this
-@inline wrap_chainrules_input(xs::AbstractArray{<:NamedTuple}) = wrap_chainrules_input.(xs)
-@inline wrap_chainrules_input(xs::AbstractArray{<:Union{Nothing, <:NamedTuple}}) = wrap_chainrules_input.(xs)
+# One easy case:
+# @inline wrap_chainrules_input(xs::Base.ReinterpretArray{<:NamedTuple, <:Tangent}) = parent(@show xs)
 
 """
   _project(x, dx)
