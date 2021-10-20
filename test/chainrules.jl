@@ -360,7 +360,7 @@ end
     @test @inferred(Zygote.z2d((re=1, im=nothing), 3.0+im)) isa Tangent{ComplexF64}
 
     # To test the generic case, we need a struct within a struct. 
-    nested = Tangent{Base.RefValue{ComplexF64}}(x = Tangent{ComplexF64}(re = 1, im = nothing),)
+    nested = Tangent{Base.RefValue{ComplexF64}}(; x=Tangent{ComplexF64}(; re=1, im=NoTangent()),)
     if VERSION > v"1.7-"
         @test @inferred(Zygote.z2d((; x=(; re=1)), Ref(3.0+im))) == nested
     else
