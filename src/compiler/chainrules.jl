@@ -269,6 +269,7 @@ zygote2differential(t::Tuple, primal::Tuple) = map(z2d, t, primal)
 zygote2differential(t::Tuple, primal) = (@warn "primal should be a tuple, not $primal"; return t)
 
 z2d(::Nothing, ::Any) = NoTangent()
+z2d(::Tuple{Vararg{Nothing}}, ::Tuple) = NoTangent()  # collapse all-zero case
 z2d(dx, ::Any) = dx
 z2d(dx::AbstractArray{<:Number}, primal::AbstractArray) = dx
 z2d(dx::AbstractArray{<:AbstractArray{<:Number}}, primal::AbstractArray) = dx
@@ -292,7 +293,11 @@ z2d(x::Union{AbstractZero, Tangent}, ::Any) = return x
 
 function z2d(delta::Tuple, primal::Tuple)
   backing = map(z2d, delta, primal)
-  return canonicalize(Tangent{typeof(primal), typeof(backing)}(backing))
+  if backing isa Tuple{Vararg{AbstractZero}}
+    return NoTangent()  # collapse all-zero case
+  else
+    return canonicalize(Tangent{typeof(primal), typeof(backing)}(backing))
+  end
 end
 
 z2d(dx::NamedTuple, primal::AbstractDict) = dx  # uses a NamedTuple but not for fields!
@@ -300,8 +305,13 @@ function z2d(delta::NamedTuple, primal::T) where T  # arbitrart struct
   fnames = fieldnames(T)
   deltas = map(n -> get(delta, n, nothing), fnames)
   primals = map(n -> getfield(primal, n), fnames)
-  backing = NamedTuple{fnames}(map(z2d, deltas, primals))  # recurse into fields
-  return canonicalize(Tangent{T, typeof(backing)}(backing))
+  inner = map(z2d, deltas, primals)  # recurse into fields
+    if inner isa Tuple{Vararg{AbstractZero}}
+    return NoTangent()  # collapse all-zero case
+  else
+    backing = NamedTuple{fnames}(inner)
+    return canonicalize(Tangent{T, typeof(backing)}(backing))
+  end
 end
 # On Julia <= 1.6, this fixes easy cases which do not require recursion into fields, e.g.
 # @inferred Zygote.z2d((re=1, im=nothing), 3.0+im)
@@ -316,9 +326,13 @@ z2d(dx::NamedTuple{L,S}, primal::AbstractDict) where {L,S<:Tuple{Vararg{Union{Nu
       :(delta.$n)
     end
   end
-  return quote
-    backing = NamedTuple{$fnames}(($(deltas...),))
-    Tangent{$T, typeof(backing)}(backing)
+  if all(d -> d == :(NoTangent()), deltas)
+    return :(NoTangent())  # collapse all-zero case
+  else
+    return quote
+      backing = NamedTuple{$fnames}(($(deltas...),))
+      Tangent{$T, typeof(backing)}(backing)
+    end
   end
 end
 
