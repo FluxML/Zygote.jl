@@ -32,6 +32,10 @@ using Zygote: Grads
     x = [0, 0, 0]
     copy!(x, ps)
     @test x == [1, 2, 3]
+
+    ps_src = Params([[1, 2], [3]])
+    ps_dst = Params([4][5])
+    ps_dst = ps_src
   end
 
   @testset "broadcast" begin
@@ -130,6 +134,22 @@ end
     @test gs3 isa Grads 
 
     @test_throws ArgumentError gs1 .+ gs4
+  end
+
+  @testset "copy" begin
+      w, b = rand(2), rand(2)
+      x1, x2 = rand(2), rand(2)
+
+      gs1 = gradient(() -> sum(w .* x1), Params([w]))
+      gs2 = gradient(() -> sum(w .* x2), Params([w]))
+
+      gs_new = copy(gs1)
+      copy!(gs2, gs1)
+
+      # TODO: these tests are currently broken because `Base.iseqeual` is not doing useful things
+      # for `Grads` right now.
+      @test_broken gs1 == gs_new
+      @test_broken gs2 == gs1
   end
 
   @testset "map and broadcast" begin

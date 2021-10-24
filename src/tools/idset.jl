@@ -15,6 +15,10 @@ Base.in(x, s::IdSet) = haskey(s.dict, x)
 Base.eltype(::IdSet{T}) where T = T
 Base.collect(s::IdSet) = Base.collect(keys(s.dict))
 Base.similar(s::IdSet, T::Type) = IdSet{T}()
+function Base.empty!(s::IdSet)
+    empty!(s.dict)
+    s
+end
 
 @forward IdSet.dict Base.length
 
