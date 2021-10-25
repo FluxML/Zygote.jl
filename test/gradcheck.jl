@@ -386,7 +386,10 @@ end
 
 @testset "vararg map" begin
   # early stop
-  @test gradient(x -> sum(map(*,x,[1,2,3])), rand(5)) == ([1,2,3,0,0],)
+  if VERSION >= v"1.5"
+    # In Julia 1.4 and earlier, map(*,rand(5),[1,2,3]) is a DimensionMismatch
+    @test gradient(x -> sum(map(*,x,[1,2,3])), rand(5)) == ([1,2,3,0,0],)
+  end
   @test gradient(x -> sum(map(*,x,(1,2,3))), rand(5)) == ([1,2,3,0,0],)
   @test gradient(x -> sum(map(*,x,[1,2,3])), Tuple(rand(5))) == ((1.0, 2.0, 3.0, nothing, nothing),)
 

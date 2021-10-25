@@ -507,13 +507,18 @@ end
   end == ([1, 2 * 10^1, 3 * 100^2],)
 
   # zip
-  @test gradient(10:14, 1:10) do xs, ys
-    sum([x/y for (x,y) in zip(xs, ys)])
-  end[2] ≈ vcat(.-(10:14) ./ (1:5).^2, zeros(5))
+  if VERSION >= v"1.5"
+    # On Julia 1.4 and earlier, [x/y for (x,y) in zip(10:14, 1:10)] is a DimensionMismatch,
+    # while on 1.5 - 1.7 it stops early. 
 
-  @test_broken gradient(10:14, 1:10) do xs, ys
-    sum(x/y for (x,y) in zip(xs, ys))   # same without collect
-  end[2] ≈ vcat(.-(10:14) ./ (1:5).^2, zeros(5))
+    @test gradient(10:14, 1:10) do xs, ys
+      sum([x/y for (x,y) in zip(xs, ys)])
+    end[2] ≈ vcat(.-(10:14) ./ (1:5).^2, zeros(5))
+
+    @test_broken gradient(10:14, 1:10) do xs, ys
+      sum(x/y for (x,y) in zip(xs, ys))   # same without collect
+    end[2] ≈ vcat(.-(10:14) ./ (1:5).^2, zeros(5))
+  end
 
   # Iterators.Filter
   @test gradient(2:9) do xs
