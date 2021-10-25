@@ -3,7 +3,7 @@
 </p>
 
 <!-- [![Build Status](https://travis-ci.org/FluxML/Zygote.jl.svg?branch=master)](https://travis-ci.org/FluxML/Zygote.jl) -->
-![CI Testing](https://github.com/FluxML/Zygote.jl/workflows/CI/badge.svg)
+[![CI Testing](https://github.com/FluxML/Zygote.jl/workflows/CI/badge.svg)](https://github.com/FluxML/Zygote.jl/actions)
 [![Dev Docs](https://img.shields.io/badge/docs-dev-blue.svg)](https://fluxml.ai/Zygote.jl/dev)
 
 `] add Zygote`
@@ -18,7 +18,7 @@ julia> using Zygote
 julia> f(x) = 5x + 3
 
 julia> f(10), f'(10)
-(53, 5)
+(53, 5.0)
 
 julia> @code_llvm f'(10)
 define i64 @"julia_#625_38792"(i64) {
@@ -29,7 +29,7 @@ top:
 
 "Source-to-source" means that Zygote hooks into Julia's compiler, and generates the backwards pass for you – as if you had written it by hand.
 
-Without compromising on performance, Zygote supports the full flexibility and dynamism of the Julia language, including control flow, recursion, closures, structs, dictionaries, and more.
+Zygote supports the full flexibility and dynamism of the Julia language, including control flow, recursion, closures, structs, dictionaries, and more.
 
 ```julia
 julia> fs = Dict("sin" => sin, "cos" => cos, "tan" => tan);

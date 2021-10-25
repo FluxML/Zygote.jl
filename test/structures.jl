@@ -53,6 +53,7 @@ struct A594 x::Float64 end
   Y = randn(2,2)
   ∇ = gradient(g,X,Y)
   @test ∇[1] == [(x = 2.0,); (x = 2.0,)]
+  @test vec(∇[1]) == [(x = 2.0,); (x = 2.0,)]
   @test ∇[2] == [1 1; 1 1]
 end
 

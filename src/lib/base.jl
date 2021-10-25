@@ -118,25 +118,54 @@ end
 
 # named tuple
 @adjoint function pairs(t::NamedTuple{N}) where N
-    pairs_namedtuple(dx::NamedTuple) = (dx.data,)
-    function pairs_namedtuple(Δ::Dict)
-        t0 = map(zero, t)
-        for (idx, v) in Δ
-            t0 = NamedTuple{N}(Base.setindex((t0...,), v, idx))
-        end
-        return (t0,)
+  
+  pairs_namedtuple_pullback(dx::NamedTuple) = (dx.data,)
+
+  pairs_namedtuple_pullback(dx::Tuple{}) = (NamedTuple(),)
+  
+  function pairs_namedtuple_pullback(Δ::Dict)
+    t0 = map(zero, t)
+    for (idx, v) in Δ
+      ii = idx isa Integer ? idx : findfirst(==(idx), keys(t))
+      t0 = NamedTuple{N}(Base.setindex((t0...,), v, ii))
     end
-    return pairs(t), pairs_namedtuple
+    return (t0,)
+  end
+
+  return pairs(t), pairs_namedtuple_pullback
+end
+
+# For merge between NamedTuple and Dict, we will just convert the Dict to a NamedTuple.
+# and then call `pullback`, which should overall be pretty efficient code generated,
+# and it avoids trying to AD the problematic generic `merge(::NamedTuple, ::iter)` method which uses `push!`.
+if VERSION >= v"1.6"
+  @adjoint merge(nt::NamedTuple, dict::Dict) = pullback(merge, nt, NamedTuple(dict))
+else
+  @adjoint merge(nt::NamedTuple, dict::Dict) = pullback(merge, nt, (;dict...))
 end
 
 @adjoint function Base.getfield(p::Pair, i::Int)
-    function pair_getfield(Δ)
-        f, s = i == 1 ? (Δ, zero(p[2])) : (zero(p[1]), Δ)
+    function pair_getfield_pullback(Δ)
+        f, s = i == 1 ? (Δ, nothing) : (nothing, Δ)
         return (first=f, second=s), nothing
     end
-    return getfield(p, i), pair_getfield
+    return getfield(p, i), pair_getfield_pullback
 end
 
 @adjoint Base.nameof(x::UnionAll) = nameof(x), _ -> (nothing,)
 
 @nograd typeintersect
+
+# Base.Fix1 and Base.Fix2: https://github.com/FluxML/Zygote.jl/issues/957
+@adjoint function (g::Base.Fix1)(y)
+    f = g.f
+    x = g.x
+    fallback_Fix1(y) = f(x, y)
+    return _pullback(__context__, fallback_Fix1, y)
+end
+@adjoint function (g::Base.Fix2)(y)
+    f = g.f
+    x = g.x
+    fallback_Fix2(y) = f(y, x)
+    return _pullback(__context__, fallback_Fix2, y)
+end

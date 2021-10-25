@@ -3,14 +3,10 @@ using FillArrays: AbstractFill, getindex_value
 using Base.Broadcast: broadcasted, broadcast_shape
 using Distributed: pmap, AbstractWorkerPool
 
-@adjoint (::Type{T})(::UndefInitializer, args...) where T<:Array = T(undef, args...), Δ -> nothing
-
 @adjoint Array(xs::AbstractArray) = Array(xs), ȳ -> (ȳ,)
 @adjoint Array(xs::Array) = Array(xs), ȳ -> (ȳ,)
 
-@nograd ones, zeros, Base.OneTo, Colon(), one, zero, sizehint!
-
-@adjoint Base.vect(xs...) = Base.vect(xs...), Δ -> (Δ...,)
+@nograd ones, zeros, Base.OneTo, Colon(), one, zero, sizehint!, count
 
 @adjoint copy(x::AbstractArray) = copy(x), ȳ -> (ȳ,)
 
@@ -18,7 +14,6 @@ using Distributed: pmap, AbstractWorkerPool
 @adjoint collect(x::AbstractArray) = collect(x), dy -> (dy,)
 
 # Array Constructors
-@adjoint (::Type{T})(x::T) where T<:Array = T(x), ȳ -> (ȳ,)
 @adjoint function (::Type{T})(x::Number, sz) where {T <: Fill}
     back(Δ::AbstractArray) = (sum(Δ), nothing)
     back(Δ::NamedTuple) = (Δ.value, nothing)
@@ -32,8 +27,10 @@ end
 
 @adjoint view(x::AbstractArray, inds...) = view(x, inds...), ∇getindex(x, inds)
 
-∇getindex(x::AbstractArray, inds) = dy -> begin
-  if inds isa  NTuple{<:Any, Integer}
+∇getindex(x::AbstractArray{T,N}, inds) where {T,N} = dy -> begin
+  if inds isa NTuple{N,Int} && T <: Number
+    dx = OneElement(dy, inds, axes(x))
+  elseif inds isa NTuple{<:Any, Integer}
     dx = _zero(x, typeof(dy))
     dx[inds...] = dy
   else
@@ -41,8 +38,24 @@ end
     dxv = view(dx, inds...)
     dxv .= accum.(dxv, _droplike(dy, dxv))
   end
-  return (dx, map(_->nothing, inds)...)
+  return (_project(x, dx), map(_->nothing, inds)...)
 end
+
+"""
+    OneElement(val, ind, axes) <: AbstractArray
+
+Extremely simple `struct` used for the gradient of scalar `getindex`.
+"""
+struct OneElement{T,N,I,A} <: AbstractArray{T,N}
+  val::T
+  ind::I
+  axes::A
+  OneElement(val::T, ind::I, axes::A) where {T<:Number, I<:NTuple{N,Int}, A<:NTuple{N,AbstractUnitRange}} where {N} = new{T,N,I,A}(val, ind, axes)
+end
+Base.size(A::OneElement) = map(length, A.axes)
+Base.axes(A::OneElement) = A.axes
+Base.getindex(A::OneElement{T,N}, i::Vararg{Int,N}) where {T,N} = ifelse(i==A.ind, A.val, zero(T))
+
 
 _zero(xs::AbstractArray{<:Number}, T::Type{Nothing}) = fill!(similar(xs), zero(eltype(xs)))
 _zero(xs::AbstractArray{<:Number}, T) = fill!(similar(xs, T), false)
@@ -55,49 +68,19 @@ _droplike(dy::Union{LinearAlgebra.Adjoint, LinearAlgebra.Transpose}, dxv::Abstra
 @adjoint getindex(::Type{T}, xs...) where {T} = T[xs...], dy -> (nothing, dy...)
 
 @adjoint! setindex!(xs::AbstractArray, x...) = setindex!(xs, x...),
-  _ -> error("Mutating arrays is not supported")
+  _ -> error("Mutating arrays is not supported -- called setindex!(::$(typeof(xs)), _...)")
 
-@adjoint! copyto!(args...) = copyto!(args...),
-  _ -> error("Mutating arrays is not supported")
+@adjoint! copyto!(xs, args...) = copyto!(xs, args...),
+  _ -> error("Mutating arrays is not supported -- called copyto!(::$(typeof(xs)), _...)")
 
 for f in [push!, pop!, pushfirst!, popfirst!]
-  @eval @adjoint! $f(xs, x...) =
-    push!(xs, x...), _ -> error("Mutating arrays is not supported")
-end
-
-# This is kind of bad, but at least we don't materialize the whole
-# array. Prefer to use `Buffer`
-# function _pullback(cx::Context, ::typeof(push!), xs::AbstractVector{<:AbstractArray}, x::AbstractArray{T}...) where T
-@adjoint! function push!(xs::AbstractVector{<:AbstractArray}, x::AbstractArray{T}...) where T
-  sz_xs = size.(xs)
-  sz_x = size.(x)
-  push!(xs, x...), Δ -> begin
-    (Δ, map(x -> Ones{T}(x...), sz_x)...)
-  end
-end
-
-@adjoint! function pop!(xs::AbstractVector{<:AbstractArray{T}}) where T
-  sz_xs = size.(xs)
-  op = pop!(xs)
-  op, Δ -> begin
-    ([Ones{T}(sz...) for sz in sz_xs], )
-  end
+  @eval @adjoint! $f(x::AbstractVector, ys...) = $f(x, ys...), 
+    _ -> error("Mutating arrays is not supported -- called $($f)(::$(typeof(x)), _...)")
 end
 
 # General
 
 @adjoint collect(x::Array) = collect(x), Δ -> (Δ,)
-
-@adjoint fill(x::Real, dims...) = fill(x, dims...), Δ->(sum(Δ), map(_->nothing, dims)...)
-
-@adjoint function circshift(A, shifts)
-  circshift(A, shifts), Δ -> (circshift(Δ, map(-, shifts)), nothing)
-end
-
-@adjoint function reverse(x::AbstractArray, args...; kwargs...)
-  _reverse(t) = reverse(t, args...; kwargs...)
-  _reverse(x), Δ->(_reverse(Δ), map(_->nothing, args)...)
-end
 
 @adjoint permutedims(xs) = permutedims(xs), Δ -> (permutedims(Δ),)
 
@@ -176,6 +159,7 @@ end
 
 struct StaticGetter{i} end
 (::StaticGetter{i})(v) where {i} = v[i]
+(::StaticGetter{i})(::Nothing) where {i} = nothing
 @generated function _unzip(tuples, ::Val{N}) where {N}
   Expr(:tuple, (:(map($(StaticGetter{i}()), tuples)) for i ∈ 1:N)...)
 end
@@ -202,20 +186,33 @@ _tryaxes(x::Tuple) = Val(length(x))
 _restore(dx, ax::Tuple) = axes(dx) == ax ? dx : reshape(vcat(dx, falses(prod(length, ax) - length(dx))), ax)
 _restore(dx, ::Val{N}) where {N} = length(dx) < N ? ntuple(i -> get(dx,i,nothing), N) : NTuple{N}(dx)
 
+# Sometimes a pullback doesn't return a Tuple, but rather returns only a
+# single nothing to say "all arguments have zero cotangent". This function is needed to
+# account for that inside the pullback for map.
+last_or_nothing(::Nothing) = nothing
+last_or_nothing(x) = last(x)
+
 for (mapfunc,∇mapfunc) in [(:map,:∇map),(:pmap,:∇pmap)]
-  @eval function $∇mapfunc(cx, f, args...)
+  @eval function $∇mapfunc(cx, f::F, args::Vararg{Any, N}) where {F, N}
     ys_and_backs = $mapfunc((args...) -> _pullback(cx, f, args...), args...)
     if isempty(ys_and_backs)
-      ys_and_backs, _ -> nothing
-    else
-      ys, backs = unzip(ys_and_backs)
-      arg_ax = map(_tryaxes, args)
-      ys, function (Δ)
+      return ys_and_backs, _ -> nothing
+    end
+    ys = map(first, ys_and_backs)
+    arg_ax = map(_tryaxes, args)
+    return ys, function map_back(Δ)
         isnothing(Δ) && return nothing
+      if Base.issingletontype(F) && length(args) == 1
+        Δarg = $mapfunc(((_,pb), δ) -> last_or_nothing(pb(δ)), ys_and_backs, Δ) # No unzip needed
+        (nothing, Δarg)
+      elseif Base.issingletontype(F) # Ensures `f` is pure: nothing captured & no state
+        Δargs = _unzip($mapfunc(((_,pb), δ) -> tailmemaybe(pb(δ)), ys_and_backs, Δ), Val(N))
+        (nothing, Δargs...)
+      else
         # Apply pullbacks in reverse order. Needed for correctness if `f` is stateful.
-        Δf_and_args_zipped = $mapfunc((f, δ) -> f(δ), _tryreverse($mapfunc, backs, Δ)...)
-        Δf_and_args = unzip(_tryreverse($mapfunc, Δf_and_args_zipped))
-        Δf = reduce(accum, Δf_and_args[1])
+        Δf_and_args_zipped = $mapfunc(((_,pb), δ) -> pb(δ), _tryreverse($mapfunc, ys_and_backs, Δ)...)
+        Δf_and_args = _unzip(_tryreverse($mapfunc, Δf_and_args_zipped), Val(N + 1))
+        Δf = reduce(accum, Δf_and_args[1]; init=nothing)
         Δargs = map(_restore, Δf_and_args[2:end], arg_ax)
         (Δf, Δargs...)
       end
@@ -320,23 +317,15 @@ end
   end
 end
 
-@adjoint function sum(xs::AbstractArray{Bool}; dims = :)
-  sum(xs, dims = dims), Δ -> (nothing,)
-end
-
-@adjoint function sum(f, xs::AbstractArray; kws...)
+@adjoint function sum(f, xs::AbstractArray{<:AbstractArray}; kws...)
   @assert !haskey(kws, :init) # TODO add init support (julia 1.6)
   return pullback(__context__, (f, xs) -> sum(f.(xs); kws...), f, xs)
 end
 
-@adjoint function sum(::typeof(abs2), X::AbstractArray; dims = :)
-  return sum(abs2, X; dims=dims), Δ::Union{Number, AbstractArray}->(nothing, ((2Δ) .* X))
+@adjoint function sum(xs::AbstractArray{Bool}; dims = :)
+  sum(xs, dims = dims), Δ -> (nothing,)
 end
 
-@adjoint function prod(xs::AbstractArray; dims = :)
-  p = prod(xs; dims = dims)
-  p, Δ -> (p ./ xs .* Δ,)
-end
 
 function _pullback(cx::AContext, ::typeof(prod), f, xs::AbstractArray)
   y, back = pullback(cx, ((f, xs) -> prod(f.(xs))), f, xs)

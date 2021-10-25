@@ -137,7 +137,7 @@ We convert the code to SSA form using Julia's built-in IR data structure, after 
 julia> Zygote.@code_ir foo(1)
 1 1 ─ %1 = (Main.bar)(_2)::Any
   │   %2 = (Main.baz)(%1)::Any
-  └──      return %2    
+  └──      return %2
 ```
 
 (There isn't much difference unless there's some control flow.)
@@ -202,7 +202,7 @@ function J(::typeof(foo), x)
   return b, Pullback{typeof(foo)}((da, db))
 end
 
-function(p::Pullback{typeof(foo)})(b̄)
+function (p::Pullback{typeof(foo)})(b̄)
   da, db = p.data[1], p.data[2]
   ā = db(b̄)
   x̄ = da(ā)

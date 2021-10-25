@@ -19,15 +19,22 @@ using Zygote: hessian_dual, hessian_reverse
   @test_throws Exception hess(identity, randn(2))
 end
 
-@testset "diagonal hessian" begin
+VERSION > v"1.6-" && @testset "diagonal hessian" begin
   @test diaghessian(x -> x[1]*x[2]^2, [1, pi]) == ([0, 2],)
 
-  xs, y = randn(2,3), rand()
-  f34(xs, y) = xs[1] * (sum(xs .^ (1:3)') + y^4)  # non-diagonal Hessian, two arguments
-  dx, dy = diaghessian(f34, xs, y)
-  @test size(dx) == size(xs)
-  @test vec(dx) ≈ diag(hessian(x -> f34(x,y), xs))
-  @test dy ≈ hessian(y -> f34(xs,y), y)
+  if VERSION > v"1.6-"
+    # Gradient of ^ may contain log(complex(...)), which interacts badly with Dual below Julia 1.6:
+    # julia> log(ForwardDiff.Dual(1,0) + 0im) # ERROR: StackOverflowError:
+    # https://github.com/JuliaDiff/ChainRules.jl/issues/525
+    # Fixed in 1.6 by: https://github.com/JuliaLang/julia/pull/36030
+    xs, y = randn(2,3), rand()
+    f34(xs, y) = xs[1] * (sum(xs .^ (1:3)') + y^4)  # non-diagonal Hessian, two arguments
+
+    dx, dy = diaghessian(f34, xs, y)
+    @test size(dx) == size(xs)
+    @test vec(dx) ≈ diag(hessian(x -> f34(x,y), xs))
+    @test dy ≈ hessian(y -> f34(xs,y), y)
+  end
 
   zs = randn(7,13)  # test chunk mode
   @test length(zs) > ForwardDiff.DEFAULT_CHUNK_THRESHOLD
@@ -42,6 +49,7 @@ end
 
 @testset "jacobian(f, args...)" begin
   @test jacobian(identity, [1,2])[1] == [1 0; 0 1]
+  @test withjacobian(identity, [1,2]) == (val = [1,2], grad = ([1 0; 0 1],))
 
   j1 = jacobian((a,x) -> a.^2 .* x, [1,2,3], 1)
   @test j1[1] ≈ Diagonal([2,4,6])
@@ -65,6 +73,7 @@ end
   j5 = jacobian((x,y) -> hcat(x[1], y), fill(pi), exp(1))  # zero-array
   @test j5[1] isa Matrix
   @test vec(j5[1]) == [1, 0]
+  @test j5[2] == [0, 1]
 
   @test_throws ArgumentError jacobian(identity, [1,2,3+im])
   @test_throws ArgumentError jacobian(sum, [1,2,3+im])  # scalar, complex
@@ -82,6 +91,10 @@ end
   Jxy = jacobian(() -> ys[1:2] .+ sum(xs.^2), Params([xs, ys]))
   @test Jxy[ys] ≈ [1 0 0; 0 1 0]
   @test Jxy[xs] ≈ [2 6 4 8; 2 6 4 8]
+
+  z, grad = withjacobian(() -> ys[1:2] .+ sum(xs.^2), Params([xs, ys]))
+  @test z == [35, 37]
+  @test grad[ys] ≈ [1 0 0; 0 1 0]
 end
 
 using ForwardDiff

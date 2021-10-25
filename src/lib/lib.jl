@@ -1,5 +1,14 @@
 using Base: RefValue
 
+if VERSION > v"1.7.0-DEV.204"
+  using Base: ismutabletype
+else
+  function ismutabletype(@nospecialize(t::Type))
+    t = Base.unwrap_unionall(t)
+    return isa(t, DataType) && t.mutable
+  end
+end
+
 # Interfaces
 
 accum() = nothing
@@ -12,8 +21,8 @@ accum(x, y) =
 
 accum(x, y, zs...) = accum(accum(x, y), zs...)
 
-accum(x::Tuple, y::Tuple) = accum.(x, y)
-accum(x::AbstractArray, y::AbstractArray) = accum.(x, y)
+accum(x::Tuple, ys::Tuple...) = accum.(x, ys...)
+accum(x::AbstractArray, ys::AbstractArray...) = accum.(x, ys...)
 
 @generated function accum(x::NamedTuple, y::NamedTuple)
   # assumes that y has no keys apart from those also in x
@@ -278,19 +287,19 @@ Jnew{T}(g) where T = Jnew{T,typeof(g)}(g)
 
 @adjoint! function __new__(T, args...)
   x = __new__(T, args...)
-  g = !T.mutable || fieldcount(T) == 0 ? nothing : grad_mut(__context__, x)
+  g = !ismutabletype(T) || fieldcount(T) == 0 ? nothing : grad_mut(__context__, x)
   x, Jnew{T,typeof(g),false}(g)
 end
 
 @adjoint! function __splatnew__(T, args)
   x = __splatnew__(T, args)
-  g = !T.mutable || fieldcount(T) == 0 ? nothing : grad_mut(__context__, x)
+  g = !ismutabletype(T) || fieldcount(T) == 0 ? nothing : grad_mut(__context__, x)
   x, Jnew{T,typeof(g),true}(g)
 end
 
 # TODO captured mutables + multiple calls to `back`
 @generated function (back::Jnew{T,G,false})(Δ::Union{NamedTuple,Nothing,RefValue}) where {T,G}
-  !T.mutable && Δ == Nothing && return :nothing
+  !ismutabletype(T) && Δ == Nothing && return :nothing
   Δ = G == Nothing ? :Δ :
       Δ <: RefValue ? :(back.g[]) :
       :(accum(back.g[], Δ))
@@ -302,7 +311,7 @@ end
 end
 
 @generated function (back::Jnew{T,G,true})(Δ::Union{NamedTuple,Nothing,RefValue}) where {T,G}
-  !T.mutable && Δ == Nothing && return :nothing
+  !ismutabletype(T) && Δ == Nothing && return :nothing
   Δ = G == Nothing ? :Δ : :(back.g)
   quote
     x̄ = $Δ

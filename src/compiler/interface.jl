@@ -50,28 +50,108 @@ sensitivity(y) = error("Output should be scalar; gradients are not defined for o
     gradient(f, args...)
 
 Returns a tuple containing `∂f/∂x` for each argument `x`,
-the derivative (for scalar x) or the gradient.
+the derivative (for scalar `x`) or the gradient.
 
 `f(args...)` must be a real number, see [`jacobian`](@ref) for array output.
+
+See also [`withgradient`](@ref) to keep the value `f(args...)`,
+and [`pullback`](@ref) for value and back-propagator.
+
+```jldoctest; setup=:(using Zygote)
+julia> gradient(*, 2.0, 3.0, 5.0)
+(15.0, 10.0, 6.0)
+
+julia> gradient(x -> sum(abs2,x), [7.0, 11.0, 13.0])
+([14.0, 22.0, 26.0],)
+
+julia> gradient([7, 11], 0, 1) do x, y, d
+         p = size(x, d)
+         sum(x.^p .+ y)
+       end
+([14.0, 22.0], 2.0, nothing)
+```
 """
 function gradient(f, args...)
   y, back = pullback(f, args...)
-  return back(sensitivity(y))
+  grad = back(sensitivity(y))
+  isnothing(grad) ? nothing : map(_project, args, grad)
 end
 
-Base.adjoint(f::Function) = x -> gradient(f, x)[1]
+# Base.adjoint(f::Function) = x -> gradient(f, x)[1]  # piracy!
+Base.adjoint(f::Function) = x -> begin  # still piracy! avoids projection for legacy reasons
+  y, back = pullback(f, x)
+  back(sensitivity(y))[1]
+end
+
+"""
+    withgradient(f, args...)
+    withgradient(f, ::Params)
+
+Returns both the value of the function and the [`gradient`](@ref),
+as a named tuple. 
+
+```jldoctest; setup=:(using Zygote)
+julia> y, ∇ = withgradient(/, 1, 2)
+(val = 0.5, grad = (0.5, -0.25))
+
+julia> ∇ == gradient(/, 1, 2)
+true
+```
+"""
+function withgradient(f, args...)
+  y, back = pullback(f, args...)
+  grad = back(sensitivity(y))
+  results = isnothing(grad) ? map(_ -> nothing, args) : map(_project, args, grad)
+  (val=y, grad=results)
+end
 
 # Param-style wrappers
 
-# TODO store ids only
+"""
+    gradient(() -> loss(), ps::Params) -> Grads
+
+Gradient with implicit parameters. Takes a zero-argument function,
+and returns a dictionary-like container, whose keys are arrays `x in ps`.
+
+```jldoctest; setup=:(using Zygote)
+julia> x = [1 2 3; 4 5 6]; y = [7, 8]; z = [1, 10, 100];
+
+julia> g = gradient(Params([x, y])) do
+         sum(x .* y .* z')
+       end
+Grads(...)
+
+julia> g[x]
+2×3 Matrix{Float64}:
+ 7.0  70.0  700.0
+ 8.0  80.0  800.0
+
+julia> haskey(g, z)  # only x and y are parameters
+false
+```
+"""
+gradient
+
+"""
+    Params([A, B])
+
+Container for implicit parameters, used when differentiating
+a zero-argument funtion `() -> loss(A, B)` with respect to `A, B`.
+"""
 struct Params
-  order::Buffer{Any, Vector{Any}}
-  params::IdSet{Any}
-  Params() = new(Buffer([], false), IdSet())
+  order::Buffer # {Any, Vector{Any}}
+  params::IdSet{Any} # TODO store ids only
 end
+
+Params() = Params(Buffer([], false), IdSet())
+Params(xs) = Params(Buffer(xs, false), IdSet(xs))
+Params(ps::Params) = ps
+Params(xs::Tuple) = Params(collect(xs))
 
 @forward Params.order Base.iterate, Base.length, Base.getindex
 @forward Params.params Base.in
+
+Base.map(::typeof(_project), args::Tuple{Params}, grad) = grad  # skip _project in gradient(f, ::Params)
 
 function Base.union!(ps::Params, itrs...)
   foreach(itr -> foreach(x -> push!(ps, x), itr), itrs)
@@ -114,9 +194,11 @@ function Base.delete!(ps::Params, x)
   return ps
 end
 
-Params(xs) = push!(Params(), xs...)
-
 Base.Broadcast.broadcasted(f, ps::Params) = broadcasted(f, ps.order)
+
+@adjoint function Broadcast.broadcasted(f::Function, ps::Params)
+  f.(ps), _ -> throw(ArgumentError("Zygote.Params does not support broadcasting within gradients, try iteration `for p in ps`"))
+end
 
 Base.:(==)(x::Params, y::Params) = x.order.data == y.order.data
 
@@ -155,7 +237,13 @@ function copy!(x::AbstractVector, ps::Params)
   ps
 end
 
+"""
+    Grads(...)
 
+Dictionary-like container returned when taking gradients with
+respect to implicit parameters. For an array `W`, appearing 
+within `Params([W, A, B...])`, the gradient is `g[W]`.
+"""
 struct Grads
   grads::IdDict{Any,Any}
   params::Params
