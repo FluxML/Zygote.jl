@@ -32,10 +32,6 @@ using Zygote: Grads
     x = [0, 0, 0]
     copy!(x, ps)
     @test x == [1, 2, 3]
-
-    ps_src = Params([[1, 2], [3]])
-    ps_dst = Params([4][5])
-    ps_dst = ps_src
   end
 
   @testset "broadcast" begin
