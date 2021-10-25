@@ -195,9 +195,6 @@ last_or_nothing(x) = last(x)
 for (mapfunc,∇mapfunc) in [(:map,:∇map),(:pmap,:∇pmap)]
   @eval function $∇mapfunc(cx, f::F, args::Vararg{Any, N}) where {F, N}
     ys_and_backs = $mapfunc((args...) -> _pullback(cx, f, args...), args...)
-    # if isempty(ys_and_backs)
-    #   return ys_and_backs, _ -> nothing
-    # end
     ys = map(first, ys_and_backs)
     arg_ax = map(_tryaxes, args)
     function map_back(Δ)

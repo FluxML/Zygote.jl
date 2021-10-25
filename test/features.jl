@@ -517,6 +517,7 @@ end
 
     @test_broken gradient(10:14, 1:10) do xs, ys
       sum(x/y for (x,y) in zip(xs, ys))   # same without collect
+      # Here @adjoint function Iterators.Zip(xs) gets dy = (is = (nothing, nothing),)
     end[2] ≈ vcat(.-(10:14) ./ (1:5).^2, zeros(5))
   end
 
@@ -536,7 +537,22 @@ end
 
   @test_broken gradient(1:10, 3:7) do xs, ys
     sum(x^2+y for x in xs, y in ys)  # same without collect
+    # Here @adjoint function Iterators.product(xs...) gets dy = (iterators = (nothing, nothing),)
   end == (10:10:100, fill(10, 5))
+
+  # Repeat that test without sum(iterator) -- also receives dy = (iterators = (nothing, nothing),)
+  function prod_acc(xs, ys)
+    out = 0
+    # for (x,y) in Iterators.product(xs, ys)
+    #   out += x^2+y
+    for xy in Iterators.product(xs, ys)
+      out += xy[1]^2 + xy[2]
+    end
+    out
+  end
+  @test prod_acc(1:10, 3:7) == sum(x^2+y for x in 1:10, y in 3:7)
+  gradient(prod_acc, 1:10, 3:7) == (nothing, nothing) # sadly
+  @test_broken gradient(prod_acc, 1:10, 3:7) == (10:10:100, fill(10, 5))
 
   @test gradient(rand(2,3)) do A
     sum([A[i,j] for i in 1:1, j in 1:2])
