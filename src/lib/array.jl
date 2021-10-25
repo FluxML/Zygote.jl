@@ -204,8 +204,10 @@ for (mapfunc,∇mapfunc) in [(:map,:∇map),(:pmap,:∇pmap)]
       if Base.issingletontype(F) && length(args) == 1
         Δarg = $mapfunc(((_,pb), δ) -> last_or_nothing(pb(δ)), ys_and_backs, Δ) # No unzip needed
         (nothing, Δarg)
-      elseif Base.issingletontype(F) # Ensures `f` is pure: nothing captured & no state
-        Δargs = _unzip($mapfunc(((_,pb), δ) -> tailmemaybe(pb(δ)), ys_and_backs, Δ), Val(N))
+      elseif Base.issingletontype(F)
+        # Ensures `f` is pure: nothing captured & no state.
+        unzipped = _unzip($mapfunc(((_,pb), δ) -> tailmemaybe(pb(δ)), ys_and_backs, Δ), Val(N))
+        Δargs = map(_restore, unzipped, arg_ax)
         (nothing, Δargs...)
       else
         # Apply pullbacks in reverse order. Needed for correctness if `f` is stateful.
