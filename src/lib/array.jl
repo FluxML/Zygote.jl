@@ -195,13 +195,12 @@ last_or_nothing(x) = last(x)
 for (mapfunc,∇mapfunc) in [(:map,:∇map),(:pmap,:∇pmap)]
   @eval function $∇mapfunc(cx, f::F, args::Vararg{Any, N}) where {F, N}
     ys_and_backs = $mapfunc((args...) -> _pullback(cx, f, args...), args...)
-    if isempty(ys_and_backs)
-      return ys_and_backs, _ -> nothing
-    end
+    # if isempty(ys_and_backs)
+    #   return ys_and_backs, _ -> nothing
+    # end
     ys = map(first, ys_and_backs)
     arg_ax = map(_tryaxes, args)
-    return ys, function map_back(Δ)
-        isnothing(Δ) && return nothing
+    function map_back(Δ)
       if Base.issingletontype(F) && length(args) == 1
         Δarg = $mapfunc(((_,pb), δ) -> last_or_nothing(pb(δ)), ys_and_backs, Δ) # No unzip needed
         (nothing, Δarg)
@@ -217,6 +216,8 @@ for (mapfunc,∇mapfunc) in [(:map,:∇map),(:pmap,:∇pmap)]
         (Δf, Δargs...)
       end
     end
+    map_back(::Nothing) = nothing
+    return ys, map_back
   end
 
   @eval @adjoint function $mapfunc(f, args::Union{AbstractArray,Tuple}...)
