@@ -133,18 +133,26 @@ end
   end
 
   @testset "copy" begin
-      w, b = rand(2), rand(2)
-      x1, x2 = rand(2), rand(2)
+    w, b = rand(2), rand(2)
+    x1, x2 = rand(2), rand(2)
 
-      gs1 = gradient(() -> sum(w .* x1), Params([w]))
-      gs2 = gradient(() -> sum(w .* x2), Params([w]))
+    _, back = pullback(() -> sum(w .* x1), Params([w]))
 
-      gs_new = copy(gs1)
-      copy!(gs2, gs1)
+    g1 = back(1)
+    g1_w = g1[w]
+    g2 = back(nothing)
+    @test isnothing(g1[w])
+    @test isnothing(g2[w])
 
-      #TODO: a bit of a hacky workaround here, would be nice if we could compare gradients directly
-      @test collect(gs1) == collect(gs_new)
-      @test collect(gs2) == collect(gs1)
+    g3 = back(1) |> copy
+    g4 = back(nothing)
+    @test !isnothing(g3[w])
+    @test g3[w] == g1_w
+    @test isnothing(g4[w])
+
+    #TODO: a bit of a hacky workaround here, would be nice if we could compare gradients directly
+    g3_copy = copy(g3)
+    @test collect(g3_copy) == collect(g3)
   end
 
   @testset "map and broadcast" begin
