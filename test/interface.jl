@@ -172,26 +172,44 @@ end
   end
 
   @testset "dictionary interface" begin
+    w, b, x = rand(2), rand(2), rand(2)
+    ps = Params([w, b])
+    gs = gradient(() -> sum(tanh.(w .* x .+ b)), ps)
+
+    @test issetequal(keys(gs), ps)
+    @test length(values(gs)) == 2
+    @test length(pairs(gs)) == 2
+    k, v = first(pairs(gs))
+    @test k === first(ps)
+    @test v === gs[first(ps)]
+  end
+
+  @testset "merge" begin
     w1, b1, x1 = rand(2), rand(2), rand(2)
     ps1 = Params([w1, b1])
     gs1 = gradient(() -> sum(tanh.(w1 .* x1 .+ b1)), ps1)
-
-    @test issetequal(keys(gs1), ps1)
-    @test length(values(gs1)) == 2
-    @test length(pairs(gs1)) == 2
-    k, v = first(pairs(gs1))
-    @test k === first(ps1)
-    @test v === gs1[first(ps1)]
 
     w2, b2, x2 = rand(2), rand(2), rand(2)
     ps2 = Params([w2, b2])
     gs2 = gradient(() -> sum(tanh.(w2 .* x2 .+ b2)), ps2)
 
-    keys1 = keys(gs1) |> collect |> copy
-    values1 = values(gs1) |> collect |> copy
+    w3, b3, x3 = rand(2), rand(2), rand(2)
+    ps3 = Params([w3, b3])
+    gs3 = gradient(() -> sum(tanh.(w3 .* x3 .+ b3)), ps3)
+
+    # merging with a single other Grads object
+    keys1 = keys(gs1)
+    values1 = values(gs1)
     gs_merged = merge!(gs1, gs2)
-    @test collect(keys(gs_merged)) == union(keys1, keys(gs2))
-    @test collect(values(gs_merged)) == union(values1, values(gs2))
+    @test issetequal(keys(gs_merged),  union(keys1, keys(gs2)))
+    @test issetequal(values(gs_merged), union(values1, values(gs2)))
+    @test length(pairs(gs_merged)) == 4
+
+    # merging with multiple other Grads objects
+    gs_merged = merge!(gs1, gs2, gs3)
+    @test issetequal(keys(gs_merged), union(keys1, keys(gs2), keys(gs3)))
+    @test issetequal(values(gs_merged), union(values1, values(gs2), values(gs3)))
+    @test length(pairs(gs_merged)) == 6
   end
 
   @testset "iteration" begin
