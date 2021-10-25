@@ -44,26 +44,27 @@ end
 
 Random.seed!(0)
 
-@testset "println, show, print" begin
+@testset "println, show, string, etc" begin
   function foo(x)
     Base.show(x)
     Base.print(x)
+    Base.print(stdout, x)
     Base.println(x)
+    Base.println(stdout, x)
     Core.show(x)
     Core.print(x)
     Core.println(x)
     return x
   end
+  println("The following printout is from testing that `print` doesn't upset gradients:")
   @test gradtest(foo, [5.0])
-end
 
-@testset "string, repr" begin
-  function foo(x)
+  function bar(x)
     string(x)
     repr(x)
     return x
   end
-  @test gradtest(foo, [5.0])
+  @test gradtest(bar, [5.0])
 end
 
 
