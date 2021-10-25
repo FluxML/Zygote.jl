@@ -301,7 +301,7 @@ end
 
 function Base.merge!(gs_dst::Grads, gs_src::Grads)
     union!(gs_dst.params, gs_src.params)
-    map!(copy, gs_dst, gs_src)
+    merge!(gs_dst.grads, gs_src.grads)
     gs_dst
 end
 
