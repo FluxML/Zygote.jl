@@ -521,6 +521,9 @@ end
     end[2] ≈ vcat(.-(10:14) ./ (1:5).^2, zeros(5))
   end
 
+  bk_z = pullback((xs,ys) -> sum([abs2(x*y) for (x,y) in zip(xs,ys)]), [1,2], [3im,4im])[2]
+  @test bk_z(1.0)[1] isa AbstractVector{<:Real}  # projection
+
   # Iterators.Filter
   @test gradient(2:9) do xs
     sum([x^2 for x in xs if iseven(x)])
@@ -561,6 +564,10 @@ end
   @test gradient(ones(3,5), 1:7) do xs, ys
     sum([x+y for x in xs, y in ys])
   end == (fill(7, 3,5), fill(15, 7))
+
+  bk_p = pullback((xs,ys) -> sum([x/y for x in xs, y in ys]), Diagonal([3,4,5]), [6,7]')[2]
+  @test bk_p(1.0)[1] isa Diagonal  # projection
+  @test bk_p(1.0)[2] isa Adjoint
 
   # Iterators.Product with enumerate
   @test gradient([2 3; 4 5]) do xs

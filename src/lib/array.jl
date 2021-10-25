@@ -292,7 +292,7 @@ _ndims(x) = Base.IteratorSize(x) isa Base.HasShape ? _ndims(Base.IteratorSize(x)
       d += nd
       init = zero.(first(dy)[n]) # allows for tuples, which accum can add:
       red = mapreduce(StaticGetter{n}(), accum, dy; dims=dims, init=init)
-      return reshape(red, axes(xs[n]))
+      return _project(xs[n], reshape(red, axes(xs[n])))
     end
   end
   Iterators.product(xs...), back
@@ -303,7 +303,7 @@ end
   back(dy::NamedTuple{(:is,)}) = tuple(dy.is)
   back(dy::AbstractArray) = ntuple(length(xs)) do d
     dx = map(StaticGetter{d}(), dy)
-    _restore(dx, axs[d])
+    _project(xs[d], _restore(dx, axs[d]))
   end |> tuple
   Iterators.Zip(xs), back
 end
