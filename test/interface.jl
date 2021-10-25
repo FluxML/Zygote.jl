@@ -146,10 +146,9 @@ end
       gs_new = copy(gs1)
       copy!(gs2, gs1)
 
-      # TODO: these tests are currently broken because `Base.iseqeual` is not doing useful things
-      # for `Grads` right now.
-      @test_broken gs1 == gs_new
-      @test_broken gs2 == gs1
+      #TODO: a bit of a hacky workaround here, would be nice if we could compare gradients directly
+      @test collect(gs1) == collect(gs_new)
+      @test collect(gs2) == collect(gs1)
   end
 
   @testset "map and broadcast" begin

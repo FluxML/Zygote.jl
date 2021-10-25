@@ -39,12 +39,6 @@ mutable struct Buffer{T,A<:AbstractArray{T}}
   freeze::Bool
 end
 
-function Base.copy!(b_dst::Buffer, b_src::Buffer)
-    b_dst.data = b_src.data
-    b_dst.freeze = b_src.freeze
-    b_dst
-end
-
 Buffer(xs::AbstractArray, args...) =
   Buffer(similar(xs, args...), false)
 

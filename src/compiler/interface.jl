@@ -237,12 +237,6 @@ function copy!(x::AbstractVector, ps::Params)
   ps
 end
 
-function copy!(ps_dst::Params, ps_src::Params)
-    copy!(ps_dst.order, ps_src.order)
-    copy!(ps_dst.params, ps_src.params)
-    ps_dst
-end
-
 """
     Grads(...)
 
@@ -305,15 +299,15 @@ function copy!(x::AbstractVector,  gs::Grads)
   x
 end
 
-function copy!(gs_dst::Grads, gs_src::Grads)
-    copy!(gs_dst.grads, gs_src.grads)
-    copy!(gs_dst.params, gs_src.params)
+function Base.merge!(gs_dst::Grads, gs_src::Grads)
+    union!(gs_dst.params, gs_src.params)
+    map!(copy, gs_dst, gs_src)
     gs_dst
 end
 
 function Base.copy(gs::Grads)
-    gs_new = Grads(IdDict(), Params())
-    copy!(gs_new, gs)
+    gs_new = Grads(IdDict(), gs.params)
+    merge!(gs_new, gs)
 end
 
 broadcasted(f, gs::Grads, gss::ADictOrGrads...) = map(f, gs, gss...)
