@@ -156,7 +156,7 @@ end
 @inline wrap_chainrules_input(dxs::AbstractArray{<:Number}) = dxs
 @inline wrap_chainrules_input(dxs::AbstractArray{<:AbstractArray{<:Number}}) = dxs
 @inline wrap_chainrules_input(dxs::AbstractArray) = map(wrap_chainrules_input, dxs)
-# Could `reinterpret` instead of broadcasting here -- TODO
+# Could `reinterpret` instead here...
 # One easy case, but can this go wrong?
 # @inline wrap_chainrules_input(xs::Base.ReinterpretArray{<:NamedTuple, <:Tangent}) = parent(@show xs)
 
@@ -300,7 +300,10 @@ function z2d(delta::Tuple, primal::Tuple)
   end
 end
 
-z2d(dx::NamedTuple, primal::AbstractDict) = dx  # uses a NamedTuple but not for fields!
+# Dict handling in Zygote is a mess... should this become a  `Tangent{Dict,Dict}` ?
+# Right now it uses a NamedTuple but not for fields of the AbstractDict struct
+z2d(dx::NamedTuple, primal::AbstractDict) = dx
+
 function z2d(delta::NamedTuple, primal::T) where T  # arbitrart struct
   fnames = fieldnames(T)
   deltas = map(n -> get(delta, n, nothing), fnames)
@@ -313,9 +316,11 @@ function z2d(delta::NamedTuple, primal::T) where T  # arbitrart struct
     return canonicalize(Tangent{T, typeof(backing)}(backing))
   end
 end
+
+# Dict case matches signature for ambiguity reasons:
+z2d(dx::NamedTuple{L,S}, primal::AbstractDict) where {L,S<:Tuple{Vararg{Union{Number,Nothing}}}} = dx
 # On Julia <= 1.6, this fixes easy cases which do not require recursion into fields, e.g.
 # @inferred Zygote.z2d((re=1, im=nothing), 3.0+im)
-z2d(dx::NamedTuple{L,S}, primal::AbstractDict) where {L,S<:Tuple{Vararg{Union{Number,Nothing}}}} = dx
 @generated function z2d(delta::NamedTuple{L,S}, primal::T) where {L,S<:Tuple{Vararg{Union{Number,Nothing}}}, T}
   fnames = fieldnames(T)
   deltas = map(fnames) do n
