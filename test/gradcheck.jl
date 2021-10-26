@@ -44,26 +44,27 @@ end
 
 Random.seed!(0)
 
-@testset "println, show, print" begin
+@testset "println, show, string, etc" begin
   function foo(x)
     Base.show(x)
     Base.print(x)
+    Base.print(stdout, x)
     Base.println(x)
+    Base.println(stdout, x)
     Core.show(x)
     Core.print(x)
     Core.println(x)
     return x
   end
+  println("The following printout is from testing that `print` doesn't upset gradients:")
   @test gradtest(foo, [5.0])
-end
 
-@testset "string, repr" begin
-  function foo(x)
+  function bar(x)
     string(x)
     repr(x)
     return x
   end
-  @test gradtest(foo, [5.0])
+  @test gradtest(bar, [5.0])
 end
 
 
@@ -356,11 +357,11 @@ end
 
   @test gradient(x -> map(+, x, (1,2,3))[1], (4,5,6)) == ((1.0, nothing, nothing),)
   @test gradient(x -> map(+, x, [1,2,3])[1], (4,5,6)) == ((1.0, 0.0, 0.0),)
-  @test_broken gradient(x -> map(+, x, (1,2,3))[1], [4,5,6]) == ([1,0,0],)  # Gradient [1.0, 0.0, 0.0] should be a tuple, since v0.6.0 at least
+  @test gradient(x -> map(+, x, (1,2,3))[1], [4,5,6]) == ([1,0,0],)
 
   # mismatched lengths, should zip
-  @test_broken gradient(x -> map(+, x, [1,2,3,99])[1], (4,5,6)) == ((1.0, 0.0, 0.0),)  # BoundsError: attempt to access 3-element Vector{Float64} at index [4]
-  @test_broken gradient(x -> map(+, x, [1,2,3])[1], (4,5,6,99)) == ((1.0, 0.0, 0.0, nothing),)  # DimensionMismatch("variable with size(x) == (4,) cannot have a gradient with size(dx) == (3,)
+  @test gradient(x -> map(+, x, [1,2,3,99])[1], (4,5,6)) == ((1.0, 0.0, 0.0),) 
+  @test gradient(x -> map(+, x, [1,2,3])[1], (4,5,6,99)) == ((1.0, 0.0, 0.0, nothing),)
 end
 
 @testset "Alternative Pmap Dispatch" begin
@@ -381,6 +382,23 @@ end
   @test_broken gradient(x -> sum(f.(x)), 1:10) == (10:-1:1,)
   s = 0
   @test gradient(x -> sum(map(f, x)), 1:10) == (10:-1:1,)
+end
+
+@testset "vararg map" begin
+  # early stop
+  if VERSION >= v"1.5"
+    # In Julia 1.4 and earlier, map(*,rand(5),[1,2,3]) is a DimensionMismatch
+    @test gradient(x -> sum(map(*,x,[1,2,3])), rand(5)) == ([1,2,3,0,0],)
+  end
+  @test gradient(x -> sum(map(*,x,(1,2,3))), rand(5)) == ([1,2,3,0,0],)
+  @test gradient(x -> sum(map(*,x,[1,2,3])), Tuple(rand(5))) == ((1.0, 2.0, 3.0, nothing, nothing),)
+
+  # mixed shapes
+  @test gradient((x,y) -> sum(map(*,x,y)), [1,2,3,4], [1 2; 3 4]) == ([1,3,2,4], [1 3; 2 4])
+  @test gradient((x,y) -> sum(map(*,x,y)), [1,2,3], [1 2; 3 4]) == ([1,3,2], [1 3; 2 0])
+  @test gradient((x,y) -> sum(map(*,x,y)), (1,2,3), [1 2; 3 4]) == ((1,3,2), [1 3; 2 0])
+  @test gradient((x,y) -> sum(map(*,x,y)), [1,2,3,4,5], [1 2; 3 4]) == ([1,3,2,4,0], [1 3; 2 4])
+  @test gradient((x,y) -> sum(map(*,x,y)), (1,2,3,4,5), [1 2; 3 4]) == ((1,3,2,4,nothing), [1 3; 2 4])
 end
 
 @testset "sort" begin
@@ -1746,6 +1764,63 @@ end
     gradient(x->norm(x*[1 1]), 1.23)
     gradient(x->norm(x*[1im, 1]), 1.23)
     gradient(x->norm(x*[1im 1]), 1.23)
+end
+
+@testset "zip & Iterators.product" begin
+  # roughly from https://github.com/FluxML/Zygote.jl/issues/221
+  d = rand(7)
+  @test gradient(rand(11)) do s
+    tot = 0
+    for (a, b) in zip(s, d)
+      tot += 13a + 17b
+    end
+    tot
+  end == ([13, 13, 13, 13, 13, 13, 13, 0, 0, 0, 0],)
+
+  @test gradient([1,2,3,4], [1 2; 3 4]) do x, y # mismatched shapes
+    tot = 0
+    for (a,b) in zip(x,y)
+      tot += a * b
+    end
+    tot
+  end == ([1, 3, 2, 4], [1 3; 2 4]) # Δy is a matrix
+
+  @test gradient((1,2,3), [1 2; 3 4]) do x, y # ... and lengths, and a tuple
+    tot = 0
+    for (a,b) in zip(x,y)
+      tot += a * b
+    end
+    tot
+  end == ((1, 3, 2), [1 3; 2 0]) # map stops early, Δy reshaped to a matrix
+
+  # similar for enumertate -- tests NamedTuple adjoint
+  @test gradient([2,3,4]) do x
+    tot = 0
+    for (i, x) in enumerate(x)
+      tot += x^i
+    end
+    tot
+  end == ([1, 6, 3 * 4^2],)
+
+  # and for Iterators.product
+  @test gradient([3,4,5], [6,7,8]) do x, y
+    tot = 0
+    for (a,b) in Iterators.product(x, y)
+      tot += a^2 + 10b
+    end
+    tot
+  end == ([18, 24, 30], [30, 30, 30])
+
+  @test gradient([3,4], [1,2,3]) do x, y
+    tot = 0
+    for ab in Iterators.product(x, y)
+      tot += *(ab...)
+    end
+    tot
+  end == ([6,6], [7,7,7])
+
+  # from https://github.com/FluxML/Zygote.jl/pull/785#issuecomment-740562889
+  @test gradient(A -> sum([A[i,j] for i in 1:3, j in 1:3]), ones(3,3)) == (ones(3,3),)
 end
 
 # https://github.com/FluxML/Zygote.jl/issues/804

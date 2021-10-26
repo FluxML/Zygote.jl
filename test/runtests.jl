@@ -3,10 +3,13 @@ using Zygote: gradient, ZygoteRuleConfig
 using CUDA
 using CUDA: has_cuda
 
+@testset "all" begin  # Overall testset ensures it keeps running after failure
+
 if has_cuda()
   @testset "CUDA tests" begin
     include("cuda.jl")
   end
+  @info "CUDA tests have run"
 else
   @warn "CUDA not found - Skipping CUDA Tests"
 end
@@ -31,6 +34,7 @@ end
 
 @testset "Features" begin
   include("features.jl")
+  @info "features.jl done"
 end
 
 @testset "Forward" begin
@@ -43,6 +47,7 @@ end
 
 @testset "ChainRules" begin
   include("chainrules.jl")
+  @info "chainrules.jl done"
 end
 
 @testset "Gradients" begin
@@ -56,3 +61,5 @@ end
 @testset "Compiler" begin
   include("compiler.jl")
 end
+
+end # @testset "all"

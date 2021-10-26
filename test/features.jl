@@ -492,6 +492,89 @@ end
   @test gradient(h, Dict(:x=>3.0, :y=>4.0, :z=>2.3)) == ((y = 0.0, z = 3.0, x = 2.3),)
 end
 
+@testset "Iterators" begin
+  # enumerate
+  @test gradient(1:5) do xs
+    sum([x^i for (i,x) in enumerate(xs)])
+  end == ([1, 4, 27, 256, 3125],)
+
+  @test gradient([1,10,100]) do xs
+    sum([xs[i]^i for (i,x) in enumerate(xs)])
+  end == ([1, 2 * 10^1, 3 * 100^2],)
+
+  @test gradient([1,10,100]) do xs
+    sum((xs[i]^i for (i,x) in enumerate(xs))) # same without collect
+  end == ([1, 2 * 10^1, 3 * 100^2],)
+
+  # zip
+  if VERSION >= v"1.5"
+    # On Julia 1.4 and earlier, [x/y for (x,y) in zip(10:14, 1:10)] is a DimensionMismatch,
+    # while on 1.5 - 1.7 it stops early. 
+
+    @test gradient(10:14, 1:10) do xs, ys
+      sum([x/y for (x,y) in zip(xs, ys)])
+    end[2] ≈ vcat(.-(10:14) ./ (1:5).^2, zeros(5))
+
+    @test_broken gradient(10:14, 1:10) do xs, ys
+      sum(x/y for (x,y) in zip(xs, ys))   # same without collect
+      # Here @adjoint function Iterators.Zip(xs) gets dy = (is = (nothing, nothing),)
+    end[2] ≈ vcat(.-(10:14) ./ (1:5).^2, zeros(5))
+  end
+
+  bk_z = pullback((xs,ys) -> sum([abs2(x*y) for (x,y) in zip(xs,ys)]), [1,2], [3im,4im])[2]
+  @test bk_z(1.0)[1] isa AbstractVector{<:Real}  # projection
+
+  # Iterators.Filter
+  @test gradient(2:9) do xs
+    sum([x^2 for x in xs if iseven(x)])
+  end == ([4, 0, 8, 0, 12, 0, 16, 0],)
+
+  @test gradient(2:9) do xs
+    sum(x^2 for x in xs if iseven(x)) # same without collect
+  end == ([4, 0, 8, 0, 12, 0, 16, 0],)
+
+  # Iterators.Product
+  @test gradient(1:10, 3:7) do xs, ys
+    sum([x^2+y for x in xs, y in ys])
+  end == (10:10:100, fill(10, 5))
+
+  @test_broken gradient(1:10, 3:7) do xs, ys
+    sum(x^2+y for x in xs, y in ys)  # same without collect
+    # Here @adjoint function Iterators.product(xs...) gets dy = (iterators = (nothing, nothing),)
+  end == (10:10:100, fill(10, 5))
+
+  # Repeat that test without sum(iterator) -- also receives dy = (iterators = (nothing, nothing),)
+  function prod_acc(xs, ys)
+    out = 0
+    # for (x,y) in Iterators.product(xs, ys)
+    #   out += x^2+y
+    for xy in Iterators.product(xs, ys)
+      out += xy[1]^2 + xy[2]
+    end
+    out
+  end
+  @test prod_acc(1:10, 3:7) == sum(x^2+y for x in 1:10, y in 3:7)
+  gradient(prod_acc, 1:10, 3:7) == (nothing, nothing) # sadly
+  @test_broken gradient(prod_acc, 1:10, 3:7) == (10:10:100, fill(10, 5))
+
+  @test gradient(rand(2,3)) do A
+    sum([A[i,j] for i in 1:1, j in 1:2])
+  end == ([1 1 0; 0 0 0],)
+
+  @test gradient(ones(3,5), 1:7) do xs, ys
+    sum([x+y for x in xs, y in ys])
+  end == (fill(7, 3,5), fill(15, 7))
+
+  bk_p = pullback((xs,ys) -> sum([x/y for x in xs, y in ys]), Diagonal([3,4,5]), [6,7]')[2]
+  @test bk_p(1.0)[1] isa Diagonal  # projection
+  @test bk_p(1.0)[2] isa Adjoint
+
+  # Iterators.Product with enumerate
+  @test gradient([2 3; 4 5]) do xs
+    sum([x^i+y for (i,x) in enumerate(xs), y in xs]) 
+  end == ([8 112; 36 2004],)
+end
+
 # https://github.com/JuliaDiff/ChainRules.jl/issues/257
 @testset "Keyword Argument Passing" begin
   struct Type1{VJP}
