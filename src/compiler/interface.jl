@@ -299,6 +299,19 @@ function copy!(x::AbstractVector,  gs::Grads)
   x
 end
 
+function Base.merge!(gs_dst::Grads, gs_srcs::Grads...)
+  for gs_src in gs_srcs
+    union!(gs_dst.params, gs_src.params)
+    merge!(gs_dst.grads, gs_src.grads)
+  end
+  gs_dst
+end
+
+function Base.copy(gs::Grads)
+  gs_new = Grads(IdDict(), gs.params)
+  merge!(gs_new, gs)
+end
+
 broadcasted(f, gs::Grads, gss::ADictOrGrads...) = map(f, gs, gss...)
 
 broadcasted(f, a::Numeric, gs::Grads) = map(x -> f(a, x), gs)
