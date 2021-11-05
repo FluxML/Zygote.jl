@@ -156,11 +156,12 @@ end
 @inline wrap_chainrules_input(dxs::AbstractArray{<:Number}) = dxs
 @inline wrap_chainrules_input(dxs::AbstractArray{<:AbstractArray{<:Number}}) = dxs
 @inline wrap_chainrules_input(dxs::AbstractArray) = map(wrap_chainrules_input, dxs)
-# Could `reinterpret` instead here...
-# One easy case, but can this go wrong?
-# @inline wrap_chainrules_input(xs::Base.ReinterpretArray{<:NamedTuple, <:Tangent}) = parent(@show xs)
 
 #=
+# Could `reinterpret` instead here? See issue 1112. 
+# One easy case, might be this:
+@inline wrap_chainrules_input(xs::Base.ReinterpretArray{<:NamedTuple, <:Tangent}) = parent(xs)
+
 # This is for `z2d` reinterpret below:
 wrap_chainrules_input(::Type{Nothing}) = NoTangent
 wrap_chainrules_input(::Type{NamedTuple{L,T}}) where {L,T} = NamedTuple{L,wrap_chainrules_input(T)}
