@@ -115,28 +115,61 @@ for T_outer in (:Tuple, :NamedTuple)
     ChainRulesCore.backing(xp)  # this is accessing ChainRulesCore internals, but it is prob safe enough, and it is fastest
   end
 end
-# Could `reinterpret` instead of broadcasting here -- TODO
-@inline wrap_chainrules_output(xs::AbstractArray{<:ChainRules.Tangent}) = wrap_chainrules_output.(xs)
+wrap_chainrules_output(dxs::AbstractArray{<:Number}) = dxs
+wrap_chainrules_output(dxs::AbstractArray{<:AbstractArray{<:Number}}) = dxs
+wrap_chainrules_output(dxs::AbstractArray) = map(wrap_chainrules_output, dxs)
+#=
+# As an optimisation, we can convert by `reinterpret` for bitstypes, e.g. arrays of tuples of numbers
+@inline function wrap_chainrules_output(dxs::AbstractArray{<:ChainRules.Tangent{<:Any, B}}) where {B}
+  if isbitstype(B)
+    # B is the backing type. It still contains NoTangent etc, which need converting to Nothing
+    reinterpret(wrap_chainrules_output(B), dxs)
+  else
+    map(wrap_chainrules_output, dxs)
+  end
+end
+wrap_chainrules_output(::Type{<:AbstractZero}) = Nothing
+wrap_chainrules_output(::Type{NamedTuple{L,T}}) where {L,T} = NamedTuple{L,wrap_chainrules_output(T)}
+@generated function wrap_chainrules_output(::Type{T}) where T<:Tuple
+  inner = map(wrap_chainrules_output, T.parameters)
+  :(Tuple{$(inner...)})
+end
+=#
 
 """
-    wrap_chainrules_input(x)
+    wrap_chainrules_input(dx)
 
-Convert `x` from the format Zygote uses internally to differentials types ChainRules uses.
+Convert `dx` from the format Zygote uses internally to differentials types ChainRules uses.
 """
-@inline wrap_chainrules_input(x) = x
+@inline wrap_chainrules_input(dx) = dx
 @inline wrap_chainrules_input(::Nothing) = ChainRules.ZeroTangent()
+@inline wrap_chainrules_input(::Tuple{Vararg{Nothing}}) = ChainRules.ZeroTangent()
 @inline wrap_chainrules_input(::AbstractArray{Nothing}) = ChainRules.ZeroTangent()
-@inline function wrap_chainrules_input(xs::Union{Tuple, NamedTuple})
-  xp = map(wrap_chainrules_input, xs)
-  ChainRules.Tangent{Any, typeof(xp)}(xp)
+@inline function wrap_chainrules_input(dxs::Union{Tuple, NamedTuple})
+  xp = map(wrap_chainrules_input, dxs)
+  # This produces Tangent{Any} since it does not get to see the primal, `x`.
+  ChainRulesCore.Tangent{Any, typeof(xp)}(xp)
 end
 # For mutable types, including x=Ref(1), Zygote makes Ref{Any}(::NamedTuple)
-@inline wrap_chainrules_input(x::Ref) = wrap_chainrules_input(x[])
-# Could `reinterpret` instead of broadcasting here -- TODO
-@inline wrap_chainrules_input(xs::AbstractArray{<:Ref}) = wrap_chainrules_input.(xs)
-@inline wrap_chainrules_input(xs::AbstractArray{<:Union{Nothing, <:Ref}}) = wrap_chainrules_input.(xs) # no test invented for this
-@inline wrap_chainrules_input(xs::AbstractArray{<:NamedTuple}) = wrap_chainrules_input.(xs)
-@inline wrap_chainrules_input(xs::AbstractArray{<:Union{Nothing, <:NamedTuple}}) = wrap_chainrules_input.(xs)
+@inline wrap_chainrules_input(dx::Ref) = wrap_chainrules_input(dx[])
+# For arrays, whitelist the safe ones, but always look inside Any[]:
+@inline wrap_chainrules_input(dxs::AbstractArray{<:Number}) = dxs
+@inline wrap_chainrules_input(dxs::AbstractArray{<:AbstractArray{<:Number}}) = dxs
+@inline wrap_chainrules_input(dxs::AbstractArray) = map(wrap_chainrules_input, dxs)
+
+#=
+# Could `reinterpret` instead here? See issue 1112. 
+# One easy case, might be this:
+@inline wrap_chainrules_input(xs::Base.ReinterpretArray{<:NamedTuple, <:Tangent}) = parent(xs)
+
+# This is for `z2d` reinterpret below:
+wrap_chainrules_input(::Type{Nothing}) = NoTangent
+wrap_chainrules_input(::Type{NamedTuple{L,T}}) where {L,T} = NamedTuple{L,wrap_chainrules_input(T)}
+@generated function wrap_chainrules_input(::Type{T}) where T<:Tuple
+  inner = map(wrap_chainrules_input, T.parameters)
+  :(Tuple{$(inner...)})
+end
+=#
 
 """
   _project(x, dx)
@@ -146,21 +179,13 @@ Also handles some Zygote-specific corrections, such as `x::Array, dx::Tuple`.
 Safe to apply to arbitrary input.
 """
 @inline function _project(x, dx)
-  # Note that this use of `wrap_chainrules_input` has the primal `x`, so could
-  # avoid making `Tangent{Any}`, perhaps via `zygote2differential` -- TODO.
-  wrap_chainrules_output(ProjectTo(x)(wrap_chainrules_input(dx)))
+  wrap_chainrules_output(ProjectTo(x)(zygote2differential(dx, x)))
 end
 
 # Restore splatted arrays
 _project(x::AbstractArray, dx::Tuple) = _project(x, reshape(collect(dx), axes(x)))
 
 # Piracy:
-# wrap_chainrules_input doesn't handle array of Union{Int,Nothing}
-(::ChainRulesCore.ProjectTo)(::Nothing) = ChainRulesCore.NoTangent()
-
-# CRC likes Tangent{<:Complex}, but Zygote makes Tangent{Any}
-(project::ProjectTo{<:Complex})(dx::Tangent) = project(Complex(dx.re, dx.im))
-
 # CRC likes Tangent{AbstractArray}, but Zygote makes Tangent{Any}
 # in particular this would hit https://github.com/JuliaDiff/ChainRulesCore.jl/blob/2ec2549b73b22bc08f554dae864fb650cfb9c3d7/src/projection.jl#L139
 # if we were not losing track of the Primal in the Tangent
@@ -236,32 +261,85 @@ end
     zygote2differential(dx, primal)
 
 Convert input `dx` from the Zygote format to the ChainRules differential types.
+This is similar to `wrap_chainrules_input(dx)`, but because it gets `primal::T`,
+it can turn `NamedTuple`s into `Tangent{T}(...)` not `Tangent{Any}(...)`.
 """
 zygote2differential(x, primal) = z2d(x, primal)
 zygote2differential(::Nothing, ::Any) = NoTangent()
 zygote2differential(t::Tuple, primal::Tuple) = map(z2d, t, primal)
 zygote2differential(t::Tuple, primal) = (@warn "primal should be a tuple, not $primal"; return t)
-z2d(x, ::Any) = x
+
 z2d(::Nothing, ::Any) = NoTangent()
-z2d(a::AbstractArray{<:Number}, primal::AbstractArray{T}) where T = a
-# Could probably `reinterpret` instead of broadcasting here -- TODO
-z2d(a::AbstractArray, primal::AbstractArray{T}) where T = z2d.(a, primal)
+z2d(::Tuple{Vararg{Nothing}}, ::Tuple) = NoTangent()  # collapse all-zero case
+z2d(dx, ::Any) = dx
+z2d(dx::AbstractArray{<:Number}, primal::AbstractArray) = dx
+z2d(dx::AbstractArray{<:AbstractArray{<:Number}}, primal::AbstractArray) = dx
+z2d(dx::AbstractArray, primal::AbstractArray) = map(z2d, dx, primal)
+#=
+# As an optimisation, we can convert by `reinterpret` for bitstypes, e.g. arrays of tuples of numbers
+function z2d(dx::AbstractArray{S}, primal::AbstractArray{P}) where {S,P}
+  if isbitstype(S)
+    T = wrap_chainrules_input(S)
+    reinterpret(Tangent{P,T}, dx)
+  else
+    map(z2d, dx, primal)
+  end
+end
+=#
+
 # Note: this should never be hit if we are converting things right, but it seems to be
 # happening in the wild for sufficiently weird functions/types.
 # This fixes most (all?) cases, but it would be good to find what we miss.
 z2d(x::Union{AbstractZero, Tangent}, ::Any) = return x
-function z2d(t::Tuple, primal::Tuple)
-  tp::Tuple = map(z2d, t, primal)
-  primal_type = typeof(primal)
-  return canonicalize(Tangent{primal_type, typeof(tp)}(tp))
+
+function z2d(delta::Tuple, primal::Tuple)
+  backing = map(z2d, delta, primal)
+  if backing isa Tuple{Vararg{AbstractZero}}
+    return NoTangent()  # collapse all-zero case
+  else
+    return canonicalize(Tangent{typeof(primal), typeof(backing)}(backing))
+  end
 end
 
-function z2d(t::NamedTuple, primal)
-  primal_type = typeof(primal)
-  fnames = fieldnames(primal_type)
-  complete_t = NamedTuple{fnames}(fn in keys(t) ? t[fn] : nothing for fn in fnames)
-  primals = NamedTuple{fnames}(getfield(primal, fn) for fn in fnames)
-  tp::NamedTuple = map(z2d, complete_t, primals)
-  return canonicalize(Tangent{primal_type, typeof(tp)}(tp))
+# Dict handling in Zygote is a mess... should this become a  `Tangent{Dict,Dict}` ?
+# Right now it uses a NamedTuple but not for fields of the AbstractDict struct
+z2d(dx::NamedTuple, primal::AbstractDict) = dx
+
+function z2d(delta::NamedTuple, primal::T) where T  # arbitrart struct
+  fnames = fieldnames(T)
+  deltas = map(n -> get(delta, n, nothing), fnames)
+  primals = map(n -> getfield(primal, n), fnames)
+  inner = map(z2d, deltas, primals)  # recurse into fields
+    if inner isa Tuple{Vararg{AbstractZero}}
+    return NoTangent()  # collapse all-zero case
+  else
+    backing = NamedTuple{fnames}(inner)
+    return canonicalize(Tangent{T, typeof(backing)}(backing))
+  end
 end
+
+# Dict case matches signature for ambiguity reasons:
+z2d(dx::NamedTuple{L,S}, primal::AbstractDict) where {L,S<:Tuple{Vararg{Union{Number,Nothing}}}} = dx
+# On Julia <= 1.6, this fixes easy cases which do not require recursion into fields, e.g.
+# @inferred Zygote.z2d((re=1, im=nothing), 3.0+im)
+@generated function z2d(delta::NamedTuple{L,S}, primal::T) where {L,S<:Tuple{Vararg{Union{Number,Nothing}}}, T}
+  fnames = fieldnames(T)
+  deltas = map(fnames) do n
+    i = findfirst(isequal(n), L)
+    if i == nothing || S.parameters[i] == Nothing
+      :(NoTangent())
+    else
+      :(delta.$n)
+    end
+  end
+  if all(d -> d == :(NoTangent()), deltas)
+    return :(NoTangent())  # collapse all-zero case
+  else
+    return quote
+      backing = NamedTuple{$fnames}(($(deltas...),))
+      Tangent{$T, typeof(backing)}(backing)
+    end
+  end
+end
+
 z2d(dx::Ref, primal) = z2d(dx[], primal)  # mutable structs

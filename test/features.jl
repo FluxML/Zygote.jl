@@ -176,9 +176,13 @@ end
 
 @test gradient(t -> t[1]*t[2], (2, 3)) == ((3, 2),)
 
-@test gradient(x -> x.re, 2+3im) === (1.0 + 0.0im,)
+@test gradient(x -> x.re, 2+3im) === (1.0 + 0.0im,)  # one NamedTuple
+@test gradient(x -> x.re*x.im, 2+3im) == (3.0 + 2.0im,)  # two, different fields
+@test gradient(x -> x.re*x.im + x.re, 2+3im) == (4.0 + 2.0im,)  # three, with accumulation
 
-@test gradient(x -> x.re*x.im, 2+3im) == (3.0 + 2.0im,)
+@test gradient(x -> abs2(x * x.re), 4+5im) == (456.0 + 160.0im,)   # gradient participates
+@test gradient(x -> abs2(x * real(x)), 4+5im) == (456.0 + 160.0im,)   # function not getproperty
+@test gradient(x -> abs2(x * getfield(x, :re)), 4+5im) == (456.0 + 160.0im,)
 
 struct Bar{T}
   a::T
@@ -418,6 +422,11 @@ end
 
   @test gradient((x,y,z) -> sum((x,y,z)[1:2]), 7, 8.8, 9.9) == (1.0, 1.0, nothing)
   @test gradient((x,y,z) -> sum((x,y,z)[[1,2,1]]), 1,2,3) == (2, 1, nothing)
+
+  @test gradient(xs -> sum(x -> x[2], xs), [(1,2,3), (4,5,6)]) == ([(nothing, 1.0, nothing), (nothing, 1.0, nothing)],)
+  @test gradient(xs -> sum(x -> prod(x[2:3]), xs), [(1,2,3), (4,5,6)]) == ([(nothing, 3.0, 2.0), (nothing, 6.0, 5.0)],)
+  @test gradient(xs -> sum(first, xs), fill((4,3),2)) == ([(1.0, nothing), (1.0, nothing)],)
+  @test gradient(xs -> sum(x -> abs2(x[1]), xs), fill((4,3),2)) == ([(8.0, nothing), (8.0, nothing)],)
 end
 
 @testset "@timed" begin
@@ -452,6 +461,13 @@ end
   @test gradient(x -> x.x^2 + x.x, Ref(3)) === ((x = 7.0,),)
   @test gradient(x -> real(x.x^2 + im * x.x), Ref(4)) === ((x = 8.0,),)
 
+  # Field access of contents:
+  @test gradient(x -> abs2(x.x) + 7 * x.x.re, Ref(1+im)) == ((x = 9.0 + 2.0im,),)
+  @test_broken gradient(x -> abs2(x[1].x) + 7 * x[1].x.re, [Ref(1+im)]) == ([(x = 9.0 + 2.0im,)],)
+  @test_broken gradient(x -> abs2(x[1].x) + 7 * real(x[1].x), [Ref(1+im)]) == ([(x = 9.0 + 2.0im,)],)  # worked on 0.6.0, 0.6.20
+
+  @test_broken gradient(x -> abs2(x[].x) + 7 * real(x[].x), Ref(Ref(1+im))) == ((x = 9.0 + 2.0im,),)  # gives nothing, same in 0.6.0
+
   # Array of mutables:
   @test gradient(x -> sum(getindex.(x).^2), Ref.(1:3))[1] == [(;x=2i) for i in 1:3]
   @test gradient(x -> sum(abs2∘getindex, x), Ref.(1:3))[1] == [(;x=2i) for i in 1:3]
@@ -462,6 +478,17 @@ end
   # Broadcasting over Ref is handled specially. Tested elsehwere too.
   @test gradient(x -> sum(sum, x .* [1,2,3]), Ref([4,5])) == ((x = [6.0, 6.0],),)
   @test gradient(x -> sum(sum, Ref(x) .* [1,2,3]), [4,5]) == ([6.0, 6.0],)
+end
+
+@testset "NamedTuples" begin
+  @test gradient(x -> x.a, (a=1, b=2)) == ((a = 1, b = nothing),)
+  @test gradient(x -> x[1].a, [(a=1, b=2)]) == ([(a = 1, b = nothing)],)
+  @test gradient(x -> x[1].a, [(a=1, b=2), (a=3, b=4)]) == ([(a = 1, b = nothing), nothing],)
+
+  # Mix with Ref
+  @test gradient(x -> x[].a, Ref((a=1, b=2))) == ((x = (a = 1, b = nothing),),)
+  @test gradient(x -> x[1][].a, [Ref((a=1, b=2)), Ref((a=3, b=4))]) == ([(x = (a = 1, b = nothing),), nothing],)
+  @test gradient(x -> x[1].a, [(a=1, b=2), "three"]) == ([(a = 1, b = nothing), nothing],)
 end
 
 function type_test()
@@ -692,4 +719,10 @@ end
   @test gradient(x -> sum(gradient(y -> sum(y.^2), x)[1]), [1, 2])[1] ≈ [2, 2]
   @test gradient(x -> sum(gradient(y -> sum(sin.(y)), x)[1]), [1, 2])[1] ≈ [-0.8414709848078965, -0.9092974268256817]
   @test gradient(x -> sum(abs, gradient(y -> sum(log.(2 .* exp.(y)) .^ 2), x)[1]), [1, 2])[1] ≈ [2,2]
+
+  # getproperty, Tangents, etc
+  @test gradient(xs -> sum((x->x.im^2).(xs)), [1+2im,3])[1] == [4im, 0]
+  @test gradient(xs -> sum((x->x.im^2), xs), [1+2im,3])[1] == [4im, 0]
+  @test gradient(xs -> sum(map(x->x.im^2, xs)), [1+2im,3])[1] == [4im, 0]
+  @test gradient(xs -> mapreduce(x->x.im^2, +, xs), [1+2im,3])[1] == [4im, 0]
 end
