@@ -176,9 +176,13 @@ end
 
 @test gradient(t -> t[1]*t[2], (2, 3)) == ((3, 2),)
 
-@test gradient(x -> x.re, 2+3im) == ((re = 1, im = nothing),)
+@test gradient(x -> x.re, 2+3im) === (1.0 + 0.0im,)  # one NamedTuple
+@test gradient(x -> x.re*x.im, 2+3im) == (3.0 + 2.0im,)  # two, different fields
+@test gradient(x -> x.re*x.im + x.re, 2+3im) == (4.0 + 2.0im,)  # three, with accumulation
 
-@test gradient(x -> x.re*x.im, 2+3im) == ((re = 3, im = 2),)
+@test gradient(x -> abs2(x * x.re), 4+5im) == (456.0 + 160.0im,)   # gradient participates
+@test gradient(x -> abs2(x * real(x)), 4+5im) == (456.0 + 160.0im,)   # function not getproperty
+@test gradient(x -> abs2(x * getfield(x, :re)), 4+5im) == (456.0 + 160.0im,)
 
 struct Bar{T}
   a::T
@@ -262,6 +266,7 @@ D(f, x) = grad(f, x)[1]
 @test D(x -> x*D(y -> x+y, 1), 1) == 1
 @test D(x -> x*D(y -> x*y, 1), 4) == 8
 
+@test sin''(1.0) ==  -sin(1.0)
 @test sin'''(1.0) ==  -cos(1.0)
 
 f(x) = throw(DimensionMismatch("fubar"))
@@ -417,6 +422,11 @@ end
 
   @test gradient((x,y,z) -> sum((x,y,z)[1:2]), 7, 8.8, 9.9) == (1.0, 1.0, nothing)
   @test gradient((x,y,z) -> sum((x,y,z)[[1,2,1]]), 1,2,3) == (2, 1, nothing)
+
+  @test gradient(xs -> sum(x -> x[2], xs), [(1,2,3), (4,5,6)]) == ([(nothing, 1.0, nothing), (nothing, 1.0, nothing)],)
+  @test gradient(xs -> sum(x -> prod(x[2:3]), xs), [(1,2,3), (4,5,6)]) == ([(nothing, 3.0, 2.0), (nothing, 6.0, 5.0)],)
+  @test gradient(xs -> sum(first, xs), fill((4,3),2)) == ([(1.0, nothing), (1.0, nothing)],)
+  @test gradient(xs -> sum(x -> abs2(x[1]), xs), fill((4,3),2)) == ([(8.0, nothing), (8.0, nothing)],)
 end
 
 @testset "@timed" begin
@@ -424,22 +434,61 @@ end
 end
 
 mutable struct MyMutable
-    value::Float64
+  value::Float64
 end
 
 function foo!(m::MyMutable, x)
-    m.value = x
+  m.value = x
 end
 
 function baz(args)
-    m = MyMutable(0.)
-    foo!(m, args...)
-    m.value
+  m = MyMutable(0.)
+  foo!(m, args...)
+  m.value
 end
 
 let
   value, back = Zygote.pullback(baz, (1.0,))
   @test back(1.) == ((1.0,),)
+end
+
+@testset "mutable struct, including Ref" begin
+  # Zygote's representation is Base.RefValue{Any}((value = 7.0,)), but the
+  # map to ChainRules types and back normalises to (value = 7.0,) same as struct:
+  @test gradient(x -> x.value^2 + x.value, MyMutable(3)) === ((value = 7.0,),)
+
+  # Same for Ref. This doesn't seem to affect `pow_mut` test in this file.
+  @test gradient(x -> x.x^2 + x.x, Ref(3)) === ((x = 7.0,),)
+  @test gradient(x -> real(x.x^2 + im * x.x), Ref(4)) === ((x = 8.0,),)
+
+  # Field access of contents:
+  @test gradient(x -> abs2(x.x) + 7 * x.x.re, Ref(1+im)) == ((x = 9.0 + 2.0im,),)
+  @test_broken gradient(x -> abs2(x[1].x) + 7 * x[1].x.re, [Ref(1+im)]) == ([(x = 9.0 + 2.0im,)],)
+  @test_broken gradient(x -> abs2(x[1].x) + 7 * real(x[1].x), [Ref(1+im)]) == ([(x = 9.0 + 2.0im,)],)  # worked on 0.6.0, 0.6.20
+
+  @test_broken gradient(x -> abs2(x[].x) + 7 * real(x[].x), Ref(Ref(1+im))) == ((x = 9.0 + 2.0im,),)  # gives nothing, same in 0.6.0
+
+  # Array of mutables:
+  @test gradient(x -> sum(getindex.(x).^2), Ref.(1:3))[1] == [(;x=2i) for i in 1:3]
+  @test gradient(x -> sum(abs2∘getindex, x), Ref.(1:3))[1] == [(;x=2i) for i in 1:3]
+
+  @test gradient(x -> (getindex.(x).^2)[1], Ref.(1:3))[1][1] == (x=2.0,)  # rest are (x = 0.0,), but nothing would be OK too
+  @test gradient(x -> (prod.(getindex.(x)))[1], Ref.(eachcol([1 2; 3 4])))[1][1] == (x = [3.0, 1.0],)
+
+  # Broadcasting over Ref is handled specially. Tested elsehwere too.
+  @test gradient(x -> sum(sum, x .* [1,2,3]), Ref([4,5])) == ((x = [6.0, 6.0],),)
+  @test gradient(x -> sum(sum, Ref(x) .* [1,2,3]), [4,5]) == ([6.0, 6.0],)
+end
+
+@testset "NamedTuples" begin
+  @test gradient(x -> x.a, (a=1, b=2)) == ((a = 1, b = nothing),)
+  @test gradient(x -> x[1].a, [(a=1, b=2)]) == ([(a = 1, b = nothing)],)
+  @test gradient(x -> x[1].a, [(a=1, b=2), (a=3, b=4)]) == ([(a = 1, b = nothing), nothing],)
+
+  # Mix with Ref
+  @test gradient(x -> x[].a, Ref((a=1, b=2))) == ((x = (a = 1, b = nothing),),)
+  @test gradient(x -> x[1][].a, [Ref((a=1, b=2)), Ref((a=3, b=4))]) == ([(x = (a = 1, b = nothing),), nothing],)
+  @test gradient(x -> x[1].a, [(a=1, b=2), "three"]) == ([(a = 1, b = nothing), nothing],)
 end
 
 function type_test()
@@ -449,13 +498,108 @@ end
 @test pullback(type_test)[1] == Complex{<:Real}
 
 @testset "Pairs" begin
-    @test (x->10*pairs((a=x, b=2))[1])'(100) === 10.0
-    @test (x->10*pairs((a=x, b=2))[2])'(100) === 0
-    foo(;kw...) = 1
-    @test gradient(() -> foo(a=1,b=2.0)) === ()
+  @test (x->10*pairs((a=x, b=2))[1])'(100) === 10.0
+  @test (x->10*pairs((a=x, b=2))[2])'(100) === 0
+  foo(;kw...) = 1
+  @test gradient(() -> foo(a=1,b=2.0)) === ()
 
-    @test (x->10*(x => 2)[1])'(100) === 10.0
-    @test (x->10*(x => 2)[2])'(100) === 0
+  @test (x->10*(x => 2)[1])'(100) === 10.0
+  @test (x->10*(x => 2)[2])'(100) === nothing
+
+  @test gradient(x-> (:x => x)[2], 17) == (1,)
+    
+  d = Dict(:x=>1.0, :y=>3.0);
+  @test gradient(d -> Dict(:x => d[:x])[:x], d) == (Dict(:x => 1),)
+end
+
+@testset "kwarg splatting, pass in object" begin
+  g(; kwargs...) = kwargs[:x] * kwargs[:z]
+  h(somedata) = g(; somedata...)
+  @test gradient(h, (; x=3.0, y=4.0, z=2.3)) == ((x = 2.3, y = 0.0, z = 3.0),)
+  @test gradient(h, Dict(:x=>3.0, :y=>4.0, :z=>2.3)) == ((y = 0.0, z = 3.0, x = 2.3),)
+end
+
+@testset "Iterators" begin
+  # enumerate
+  @test gradient(1:5) do xs
+    sum([x^i for (i,x) in enumerate(xs)])
+  end == ([1, 4, 27, 256, 3125],)
+
+  @test gradient([1,10,100]) do xs
+    sum([xs[i]^i for (i,x) in enumerate(xs)])
+  end == ([1, 2 * 10^1, 3 * 100^2],)
+
+  @test gradient([1,10,100]) do xs
+    sum((xs[i]^i for (i,x) in enumerate(xs))) # same without collect
+  end == ([1, 2 * 10^1, 3 * 100^2],)
+
+  # zip
+  if VERSION >= v"1.5"
+    # On Julia 1.4 and earlier, [x/y for (x,y) in zip(10:14, 1:10)] is a DimensionMismatch,
+    # while on 1.5 - 1.7 it stops early. 
+
+    @test gradient(10:14, 1:10) do xs, ys
+      sum([x/y for (x,y) in zip(xs, ys)])
+    end[2] ≈ vcat(.-(10:14) ./ (1:5).^2, zeros(5))
+
+    @test_broken gradient(10:14, 1:10) do xs, ys
+      sum(x/y for (x,y) in zip(xs, ys))   # same without collect
+      # Here @adjoint function Iterators.Zip(xs) gets dy = (is = (nothing, nothing),)
+    end[2] ≈ vcat(.-(10:14) ./ (1:5).^2, zeros(5))
+  end
+
+  bk_z = pullback((xs,ys) -> sum([abs2(x*y) for (x,y) in zip(xs,ys)]), [1,2], [3im,4im])[2]
+  @test bk_z(1.0)[1] isa AbstractVector{<:Real}  # projection
+
+  # Iterators.Filter
+  @test gradient(2:9) do xs
+    sum([x^2 for x in xs if iseven(x)])
+  end == ([4, 0, 8, 0, 12, 0, 16, 0],)
+
+  @test gradient(2:9) do xs
+    sum(x^2 for x in xs if iseven(x)) # same without collect
+  end == ([4, 0, 8, 0, 12, 0, 16, 0],)
+
+  # Iterators.Product
+  @test gradient(1:10, 3:7) do xs, ys
+    sum([x^2+y for x in xs, y in ys])
+  end == (10:10:100, fill(10, 5))
+
+  @test_broken gradient(1:10, 3:7) do xs, ys
+    sum(x^2+y for x in xs, y in ys)  # same without collect
+    # Here @adjoint function Iterators.product(xs...) gets dy = (iterators = (nothing, nothing),)
+  end == (10:10:100, fill(10, 5))
+
+  # Repeat that test without sum(iterator) -- also receives dy = (iterators = (nothing, nothing),)
+  function prod_acc(xs, ys)
+    out = 0
+    # for (x,y) in Iterators.product(xs, ys)
+    #   out += x^2+y
+    for xy in Iterators.product(xs, ys)
+      out += xy[1]^2 + xy[2]
+    end
+    out
+  end
+  @test prod_acc(1:10, 3:7) == sum(x^2+y for x in 1:10, y in 3:7)
+  gradient(prod_acc, 1:10, 3:7) == (nothing, nothing) # sadly
+  @test_broken gradient(prod_acc, 1:10, 3:7) == (10:10:100, fill(10, 5))
+
+  @test gradient(rand(2,3)) do A
+    sum([A[i,j] for i in 1:1, j in 1:2])
+  end == ([1 1 0; 0 0 0],)
+
+  @test gradient(ones(3,5), 1:7) do xs, ys
+    sum([x+y for x in xs, y in ys])
+  end == (fill(7, 3,5), fill(15, 7))
+
+  bk_p = pullback((xs,ys) -> sum([x/y for x in xs, y in ys]), Diagonal([3,4,5]), [6,7]')[2]
+  @test bk_p(1.0)[1] isa Diagonal  # projection
+  @test bk_p(1.0)[2] isa Adjoint
+
+  # Iterators.Product with enumerate
+  @test gradient([2 3; 4 5]) do xs
+    sum([x^i+y for (i,x) in enumerate(xs), y in xs]) 
+  end == ([8 112; 36 2004],)
 end
 
 # https://github.com/JuliaDiff/ChainRules.jl/issues/257
@@ -485,6 +629,25 @@ end
   i = 2
   Zygote.gradient(loss_adjoint,[1.0])
   @test x[1] == x[2]
+end
+
+@testset "splats" begin
+  @test gradient(x -> max(x...), [1,2,3])[1] == [0,0,1]
+  @test gradient(x -> min(x...), (1,2,3))[1] === (1.0, 0.0, 0.0)
+
+  @test gradient(x -> max(x...), [1 2; 3 4])[1] == [0 0; 0 1]
+  @test gradient(x -> max(x...), [1,2,3]')[1] == [0 0 1]
+
+  # https://github.com/FluxML/Zygote.jl/issues/599
+  @test gradient(w -> sum([w...]), [1,1])[1] isa AbstractVector
+
+  # https://github.com/FluxML/Zygote.jl/issues/866
+  f866(x) = reshape(x, fill(2, 2)...)
+  @test gradient(x->sum(f866(x)), rand(4))[1] == [1,1,1,1]
+
+  # https://github.com/FluxML/Zygote.jl/issues/731
+  f731(x) = sum([x' * x, x...])
+  @test_broken gradient(f731, ones(3)) # MethodError: no method matching +(::Tuple{Float64, Float64, Float64}, ::Vector{Float64})
 end
 
 @testset "accumulation" begin
@@ -538,6 +701,11 @@ end
   @test gradient(x -> sum(_f.(x)), [1,2,3]) == ([0.5, 0.5, 0.5],)
   @test gradient(x -> sum(map(_f, x)), [1,2,3]) == ([0.5, 0.5, 0.5],)
 
+  # with Bool
+  @test gradient(x -> sum(1 .- (x .> 0)), randn(5)) == (nothing,)
+  @test gradient(x -> sum((y->1-y).(x .> 0)), randn(5)) == (nothing,)
+  @test gradient(x -> sum(x .- (x .> 0)), randn(5)) == ([1,1,1,1,1],)
+
   @test gradient(x -> sum(x ./ [1,2,4]), [1,2,pi]) == ([1.0, 0.5, 0.25],)
   @test gradient(x -> sum(map(/, x, [1,2,4])), [1,2,pi]) == ([1.0, 0.5, 0.25],)
 
@@ -546,4 +714,15 @@ end
   @test gradient((x,p) -> sum(x .^ p), [1.0,2.0,4.0], -1)[1] ≈ [-1.0, -0.25, -0.0625]
   @test gradient((x,p) -> sum(z -> z^p, x), [1.0,2.0,4.0], -1)[1] ≈ [-1.0, -0.25, -0.0625]
   @test gradient((x,p) -> mapreduce(z -> z^p, +, x), [1.0,2.0,4.0], -1)[1] ≈ [-1.0, -0.25, -0.0625]
+
+  # second order
+  @test gradient(x -> sum(gradient(y -> sum(y.^2), x)[1]), [1, 2])[1] ≈ [2, 2]
+  @test gradient(x -> sum(gradient(y -> sum(sin.(y)), x)[1]), [1, 2])[1] ≈ [-0.8414709848078965, -0.9092974268256817]
+  @test gradient(x -> sum(abs, gradient(y -> sum(log.(2 .* exp.(y)) .^ 2), x)[1]), [1, 2])[1] ≈ [2,2]
+
+  # getproperty, Tangents, etc
+  @test gradient(xs -> sum((x->x.im^2).(xs)), [1+2im,3])[1] == [4im, 0]
+  @test gradient(xs -> sum((x->x.im^2), xs), [1+2im,3])[1] == [4im, 0]
+  @test gradient(xs -> sum(map(x->x.im^2, xs)), [1+2im,3])[1] == [4im, 0]
+  @test gradient(xs -> mapreduce(x->x.im^2, +, xs), [1+2im,3])[1] == [4im, 0]
 end

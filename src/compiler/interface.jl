@@ -68,15 +68,20 @@ julia> gradient([7, 11], 0, 1) do x, y, d
          p = size(x, d)
          sum(x.^p .+ y)
        end
-([14.0, 22.0], 2, nothing)
+([14.0, 22.0], 2.0, nothing)
 ```
 """
 function gradient(f, args...)
   y, back = pullback(f, args...)
-  return back(sensitivity(y))
+  grad = back(sensitivity(y))
+  isnothing(grad) ? nothing : map(_project, args, grad)
 end
 
-Base.adjoint(f::Function) = x -> gradient(f, x)[1]
+# Base.adjoint(f::Function) = x -> gradient(f, x)[1]  # piracy!
+Base.adjoint(f::Function) = x -> begin  # still piracy! avoids projection for legacy reasons
+  y, back = pullback(f, x)
+  back(sensitivity(y))[1]
+end
 
 """
     withgradient(f, args...)
@@ -95,7 +100,9 @@ true
 """
 function withgradient(f, args...)
   y, back = pullback(f, args...)
-  (val = y, grad = back(sensitivity(y)))
+  grad = back(sensitivity(y))
+  results = isnothing(grad) ? map(_ -> nothing, args) : map(_project, args, grad)
+  (val=y, grad=results)
 end
 
 # Param-style wrappers
@@ -115,9 +122,9 @@ julia> g = gradient(Params([x, y])) do
 Grads(...)
 
 julia> g[x]
-2×3 Matrix{Int64}:
- 7  70  700
- 8  80  800
+2×3 Matrix{Float64}:
+ 7.0  70.0  700.0
+ 8.0  80.0  800.0
 
 julia> haskey(g, z)  # only x and y are parameters
 false
@@ -143,6 +150,8 @@ Params(xs::Tuple) = Params(collect(xs))
 
 @forward Params.order Base.iterate, Base.length, Base.getindex
 @forward Params.params Base.in
+
+Base.map(::typeof(_project), args::Tuple{Params}, grad) = grad  # skip _project in gradient(f, ::Params)
 
 function Base.union!(ps::Params, itrs...)
   foreach(itr -> foreach(x -> push!(ps, x), itr), itrs)
@@ -172,20 +181,6 @@ function Base.push!(ps::Params, x)
     push!(ps.params, x)
   end
   return ps
-end
-
-@adjoint! function Base.push!(xs::IdSet, x...)
-  l = length(x)
-  push!(xs, x...), Δ -> begin
-    (Δ, ntuple(_ -> nothing, l)...)
-  end
-end
-
-@adjoint! function Base.push!(xs::Params, x::AbstractArray{T}...) where T
-  sz_x = size.(x)
-  push!(xs, x...), Δ -> begin
-    (Δ, map(x -> Ones{T}(x...), sz_x)...)
-  end
 end
 
 Base.push!(ps::Params, x...) = (foreach(x -> push!(ps, x), x); ps)
@@ -302,6 +297,19 @@ function copy!(x::AbstractVector,  gs::Grads)
     i += length(p)
   end
   x
+end
+
+function Base.merge!(gs_dst::Grads, gs_srcs::Grads...)
+  for gs_src in gs_srcs
+    union!(gs_dst.params, gs_src.params)
+    merge!(gs_dst.grads, gs_src.grads)
+  end
+  gs_dst
+end
+
+function Base.copy(gs::Grads)
+  gs_new = Grads(IdDict(), gs.params)
+  merge!(gs_new, gs)
 end
 
 broadcasted(f, gs::Grads, gss::ADictOrGrads...) = map(f, gs, gss...)

@@ -45,18 +45,20 @@ function Base.reducedim_init(::typeof(identity), ::typeof(accum), A::AbstractArr
   Base.reducedim_initarray(A, region, nothing, Union{Nothing,eltype(A)})
 end
 
-trim(x, Δ) = reshape(Δ, ntuple(i -> size(Δ, i), Val(ndims(x))))
-trim(x::Tuple, Δ) = NTuple{length(x)}(Δ)
-
-unbroadcast(x::AbstractArray, x̄) =
-  size(x) == size(x̄) ? x̄ :
-  length(x) == length(x̄) ? trim(x, x̄) :
-    trim(x, accum_sum(x̄, dims = ntuple(i -> size(x, i) == 1 ? i : ndims(x̄)+1, Val(ndims(x̄)))))
-
+function unbroadcast(x::AbstractArray, x̄)
+  N = ndims(x̄)
+  if length(x) == length(x̄)
+    _project(x, x̄)  # ProjectTo handles reshape, offsets, structured matrices, row vectors
+  else
+    dims = ntuple(d -> size(x, d) == 1 ? d : ndims(x̄)+1, ndims(x̄))
+    _project(x, accum_sum(x̄; dims = dims))
+  end
+end
 unbroadcast(x::Number, x̄) = accum_sum(x̄)
 unbroadcast(x::Tuple{<:Any}, x̄) = (accum_sum(x̄),)
 unbroadcast(x::Base.RefValue, x̄) = (x=accum_sum(x̄),)
-unbroadcast(x::Tuple, x̄) = trim(x, length(x) == length(x̄) ? x̄ : accum_sum(x̄; dims=2:ndims(x̄))) # case length(x) > 1
+unbroadcast(x::Tuple, x̄) =  NTuple{length(x)}(length(x) == length(x̄) ? x̄ : accum_sum(x̄; dims=2:ndims(x̄))) # case length(x) > 1
+unbroadcast(x::Tuple, x̄::Nothing) = nothing
 
 unbroadcast(x::AbstractArray, x̄::Nothing) = nothing
 
@@ -71,7 +73,9 @@ unbroadcast(x::AbstractArray, x̄::Nothing) = nothing
   broadcast(+, xs...), ȳ -> (nothing, map(x -> unbroadcast(x, ȳ), xs)...)
 
 @adjoint broadcasted(::typeof(-), x::Numeric, y::Numeric) = x .- y,
-  Δ -> (nothing, unbroadcast(x, Δ), -unbroadcast(y, Δ))
+  Δ -> (nothing, unbroadcast(x, Δ), _minus(unbroadcast(y, Δ)))
+_minus(Δ) = -Δ
+_minus(::Nothing) = nothing
 
 @adjoint broadcasted(::typeof(*), x::Numeric, y::Numeric) = x.*y,
    Δ -> (nothing, unbroadcast(x, Δ .* conj.(y)), unbroadcast(y, Δ .* conj.(x)))
@@ -175,7 +179,7 @@ _dual_safearg(x) = false
   # Avoid generic broadcasting in two easy cases:
   if T == Bool
     return (f.(args...), _ -> nothing) 
-  elseif T <: Real && isconcretetype(T) && _dual_purefun(F) && all(_dual_safearg, args)
+  elseif T <: Real && isconcretetype(T) && _dual_purefun(F) && all(_dual_safearg, args) && !isderiving()
     return broadcast_forward(f, args...)
   end
   len = inclen(args)
@@ -263,8 +267,8 @@ end
 
   end
 
-  @adjoint CUDA.CuArray{N,T}(xs::Array) where {N,T} =
-    CUDA.CuArray{N,T}(xs), Δ -> (convert(Array, Δ), )
+  @adjoint (::Type{T})(xs::Array) where {T <: CUDA.CuArray} =
+    T(xs), Δ -> (convert(Array, Δ), )
 
   @adjoint function sum(xs::CUDA.AbstractGPUArray; dims = :)
     placeholder = similar(xs)

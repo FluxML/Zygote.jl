@@ -144,5 +144,62 @@ end
   @test Zygote.gradient(sumall, ms) == ((a = 2, b = 2),)
 end
 
+using ChainRulesCore
+
+function _Gaussian(suffix::Symbol)
+    name = gensym(Symbol(:Gaussian_, suffix))
+    return @eval begin
+        struct $name{Tm, TP}
+            m::Tm
+            P::TP
+        end
+        $name
+    end
+end
+
+@testset "inference for `getproperty`" begin
+    Gaussian = _Gaussian(:getproperty)
+    g = Gaussian(randn(3), randn(3, 3))
+    y, back = @inferred pullback(x -> x.m, g)
+    @test y == getfield(g, :m)
+    # This type instability is due to the handling of non-bitstypes in `accum_param`
+    if VERSION > v"1.7-"
+      @test Base.return_types(back, Tuple{Vector{Float64}}) == Any[Union{Tuple{Nothing}, typeof(((m = [1.0, 0.0, 0.0], P = nothing),))}]
+    end
+    @test back([1., 0, 0]) == ((m = [1.0, 0.0, 0.0], P = nothing),)
+
+    Base.getproperty(g::Gaussian, s::Symbol) = 2getfield(g, s)
+    y, back = pullback(x -> x.m, g)
+    @test y == 2getfield(g, :m)
+    @test back([1., 0, 0]) == ((m = [2.0, 0.0, 0.0], P = nothing),)
+
+
+    Gaussian = _Gaussian(:pullback)
+    g = Gaussian(randn(3), randn(3, 3))
+    y, back = @inferred pullback(x -> x.m, g)
+
+    Zygote._pullback(::Zygote.AContext, ::typeof(getproperty), g::Gaussian, s::Symbol) = 3getfield(g, s), Δ -> (nothing, (; ((:m, :P) .=> nothing)..., s => 3Δ), nothing)
+    y, back = pullback(x -> x.m, g)
+    @test y == 3getfield(g, :m)
+    @test back([1., 0, 0]) == ((m = [3.0, 0.0, 0.0], P = nothing),)
+
+
+    Gaussian = _Gaussian(:rrule)
+    g = Gaussian(randn(3), randn(3, 3))
+    y, back = @inferred pullback(x -> x.m, g)
+
+    ChainRulesCore.rrule(::typeof(getproperty), g::Gaussian, s::Symbol) = 4getfield(g, s), Δ -> (NoTangent(), Tangent{typeof(g)}(; s => 4Δ), NoTangent())
+    y, back = pullback(x -> x.m, g)
+    @test y == 4getfield(g, :m)
+    @test back([1., 0, 0]) == ((m = [4.0, 0.0, 0.0], P = nothing),)
+
+
+    Gaussian = _Gaussian(:bitstype)
+    g = Gaussian(randn(), randn())
+    y, back = @inferred pullback(x -> x.m, g)
+    @test y == getfield(g, :m)
+    @test @inferred(back(1.0)) == ((m = 1.0, P = nothing),)
+end
+
 # issue 897
 @test gradient(x -> sum(norm, collect(eachcol(x))), ones(3, 400))[1] ≈ fill(0.5773502691896258, 3, 400)

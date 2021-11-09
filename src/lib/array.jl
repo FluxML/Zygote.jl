@@ -38,7 +38,7 @@ end
     dxv = view(dx, inds...)
     dxv .= accum.(dxv, _droplike(dy, dxv))
   end
-  return (dx, map(_->nothing, inds)...)
+  return (_project(x, dx), map(_->nothing, inds)...)
 end
 
 """
@@ -50,7 +50,7 @@ struct OneElement{T,N,I,A} <: AbstractArray{T,N}
   val::T
   ind::I
   axes::A
-  OneElement(val::T, ind::I, axes::A) where {T<:Number, I<:NTuple{N,Int}, A} where {N} = new{T,N,I,A}(val, ind, axes)
+  OneElement(val::T, ind::I, axes::A) where {T<:Number, I<:NTuple{N,Int}, A<:NTuple{N,AbstractUnitRange}} where {N} = new{T,N,I,A}(val, ind, axes)
 end
 Base.size(A::OneElement) = map(length, A.axes)
 Base.axes(A::OneElement) = A.axes
@@ -74,27 +74,8 @@ _droplike(dy::Union{LinearAlgebra.Adjoint, LinearAlgebra.Transpose}, dxv::Abstra
   _ -> error("Mutating arrays is not supported -- called copyto!(::$(typeof(xs)), _...)")
 
 for f in [push!, pop!, pushfirst!, popfirst!]
-  @eval @adjoint! $f(xs, x...) = $f(xs, x...), 
-    _ -> error("Mutating arrays is not supported -- called $($f)(::$(typeof(xs)), _...)")
-end
-
-# This is kind of bad, but at least we don't materialize the whole
-# array. Prefer to use `Buffer`
-# function _pullback(cx::Context, ::typeof(push!), xs::AbstractVector{<:AbstractArray}, x::AbstractArray{T}...) where T
-@adjoint! function push!(xs::AbstractVector{<:AbstractArray}, x::AbstractArray{T}...) where T
-  sz_xs = size.(xs)
-  sz_x = size.(x)
-  push!(xs, x...), Δ -> begin
-    (Δ, map(x -> Ones{T}(x...), sz_x)...)
-  end
-end
-
-@adjoint! function pop!(xs::AbstractVector{<:AbstractArray{T}}) where T
-  sz_xs = size.(xs)
-  op = pop!(xs)
-  op, Δ -> begin
-    ([Ones{T}(sz...) for sz in sz_xs], )
-  end
+  @eval @adjoint! $f(x::AbstractVector, ys...) = $f(x, ys...), 
+    _ -> error("Mutating arrays is not supported -- called $($f)(::$(typeof(x)), _...)")
 end
 
 # General
@@ -198,30 +179,44 @@ end
 _tryreverse(m, x) = x
 _tryreverse(m::typeof(map), x::Union{AbstractVector, Tuple}) = reverse(x)
 
+# With mismatched lengths, map stops early. With mismatched shapes, it makes a vector.
+# So we keep axes(x) to restore gradient dx to its full length & correct shape.
+_tryaxes(x) = axes(x)
+_tryaxes(x::Tuple) = Val(length(x))
+_restore(dx, ax::Tuple) = axes(dx) == ax ? dx : reshape(vcat(dx, falses(prod(length, ax) - length(dx))), ax)
+_restore(dx, ::Val{N}) where {N} = length(dx) < N ? ntuple(i -> get(dx,i,nothing), N) : NTuple{N}(dx)
+
+# Sometimes a pullback doesn't return a Tuple, but rather returns only a
+# single nothing to say "all arguments have zero cotangent". This function is needed to
+# account for that inside the pullback for map.
+last_or_nothing(::Nothing) = nothing
+last_or_nothing(x) = last(x)
+
 for (mapfunc,∇mapfunc) in [(:map,:∇map),(:pmap,:∇pmap)]
-  @eval function $∇mapfunc(cx, f::F, args...) where {F}
+  @eval function $∇mapfunc(cx, f::F, args::Vararg{Any, N}) where {F, N}
     ys_and_backs = $mapfunc((args...) -> _pullback(cx, f, args...), args...)
-    if isempty(ys_and_backs)
-      ys_and_backs, _ -> nothing
-    else
-      ys = map(first, ys_and_backs)
-      ys, function (Δ)
-        isnothing(Δ) && return nothing
-        if Base.issingletontype(F) && length(args) == 1
-          Δarg = $mapfunc(((_,pb), δ) -> last(pb(δ)), ys_and_backs, Δ) # No unzip needed
-          (nothing, Δarg)
-        elseif Base.issingletontype(F) # Ensures `f` is pure: nothing captured & no state
-          Δargs = unzip($mapfunc(((_,pb), δ) -> Base.tail(pb(δ)), ys_and_backs, Δ))
-          (nothing, Δargs...)
-        else
-          # Apply pullbacks in reverse order. Needed for correctness if `f` is stateful.
-          Δf_and_args_zipped = $mapfunc(((_,pb), δ) -> pb(δ), _tryreverse($mapfunc, ys_and_backs, Δ)...)
-          Δf_and_args = unzip(_tryreverse($mapfunc, Δf_and_args_zipped))
-          Δf = reduce(accum, Δf_and_args[1])
-          (Δf, Δf_and_args[2:end]...)
-        end
+    ys = map(first, ys_and_backs)
+    arg_ax = map(_tryaxes, args)
+    function map_back(Δ)
+      if Base.issingletontype(F) && length(args) == 1
+        Δarg = $mapfunc(((_,pb), δ) -> last_or_nothing(pb(δ)), ys_and_backs, Δ) # No unzip needed
+        (nothing, Δarg)
+      elseif Base.issingletontype(F)
+        # Ensures `f` is pure: nothing captured & no state.
+        unzipped = _unzip($mapfunc(((_,pb), δ) -> tailmemaybe(pb(δ)), ys_and_backs, Δ), Val(N))
+        Δargs = map(_restore, unzipped, arg_ax)
+        (nothing, Δargs...)
+      else
+        # Apply pullbacks in reverse order. Needed for correctness if `f` is stateful.
+        Δf_and_args_zipped = $mapfunc(((_,pb), δ) -> pb(δ), _tryreverse($mapfunc, ys_and_backs, Δ)...)
+        Δf_and_args = _unzip(_tryreverse($mapfunc, Δf_and_args_zipped), Val(N + 1))
+        Δf = reduce(accum, Δf_and_args[1]; init=nothing)
+        Δargs = map(_restore, Δf_and_args[2:end], arg_ax)
+        (Δf, Δargs...)
       end
     end
+    map_back(::Nothing) = nothing
+    return ys, map_back
   end
 
   @eval @adjoint function $mapfunc(f, args::Union{AbstractArray,Tuple}...)
@@ -269,6 +264,48 @@ end
         dx[t] .= Δ
         (nothing, dx)
     end
+end
+
+# Iterators
+
+@adjoint function enumerate(xs)
+  back(::AbstractArray{Nothing}) = nothing
+  back(dy::NamedTuple{(:itr,)}) = tuple(dy.itr)
+  back(diys) = (map(last, diys),)
+  enumerate(xs), back
+end
+
+@adjoint Iterators.Filter(f, x) = pullback(filter, f, collect(x))
+
+_ndims(::Base.HasShape{d}) where {d} = d
+_ndims(x) = Base.IteratorSize(x) isa Base.HasShape ? _ndims(Base.IteratorSize(x)) : 1
+
+@adjoint function Iterators.product(xs...)
+  back(::AbstractArray{Nothing}) = nothing
+  back(dy::NamedTuple{(:iterators,)}) = dy.iterators
+  function back(dy::AbstractArray)
+    d = 1
+    ntuple(length(xs)) do n
+      first(dy)[n] === nothing && return nothing
+      nd = _ndims(xs[n])
+      dims = ntuple(i -> i<d ? i : i+nd, ndims(dy)-nd)
+      d += nd
+      init = zero.(first(dy)[n]) # allows for tuples, which accum can add:
+      red = mapreduce(StaticGetter{n}(), accum, dy; dims=dims, init=init)
+      return _project(xs[n], reshape(red, axes(xs[n])))
+    end
+  end
+  Iterators.product(xs...), back
+end
+
+@adjoint function Iterators.Zip(xs)
+  axs = map(_tryaxes, xs)  # same function used for map
+  back(dy::NamedTuple{(:is,)}) = tuple(dy.is)
+  back(dy::AbstractArray) = ntuple(length(xs)) do d
+    dx = map(StaticGetter{d}(), dy)
+    _project(xs[d], _restore(dx, axs[d]))
+  end |> tuple
+  Iterators.Zip(xs), back
 end
 
 # Reductions

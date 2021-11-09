@@ -275,6 +275,13 @@ end
         test_rrule(ZygoteRuleConfig(), getindex, rand(5), 3; rrule_f=rrule_via_ad)
     end
 
+    @testset "kwargs" begin
+        test_rrule(
+            ZygoteRuleConfig(), sum, [1.0 2; 3 4];
+            rrule_f=rrule_via_ad, check_inferred=false, fkwargs=(;dims=1)
+        )
+    end
+
     @testset "struct" begin
         struct Foo
             x
@@ -318,10 +325,51 @@ end
         test_rrule(ZygoteRuleConfig(), +, rand(3), rand(3); rrule_f=rrule_via_ad)
         test_rrule(ZygoteRuleConfig(), *, rand(1, 3), rand(3); rrule_f=rrule_via_ad)
     end
+
+    @testset "rules which call rrule_via_ad" begin
+        # since cbrt has a rule, this will test the shortcut:
+        test_rrule(ZygoteRuleConfig(), sum, cbrt, randn(5))
+        test_rrule(ZygoteRuleConfig(), sum, cbrt, randn(5); rrule_f=rrule_via_ad)
+
+        # but x -> cbrt(x) has no rule, so will be done by Zygote
+        test_rrule(ZygoteRuleConfig(), sum, x -> cbrt(x), randn(5))
+        test_rrule(ZygoteRuleConfig(), sum, x -> cbrt(x), randn(5); rrule_f=rrule_via_ad)
+    end
+
+    # See https://github.com/FluxML/Zygote.jl/issues/1078
+    @testset "ProjectTo{AbstractArray}(::Tangent{Any})" begin
+        X = UpperHessenberg(randn(5, 5))
+        dX = Tangent{Any}(element=randn(5, 5))
+        @test ProjectTo(X)(dX) === dX
+    end
 end
 
 @testset "FastMath support" begin
     @test gradient(2.0) do x
       @fastmath x^2.0
     end == (4.0,)
+end
+
+@testset "zygote2differential inference" begin
+    @test @inferred(Zygote.z2d(1.0, 2.0)) isa Real
+    @test @inferred(Zygote.z2d([1,2,3], [4,5,6])) isa Vector
+    @test @inferred(Zygote.z2d((1, 2.0, 3+4im), (5, 6.0, 7+8im))) isa Tangent{<:Tuple}
+
+    # Below Julia 1.7, these need a @generated version to be inferred:
+    @test @inferred(Zygote.z2d((re=1,), 3.0+im)) isa Tangent{ComplexF64}
+    @test @inferred(Zygote.z2d((re=1, im=nothing), 3.0+im)) isa Tangent{ComplexF64}
+
+    # collapse nothings
+    @test @inferred(Zygote.z2d((nothing,), (1,))) === NoTangent()
+    @test @inferred(Zygote.z2d((nothing, nothing), (1,2))) === NoTangent()
+
+    # To test the generic case, we need a struct within a struct. 
+    nested = Tangent{Base.RefValue{ComplexF64}}(; x=Tangent{ComplexF64}(; re=1, im=NoTangent()),)
+    if VERSION > v"1.7-"
+        @test @inferred(Zygote.z2d((; x=(; re=1)), Ref(3.0+im))) == nested
+        @test @inferred(Zygote.z2d((; x=(; re=nothing)), Ref(3.0+im))) === NoTangent()
+    else
+        @test Zygote.z2d((; x=(; re=1)), Ref(3.0+im)) == nested
+        @test Zygote.z2d((; x=(; re=nothing)), Ref(3.0+im)) === NoTangent()
+    end
 end

@@ -33,6 +33,7 @@ include("compiler/show.jl")
 
 include("lib/grad.jl")
 include("lib/lib.jl")
+include("lib/literal_getproperty.jl")
 include("lib/number.jl")
 include("lib/base.jl")
 include("lib/array.jl")

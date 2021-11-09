@@ -105,7 +105,7 @@ This reverse-mode Jacobian needs to evaluate the pullback once for each element 
 Doing so is usually only efficient when `length(y)` is small compared to `length(a)`,
 otherwise forward mode is likely to be better.
 
-See also [`withjacobian`](@ref), `hessian`](@ref), [`hessian_reverse`](@ref).
+See also [`withjacobian`](@ref), [`hessian`](@ref), [`hessian_reverse`](@ref).
 
 # Examples
 
