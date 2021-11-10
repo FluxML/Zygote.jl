@@ -753,7 +753,7 @@ end
   C::Cholesky{T, <:StridedMatrix{T}} where {T<:Real}, ::Val{:L}
 )
   return literal_getproperty(C, Val(:L)), function(Δ)
-    Δ_factors = C.uplo == 'L' ? tril!(collect(Δ)) : triu(collect(Δ'))
+    Δ_factors = C.uplo == 'L' ? tril!(collect(Δ)) : triu!(collect(Δ'))
     return ((uplo=nothing, info=nothing, factors=Δ_factors),)
   end
 end
