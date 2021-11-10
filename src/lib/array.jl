@@ -758,7 +758,7 @@ end
   end
 end
 
-@adjoint function logdet(C::Cholesky{T, <:StridedMatrix{T}} where {T<:Real})
+@adjoint function logdet(C::Cholesky)
   return logdet(C), function(Δ)
     return ((uplo=nothing, info=nothing, factors=Diagonal(2 .* Δ ./ diag(C.factors))),)
   end
