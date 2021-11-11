@@ -803,13 +803,13 @@ end
     @test gradtest(B->logdet(cholesky(Symmetric(B))), A * A' + I)
 
     @testset "inference" begin
-      out, pb = _pullback(Context(), C -> C.U, cholesky(Symmetric(A'A + I, :U)))
+      out, pb = pullback(C -> C.U, cholesky(Symmetric(A'A + I, :U)))
       @inferred pb(out)
-      out, pb = _pullback(Context(), C -> C.U, cholesky(Symmetric(A'A + I, :L)))
+      out, pb = pullback(C -> C.U, cholesky(Symmetric(A'A + I, :L)))
       @inferred pb(out)
-      out, pb = _pullback(Context(), C -> C.L, cholesky(Symmetric(A'A + I, :U)))
+      out, pb = pullback(C -> C.L, cholesky(Symmetric(A'A + I, :U)))
       @inferred pb(out)
-      out, pb = _pullback(Context(), C -> C.L, cholesky(Symmetric(A'A + I, :L)))
+      out, pb = pullback(C -> C.L, cholesky(Symmetric(A'A + I, :L)))
       @inferred pb(out)
     end
   end

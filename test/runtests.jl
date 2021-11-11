@@ -1,5 +1,5 @@
 using Zygote, Test
-using Zygote: gradient, ZygoteRuleConfig, _pullback, Context
+using Zygote: gradient, ZygoteRuleConfig
 using CUDA
 using CUDA: has_cuda
 
