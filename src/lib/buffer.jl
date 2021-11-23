@@ -46,7 +46,7 @@ _pullback(cx::AContext, ::typeof(Broadcast.materialize!), b::Buffer, x::Abstract
 
 @adjoint function copy(b::Buffer)
   copy(b), function (b̄)
-    grad_mut(__context__, b)[:] = b̄
+    grad_mut(__context__, b)[:] .= b̄
     return
   end
 end
