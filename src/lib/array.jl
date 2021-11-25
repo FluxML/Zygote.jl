@@ -741,15 +741,19 @@ end
     return ((uplo=nothing, info=nothing, factors=nothing),)
   end
 end
-@adjoint function literal_getproperty(C::Cholesky, ::Val{:U})
+@adjoint function literal_getproperty(
+  C::Cholesky{T, <:StridedMatrix{T}} where {T<:Real}, ::Val{:U}
+)
   return literal_getproperty(C, Val(:U)), function(Δ)
-    Δ_factors = C.uplo == 'U' ? UpperTriangular(Δ) : LowerTriangular(copy(Δ'))
+    Δ_factors = C.uplo == 'U' ? triu!(collect(Δ)) : tril!(collect(Δ'))
     return ((uplo=nothing, info=nothing, factors=Δ_factors),)
   end
 end
-@adjoint function literal_getproperty(C::Cholesky, ::Val{:L})
+@adjoint function literal_getproperty(
+  C::Cholesky{T, <:StridedMatrix{T}} where {T<:Real}, ::Val{:L}
+)
   return literal_getproperty(C, Val(:L)), function(Δ)
-    Δ_factors = C.uplo == 'L' ? LowerTriangular(Δ) : UpperTriangular(copy(Δ'))
+    Δ_factors = C.uplo == 'L' ? tril!(collect(Δ)) : triu!(collect(Δ'))
     return ((uplo=nothing, info=nothing, factors=Δ_factors),)
   end
 end

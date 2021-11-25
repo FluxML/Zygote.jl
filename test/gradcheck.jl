@@ -801,6 +801,17 @@ end
     @test gradtest(A->logdet(cholesky(A' * A + I)), A)
     @test gradtest(B->cholesky(Symmetric(B)).U, A * A' + I)
     @test gradtest(B->logdet(cholesky(Symmetric(B))), A * A' + I)
+
+    @testset "inference" begin
+      out, pb = pullback(C -> C.U, cholesky(Symmetric(A'A + I, :U)))
+      @inferred pb(out)
+      out, pb = pullback(C -> C.U, cholesky(Symmetric(A'A + I, :L)))
+      @inferred pb(out)
+      out, pb = pullback(C -> C.L, cholesky(Symmetric(A'A + I, :U)))
+      @inferred pb(out)
+      out, pb = pullback(C -> C.L, cholesky(Symmetric(A'A + I, :L)))
+      @inferred pb(out)
+    end
   end
   @testset "cholesky - scalar" begin
     rng = MersenneTwister(123456)
