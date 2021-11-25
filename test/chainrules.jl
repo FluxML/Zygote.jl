@@ -267,14 +267,8 @@ end
 
 @testset "ChainRulesCore.rrule_via_ad" begin
     @testset "basic" begin
-        # broken because Zygoye compresses `(NoTangent(), NoTangent())` into just NoTangent()
-        # which ChainRulesTestUtils does not think is valid:
-        @test_broken(rrule_via_ad(ZygoteRuleConfig(), round, 2.2) isa Tuple{NoTangent,NoTangent})
-        # Later: That makes no sense, would always be broken. If you call the pullback,
-        # then right now Zygote agrees with the rrule, but gives 0.0 not NoTangent:
+        # Not marked as tests since perhaps ZeroTangent would be better.
         rrule_via_ad(ZygoteRuleConfig(), round, 2.2)[2](1) == (NoTangent(), 0.0)
-        rrule(round, 2.2)[2](1) == (NoTangent(), 0.0)
-        # Not marked as tests since perhaps NoTangent would be better.
         # But test_rrule is happy:
         test_rrule(ZygoteRuleConfig(), round, 2.2; rrule_f=rrule_via_ad)
 
