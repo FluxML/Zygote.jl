@@ -1,4 +1,6 @@
 using ChainRulesCore, ChainRulesTestUtils, Zygote
+using Zygote: ZygoteRuleConfig
+
 @testset "ChainRules integration" begin
     @testset "ChainRules basics" begin
         cr_inner_demo_rrule_hitcount = Ref(0)
@@ -265,13 +267,12 @@ end
 
 @testset "ChainRulesCore.rrule_via_ad" begin
     @testset "basic" begin
-        # broken because Zygoye compresses `(NoTangent(), NoTangent())` into just NoTangent()
-        # which ChainRulesTestUtils does not think is valid:
-        @test_broken(rrule_via_ad(ZygoteRuleConfig(), round, 2.2) isa Tuple{NoTangent,NoTangent})
-        # uncomment below when/if above is fixed
-        # test_rrule(ZygoteRuleConfig(), round, 2.2; rrule_f=rrule_via_ad)
+        # Not marked as tests since perhaps ZeroTangent would be better.
+        rrule_via_ad(ZygoteRuleConfig(), round, 2.2)[2](1) == (NoTangent(), 0.0)
+        # But test_rrule is happy:
+        test_rrule(ZygoteRuleConfig(), round, 2.2; rrule_f=rrule_via_ad)
 
-        test_rrule(ZygoteRuleConfig(), vcat, rand(3), rand(4); rrule_f=rrule_via_ad, check_inferred=false)
+        test_rrule(ZygoteRuleConfig(), vcat, rand(3), rand(4); rrule_f=rrule_via_ad)
         test_rrule(ZygoteRuleConfig(), getindex, rand(5), 3; rrule_f=rrule_via_ad)
     end
 
@@ -313,10 +314,13 @@ end
         test_rrule(
             ZygoteRuleConfig(), my_namedtuple, 1., (2.0, 2.4), 3.; rrule_f=rrule_via_ad
         )
-        test_rrule(ZygoteRuleConfig(), sum, (1.0, 2.0, 3.0); rrule_f=rrule_via_ad)
+        test_rrule(
+            ZygoteRuleConfig(), sum, (1.0, 2.0, 3.0); rrule_f=rrule_via_ad, check_inferred=false
+        )
         test_rrule(
             ZygoteRuleConfig(), sum, (a=1.0, b=2.0); rrule_f=rrule_via_ad, check_inferred=false
         )
+        # There is at present no rrule for sum(::Tuple), so those are testing zygote directly.
     end
 
     @testset "arrays" begin
@@ -348,6 +352,10 @@ end
     @test gradient(2.0) do x
       @fastmath x^2.0
     end == (4.0,)
+
+    @test gradient(2) do x
+      @fastmath log(x)
+    end == (1/2,)
 end
 
 @testset "zygote2differential inference" begin
