@@ -1,6 +1,14 @@
 using Zygote: Grads
 
 @testset "Params" begin
+  @testset "in" begin
+    w = rand(2,3)
+    b = rand(2)
+    ps = Params([w])
+    @test w ∈ ps
+    @test b ∉ ps
+  end
+  
   @testset "delete!" begin
     w = rand(2,3)
     b = rand(2)
