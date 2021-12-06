@@ -149,7 +149,8 @@ Params(ps::Params) = ps
 Params(xs::Tuple) = Params(collect(xs))
 
 @forward Params.order Base.iterate, Base.length, Base.getindex
-@forward Params.params Base.in
+
+Base.in(ps::Params, x) = x in ps.params
 
 Base.map(::typeof(_project), args::Tuple{Params}, grad) = grad  # skip _project in gradient(f, ::Params)
 
