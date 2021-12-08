@@ -39,6 +39,15 @@ end
   return (_project(x, dx), map(_->nothing, inds)...)
 end
 
+using CUDA
+import NNlib
+
+∇getindex(x::CuArray, inds::Tuple{AbstractArray{<:Integer}}) = dy -> begin
+  dx = _zero(x, eltype(dy))
+  NNlib.scatter!(+, dx, dy, inds[1])
+  return (_project(x, dx), map(_->nothing, inds)...)
+end
+
 """
     OneElement(val, ind, axes) <: AbstractArray
 
