@@ -1470,9 +1470,9 @@ using Zygote: Buffer
 
   ∇W1, ∇W2, ∇x = gradient((W1, W2, x) -> buffer_arrays(W1, W2, x), W1, W2, x)
 
-  @test ∇W1 == [1.0 1.0 1.0; 1.0 1.0 1.0; 1.0 1.0 1.0]
-  @test ∇W2 == [1.0 1.0 1.0; 1.0 1.0 1.0; 1.0 1.0 1.0]
-  @test ∇x == [6.0; 6.0; 6.0;;]
+  @test ∇W1 == W1
+  @test ∇W2 == W2
+  @test ∇x == 6 .* x
 end
 
 @testset "FillArrays" begin
