@@ -235,7 +235,7 @@ function copy!(x::AbstractVector, ps::Params)
     x[i+1:i+length(p)] .= vec(p)
     i += length(p)
   end
-  ps
+  x
 end
 
 """
