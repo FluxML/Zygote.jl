@@ -52,7 +52,7 @@ _pullback(cx::AContext, ::typeof(Broadcast.materialize!), b::Buffer, x::Abstract
     return
   end
 
-  function copy_sensitivity(b̄::Union{Tuple,Vector{T}}) where {T<:AbstractArray}
+  function copy_sensitivity(b̄::Union{Tuple,AbstractVector{T}}) where {T<:AbstractArray}
     grad_mut(__context__, b)[:] .= b̄
     return
   end
