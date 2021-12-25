@@ -45,8 +45,17 @@ _pullback(cx::AContext, ::typeof(Broadcast.materialize!), b::Buffer, x::Abstract
   _pullback(cx, copyto!, b, x)
 
 @adjoint function copy(b::Buffer)
-  copy(b), function (b̄)
-    grad_mut(__context__, b)[:] = b̄
+  res = copy(b)
+
+  function copy_sensitivity(b̄)
+    grad_mut(__context__, b)[:] .= vec(b̄)
     return
   end
+
+  function copy_sensitivity(b̄::Union{Tuple,AbstractVector{T}}) where {T<:AbstractArray}
+    grad_mut(__context__, b)[:] .= b̄
+    return
+  end
+
+  return res, copy_sensitivity
 end

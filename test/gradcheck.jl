@@ -1456,6 +1456,23 @@ using Zygote: Buffer
     prod(copy(b))
   end == (3,)
 
+  # Buffer storing arrays test
+  W1 = ones(3, 3)
+  W2 = ones(3, 3)
+  x = ones(3, 1)
+
+  function buffer_arrays(W1, W2, x)
+    b = Buffer([])
+    push!(b, W1 * x)
+    push!(b, W2 * x)
+    return sum(vcat(copy(b)...))
+  end
+
+  ∇W1, ∇W2, ∇x = gradient((W1, W2, x) -> buffer_arrays(W1, W2, x), W1, W2, x)
+
+  @test ∇W1 == W1
+  @test ∇W2 == W2
+  @test ∇x == 6 .* x
 end
 
 @testset "FillArrays" begin
