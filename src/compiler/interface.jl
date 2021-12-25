@@ -235,7 +235,7 @@ function copy!(x::AbstractVector, ps::Params)
     x[i+1:i+length(p)] .= vec(p)
     i += length(p)
   end
-  ps
+  x
 end
 
 """
@@ -288,7 +288,7 @@ function copy!(gs::Grads, x::AbstractVector)
     gs[p] .= reshape(x[i+1:i+length(p)], size(p))
     i += length(p)
   end
-  x
+  gs
 end
 
 function copy!(x::AbstractVector,  gs::Grads)
