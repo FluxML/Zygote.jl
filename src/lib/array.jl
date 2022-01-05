@@ -39,21 +39,6 @@ end
   return (_project(x, dx), map(_->nothing, inds)...)
 end
 
-using CUDA
-import NNlib
-
-∇getindex(x::CuArray, inds::Tuple{AbstractArray{<:Integer}}) = dy -> begin
-  dx = _zero(x, eltype(dy))
-  inds1_cpu = Array(inds[1])
-  if allunique(inds1_cpu)
-    dxv = view(dx, inds[1])
-    dxv .= accum.(dxv, _droplike(dy, dxv))
-  else
-    NNlib.scatter!(+, dx, dy, inds1_cpu)
-  end
-  return (_project(x, dx), map(_->nothing, inds)...)
-end
-
 """
     OneElement(val, ind, axes) <: AbstractArray
 
