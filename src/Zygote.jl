@@ -1,5 +1,13 @@
 module Zygote
 
+# This reduces time to first gradient, by 4x in the Flux example in Zygote#1126
+if isdefined(Base, :Experimental) && isdefined(Base.Experimental, Symbol("@optlevel"))
+  @eval Base.Experimental.@optlevel 1  # Julia 1.5
+end
+if isdefined(Base, :Experimental) && isdefined(Base.Experimental, Symbol("@max_methods"))
+  @eval Base.Experimental.@max_methods 1  # Julia 1.8, JuliaLang#43370
+end
+
 using LinearAlgebra, Statistics
 using LinearAlgebra: copytri!, AbstractTriangular
 
