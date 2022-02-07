@@ -279,7 +279,7 @@ end
 for mapfunc in [map,pmap]
   @testset "$mapfunc" begin
     @test gradtest(xs -> sum(mapfunc(x -> x^2, xs)), rand(2,3))
-    @test gradtest((xss...) -> sum(mapfunc((xs...) -> sqrt(sum(xs.^2)), xss...)), [rand(5) for _ in 1:6]...)
+    @test gradtest((xss...) -> sum(mapfunc((xs...) -> sqrt(sum(xs.^2)), xss...)), [rand(5) for _ in 1:6]...) # test multiple collections
     function foo(y)
       bar = (x) -> x*y
       sum(mapfunc(bar, 1:5))
@@ -287,49 +287,49 @@ for mapfunc in [map,pmap]
     @test gradtest(foo, 3)
     @test gradient(v -> sum([x for x in v]), [1.1,2.2,3.3]) == ([1, 1, 1],)
   end
+end
 
-  @testset "Tuple adjoint" begin
-    x = randn(3)
-    _, pb = Zygote.pullback(x -> map(abs2, x), x)
-    Δy = randn(3)
-    @test first(pb((Δy..., ))) ≈ first(pb(Δy))
+@testset "Tuple adjoint" begin
+  x = randn(3)
+  _, pb = Zygote.pullback(x -> map(abs2, x), x)
+  Δy = randn(3)
+  @test first(pb((Δy..., ))) ≈ first(pb(Δy))
+end
+
+@testset "empty tuples" begin
+  out, pb = Zygote.pullback(map, -, ())
+  @test pb(out) === (nothing, ())
+
+  out, pb = Zygote.pullback(map, +, (), ())
+  @test pb(()) === (nothing, (), ())
+
+  function build_foo(z)
+    foo(x) = x * z
+    return foo
   end
+  out, pb = Zygote.pullback(map, build_foo(5.0), ())
+  @test pb(()) === (nothing, ())
+end
 
-  @testset "empty tuples" begin
-    out, pb = Zygote.pullback(map, -, ())
-    @test pb(out) === (nothing, ())
+@testset "Vector{Nothing} cotangent" begin
+  Δ = Vector{Nothing}(nothing, 5)
 
-    out, pb = Zygote.pullback(map, +, (), ())
-    @test pb(()) === (nothing, (), ())
+  # Unary stateless
+  out, pb = Zygote.pullback(map, -, randn(5))
+  @test pb(Δ)[2] isa Vector{Nothing}
 
-    function build_foo(z)
-      foo(x) = x * z
-      return foo
-    end
-    out, pb = Zygote.pullback(map, build_foo(5.0), ())
-    @test pb(()) === (nothing, ())
+  # Binary stateless
+  out, pb = Zygote.pullback(map, +, randn(5), randn(5))
+  @test pb(Δ)[2] isa Vector{Nothing}
+  @test pb(Δ)[3] isa Vector{Nothing}
+
+  # Stateful
+  function build_foo(z)
+    foo(x) = x * z
+    return foo
   end
-
-  @testset "Vector{Nothing} cotangent" begin
-    Δ = Vector{Nothing}(nothing, 5)
-
-    # Unary stateless
-    out, pb = Zygote.pullback(map, -, randn(5))
-    @test pb(Δ)[2] isa Vector{Nothing}
-
-    # Binary stateless
-    out, pb = Zygote.pullback(map, +, randn(5), randn(5))
-    @test pb(Δ)[2] isa Vector{Nothing}
-    @test pb(Δ)[3] isa Vector{Nothing}
-
-    # Stateful
-    function build_foo(z)
-      foo(x) = x * z
-      return foo
-    end
-    out, pb = Zygote.pullback(map, build_foo(5.0), randn(5))
-    @test pb(Δ)[2] isa Vector{Nothing}
-  end
+  out, pb = Zygote.pullback(map, build_foo(5.0), randn(5))
+  @test pb(Δ)[2] isa Vector{Nothing}
 end
 
 # Check that map infers correctly. pmap still doesn't infer.
