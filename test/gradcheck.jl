@@ -364,7 +364,7 @@ end
   @test gradient(x -> map(+, x, [1,2,3])[1], (4,5,6,99)) == ((1.0, 0.0, 0.0, nothing),)
 end
 
-@testset "Alternative Pmap Dispatch" begin
+@testset "pmap with caching pool" begin
     cache_and_map(f,xs...) = pmap(f, CachingPool(workers()), xs...; batch_size = 1)
     @test gradtest(xs -> sum(cache_and_map(x -> x^2, xs)), rand(2,3))
     @test gradtest((xss...) -> sum(cache_and_map((xs...) -> sqrt(sum(xs.^2)), xss...)), [rand(5) for _ in 1:6]...)
@@ -374,6 +374,20 @@ end
     end
     @test gradtest(foo, 3)
     @test gradient(v -> sum([x for x in v]), [1.1,2.2,3.3]) == ([1, 1, 1],)
+end
+
+# more elaborate tests of upstream pmap rule in ChainRules
+@testset "multiple pmaps" begin
+    function sequential(xs)
+        ys = pmap(x -> x^2, xs)
+        sum(pmap(y -> y^3, ys))
+    end
+    @test gradtest(sequential, rand(2,3))
+    function nested(xs)
+        inner(arr) = sum(pmap(x -> x^2, arr))
+        sum(pmap(inner, xs))
+    end
+    @test gradtest(nested, [rand(3) for _ in 1:2])
 end
 
 @testset "Stateful Map" begin
