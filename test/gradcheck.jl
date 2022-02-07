@@ -2,7 +2,7 @@ using Zygote, Test, Random, LinearAlgebra, Statistics, FillArrays,
     AbstractFFTs, FFTW, Distances
 using Zygote: gradient
 using Base.Broadcast: broadcast_shape
-using Distributed: pmap, CachingPool, workers
+using Distributed: pmap, CachingPool, workers, nworkers
 import FiniteDifferences
 
 function ngradient(f, xs::AbstractArray...)
@@ -378,16 +378,19 @@ end
 
 # more elaborate tests of upstream pmap rule in ChainRules
 @testset "multiple pmaps" begin
-    function sequential(xs)
-        ys = pmap(x -> x^2, xs)
-        sum(pmap(y -> y^3, ys))
-    end
-    @test gradtest(sequential, rand(2,3))
-    function nested(xs)
-        inner(arr) = sum(pmap(x -> x^2, arr))
-        sum(pmap(inner, xs))
-    end
-    @test gradtest(nested, [rand(3) for _ in 1:2])
+  function sequential(xs)
+    ys = pmap(x -> x^2, xs)
+    sum(pmap(y -> y^3, ys))
+  end
+  @test gradtest(sequential, rand(2,3))
+
+  function nested(xs)
+    X = [xs[:, i] for i in 1:size(xs)[2]]
+    inner(arr) = sum(pmap(x -> x^2, arr))
+    sum(pmap(inner, X))
+  end
+  xs  = rand(10, clamp(nworkers() - 1, 1, 2)) # only set outer iterations > 1 if we won't exhaust worker pool
+  @test gradtest(nested, xs)
 end
 
 @testset "Stateful Map" begin
