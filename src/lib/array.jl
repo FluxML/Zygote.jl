@@ -192,7 +192,7 @@ _restore(dx, ::Val{N}) where {N} = length(dx) < N ? ntuple(i -> get(dx,i,nothing
 last_or_nothing(::Nothing) = nothing
 last_or_nothing(x) = last(x)
 
-for (mapfunc,∇mapfunc) in [(:map,:∇map),(:pmap,:∇pmap)]
+for (mapfunc,∇mapfunc) in [(:map,:∇map)]
   @eval function $∇mapfunc(cx, f::F, args::Vararg{Any, N}) where {F, N}
     ys_and_backs = $mapfunc((args...) -> _pullback(cx, f, args...), args...)
     ys = map(first, ys_and_backs)
@@ -221,17 +221,6 @@ for (mapfunc,∇mapfunc) in [(:map,:∇map),(:pmap,:∇pmap)]
 
   @eval @adjoint function $mapfunc(f, args::Union{AbstractArray,Tuple}...)
     $∇mapfunc(__context__, f, args...)
-  end
-end
-
-@adjoint function pmap(f, wp::AbstractWorkerPool, args...; kwargs...)
-  ys_backs = pmap((x...) -> _pullback(__context__, f, x...), wp, args...; kwargs...)
-  ys, backs = unzip(ys_backs)
-  ys, function (Δ)
-    res = pmap((df,d) -> df(d), wp, backs, Δ; kwargs...)
-    Δf_and_args = unzip(res)
-    Δf = reduce(accum, Δf_and_args[1])
-    (Δf, nothing, Δf_and_args[2:end]..., nothing, nothing)
   end
 end
 
