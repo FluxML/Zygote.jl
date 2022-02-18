@@ -286,8 +286,11 @@ _ndims(x) = Base.IteratorSize(x) isa Base.HasShape ? _ndims(Base.IteratorSize(x)
   function back(dy::AbstractArray)
     d = 1
     ntuple(length(xs)) do n
-      first(dy)[n] === nothing && return nothing
       nd = _ndims(xs[n])
+      if first(dy)[n] === nothing
+        d += nd
+        return nothing
+      end
       dims = ntuple(i -> i<d ? i : i+nd, ndims(dy)-nd)
       d += nd
       init = zero.(first(dy)[n]) # allows for tuples, which accum can add:
