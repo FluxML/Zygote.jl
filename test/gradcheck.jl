@@ -1961,3 +1961,19 @@ end
   @test g1[1].A isa Number
   @test size(g1[2]) == size(V)
 end
+
+@testset "Zygote #1162" begin
+  function zygote1162(as, bs)
+      results = [f1162(a, b) for (a, b) in zip(as, bs)]
+      return results[2][1] + results[2][2]
+  end
+  function f1162(a, b)
+      return [a^2, b^2]
+  end
+
+  as = (1.0, 2.0, 3.0)
+  bs = (4.0, 5.0, 6.0)
+
+  g = Zygote.gradient(zygote1162, as, bs)
+  @test g == ((nothing, 2*as[2], nothing), (nothing, 2*bs[2], nothing))
+end

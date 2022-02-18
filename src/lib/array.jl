@@ -184,7 +184,7 @@ _tryreverse(m::typeof(map), x::Union{AbstractVector, Tuple}) = reverse(x)
 _tryaxes(x) = axes(x)
 _tryaxes(x::Tuple) = Val(length(x))
 _restore(dx, ax::Tuple) = axes(dx) == ax ? dx : reshape(vcat(dx, falses(prod(length, ax) - length(dx))), ax)
-_restore(dx, ::Val{N}) where {N} = length(dx) < N ? ntuple(i -> get(dx,i,nothing), N) : NTuple{N}(dx)
+_restore(dx, ::Val{N}) where {N} = ntuple(i -> get(dx,i,nothing), N)
 
 # Sometimes a pullback doesn't return a Tuple, but rather returns only a
 # single nothing to say "all arguments have zero cotangent". This function is needed to
