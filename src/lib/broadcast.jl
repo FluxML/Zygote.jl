@@ -144,6 +144,9 @@ end
   end
 end
 
+@adjoint broadcasted(::Type{T}, x::Numeric) where T =
+  T.(x), ȳ -> (nothing, _project(x, ȳ),)
+
 # General Fallback
 # ================
 
