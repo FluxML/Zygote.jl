@@ -286,17 +286,18 @@ using GPUArraysCore  # replaces @require CUDA block, weird indenting to preserve
 
   pull_block_vert(sz, Δ::AbstractGPUArray, A::Number) = @allowscalar Δ[sz]
 
-  import NNlib
-  
   ∇getindex(x::CUDA.CuArray, inds::Tuple{AbstractArray{<:Integer}}) = dy -> begin
-    dx = _zero(x, eltype(dy))
     inds1_cpu = Array(inds[1])
     if allunique(inds1_cpu)
+      dx = _zero(x, eltype(dy))
       dxv = view(dx, inds[1])
       dxv .= accum.(dxv, _droplike(dy, dxv))
+      return _project(x, dx), nothing
     else
-      NNlib.scatter!(+, dx, dy, inds1_cpu)
+      dx = zeros(eltype(dy), length(x))
+      dxv = view(dx, inds1_cpu)
+      dxv .= accum.(dxv, _droplike(Array(dy), dxv))
+      return _project(x, CUDA.CuArray(dx)), nothing
     end
-    return (_project(x, dx), map(_->nothing, inds)...)
   end
 end
