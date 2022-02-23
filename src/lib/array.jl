@@ -814,7 +814,21 @@ end
 @adjoint function \(P::AbstractFFTs.Plan, xs)
   return P \ xs, function(Δ)
     N = prod(size(Δ)[[P.region...]])
-    return (nothing, (P * Δ)/N)
+    return (nothing, (P * Δ) / N)
+  end
+end
+
+@adjoint function *(P::AbstractFFTs.ScaledPlan, xs)
+  return P * xs, function(Δ)
+    N = prod(size(xs)[[P.p.region...]])
+    return (nothing, N * P.scale^2 * (P \ Δ))
+  end
+end
+
+@adjoint function \(P::AbstractFFTs.ScaledPlan, xs)
+  return P \ xs, function(Δ)
+    N = prod(size(xs)[[P.p.region...]])
+    return (nothing, (P * Δ) / (N * P.scale^2))
   end
 end
 
