@@ -1530,35 +1530,33 @@ end
       mirrorI = mirrorIndex(i,sizeX[1])
       FreqIndMat = findicateMat(mirrorI, j, size(X̂r,1), sizeX[2])
       listOfSols = [(fft, bfft(indicateMat), bfft(indicateMat*im),
-                     plan_fft(X), i, X),
-                    (ifft, 1/N*fft(indicateMat), 1/N*fft(indicateMat*im),
-                     plan_fft(X), i, X),
-                    (bfft, fft(indicateMat), fft(indicateMat*im), nothing, i,
-                     X),
-                    (rfft, real.(brfft(FreqIndMat, sizeX[1])),
-                     real.(brfft(FreqIndMat*im, sizeX[1])), plan_rfft(X),
-                     mirrorI, X),
-                    ((K)->(irfft(K,sizeX[1])), 1/N * rfft(indicateMat),
-                     zeros(size(X̂r)), plan_rfft(X), i, X̂r)]
-      for (trans, solRe, solIm, P, mI, evalX) in listOfSols
+                     plan_fft(X), plan_ifft(X), i, X),
+                     (ifft, 1/N*fft(indicateMat), 1/N*fft(indicateMat*im),
+                      plan_ifft(X), plan_fft(X), i, X),
+                     (bfft, fft(indicateMat), fft(indicateMat*im),
+                      plan_bfft(X), nothing, i, X),
+                     (rfft, real.(brfft(FreqIndMat, sizeX[1])),
+                      real.(brfft(FreqIndMat*im, sizeX[1])), plan_rfft(X),
+                      plan_irfft(X̂r, sizeX[1]), mirrorI, X),
+                     ((K)->(irfft(K, sizeX[1])), 1/N * rfft(indicateMat),
+                      zeros(size(X̂r)), plan_irfft(X̂r, sizeX[1]),
+                      plan_rfft(X), i, X̂r)] # 3 of the FFT plan tests fail for this case, hence the checks eltype(evalX) <: Real
+      for (trans, solRe, solIm, P, Pinv, mI, evalX) in listOfSols
         @test oldgradient((X)->real.(trans(X))[mI, j], evalX)[1] ≈
           solRe
         @test oldgradient((X)->imag.(trans(X))[mI, j], evalX)[1] ≈
           solIm
-        if typeof(P) <:AbstractFFTs.Plan && maximum(trans .== [fft,rfft])
-          @test oldgradient((X)->real.(P * X)[mI, j], evalX)[1] ≈
+        if typeof(P) <:AbstractFFTs.Plan
+          (eltype(evalX) <: Real) && @test oldgradient((X)->real.(P * X)[mI, j], evalX)[1] ≈
             solRe
-          @test oldgradient((X)->imag.(P * X)[mI, j], evalX)[1] ≈
+          (eltype(evalX) <: Real) && @test oldgradient((X)->imag.(P * X)[mI, j], evalX)[1] ≈
             solIm
-        elseif typeof(P) <: AbstractFFTs.Plan
-          @test oldgradient((X)->real.(P \ X)[mI, j], evalX)[1] ≈
+        end
+        if typeof(Pinv) <: AbstractFFTs.Plan
+          @test oldgradient((X)->real.(Pinv \ X)[mI, j], evalX)[1] ≈
             solRe
-          # for whatever reason the rfft_plan doesn't handle this case well,
-          # even though irfft does
-          if eltype(evalX) <: Real
-            @test oldgradient((X)->imag.(P \ X)[mI, j], evalX)[1] ≈
-              solIm
-          end
+          (eltype(evalX) <: Real) && @test oldgradient((X)->imag.(Pinv \ X)[mI, j], evalX)[1] ≈
+            solIm
         end
       end
     end
