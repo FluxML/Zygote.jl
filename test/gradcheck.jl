@@ -1407,9 +1407,17 @@ end
   @test all(gradient((x,y) -> sum(x .* y), [1,2], [3 4 5]) .≈ ([12, 12], [3 3 3]))
   @test all(gradient((x,y) -> sum(x ./ y), [1,2], 5) .≈ ([0.2, 0.2], -0.12))
 
+  # https://github.com/FluxML/Zygote.jl/pull/1171
   sm = sprand(5, 5, 0.5)
   @test gradient(x -> sum(abs2, Float32.(x)), sm)[1] ≈ gradient(x -> sum(abs2, x), Matrix{Float32}(sm))[1]
   @test gradient(x -> real(sum(ComplexF32.(x) .+ 1 .+ im)), sm)[1] isa SparseMatrixCSC{Float64}
+
+  # https://github.com/FluxML/Zygote.jl/issues/1178
+  function f1179(x)
+    fs = Ref.(x)
+    getindex.(fs)
+  end
+  @test gradient(sum∘f1179, ones(2)) == ([2.0, 2.0],)
 end
 
 using Zygote: Buffer
