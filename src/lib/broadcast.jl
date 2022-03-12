@@ -253,43 +253,33 @@ end
   return y, bc_fwd_back
 end
 
-@init @require CUDA="052768ef-5323-5732-b1bb-66c8b64840ba" begin
+@init @require GPUArrays = "0c68f7d7-f131-5f86-a1c3-88cf8149b2d7" begin
+  # Ordinary broadcasting calls broadcast_forward anyway when certain its' safe,
+  # so perhaps this can be deleted? Possible edge case here:
+  # https://github.com/FluxML/Zygote.jl/pull/1018#issuecomment-873629415
 
-  const CuArrayStyle = CUDA.AbstractGPUArrayStyle
+  @eval @adjoint broadcasted(::AbstractGPUArrayStyle, f, args...) =
+    broadcast_forward(f, args...)
 
-  if isdefined(CUDA, :cufunc)  # CUDA < 3.0
-
-    @eval @adjoint broadcasted(::CuArrayStyle, f, args...) =
-      broadcast_forward(CUDA.cufunc(f), args...)
-
-  else # CUDA >= 3.0 -- don't need cufunc(f).
-       # Ordinary broadcasting calls broadcast_forward anyway when certain its' safe,
-       # so perhaps this can be deleted? Possible edge case here:
-       # https://github.com/FluxML/Zygote.jl/pull/1018#issuecomment-873629415
-
-    @eval @adjoint broadcasted(::CuArrayStyle, f, args...) =
-      broadcast_forward(f, args...)
-
-  end
-
-  @adjoint (::Type{T})(xs::Array) where {T <: CUDA.CuArray} =
+  @adjoint (::Type{T})(xs::Array) where {T <: AbstractGPUArray} =
     T(xs), Δ -> (convert(Array, Δ), )
 
-  @adjoint function sum(xs::CUDA.AbstractGPUArray; dims = :)
+  @adjoint function sum(xs::AbstractGPUArray; dims = :)
     placeholder = similar(xs)
     sum(xs, dims = dims), Δ -> (placeholder .= Δ,)
   end
 
   # Make sure sum(f, ::CuArray) uses broadcase through forward-mode defined above
   # Not the ChainRules.rrule which will use the Zygote.Context and thus not be GPU compatible
-  @adjoint function sum(f, xs::CUDA.AbstractGPUArray; kws...)
+  @adjoint function sum(f, xs::AbstractGPUArray; kws...)
     @assert !haskey(kws, :init) # TODO add init support (julia 1.6)
     return pullback(__context__, (f, xs) -> sum(f.(xs); kws...), f, xs)
   end
 
-  @adjoint function Base.convert(::Type{T}, xs::Array)  where {T<:CUDA.AbstractGPUArray}
+  @adjoint function Base.convert(::Type{T}, xs::Array)  where {T<:AbstractGPUArray}
     Base.convert(T, xs), Δ -> (nothing, Base.convert(Array, Δ),)
   end
 
-  @eval pull_block_vert(sz, Δ::CUDA.CuArray, A::Number) = CUDA.@allowscalar Δ[sz]
+  @eval pull_block_vert(sz, Δ::CUDA.CuArray, A::Number) = GPUArrays.@allowscalar Δ[sz]
+
 end
