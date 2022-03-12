@@ -1,7 +1,7 @@
 using InteractiveUtils
 using InteractiveUtils: typesof
 using Core: Typeof
-import Base: copy!
+import Base: copy!, IdSet
 import Base.Broadcast: broadcasted, materialize!
 
 mutable struct Context <: AContext
@@ -144,7 +144,7 @@ struct Params
 end
 
 Params() = Params(Buffer([], false), IdSet())
-Params(xs) = Params(Buffer(xs, false), IdSet(xs))
+Params(xs) = Params(Buffer(xs, false), IdSet{Any}(xs))
 Params(ps::Params) = ps
 Params(xs::Tuple) = Params(collect(xs))
 
