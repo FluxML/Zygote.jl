@@ -1,7 +1,7 @@
 module Profile
 
 using Requires
-using ..Zygote: Pullback, IdSet, meta, stacklines
+using ..Zygote: Pullback, meta, stacklines
 
 function loc(f)
   # TODO perhaps find most general method
@@ -36,7 +36,7 @@ function mem(x, seen)
   sum(x -> mem(x, seen), fields(x))
 end
 
-mem(x) = mem(x, IdSet())
+mem(x) = mem(x, Base.IdSet())
 
 struct Node
   func::Symbol

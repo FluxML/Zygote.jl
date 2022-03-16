@@ -18,7 +18,6 @@ export rrule_via_ad
 
 const Numeric{T<:Number} = Union{T, AbstractArray{<:T}}
 
-include("tools/idset.jl")
 include("tools/buffer.jl")
 include("tools/builtins.jl")
 
