@@ -360,7 +360,7 @@ end
   @test gradient(x -> map(+, x, (1,2,3))[1], [4,5,6]) == ([1,0,0],)
 
   # mismatched lengths, should zip
-  @test gradient(x -> map(+, x, [1,2,3,99])[1], (4,5,6)) == ((1.0, 0.0, 0.0),) 
+  @test gradient(x -> map(+, x, [1,2,3,99])[1], (4,5,6)) == ((1.0, 0.0, 0.0),)
   @test gradient(x -> map(+, x, [1,2,3])[1], (4,5,6,99)) == ((1.0, 0.0, 0.0, nothing),)
 end
 
@@ -1386,7 +1386,7 @@ end
 end
 
 @testset "broadcast" begin
-  # Before https://github.com/FluxML/Zygote.jl/pull/1001 this gave [1 1 1; 1 0 1; 1 1 -1] 
+  # Before https://github.com/FluxML/Zygote.jl/pull/1001 this gave [1 1 1; 1 0 1; 1 1 -1]
   @test gradient(x -> sum(sin.(x)), Diagonal([0,pi/2,pi]))[1] ≈ [1 0 0; 0 0 0; 0 0 -1]
 
   a = rand(3)
@@ -1485,17 +1485,6 @@ using Zygote: Buffer
   @test ∇W1 == W1
   @test ∇W2 == W2
   @test ∇x == 6 .* x
-end
-
-@testset "FillArrays" begin
-  @test gradcheck(x->sum(Fill(x[], (2, 2))), [0.1])
-  @test first(Zygote.gradient(sz->sum(Ones(sz)), 6)) === nothing
-  @test first(Zygote.gradient(sz->sum(Zeros(sz)), 6)) === nothing
-  @test gradcheck(x->Fill(x[], 5).value, [0.1])
-  @test gradcheck(x->FillArrays.getindex_value(Fill(x[], 5)), [0.1])
-
-  @test first(Zygote.pullback(Ones{Float32}, 10)) isa Ones{Float32}
-  @test first(Zygote.pullback(Zeros{Float32}, 10)) isa Zeros{Float32}
 end
 
 @testset "AbstractArray Addition / Subtraction / Negation" begin
@@ -1623,6 +1612,16 @@ end
 end
 
 @testset "FillArrays" begin
+  
+  @test gradcheck(x->sum(Fill(x[], (2, 2))), [0.1])
+  @test first(Zygote.gradient(sz->sum(Ones(sz)), 6)) === nothing
+  @test first(Zygote.gradient(sz->sum(Zeros(sz)), 6)) === nothing
+  @test gradcheck(x->Fill(x[], 5).value, [0.1])
+  @test gradcheck(x->FillArrays.getindex_value(Fill(x[], 5)), [0.1])
+
+  @test first(Zygote.pullback(Ones{Float32}, 10)) isa Ones{Float32}
+  @test first(Zygote.pullback(Zeros{Float32}, 10)) isa Zeros{Float32}
+
   rng, M, N = MersenneTwister(123456), 7, 11
   x, y = randn(rng), randn(rng)
   @test Zygote.gradient(x->sum(Fill(x, N)), x)[1] == N
@@ -1988,4 +1987,14 @@ end
 
   g = Zygote.gradient(zygote1162, as, bs)
   @test g == ((nothing, 2*as[2], nothing), (nothing, 2*bs[2], nothing))
+end
+
+@testset "Zygote #1184" begin
+  n, d = 3, 2
+  x = [randn(d) for _ in 1:n]
+
+  f = sin
+  g(x) = sum.((f,), x)
+  h(x) = sum(abs2, g(x))
+  @test gradient(h, x)[1] isa typeof(x)
 end
