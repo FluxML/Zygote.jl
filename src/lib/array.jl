@@ -1,7 +1,8 @@
 using Random, FillArrays, AbstractFFTs
 using FillArrays: AbstractFill, getindex_value
 using Base.Broadcast: broadcasted, broadcast_shape
-using Distributed: pmap, AbstractWorkerPool
+using Distributed: pmap, AbstractWorkerPool, workers, nworkers, myid, remotecall_fetch
+using DistributedArrays
 
 @adjoint Array(xs::AbstractArray) = Array(xs), ȳ -> (ȳ,)
 @adjoint Array(xs::Array) = Array(xs), ȳ -> (ȳ,)
@@ -192,7 +193,7 @@ _restore(dx, ::Val{N}) where {N} = length(dx) < N ? ntuple(i -> get(dx,i,nothing
 last_or_nothing(::Nothing) = nothing
 last_or_nothing(x) = last(x)
 
-for (mapfunc,∇mapfunc) in [(:map,:∇map),(:pmap,:∇pmap)]
+for (mapfunc,∇mapfunc) in [(:map,:∇map)]
   @eval function $∇mapfunc(cx, f::F, args::Vararg{Any, N}) where {F, N}
     ys_and_backs = $mapfunc((args...) -> _pullback(cx, f, args...), args...)
     ys = map(first, ys_and_backs)
@@ -274,7 +275,7 @@ end
         # combine the results from each proc into res
         
         res_batches = asyncmap(run_backs, unique_IDs, positions)
-        res = Array{Any}(undef, output_axes)
+        res = similar(Array{Any}, output_axes)
 
         for (positions, res_batch) in zip(positions, res_batches)
             res[positions] = res_batch

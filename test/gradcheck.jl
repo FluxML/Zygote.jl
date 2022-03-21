@@ -376,7 +376,7 @@ end
     @test gradient(v -> sum([x for x in v]), [1.1,2.2,3.3]) == ([1, 1, 1],)
 end
 
-# more elaborate tests of upstream pmap rule in ChainRules
+# more elaborate tests of pmap rule
 @testset "multiple pmaps" begin
   function sequential(xs)
     ys = pmap(x -> x^2, xs)
