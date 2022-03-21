@@ -393,6 +393,11 @@ end
   @test gradtest(nested, xs)
 end
 
+@testset "pmap kwargs" begin
+    @test gradtest(xs -> pmap(x -> x^2, xs, batch_size=2), rand(4)) # batch_size > 1
+    @test gradtest(xs -> pmap(x -> x^2, xs, distributed=false), rand(4)) # distributed = false
+end
+
 @testset "Stateful Map" begin
   s = 0
   f(x) = (s += x)

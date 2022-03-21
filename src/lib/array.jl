@@ -225,17 +225,6 @@ for (mapfunc,∇mapfunc) in [(:map,:∇map)]
   end
 end
 
-#@adjoint function pmap(f, wp::AbstractWorkerPool, args...; kwargs...)
-#  ys_backs = pmap((x...) -> _pullback(__context__, f, x...), wp, args...; kwargs...)
-#  ys, backs = unzip(ys_backs)
-#  ys, function (Δ)
-#    res = pmap((df,d) -> df(d), wp, backs, Δ; kwargs...)
-#    Δf_and_args = unzip(res)
-#    Δf = reduce(accum, Δf_and_args[1])
-#    (Δf, nothing, Δf_and_args[2:end]..., nothing, nothing)
-#  end
-#end
-
 # Now that there is a backwards rule for zip,
 # it should be fine to deal with only a single collection X
 @adjoint function pmap(f, p::AbstractWorkerPool, X; kwargs...)
