@@ -224,15 +224,69 @@ for (mapfunc,∇mapfunc) in [(:map,:∇map),(:pmap,:∇pmap)]
   end
 end
 
-@adjoint function pmap(f, wp::AbstractWorkerPool, args...; kwargs...)
-  ys_backs = pmap((x...) -> _pullback(__context__, f, x...), wp, args...; kwargs...)
-  ys, backs = unzip(ys_backs)
-  ys, function (Δ)
-    res = pmap((df,d) -> df(d), wp, backs, Δ; kwargs...)
-    Δf_and_args = unzip(res)
-    Δf = reduce(accum, Δf_and_args[1])
-    (Δf, nothing, Δf_and_args[2:end]..., nothing, nothing)
-  end
+#@adjoint function pmap(f, wp::AbstractWorkerPool, args...; kwargs...)
+#  ys_backs = pmap((x...) -> _pullback(__context__, f, x...), wp, args...; kwargs...)
+#  ys, backs = unzip(ys_backs)
+#  ys, function (Δ)
+#    res = pmap((df,d) -> df(d), wp, backs, Δ; kwargs...)
+#    Δf_and_args = unzip(res)
+#    Δf = reduce(accum, Δf_and_args[1])
+#    (Δf, nothing, Δf_and_args[2:end]..., nothing, nothing)
+#  end
+#end
+
+# Now that there is a backwards rule for zip,
+# it should be fine to deal with only a single collection X
+@adjoint function pmap(f, p::AbstractWorkerPool, X; kwargs...)
+    darr = dfill([], (nworkers(p) + 1,), vcat(myid(), workers(p))) # Include own proc to handle empty worker pool
+
+    function forw(x)
+        y, back = _pullback(__context__, f, x)
+        push!(darr[:L][1], back)
+        return y, myid(), length(darr[:L][1])
+    end
+
+    ys_IDs_indices = pmap(forw, p, X; kwargs...)
+    ys = getindex.(ys_IDs_indices, 1) # the primal values
+    IDs = getindex.(ys_IDs_indices, 2) # remember which processors handled which elements of X
+    indices = getindex.(ys_IDs_indices, 3) # remember the index of the pullback in the array on each processor
+    output_axes = axes(ys)
+ 
+    # create a list of positions in X handled by each processor
+    unique_IDs = sort!(unique(IDs))
+    T = eltype(eachindex(ys_IDs_indices))
+    positions = [Vector{T}() for _ in 1:length(unique_IDs)]
+    for i in eachindex(ys_IDs_indices)
+        push!(positions[searchsortedfirst(unique_IDs, IDs[i])], i)
+    end
+
+    function pmap_pullback(Δ)
+        # runs the pullback for each position handled by proc ID in forward pass
+        function run_backs(ID, positions)
+            Δ_batch = Δ[positions]
+            indices_batch = indices[positions]
+            res_batch = remotecall_fetch(ID) do
+                    asyncmap((Δy, i) -> darr[:L][1][i](Δy), Δ_batch, indices_batch) # run all the backs in a local asyncmap
+                end 
+            return res_batch
+        end
+
+        # combine the results from each proc into res
+        
+        res_batches = asyncmap(run_backs, unique_IDs, positions)
+        res = Array{Any}(undef, output_axes)
+
+        for (positions, res_batch) in zip(positions, res_batches)
+            res[positions] = res_batch
+        end
+
+        # extract f̄ and X̄ 
+        Δf_and_args = unzip(res)
+        Δf = reduce(accum, Δf_and_args[1])
+        return (Δf, nothing, Δf_and_args[2:end]..., nothing, nothing)
+    end
+
+    return ys, pmap_pullback
 end
 
 for t in subtypes(AbstractWorkerPool)
