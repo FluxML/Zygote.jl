@@ -18,11 +18,7 @@ Zygote is easy to understand since, at its core, it has a one-function API (`pul
 
 `gradient` calculates derivatives. For example, the derivative of ``3x^2 + 2x + 1`` is ``6x + 2``, so when `x = 5`, `dx = 32`.
 
-<<<<<<< HEAD
-```jldoctest
-=======
-```jldoctest
->>>>>>> 57a2cf48af9ffa199f29ac42ee41a320b98de8d6
+```jldoctest index
 julia> using Zygote
 
 julia> gradient(x -> 3x^2 + 2x + 1, 5)
@@ -31,11 +27,7 @@ julia> gradient(x -> 3x^2 + 2x + 1, 5)
 
 `gradient` returns a tuple, with a gradient for each argument to the function.
 
-<<<<<<< HEAD
-```jldoctest
-=======
-```jldoctest
->>>>>>> 57a2cf48af9ffa199f29ac42ee41a320b98de8d6
+```jldoctest index
 julia> gradient((a, b) -> a*b, 2, 3)
 (3, 2)
 ```
@@ -56,11 +48,7 @@ julia> gradient(x -> 3x^2 + 2x + 1, 1//4)
 
 Control flow is fully supported, including recursion.
 
-<<<<<<< HEAD
-```jldoctest
-=======
-```jldoctest
->>>>>>> 57a2cf48af9ffa199f29ac42ee41a320b98de8d6
+```jldoctest index
 julia> function pow(x, n)
          r = 1
          for i = 1:n
@@ -82,11 +70,7 @@ julia> gradient(x -> pow2(x, 3), 5)
 
 Data structures are also supported, including mutable ones like dictionaries. Arrays are currently immutable, though [this may change](https://github.com/FluxML/Zygote.jl/pull/75) in future.
 
-<<<<<<< HEAD
-```jldoctest
-=======
-```jldoctest
->>>>>>> 57a2cf48af9ffa199f29ac42ee41a320b98de8d6
+```jldoctest index
 julia> d = Dict()
 Dict{Any,Any} with 0 entries
 
@@ -104,11 +88,7 @@ julia> d[:x]
 
 Julia makes it easy to work with custom types, and Zygote makes it easy to differentiate them. For example, given a simple `Point` type:
 
-<<<<<<< HEAD
-```jldoctest
-=======
-```jldoctest
->>>>>>> 57a2cf48af9ffa199f29ac42ee41a320b98de8d6
+```jldoctest index
 import Base: +, -
 
 struct Point
@@ -121,11 +101,7 @@ a::Point - b::Point = Point(a.x - b.x, a.y - b.y)
 dist(p::Point) = sqrt(p.x^2 + p.y^2)
 ```
 
-<<<<<<< HEAD
-```jldoctest
-=======
-```jldoctest
->>>>>>> 57a2cf48af9ffa199f29ac42ee41a320b98de8d6
+```jldoctest index
 julia> a = Point(1, 2)
 Point(1.0, 2.0)
 
@@ -143,11 +119,7 @@ Zygote's default representation of the "point adjoint" is a named tuple with gra
 
 This means we can do something very powerful: differentiating through Julia libraries, even if they weren't designed for this. For example, `colordiff` might be a smarter loss function on colours than simple mean-squared-error:
 
-<<<<<<< HEAD
-```jldoctest
-=======
-```jldoctest
->>>>>>> 57a2cf48af9ffa199f29ac42ee41a320b98de8d6
+```jldoctest index
 julia> using Colors
 
 julia> colordiff(RGB(1, 0, 0), RGB(0, 1, 0))
@@ -161,11 +133,7 @@ julia> gradient(colordiff, RGB(1, 0, 0), RGB(0, 1, 0))
 
 It's easy to work with even very large and complex models, and there are few ways to do this. Autograd-style models pass around a collection of weights. Depending on how you write your model, there are multiple ways to *explicity* take gradients with respect to parameters. For example, the function `linear` accepts the parameters as an argument to the model. So, we directly pass in the parameters, `θ`, as an argument to the function being differentiated.
 
-<<<<<<< HEAD
-```jldoctest
-=======
-```jldoctest
->>>>>>> 57a2cf48af9ffa199f29ac42ee41a320b98de8d6
+```jldoctest index
 julia> linear(θ, x) = θ[:W] * x .+ θ[:b]
 linear (generic function with 1 method)
 
@@ -189,11 +157,7 @@ We can combine the role of the dictionary and the function here by making a call
 contains the parameters, equivalent to a closure. Passed explicitly to `gradient`, we get a named tuple
 with the same field names:
 
-<<<<<<< HEAD
-```jldoctest
-=======
-```jldoctest
->>>>>>> 57a2cf48af9ffa199f29ac42ee41a320b98de8d6
+```jldoctest index
 julia> struct Linear
          W
          b
@@ -210,11 +174,7 @@ julia> dmodel = gradient(model -> sum(model(x)), model)[1]
 
 Zygote also supports another way to take gradients, via *implicit parameters*. Here the loss function takes zero arguments, but the variables of interest are indicated by a special `Params` object. The function `linear` which depends on `W` and `b` is executed when the loss function `() -> sum(linear(x))` is called, and hence this dependence is visible to Zygote:
 
-<<<<<<< HEAD
-```jldoctest
-=======
-```jldoctest
->>>>>>> 57a2cf48af9ffa199f29ac42ee41a320b98de8d6
+```jldoctest index
 julia> W = rand(2, 5); b = rand(2);
 
 julia> linear(x) = W * x .+ b
