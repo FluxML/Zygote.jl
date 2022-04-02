@@ -22,7 +22,7 @@ Zygote is easy to understand since, at its core, it has a one-function API (`pul
 julia> using Zygote
 
 julia> gradient(x -> 3x^2 + 2x + 1, 5)
-(32,)
+(32.0,)
 ```
 
 `gradient` returns a tuple, with a gradient for each argument to the function.
@@ -119,7 +119,7 @@ Zygote's default representation of the "point adjoint" is a named tuple with gra
 
 This means we can do something very powerful: differentiating through Julia libraries, even if they weren't designed for this. For example, `colordiff` might be a smarter loss function on colours than simple mean-squared-error:
 
-```jldoctest index
+```julia
 julia> using Colors
 
 julia> colordiff(RGB(1, 0, 0), RGB(0, 1, 0))
@@ -133,7 +133,7 @@ julia> gradient(colordiff, RGB(1, 0, 0), RGB(0, 1, 0))
 
 It's easy to work with even very large and complex models, and there are few ways to do this. Autograd-style models pass around a collection of weights. Depending on how you write your model, there are multiple ways to *explicity* take gradients with respect to parameters. For example, the function `linear` accepts the parameters as an argument to the model. So, we directly pass in the parameters, `θ`, as an argument to the function being differentiated.
 
-```jldoctest index
+```julia
 julia> linear(θ, x) = θ[:W] * x .+ θ[:b]
 linear (generic function with 1 method)
 
