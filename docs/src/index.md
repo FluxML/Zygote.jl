@@ -72,7 +72,7 @@ Data structures are also supported, including mutable ones like dictionaries. Ar
 
 ```jldoctest index
 julia> d = Dict()
-Dict{Any,Any} with 0 entries
+Dict{Any, Any}()
 
 julia> gradient(5) do x
          d[:x] = x
