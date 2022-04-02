@@ -29,7 +29,7 @@ julia> gradient(x -> 3x^2 + 2x + 1, 5)
 
 ```jldoctest index
 julia> gradient((a, b) -> a*b, 2, 3)
-(3, 2)
+(3.0, 2.0)
 ```
 
 This will work equally well if the arguments are arrays, structs, or any other Julia type, but the function should return a scalar (like a loss or objective ``l``, if you're doing optimisation / ML).
@@ -59,13 +59,13 @@ julia> function pow(x, n)
 pow (generic function with 1 method)
 
 julia> gradient(x -> pow(x, 3), 5)
-(75,)
+(75.0,)
 
 julia> pow2(x, n) = n <= 0 ? 1 : x*pow2(x, n-1)
 pow2 (generic function with 1 method)
 
 julia> gradient(x -> pow2(x, 3), 5)
-(75,)
+(75.0,)
 ```
 
 Data structures are also supported, including mutable ones like dictionaries. Arrays are currently immutable, though [this may change](https://github.com/FluxML/Zygote.jl/pull/75) in future.
@@ -78,7 +78,7 @@ julia> gradient(5) do x
          d[:x] = x
          d[:x] * d[:x]
        end
-(10,)
+(10.0,)
 
 julia> d[:x]
 5
@@ -101,7 +101,7 @@ a::Point - b::Point = Point(a.x - b.x, a.y - b.y)
 dist(p::Point) = sqrt(p.x^2 + p.y^2)
 ```
 
-```jldoctest index
+```julia
 julia> a = Point(1, 2)
 Point(1.0, 2.0)
 
@@ -157,7 +157,7 @@ We can combine the role of the dictionary and the function here by making a call
 contains the parameters, equivalent to a closure. Passed explicitly to `gradient`, we get a named tuple
 with the same field names:
 
-```jldoctest index
+```julia
 julia> struct Linear
          W
          b
@@ -174,7 +174,7 @@ julia> dmodel = gradient(model -> sum(model(x)), model)[1]
 
 Zygote also supports another way to take gradients, via *implicit parameters*. Here the loss function takes zero arguments, but the variables of interest are indicated by a special `Params` object. The function `linear` which depends on `W` and `b` is executed when the loss function `() -> sum(linear(x))` is called, and hence this dependence is visible to Zygote:
 
-```jldoctest index
+```julia
 julia> W = rand(2, 5); b = rand(2);
 
 julia> linear(x) = W * x .+ b
