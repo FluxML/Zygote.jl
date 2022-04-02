@@ -5,7 +5,7 @@ Pkg.activate(@__DIR__); Pkg.instantiate()
 pushfirst!(LOAD_PATH, joinpath(@__DIR__, ".."))
 
 using Documenter, Zygote
-
+DocMeta.setdocmeta!(Zygote, :DocTestSetup, :(using Zygote); recursive=true)
 makedocs(
   sitename="Zygote",
   strict=true,
