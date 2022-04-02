@@ -88,7 +88,7 @@ julia> d[:x]
 
 Julia makes it easy to work with custom types, and Zygote makes it easy to differentiate them. For example, given a simple `Point` type:
 
-```jldoctest index
+```julia
 import Base: +, -
 
 struct Point
