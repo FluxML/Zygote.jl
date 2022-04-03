@@ -4,7 +4,7 @@ Complex numbers add some difficulty to the idea of a "gradient". To talk about `
 
 If `f` returns a real number, things are fairly straightforward. For ``c = x + yi`` and  ``z = f(c)``, we can define the adjoint ``\bar c = \frac{\partial z}{\partial x} + \frac{\partial z}{\partial y}i = \bar x + \bar y i`` (note that ``\bar c`` means gradient, and ``c'`` means conjugate). It's exactly as if the complex number were just a pair of reals `(re, im)`. This works out of the box.
 
-```julia
+```jldoctest complex
 julia> gradient(c -> abs2(c), 1+2im)
 (2 + 4im,)
 ```
@@ -13,21 +13,21 @@ However, while this is a very pragmatic definition that works great for gradient
 
 Fortunately it's also possible to get these derivatives; they are the conjugate of the gradients for the real part.
 
-```julia
+```jldoctest complex
 julia> gradient(x -> real(log(x)), 1+2im)[1] |> conj
 0.2 - 0.4im
 ```
 
 We can check that this function is holomorphic – and thus that the gradient we got out is sensible – by checking the Cauchy-Riemann equations. In other words this should give the same answer:
 
-```julia
+```jldoctest complex
 julia> -im*gradient(x -> imag(log(x)), 1+2im)[1] |> conj
 0.2 - 0.4im
 ```
 
 Notice that this fails in a non-holomorphic case, `f(x) = log(x')`:
 
-```julia
+```jldoctest complex
 julia> gradient(x -> real(log(x')), 1+2im)[1] |> conj
 0.2 - 0.4im
 
@@ -37,7 +37,7 @@ julia> -im*gradient(x -> imag(log(x')), 1+2im)[1] |> conj
 
 In cases like these, all bets are off. The gradient can only be described with more information; either a 2x2 Jacobian (a generalisation of the Real case, where the second column is now non-zero), or by the two Wirtinger derivatives (a generalisation of the holomorphic case, where ``\frac{∂ f}{∂ z'}`` is now non-zero). To get these efficiently, as we would a Jacobian, we can just call the backpropagators twice.
 
-```julia
+```jldoctest complex
 function jacobi(f, x)
   y, back = Zygote.pullback(f, x)
   back(1)[1], back(im)[1]
@@ -49,7 +49,7 @@ function wirtinger(f, x)
 end
 ```
 
-```julia
+```jldoctest complex
 julia> wirtinger(x -> 3x^2 + 2x + 1, 1+2im)
 (8.0 + 12.0im, 0.0 + 0.0im)
 

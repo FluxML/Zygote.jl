@@ -43,7 +43,7 @@ you should use the low-level `_pullback` method and the pullback it returns.
 This will directly show either the derived adjoint code or the code for a custom
 adjoint, if there is one.
 
-```julia
+```jldoctest profiling
 julia> using Zygote: Context, _pullback
 
 julia> add(a, b) = a+b
