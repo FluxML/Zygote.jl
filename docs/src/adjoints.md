@@ -35,13 +35,13 @@ julia> y
 
 To make this concrete, take the function ``y = \sin(x)``. ``\frac{\partial y}{\partial x} = \cos(x)``, so the pullback is ``\bar{y} \cos(x)``. In other words `pullback(sin, x)` behaves the same as
 
-```jldoctest adjoints
+```julia
 dsin(x) = (sin(x), ȳ -> (ȳ * cos(x),))
 ```
 
 `gradient` takes a function ``l = f(x)`` and assumes ``l̄ = \frac{\partial l}{\partial l} = 1`` and feeds this in to the pullback. In the case of `sin`,
 
-```jldoctest adjoints
+```julia
 julia> function gradsin(x)
          _, back = dsin(x)
          back(1)
@@ -79,14 +79,14 @@ Zygote has many adjoints for non-mathematical operations such as for indexing an
 We can extend Zygote to a new function with the `@adjoint` function.
 
 ```jldoctest adjoints
-julia> mul(a, b) = a*b
+julia> mul(a, b) = a*b;
 
 julia> using Zygote: @adjoint
 
 julia> @adjoint mul(a, b) = mul(a, b), c̄ -> (c̄*b, c̄*a)
 
 julia> gradient(mul, 2, 3)
-(3, 2)
+(3.0, 2.0)
 ```
 
 It might look strange that we write `mul(a, b)` twice here. In this case we want to call the normal `mul` function for the pullback pass, but you may also want to modify the pullback pass (for example, to capture intermediate results in the pullback).
@@ -165,7 +165,7 @@ julia> @adjoint hook(f, x) = x, x̄ -> (nothing, f(x̄))
 
 ```jldoctest adjoints
 julia> gradient((a, b) -> hook(-, a)*b, 2, 3)
-(-3, 2)
+(-3.0, 2.0)
 ```
 
 We could use this for debugging or modifying gradients (e.g. gradient clipping).
@@ -173,7 +173,7 @@ We could use this for debugging or modifying gradients (e.g. gradient clipping).
 ```jldoctest adjoints
 julia> gradient((a, b) -> hook(ā -> @show(ā), a)*b, 2, 3)
 ā = 3
-(3, 2)
+(3.0, 2.0)
 ```
 
 Zygote provides both `hook` and `@showgrad` so you don't have to write these yourself.
@@ -208,7 +208,7 @@ julia> gradient(x -> checkpoint(foo, x), 1)
 
 It's easy to check whether the code we're running is currently being differentiated.
 
-```jldoctest adjoints
+```julia
 isderiving() = false
 
 @adjoint isderiving() = true, _ -> nothing
@@ -216,7 +216,7 @@ isderiving() = false
 
 A more interesting example is to actually detect how many levels of nesting are going on.
 
-```jldoctest adjoints
+```julia
 nestlevel() = 0
 
 @adjoint nestlevel() = nestlevel()+1, _ -> nothing
@@ -224,7 +224,7 @@ nestlevel() = 0
 
 Demo:
 
-```jldoctest adjoints
+```julia
 julia> function f(x)
          println(nestlevel(), " levels of nesting")
          return x
