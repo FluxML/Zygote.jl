@@ -18,7 +18,9 @@ The `@adjoint` macro is an important part of Zygote's interface; customising you
 
 `gradient` is really just syntactic sugar around the more fundamental function `pullback`.
 
-```julia
+```jldoctest adjoints
+julia> using Zygote
+
 julia> y, back = Zygote.pullback(sin, 0.5);
 
 julia> y
@@ -39,7 +41,7 @@ dsin(x) = (sin(x), ȳ -> (ȳ * cos(x),))
 
 `gradient` takes a function ``l = f(x)`` and assumes ``l̄ = \frac{\partial l}{\partial l} = 1`` and feeds this in to the pullback. In the case of `sin`,
 
-```julia
+```jldoctest adjoints
 julia> function gradsin(x)
          _, back = dsin(x)
          back(1)
@@ -55,7 +57,7 @@ julia> cos(0.5)
 
 More generally
 
-```julia
+```jldoctest adjoints
 julia> function mygradient(f, x...)
          _, back = Zygote.pullback(f, x...)
          back(1)
@@ -76,7 +78,7 @@ Zygote has many adjoints for non-mathematical operations such as for indexing an
 
 We can extend Zygote to a new function with the `@adjoint` function.
 
-```julia
+```jldoctest adjoints
 julia> mul(a, b) = a*b
 
 julia> using Zygote: @adjoint
@@ -152,7 +154,7 @@ We usually use custom adjoints to add gradients that Zygote can't derive itself 
 
 ### Gradient Hooks
 
-```julia
+```jldoctest adjoints
 julia> hook(f, x) = x
 hook (generic function with 1 method)
 
@@ -161,14 +163,14 @@ julia> @adjoint hook(f, x) = x, x̄ -> (nothing, f(x̄))
 
 `hook` doesn't seem that interesting, as it doesn't do anything. But the fun part is in the adjoint; it's allowing us to apply a function `f` to the gradient of `x`.
 
-```julia
+```jldoctest adjoints
 julia> gradient((a, b) -> hook(-, a)*b, 2, 3)
 (-3, 2)
 ```
 
 We could use this for debugging or modifying gradients (e.g. gradient clipping).
 
-```julia
+```jldoctest adjoints
 julia> gradient((a, b) -> hook(ā -> @show(ā), a)*b, 2, 3)
 ā = 3
 (3, 2)
@@ -180,7 +182,7 @@ Zygote provides both `hook` and `@showgrad` so you don't have to write these you
 
 A more advanced example is checkpointing, in which we save memory by re-computing the pullback pass of a function during the backwards pass. To wit:
 
-```julia
+```jldoctest adjoints
 julia> checkpoint(f, x) = f(x)
 checkpoint (generic function with 1 method)
 
@@ -192,7 +194,7 @@ julia> gradient(x -> checkpoint(sin, x), 1)
 
 If a function has side effects we'll see that the pullback pass happens twice, as expected.
 
-```julia
+```jldoctest adjoints
 julia> foo(x) = (println(x); sin(x))
 foo (generic function with 1 method)
 
@@ -222,7 +224,7 @@ nestlevel() = 0
 
 Demo:
 
-```julia
+```jldoctest adjoints
 julia> function f(x)
          println(nestlevel(), " levels of nesting")
          return x
