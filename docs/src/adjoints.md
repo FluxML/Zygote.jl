@@ -172,7 +172,7 @@ We could use this for debugging or modifying gradients (e.g. gradient clipping).
 
 ```jldoctest adjoints
 julia> gradient((a, b) -> hook(ā -> @show(ā), a)*b, 2, 3)
-ā = 3
+ā = 3.0
 (3.0, 2.0)
 ```
 
