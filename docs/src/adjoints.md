@@ -95,7 +95,7 @@ It might look strange that we write `mul(a, b)` twice here. In this case we want
 
 One good use for custom adjoints is to customise how your own types behave during differentiation. For example, in our `Point` example we noticed that the adjoint is a named tuple, rather than another point.
 
-```jldoctest adjoints
+```julia
 import Base: +, -
 
 struct Point
@@ -111,14 +111,14 @@ a::Point - b::Point = Point(width(a) - width(b), height(a) - height(b))
 dist(p::Point) = sqrt(width(p)^2 + height(p)^2)
 ```
 
-```jldoctest adjoints
+```julia
 julia> gradient(a -> dist(a), Point(1, 2))[1]
 (x = 0.4472135954999579, y = 0.8944271909999159)
 ```
 
 Fundamentally, this happens because of Zygote's default adjoint for `getfield`.
 
-```jldoctest adjoints
+```julia
 julia> gradient(a -> a.x, Point(1, 2))
 ((x = 1, y = nothing),)
 ```
