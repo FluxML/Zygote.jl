@@ -68,6 +68,12 @@ function accum_global(cx::Context, ref, x̄)
   return
 end
 
+# Needed for nested AD
+function _pullback(::typeof(accum_global), cx::Context, ref, x̄)
+  accum_global_pullback(_) = nothing
+  return accum_global(cx, ref, x̄), accum_global_pullback
+end
+
 unwrap(x) = x
 
 @adjoint unwrap(x) = unwrap(x), x̄ -> (accum_param(__context__, x, x̄),)
