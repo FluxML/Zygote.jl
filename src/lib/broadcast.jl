@@ -253,6 +253,7 @@ end
   return y, bc_fwd_back
 end
 
+# using GPUArrays
 @init @require GPUArrays = "0c68f7d7-f131-5f86-a1c3-88cf8149b2d7" begin
   # Ordinary broadcasting calls broadcast_forward anyway when certain its' safe,
   # so perhaps this can be deleted? Possible edge case here:
