@@ -138,8 +138,8 @@ gradient
 Container for implicit parameters, used when differentiating
 a zero-argument funtion `() -> loss(A, B)` with respect to `A, B`.
 """
-struct Params
-  order::Buffer # {Any, Vector{Any}}
+struct Params{B <: Buffer}
+  order::B
   params::IdSet{Any} # TODO store ids only
 end
 
