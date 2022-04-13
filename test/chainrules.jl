@@ -263,6 +263,18 @@ using Zygote: ZygoteRuleConfig
         @test (1.0,) == Zygote.gradient(oout_id_outer, π)
         @test oout_id_rrule_hitcount[] == 0
     end
+
+    # issue #1204
+    @testset "NotImplemented" begin
+        f_notimplemented(x) = x
+        @scalar_rule f_notimplemented(x) @not_implemented("not implemented :(")
+        @test Zygote.gradient(f_notimplemented, 0.1) === (nothing,)
+        @test Zygote.gradient(x -> f_notimplemented(x[1]), 0.1) === (nothing,)
+        if isdefined(Base, :only)
+            @test Zygote.gradient(x -> f_notimplemented(only(x)), (0.1,)) === (nothing,)
+            @test Zygote.gradient(x -> f_notimplemented(only(x)), [0.1]) === (nothing,)
+        end
+    end
 end
 
 @testset "ChainRulesCore.rrule_via_ad" begin
