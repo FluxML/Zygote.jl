@@ -18,18 +18,18 @@ Zygote is easy to understand since, at its core, it has a one-function API (`pul
 
 `gradient` calculates derivatives. For example, the derivative of ``3x^2 + 2x + 1`` is ``6x + 2``, so when `x = 5`, `dx = 32`.
 
-```julia
+```jldoctest index
 julia> using Zygote
 
 julia> gradient(x -> 3x^2 + 2x + 1, 5)
-(32,)
+(32.0,)
 ```
 
 `gradient` returns a tuple, with a gradient for each argument to the function.
 
-```julia
+```jldoctest index
 julia> gradient((a, b) -> a*b, 2, 3)
-(3, 2)
+(3.0, 2.0)
 ```
 
 This will work equally well if the arguments are arrays, structs, or any other Julia type, but the function should return a scalar (like a loss or objective ``l``, if you're doing optimisation / ML).
@@ -48,7 +48,7 @@ julia> gradient(x -> 3x^2 + 2x + 1, 1//4)
 
 Control flow is fully supported, including recursion.
 
-```julia
+```jldoctest index
 julia> function pow(x, n)
          r = 1
          for i = 1:n
@@ -59,26 +59,26 @@ julia> function pow(x, n)
 pow (generic function with 1 method)
 
 julia> gradient(x -> pow(x, 3), 5)
-(75,)
+(75.0,)
 
 julia> pow2(x, n) = n <= 0 ? 1 : x*pow2(x, n-1)
 pow2 (generic function with 1 method)
 
 julia> gradient(x -> pow2(x, 3), 5)
-(75,)
+(75.0,)
 ```
 
 Data structures are also supported, including mutable ones like dictionaries. Arrays are currently immutable, though [this may change](https://github.com/FluxML/Zygote.jl/pull/75) in future.
 
-```julia
+```jldoctest index
 julia> d = Dict()
-Dict{Any,Any} with 0 entries
+Dict{Any, Any}()
 
 julia> gradient(5) do x
          d[:x] = x
          d[:x] * d[:x]
        end
-(10,)
+(10.0,)
 
 julia> d[:x]
 5

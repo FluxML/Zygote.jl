@@ -184,7 +184,7 @@ _tryreverse(m::typeof(map), x::Union{AbstractVector, Tuple}) = reverse(x)
 _tryaxes(x) = axes(x)
 _tryaxes(x::Tuple) = Val(length(x))
 _restore(dx, ax::Tuple) = axes(dx) == ax ? dx : reshape(vcat(dx, falses(prod(length, ax) - length(dx))), ax)
-_restore(dx, ::Val{N}) where {N} = length(dx) < N ? ntuple(i -> get(dx,i,nothing), N) : NTuple{N}(dx)
+_restore(dx, ::Val{N}) where {N} = ntuple(i -> get(dx,i,nothing), N)
 
 # Sometimes a pullback doesn't return a Tuple, but rather returns only a
 # single nothing to say "all arguments have zero cotangent". This function is needed to
@@ -286,10 +286,10 @@ _ndims(x) = Base.IteratorSize(x) isa Base.HasShape ? _ndims(Base.IteratorSize(x)
   function back(dy::AbstractArray)
     d = 1
     ntuple(length(xs)) do n
-      first(dy)[n] === nothing && return nothing
       nd = _ndims(xs[n])
       dims = ntuple(i -> i<d ? i : i+nd, ndims(dy)-nd)
       d += nd
+      first(dy)[n] === nothing && return nothing
       init = zero.(first(dy)[n]) # allows for tuples, which accum can add:
       red = mapreduce(StaticGetter{n}(), accum, dy; dims=dims, init=init)
       return _project(xs[n], reshape(red, axes(xs[n])))

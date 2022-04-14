@@ -29,7 +29,11 @@ function reflect(@nospecialize(sigtypes::Tuple), world::UInt = typemax(UInt))
     end
     method_index === 0 && return nothing
     type_signature, raw_static_params, method = _methods[method_index]
-    method_instance = Core.Compiler.specialize_method(method, type_signature, raw_static_params, false)
+    if VERSION < v"1.8-"
+        method_instance = Core.Compiler.specialize_method(method, type_signature, raw_static_params, false)
+    else
+        method_instance = Core.Compiler.specialize_method(method, type_signature, raw_static_params; preexisting=false)
+    end
     method_signature = method.sig
     static_params = Any[raw_static_params...]
     return method_instance, method_signature, static_params

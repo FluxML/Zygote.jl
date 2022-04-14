@@ -9,7 +9,7 @@
 
     This page exists to descibe how Zygote works, and how adjoints can be directly defined for Zygote.
     Defining adjoints this way does not make them accessible to other AD systems, but does let you do things that directly depend on how Zygote works.
-    It allows for specific definitions of adjoints that are only defined for Zgyote (which might work differently to more generic definitions defined for all AD).
+    It allows for specific definitions of adjoints that are only defined for Zygote (which might work differently to more generic definitions defined for all AD).
 
 
 The `@adjoint` macro is an important part of Zygote's interface; customising your backwards pass is not only possible but widely used and encouraged. While there are specific utilities available for common things like gradient clipping, understanding adjoints will give you the most flexibility. We first give a bit more background on what these pullback things are.
@@ -18,7 +18,9 @@ The `@adjoint` macro is an important part of Zygote's interface; customising you
 
 `gradient` is really just syntactic sugar around the more fundamental function `pullback`.
 
-```julia
+```jldoctest adjoints
+julia> using Zygote
+
 julia> y, back = Zygote.pullback(sin, 0.5);
 
 julia> y
@@ -55,7 +57,7 @@ julia> cos(0.5)
 
 More generally
 
-```julia
+```jldoctest adjoints
 julia> function mygradient(f, x...)
          _, back = Zygote.pullback(f, x...)
          back(1)
@@ -68,7 +70,7 @@ julia> mygradient(sin, 0.5)
 
 The rest of this section contains more technical detail. It can be skipped if you only need an intuition for pullbacks; you generally won't need to worry about it as a user.
 
-If ``x`` and ``y`` are vectors, ``\frac{\partial y}{\partial x}`` becomes a Jacobian. Importantly, because we are implementing reverse mode we actually left-multiply the Jacobian, i.e. `v'J`, rather than the more usual `J*v`. Transposing `v` to a row vector and back `(v'J)'` is equivalent to `J'v` so our gradient rules actually implement the *adjoint* of the Jacobian. This is relevant even for scalar code: the adjoint for `y = sin(x)` is `x̄ = sin(x)'*ȳ`; the conjugation is usually moot but gives the correct behaviour for complex code. "Pullbacks" are therefore sometimes called "vector-Jacobian products" (VJPs), and we refer to the reverse mode rules themselves as "adjoints".
+If ``x`` and ``y`` are vectors, ``\frac{\partial y}{\partial x}`` becomes a Jacobian. Importantly, because we are implementing reverse mode we actually left-multiply the Jacobian, i.e. `v'J`, rather than the more usual `J*v`. Transposing `v` to a row vector and back `(v'J)'` is equivalent to `J'v` so our gradient rules actually implement the *adjoint* of the Jacobian. This is relevant even for scalar code: the adjoint for `y = sin(x)` is `x̄ = cos(x)'*ȳ`; the conjugation is usually moot but gives the correct behaviour for complex code. "Pullbacks" are therefore sometimes called "vector-Jacobian products" (VJPs), and we refer to the reverse mode rules themselves as "adjoints".
 
 Zygote has many adjoints for non-mathematical operations such as for indexing and data structures. Though these can still be seen as linear functions of vectors, it's not particularly enlightening to implement them with an actual matrix multiply. In these cases it's easiest to think of the adjoint as a kind of inverse. For example, the gradient of a function that takes a tuple to a struct (e.g. `y = Complex(a, b)`) will generally take a struct to a tuple (`(ȳ.re, ȳ.im)`). The gradient of a `getindex` `y = x[i...]` is a `setindex!` `x̄[i...] = ȳ`, etc.
 
@@ -76,15 +78,15 @@ Zygote has many adjoints for non-mathematical operations such as for indexing an
 
 We can extend Zygote to a new function with the `@adjoint` function.
 
-```julia
-julia> mul(a, b) = a*b
+```jldoctest adjoints
+julia> mul(a, b) = a*b;
 
 julia> using Zygote: @adjoint
 
 julia> @adjoint mul(a, b) = mul(a, b), c̄ -> (c̄*b, c̄*a)
 
 julia> gradient(mul, 2, 3)
-(3, 2)
+(3.0, 2.0)
 ```
 
 It might look strange that we write `mul(a, b)` twice here. In this case we want to call the normal `mul` function for the pullback pass, but you may also want to modify the pullback pass (for example, to capture intermediate results in the pullback).
@@ -152,7 +154,7 @@ We usually use custom adjoints to add gradients that Zygote can't derive itself 
 
 ### Gradient Hooks
 
-```julia
+```jldoctest adjoints
 julia> hook(f, x) = x
 hook (generic function with 1 method)
 
@@ -161,17 +163,17 @@ julia> @adjoint hook(f, x) = x, x̄ -> (nothing, f(x̄))
 
 `hook` doesn't seem that interesting, as it doesn't do anything. But the fun part is in the adjoint; it's allowing us to apply a function `f` to the gradient of `x`.
 
-```julia
+```jldoctest adjoints
 julia> gradient((a, b) -> hook(-, a)*b, 2, 3)
-(-3, 2)
+(-3.0, 2.0)
 ```
 
 We could use this for debugging or modifying gradients (e.g. gradient clipping).
 
-```julia
+```jldoctest adjoints
 julia> gradient((a, b) -> hook(ā -> @show(ā), a)*b, 2, 3)
-ā = 3
-(3, 2)
+ā = 3.0
+(3.0, 2.0)
 ```
 
 Zygote provides both `hook` and `@showgrad` so you don't have to write these yourself.
@@ -180,7 +182,7 @@ Zygote provides both `hook` and `@showgrad` so you don't have to write these you
 
 A more advanced example is checkpointing, in which we save memory by re-computing the pullback pass of a function during the backwards pass. To wit:
 
-```julia
+```jldoctest adjoints
 julia> checkpoint(f, x) = f(x)
 checkpoint (generic function with 1 method)
 
@@ -192,7 +194,7 @@ julia> gradient(x -> checkpoint(sin, x), 1)
 
 If a function has side effects we'll see that the pullback pass happens twice, as expected.
 
-```julia
+```jldoctest adjoints
 julia> foo(x) = (println(x); sin(x))
 foo (generic function with 1 method)
 

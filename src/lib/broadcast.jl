@@ -59,6 +59,8 @@ unbroadcast(x::Tuple{<:Any}, x̄) = (accum_sum(x̄),)
 unbroadcast(x::Base.RefValue, x̄) = (x=accum_sum(x̄),)
 unbroadcast(x::Tuple, x̄) =  NTuple{length(x)}(length(x) == length(x̄) ? x̄ : accum_sum(x̄; dims=2:ndims(x̄))) # case length(x) > 1
 unbroadcast(x::Tuple, x̄::Nothing) = nothing
+# fixing issue #1184, not duplicate method, since the above allows for an empty tuple
+unbroadcast(x::Tuple{<:Any}, x̄::Nothing) = nothing
 
 unbroadcast(x::AbstractArray, x̄::Nothing) = nothing
 
@@ -81,7 +83,7 @@ _minus(::Nothing) = nothing
    Δ -> (nothing, unbroadcast(x, Δ .* conj.(y)), unbroadcast(y, Δ .* conj.(x)))
 @adjoint broadcasted(::typeof(*), x::Number, y::AbstractArray{<:Number}) =
   _pullback(*, x, y)  # this uses dot(y,Δ) instead of sum(Δ .* conj.(y))
-@adjoint broadcasted(::typeof(*), x::AbstractArray{<:Number}, y::Number) = 
+@adjoint broadcasted(::typeof(*), x::AbstractArray{<:Number}, y::Number) =
   _pullback(*, x, y)
 
 @adjoint function broadcasted(::typeof(/), x::Numeric, y::Numeric)
@@ -144,6 +146,9 @@ end
   end
 end
 
+@adjoint broadcasted(::Type{T}, x::Numeric) where {T<:Number} =
+  T.(x), ȳ -> (nothing, _project(x, ȳ),)
+
 # General Fallback
 # ================
 
@@ -178,7 +183,7 @@ _dual_safearg(x) = false
   T = Broadcast.combine_eltypes(f, args)
   # Avoid generic broadcasting in two easy cases:
   if T == Bool
-    return (f.(args...), _ -> nothing) 
+    return (f.(args...), _ -> nothing)
   elseif T <: Real && isconcretetype(T) && _dual_purefun(F) && all(_dual_safearg, args) && !isderiving()
     return broadcast_forward(f, args...)
   end
@@ -257,7 +262,7 @@ end
     @eval @adjoint broadcasted(::CuArrayStyle, f, args...) =
       broadcast_forward(CUDA.cufunc(f), args...)
 
-  else # CUDA >= 3.0 -- don't need cufunc(f). 
+  else # CUDA >= 3.0 -- don't need cufunc(f).
        # Ordinary broadcasting calls broadcast_forward anyway when certain its' safe,
        # so perhaps this can be deleted? Possible edge case here:
        # https://github.com/FluxML/Zygote.jl/pull/1018#issuecomment-873629415
@@ -274,14 +279,14 @@ end
     placeholder = similar(xs)
     sum(xs, dims = dims), Δ -> (placeholder .= Δ,)
   end
-  
+
   # Make sure sum(f, ::CuArray) uses broadcase through forward-mode defined above
   # Not the ChainRules.rrule which will use the Zygote.Context and thus not be GPU compatible
   @adjoint function sum(f, xs::CUDA.AbstractGPUArray; kws...)
     @assert !haskey(kws, :init) # TODO add init support (julia 1.6)
     return pullback(__context__, (f, xs) -> sum(f.(xs); kws...), f, xs)
   end
-  
+
   @adjoint function Base.convert(::Type{T}, xs::Array)  where {T<:CUDA.AbstractGPUArray}
     Base.convert(T, xs), Δ -> (nothing, Base.convert(Array, Δ),)
   end

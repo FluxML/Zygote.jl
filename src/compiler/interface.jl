@@ -1,7 +1,7 @@
 using InteractiveUtils
 using InteractiveUtils: typesof
 using Core: Typeof
-import Base: copy!
+import Base: copy!, IdSet
 import Base.Broadcast: broadcasted, materialize!
 
 mutable struct Context <: AContext
@@ -138,18 +138,19 @@ gradient
 Container for implicit parameters, used when differentiating
 a zero-argument funtion `() -> loss(A, B)` with respect to `A, B`.
 """
-struct Params
-  order::Buffer # {Any, Vector{Any}}
+struct Params{B <: Buffer}
+  order::B
   params::IdSet{Any} # TODO store ids only
 end
 
 Params() = Params(Buffer([], false), IdSet())
-Params(xs) = Params(Buffer(xs, false), IdSet(xs))
+Params(xs) = Params(Buffer(xs, false), IdSet{Any}(xs))
 Params(ps::Params) = ps
 Params(xs::Tuple) = Params(collect(xs))
 
 @forward Params.order Base.iterate, Base.length, Base.getindex
-@forward Params.params Base.in
+
+Base.in(ps::Params, x) = x in ps.params
 
 Base.map(::typeof(_project), args::Tuple{Params}, grad) = grad  # skip _project in gradient(f, ::Params)
 
@@ -234,7 +235,7 @@ function copy!(x::AbstractVector, ps::Params)
     x[i+1:i+length(p)] .= vec(p)
     i += length(p)
   end
-  ps
+  x
 end
 
 """
@@ -287,7 +288,7 @@ function copy!(gs::Grads, x::AbstractVector)
     gs[p] .= reshape(x[i+1:i+length(p)], size(p))
     i += length(p)
   end
-  x
+  gs
 end
 
 function copy!(x::AbstractVector,  gs::Grads)
