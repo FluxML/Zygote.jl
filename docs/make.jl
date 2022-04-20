@@ -1,6 +1,6 @@
 using Pkg;
 Pkg.activate(joinpath(@__DIR__, "..")); Pkg.instantiate()
-Pkg.activate(); Pkg.instantiate()
+Pkg.activate(@__DIR__); Pkg.instantiate()
 
 pushfirst!(LOAD_PATH, joinpath(@__DIR__, ".."))
 
@@ -8,6 +8,7 @@ using Documenter, Zygote
 
 makedocs(
   sitename="Zygote",
+  doctest = true,
   pages = [
         "Home" => "index.md",
         "Custom Adjoints" => "adjoints.md",

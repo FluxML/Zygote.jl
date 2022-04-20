@@ -6,6 +6,7 @@ or a Hessian (by taking a second derivative).
 ```@docs
 Zygote.jacobian
 Zygote.hessian
+Zygote.diaghessian
 ```
 
 Zygote also provides a set of helpful utilities. These are all "user-level" tools –
@@ -13,6 +14,8 @@ in other words you could have written them easily yourself, but they live in
 Zygote for convenience.
 
 ```@docs
+Zygote.withgradient
+Zygote.withjacobian
 Zygote.@showgrad
 Zygote.hook
 Zygote.dropgrad
@@ -34,16 +37,17 @@ using Zygote, Test
 
 w, x1, x2, b = rand(2), rand(2), rand(2), rand(2)
 
-gs1 = gradient(() -> sum(tanh.(w .* x1 .+ b)), Params([w, b])) 
-gs2 = gradient(() -> sum(tanh.(w .* x2 .+ b)), Params([w, b])) 
+gs1 = gradient(() -> sum(tanh.(w .* x1 .+ b)), Params([w, b]))
+gs2 = gradient(() -> sum(tanh.(w .* x2 .+ b)), Params([w, b]))
 
 # accumulate gradients
 gs = gs1 .+ gs2
-@test gs[w] ≈ gs1[w] + gs2[w] 
-@test gs[b] ≈ gs1[b] + gs2[b] 
+@test gs[w] ≈ gs1[w] + gs2[w]
+@test gs[b] ≈ gs1[b] + gs2[b]
 
-# gradients and dictionaries interact nicely
-gs .+= Dict(p => randn(size(p)) for p in keys(gs)) 
+# gradients and IdDict interact nicely
+# note that an IdDict must be used for gradient algebra on the GPU
+gs .+= IdDict(p => randn(size(p)) for p in keys(gs))
 
 # clip gradients
 map(x -> clamp.(x, -0.1, 0.1), gs)

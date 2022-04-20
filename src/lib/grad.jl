@@ -50,16 +50,18 @@ is higher-dimensional.
 This uses forward over reverse, ForwardDiff over Zygote, calling `hessian_dual(f, x)`.
 See [`hessian_reverse`](@ref) for an all-Zygote alternative.
 
+See also [`diaghessian`](@ref) to compute only the diagonal part.
+
 # Examples
 
 ```jldoctest; setup=:(using Zygote)
 julia> hessian(x -> x[1]*x[2], randn(2))
-2×2 Array{Float64,2}:
+2×2 Matrix{Float64}:
  0.0  1.0
  1.0  0.0
 
 julia> hessian(x -> sum(x.^3), [1 2; 3 4])  # uses linear indexing of x
-4×4 Array{$Int,2}:
+4×4 Matrix{$Int}:
  6   0   0   0
  0  18   0   0
  0   0  12   0
@@ -103,13 +105,13 @@ This reverse-mode Jacobian needs to evaluate the pullback once for each element 
 Doing so is usually only efficient when `length(y)` is small compared to `length(a)`,
 otherwise forward mode is likely to be better.
 
-See also [`hessian`](@ref), [`hessian_reverse`](@ref).
+See also [`withjacobian`](@ref), [`hessian`](@ref), [`hessian_reverse`](@ref).
 
 # Examples
 
 ```jldoctest; setup=:(using Zygote)
 julia> jacobian(a -> 100*a[1:3].^2, 1:7)[1]  # first index (rows) is output
-3×7 Array{$Int,2}:
+3×7 Matrix{$Int}:
  200    0    0  0  0  0  0
    0  400    0  0  0  0  0
    0    0  600  0  0  0  0
@@ -124,7 +126,7 @@ julia> jacobian((a,d) -> prod(a, dims=d), [1 2; 3 4; 5 6], 2)
 !!! warning
     For arguments of any type except `Number` & `AbstractArray`, the result is `nothing`.
 
-```jldoctest; setup=:(using Zygote)
+```
 julia> jacobian((a,s) -> a.^length(s), [1,2,3], "str")
 ([3 0 0; 0 12 0; 0 0 27], nothing)
 
@@ -132,10 +134,22 @@ julia> jacobian((a,t) -> sum(a .* t[1]) + t[2], [1,2,3], (4,5))
 ([4 4 4], nothing)
 
 julia> gradient((a,t) -> sum(a .* t[1]) + t[2], [1,2,3], (4,5))  # gradient undersands the tuple
-([4, 4, 4], (6, 1))
+([4 4 4], (6, 1))
 ```
 """
-function jacobian(f, args...)
+jacobian(f, args...) = withjacobian(f, args...).grad
+
+"""
+    withjacobian(f, args...)
+
+Returns both the value `f(args...)` and the [`jacobian`](@ref) as a named tuple.
+
+```jldoctest; setup=:(using Zygote)
+julia> withjacobian(cumsum, [1,2,3])
+(val = [1, 3, 6], grad = ([1 0 0; 1 1 0; 1 1 1],))
+```
+"""
+function withjacobian(f, args...)
   y, back = pullback(_jvec∘f, args...)
   out = map(args) do x
     T = promote_type(eltype(x), eltype(y))
@@ -151,7 +165,7 @@ function jacobian(f, args...)
       _gradcopy!(view(dx,k,:), grad)
     end
   end
-  out
+  (val=y, grad=out)
 end
 
 _jvec(x::AbstractArray) = vec(x)
@@ -185,17 +199,19 @@ julia> Jxy = jacobian(() -> ys[1:2] .+ sum(xs.^2), Params([xs, ys]))
 Grads(...)
 
 julia> Jxy[ys]
-2×3 Array{$Int,2}:
+2×3 Matrix{$Int}:
  1  0  0
  0  1  0
 
 julia> Jxy[xs]
-2×4 Array{$Int,2}:
+2×4 Matrix{$Int}:
  2  6  4  8
  2  6  4  8
 ```
 """
-function jacobian(f, pars::Params)
+jacobian(f, pars::Params) = withjacobian(f, pars::Params).grad
+
+function withjacobian(f, pars::Params)
   y, back = pullback(_jvec∘f, pars)
   out = IdDict()
   for p in pars
@@ -211,5 +227,54 @@ function jacobian(f, pars::Params)
       _gradcopy!(view(out[p],k,:), grads[p])
     end
   end
-  Grads(out, pars)
+  (val=y, grad=Grads(out, pars))
 end
+
+"""
+    diaghessian(f, args...) -> Tuple
+
+Diagonal part of the Hessian. Returns a tuple containing, for each argument `x`,
+`h` of the same shape with `h[i] = Hᵢᵢ = ∂²y/∂x[i]∂x[i]`. 
+The original evaluation `y = f(args...)` must give a real number `y`.
+
+For one vector argument `x`, this is equivalent to `(diag(hessian(f,x)),)`.
+Like [`hessian`](@ref) it uses ForwardDiff over Zygote. 
+
+!!! warning
+    For arguments of any type except `Number` & `AbstractArray`, the result is `nothing`.
+
+# Examples
+```jldoctest; setup=:(using Zygote, LinearAlgebra)
+julia> diaghessian(x -> sum(x.^3), [1 2; 3 4])[1]
+2×2 Matrix{$Int}:
+  6  12
+ 18  24
+
+julia> Diagonal(vec(ans)) == hessian(x -> sum(x.^3), [1 2; 3 4])  # full Hessian is diagonal
+true
+
+julia> diaghessian((x,y) -> sum(x .* y .* y'), [1 22; 333 4], [0.5, 0.666])  # two array arguments
+([0.0 0.0; 0.0 0.0], [2.0, 8.0])
+
+julia> diaghessian(atan, 1, 2)  # two scalar arguments
+(-0.16, 0.16)
+
+julia> hessian(xy -> atan(xy[1], xy[2]), [1, 2])  # full Hessian is not diagonal
+2×2 Matrix{Float64}:
+ -0.16  -0.12
+ -0.12   0.16
+```
+"""
+function diaghessian(f, args...)
+  ntuple(length(args)) do n
+    let x = args[n], valn = Val(n)  # let Val improves speed, sometimes
+      if x isa AbstractArray
+        forward_diag(x -> gradient(f, _splice(x, args, valn)...)[n], x)[2]
+      elseif x isa Number
+        ForwardDiff.derivative(x -> gradient(f, _splice(x, args, valn)...)[n], x)
+      end
+    end
+  end
+end
+
+_splice(x, args, ::Val{n}) where {n} = ntuple(i -> i==n ? x : args[i], length(args))

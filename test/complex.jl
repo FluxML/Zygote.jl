@@ -1,9 +1,13 @@
 using Zygote, Test, LinearAlgebra
 
+@testset "basic" begin
+
 @test gradient(x -> real(abs(x)*exp(im*angle(x))), 10+20im)[1] ≈ 1
 @test gradient(x -> imag(real(x)+0.3im), 0.3)[1] ≈ 0
-@test gradient(x -> imag(conj(x)+0.3im), 0.3)[1] ≈ -1im
-@test gradient(x -> abs((imag(x)+0.3)), 0.3)[1] == 1im
+@test gradient(x -> imag(conj(x)+0.3im), 0.3 + 0im)[1] ≈ -1im
+@test gradient(x -> imag(conj(x)+0.3im), 0.3)[1] ≈ 0  # projected to zero
+@test gradient(x -> abs((imag(x)+0.3)), 0.3 + 0im)[1] ≈ 1im
+@test gradient(x -> abs((imag(x)+0.3)), 0.3)[1] ≈ 0
 
 @test gradient(a -> real((a*conj(a))), 0.3im)[1] == 0.6im
 @test gradient(a -> real((a.*conj(a))), 0.3im)[1] == 0.6im
@@ -18,8 +22,10 @@ using Zygote, Test, LinearAlgebra
 @test gradient(x -> real(logabsdet(x)[1]), [1 2im; 3im 4])[1] ≈ [4 3im; 2im 1]/10
 
 # https://github.com/FluxML/Zygote.jl/issues/705
-@test gradient(x -> imag(sum(exp, x)), [1,2,3])[1] ≈ im .* exp.(1:3)
+@test gradient(x -> imag(sum(exp, x)), [1,2,3])[1] ≈ real(im .* exp.(1:3))
 @test gradient(x -> imag(sum(exp, x)), [1+0im,2,3])[1] ≈ im .* exp.(1:3)
+
+end # @testset
 
 fs_C_to_R = (real,
              imag,
@@ -81,3 +87,26 @@ fs_C_to_C_non_holomorphic = (conj,
         end
     end
 end
+
+@testset "issue 342" begin
+    @test Zygote.gradient(x->real(x + 2.0*im), 3.0) == (1.0,)
+    @test Zygote.gradient(x->imag(x + 2.0*im), 3.0) == (0.0,)
+end
+
+@testset "issue 402" begin
+    A = [1,2,3.0]
+    y, B_getindex = Zygote.pullback(x->getindex(x,2,1),Diagonal(A))
+    bA = B_getindex(1)[1]
+    @test bA isa Diagonal
+    @test bA == [0.0 0.0 0.0; 0.0 0.0 0.0; 0.0 0.0 0.0]
+end
+
+@testset "issue #917" begin
+    function fun(v)
+        c = v[1:3] + v[4:6]*im
+        r = v[7:9]
+        sum(r .* abs2.(c)) # This would be calling my actual function depending on r and c
+    end
+    @test Zygote.hessian(fun, collect(1:9)) ≈ [14 0 0 0 0 0 2 0 0; 0 16 0 0 0 0 0 4 0; 0 0 18 0 0 0 0 0 6; 0 0 0 14 0 0 8 0 0; 0 0 0 0 16 0 0 10 0; 0 0 0 0 0 18 0 0 12; 2 0 0 8 0 0 0 0 0; 0 4 0 0 10 0 0 0 0; 0 0 6 0 0 12 0 0 0]
+end
+

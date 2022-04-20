@@ -1,7 +1,7 @@
 using InteractiveUtils
 using InteractiveUtils: typesof
 using Core: Typeof
-import Base: copy!
+import Base: copy!, IdSet
 import Base.Broadcast: broadcasted, materialize!
 
 mutable struct Context <: AContext
@@ -43,35 +43,116 @@ end
 
 sensitivity(y::Number) = one(y)
 sensitivity(y::Complex) = error("Output is complex, so the gradient is not defined.")
-sensitivity(y::AbstractArray) = error("output an array, so the gradient is not defined. Perhaps you wanted jacobian.")
+sensitivity(y::AbstractArray) = error("Output is an array, so the gradient is not defined. Perhaps you wanted jacobian.")
 sensitivity(y) = error("Output should be scalar; gradients are not defined for output $(repr(y))")
 
 """
     gradient(f, args...)
 
 Returns a tuple containing `∂f/∂x` for each argument `x`,
-the derivative (for scalar x) or the gradient.
+the derivative (for scalar `x`) or the gradient.
 
 `f(args...)` must be a real number, see [`jacobian`](@ref) for array output.
+
+See also [`withgradient`](@ref) to keep the value `f(args...)`,
+and [`pullback`](@ref) for value and back-propagator.
+
+```jldoctest; setup=:(using Zygote)
+julia> gradient(*, 2.0, 3.0, 5.0)
+(15.0, 10.0, 6.0)
+
+julia> gradient(x -> sum(abs2,x), [7.0, 11.0, 13.0])
+([14.0, 22.0, 26.0],)
+
+julia> gradient([7, 11], 0, 1) do x, y, d
+         p = size(x, d)
+         sum(x.^p .+ y)
+       end
+([14.0, 22.0], 2.0, nothing)
+```
 """
 function gradient(f, args...)
   y, back = pullback(f, args...)
-  return back(sensitivity(y))
+  grad = back(sensitivity(y))
+  isnothing(grad) ? nothing : map(_project, args, grad)
 end
 
-Base.adjoint(f::Function) = x -> gradient(f, x)[1]
+# Base.adjoint(f::Function) = x -> gradient(f, x)[1]  # piracy!
+Base.adjoint(f::Function) = x -> begin  # still piracy! avoids projection for legacy reasons
+  y, back = pullback(f, x)
+  back(sensitivity(y))[1]
+end
+
+"""
+    withgradient(f, args...)
+    withgradient(f, ::Params)
+
+Returns both the value of the function and the [`gradient`](@ref),
+as a named tuple. 
+
+```jldoctest; setup=:(using Zygote)
+julia> y, ∇ = withgradient(/, 1, 2)
+(val = 0.5, grad = (0.5, -0.25))
+
+julia> ∇ == gradient(/, 1, 2)
+true
+```
+"""
+function withgradient(f, args...)
+  y, back = pullback(f, args...)
+  grad = back(sensitivity(y))
+  results = isnothing(grad) ? map(_ -> nothing, args) : map(_project, args, grad)
+  (val=y, grad=results)
+end
 
 # Param-style wrappers
 
-# TODO store ids only
-struct Params
-  order::Buffer{Any, Vector{Any}}
-  params::IdSet{Any}
-  Params() = new(Buffer([], false), IdSet())
+"""
+    gradient(() -> loss(), ps::Params) -> Grads
+
+Gradient with implicit parameters. Takes a zero-argument function,
+and returns a dictionary-like container, whose keys are arrays `x in ps`.
+
+```jldoctest; setup=:(using Zygote)
+julia> x = [1 2 3; 4 5 6]; y = [7, 8]; z = [1, 10, 100];
+
+julia> g = gradient(Params([x, y])) do
+         sum(x .* y .* z')
+       end
+Grads(...)
+
+julia> g[x]
+2×3 Matrix{Float64}:
+ 7.0  70.0  700.0
+ 8.0  80.0  800.0
+
+julia> haskey(g, z)  # only x and y are parameters
+false
+```
+"""
+gradient
+
+"""
+    Params([A, B])
+
+Container for implicit parameters, used when differentiating
+a zero-argument funtion `() -> loss(A, B)` with respect to `A, B`.
+"""
+struct Params{B <: Buffer}
+  order::B
+  params::IdSet{Any} # TODO store ids only
 end
 
+Params() = Params(Buffer([], false), IdSet())
+Params(xs) = Params(Buffer(xs, false), IdSet{Any}(xs))
+Params(ps::Params) = ps
+Params(xs::Tuple) = Params(collect(xs))
+
 @forward Params.order Base.iterate, Base.length, Base.getindex
-@forward Params.params Base.in
+
+Base.in(x, ps::Params) = x in ps.params
+
+Base.map(::typeof(_project), args::Tuple{Params}, grad) = grad  # skip _project in gradient(f, ::Params)
 
 function Base.union!(ps::Params, itrs...)
   foreach(itr -> foreach(x -> push!(ps, x), itr), itrs)
@@ -80,6 +161,9 @@ end
 
 Base.copy(ps::Params) = union!(Params(), ps)
 Base.union(ps::Params, itrs...) = union!(copy(ps), itrs...)
+Base.issetequal(ps1::Params, ps2::Params) = issetequal(ps1.params, ps2.params)
+Base.issetequal(ps1::Params, x::Base.AbstractSet) = issetequal(ps1.params, x)
+Base.issetequal(x::Base.AbstractSet, ps1::Params) = issetequal(x, ps1.params)
 
 function Base.intersect!(ps::Params, itrs...)
   for itr in itrs
@@ -111,9 +195,11 @@ function Base.delete!(ps::Params, x)
   return ps
 end
 
-Params(xs) = push!(Params(), xs...)
-
 Base.Broadcast.broadcasted(f, ps::Params) = broadcasted(f, ps.order)
+
+@adjoint function Broadcast.broadcasted(f::Function, ps::Params)
+  f.(ps), _ -> throw(ArgumentError("Zygote.Params does not support broadcasting within gradients, try iteration `for p in ps`"))
+end
 
 Base.:(==)(x::Params, y::Params) = x.order.data == y.order.data
 
@@ -136,8 +222,8 @@ function copy!(ps::Params, x::AbstractVector)
   @assert length(x) == sum(length(p) for p in ps)
   i = 0
   for p in ps
-      p .= reshape(x[i+1:i+length(p)], size(p))
-      i += length(p)
+    p .= reshape(x[i+1:i+length(p)], size(p))
+    i += length(p)
   end
   ps
 end
@@ -146,13 +232,19 @@ function copy!(x::AbstractVector, ps::Params)
   @assert length(x) == sum(length(p) for p in ps)
   i = 0
   for p in ps
-      x[i+1:i+length(p)] .= vec(p)
-      i += length(p)
+    x[i+1:i+length(p)] .= vec(p)
+    i += length(p)
   end
-  ps
+  x
 end
 
+"""
+    Grads(...)
 
+Dictionary-like container returned when taking gradients with
+respect to implicit parameters. For an array `W`, appearing 
+within `Params([W, A, B...])`, the gradient is `g[W]`.
+"""
 struct Grads
   grads::IdDict{Any,Any}
   params::Params
@@ -193,19 +285,32 @@ length of `x` has to be equal to the sum of the lengths of all gradients.
 function copy!(gs::Grads, x::AbstractVector)
   i = 0
   for p in gs.params
-      gs[p] .= reshape(x[i+1:i+length(p)], size(p))
-      i += length(p)
+    gs[p] .= reshape(x[i+1:i+length(p)], size(p))
+    i += length(p)
   end
-  x
+  gs
 end
 
 function copy!(x::AbstractVector,  gs::Grads)
   i = 0
   for p in gs.params
-      x[i+1:i+length(p)] .= vec(gs[p])
-      i += length(p)
+    x[i+1:i+length(p)] .= vec(gs[p])
+    i += length(p)
   end
   x
+end
+
+function Base.merge!(gs_dst::Grads, gs_srcs::Grads...)
+  for gs_src in gs_srcs
+    union!(gs_dst.params, gs_src.params)
+    merge!(gs_dst.grads, gs_src.grads)
+  end
+  gs_dst
+end
+
+function Base.copy(gs::Grads)
+  gs_new = Grads(IdDict(), gs.params)
+  merge!(gs_new, gs)
 end
 
 broadcasted(f, gs::Grads, gss::ADictOrGrads...) = map(f, gs, gss...)
