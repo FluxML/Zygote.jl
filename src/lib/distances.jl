@@ -65,22 +65,22 @@ function rrule(::typeof(colwise), s::Euclidean, x::AbstractMatrix, y::AbstractMa
   end
 end
 
-function rrule(::typeof(pairwise), ::Euclidean, X::AbstractMatrix, Y::AbstractMatrix; dims=2)
+function rrule(config::RuleConfig{>:HasReverseMode}, ::typeof(pairwise), ::Euclidean, X::AbstractMatrix, Y::AbstractMatrix; dims=2)
 
   # Modify the forwards-pass slightly to ensure stability on the reverse.
   function _pairwise_euclidean(X, Y)
     δ = eps(promote_type(eltype(X), eltype(Y)))^2
     return sqrt.(max.(pairwise(SqEuclidean(), X, Y; dims=dims), δ))
   end
-  D, back = pullback(_pairwise_euclidean, X, Y)
+  D, back = rrule_via_ad(config, _pairwise_euclidean, X, Y)
 
   return D, function(Δ)
     return (NO_FIELDS, NO_FIELDS, back(Δ)...)
   end
 end
 
-function rrule(::typeof(pairwise), ::Euclidean, X::AbstractMatrix; dims=2)
-  D, back = pullback(X -> pairwise(SqEuclidean(), X; dims = dims), X)
+function rrule(config::RuleConfig{>:HasReverseMode}, ::typeof(pairwise), ::Euclidean, X::AbstractMatrix; dims=2)
+  D, back = rrule_via_ad(config, X -> pairwise(SqEuclidean(), X; dims = dims), X)
   D .= sqrt.(D)
   return D, function(Δ)
     Δ = Δ ./ (2 .* max.(D, eps(eltype(D))))
