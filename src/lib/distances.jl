@@ -1,7 +1,7 @@
 using .Distances
 import .ChainRules: NoTangent, rrule, rrule_via_ad
 
-function rrule(::SqEuclidean, x::AbstractVector, y::AbstractVector)
+function rrule(::ZygoteRuleConfig, ::SqEuclidean, x::AbstractVector, y::AbstractVector)
   δ = x .- y
   function sqeuclidean(Δ::Real)
     x̄ = (2 * Δ) .* δ
@@ -10,14 +10,14 @@ function rrule(::SqEuclidean, x::AbstractVector, y::AbstractVector)
   return sum(abs2, δ), sqeuclidean
 end
 
-function rrule(::typeof(colwise), s::SqEuclidean, x::AbstractMatrix, y::AbstractMatrix)
+function rrule(::ZygoteRuleConfig, ::typeof(colwise), s::SqEuclidean, x::AbstractMatrix, y::AbstractMatrix)
   return colwise(s, x, y), function (Δ::AbstractVector)
     x̄ = 2 .* Δ' .* (x .- y)
     return NoTangent(), NoTangent(), x̄, -x̄
   end
 end
 
-function rrule(::typeof(pairwise), s::SqEuclidean, x::AbstractMatrix, y::AbstractMatrix; dims::Int=2)
+function rrule(::ZygoteRuleConfig, ::typeof(pairwise), s::SqEuclidean, x::AbstractMatrix, y::AbstractMatrix; dims::Int=2)
   if dims==1
     return pairwise(s, x, y; dims=1), ∇pairwise(s, transpose(x), transpose(y), transpose)
   else
@@ -32,7 +32,7 @@ end
     return NoTangent(), NoTangent(), f(x̄), f(ȳ)
   end
 
-function rrule(::typeof(pairwise), s::SqEuclidean, x::AbstractMatrix; dims::Int=2)
+function rrule(::ZygoteRuleConfig, ::typeof(pairwise), s::SqEuclidean, x::AbstractMatrix; dims::Int=2)
   if dims==1
     return pairwise(s, x; dims=1), ∇pairwise(s, transpose(x), transpose)
   else
@@ -47,7 +47,7 @@ end
     return NoTangent(), NoTangent(), x * (2 .* (d1 .+ d2 .- Δ .- transpose(Δ))) |> f
   end
 
-function rrule(::Euclidean, x::AbstractVector, y::AbstractVector)
+function rrule(::ZygoteRuleConfig, ::Euclidean, x::AbstractVector, y::AbstractVector)
   D = x .- y
   δ = sqrt(sum(abs2, D))
   function euclidean(Δ::Real)
@@ -57,7 +57,7 @@ function rrule(::Euclidean, x::AbstractVector, y::AbstractVector)
   return δ, euclidean
 end
 
-function rrule(::typeof(colwise), s::Euclidean, x::AbstractMatrix, y::AbstractMatrix)
+function rrule(::ZygoteRuleConfig, ::typeof(colwise), s::Euclidean, x::AbstractMatrix, y::AbstractMatrix)
   d = colwise(s, x, y)
   return d, function (Δ::AbstractVector)
     x̄ = (Δ ./ max.(d, eps(eltype(d))))' .* (x .- y)
