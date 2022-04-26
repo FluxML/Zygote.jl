@@ -131,7 +131,7 @@ end
 forwarddiff(f, x; chunk_threshold = ForwardDiff.DEFAULT_CHUNK_THRESHOLD) = f(x)
 
 @adjoint function forwarddiff(f, x; chunk_threshold = ForwardDiff.DEFAULT_CHUNK_THRESHOLD)
-    y, J = forward_jacobian(f, x; chunk_threshold)
+    y, J = forward_jacobian(f, x; chunk_threshold = chunk_threshold)
     return y, ȳ -> (nothing, reshape_scalar(x, J * vec_scalar(ȳ)))
 end
 

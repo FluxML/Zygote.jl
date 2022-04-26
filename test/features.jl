@@ -379,7 +379,7 @@ end == (10,)
   for chunk_threshold in 1:10:100
     x = [1:100;]
     @test gradient(x) do x
-      Zygote.forwarddiff(x -> x' * x, x; chunk_threshold)
+      Zygote.forwarddiff(x -> x' * x, x; chunk_threshold = chunk_threshold)
     end == (2 * x,)
   end
 end
