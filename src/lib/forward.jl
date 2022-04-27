@@ -131,11 +131,11 @@ end
 forwarddiff(f, x; chunk_threshold = ForwardDiff.DEFAULT_CHUNK_THRESHOLD) = f(x)
 
 @adjoint function forwarddiff(f, x; chunk_threshold = ForwardDiff.DEFAULT_CHUNK_THRESHOLD)
-    y, J = forward_jacobian(f, x; chunk_threshold = chunk_threshold)
-    return y, ȳ -> (nothing, reshape_scalar(x, J * vec_scalar(ȳ)))
+  y, J = forward_jacobian(f, x; chunk_threshold = chunk_threshold)
+  return y, ȳ -> (nothing, reshape_scalar(x, J * vec_scalar(ȳ)))
 end
 
-# Use this to allow second derivatives -- this is forward-over-forward, 
+# Use this to allow second derivatives -- this is forward-over-forward,
 # see  https://github.com/FluxML/Zygote.jl/issues/769  for a forward-over-reverse proposal
 @adjoint ForwardDiff.gradient(f, x) = pullback(forwarddiff, x -> ForwardDiff.gradient(f, x), x)
 @adjoint ForwardDiff.jacobian(f, x) = pullback(forwarddiff, x -> ForwardDiff.jacobian(f, x), x)
