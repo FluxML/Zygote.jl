@@ -81,8 +81,12 @@ unwrap(ref, x) = x
 end
 
 function global_set(ref, val)
-  ccall(:jl_set_global, Cvoid, (Any, Any, Any),
-        ref.mod, ref.name, val)
+  @static if VERSION < v"1.9.0-DEV.265"
+    ccall(:jl_set_global, Cvoid, (Any, Any, Any),
+          ref.mod, ref.name, val)
+  else
+    setglobal!(ref.mod, ref.name, val)
+  end
 end
 
 @adjoint! function global_set(ref, x)
