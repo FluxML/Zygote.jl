@@ -137,8 +137,28 @@ end
 
 # Use this to allow second derivatives -- this is forward-over-forward,
 # see  https://github.com/FluxML/Zygote.jl/issues/769  for a forward-over-reverse proposal
-@adjoint ForwardDiff.gradient(f, x) = pullback(forwarddiff, x -> ForwardDiff.gradient(f, x), x)
-@adjoint ForwardDiff.jacobian(f, x) = pullback(forwarddiff, x -> ForwardDiff.jacobian(f, x), x)
+@adjoint function ForwardDiff.gradient(f, x)
+  F = typeof(f)
+  Base.issingletontype(F) || @warn """`ForwardDiff.gradient(f, x)` within Zygote cannot track gradients with respect to `f`
+  typeof(f) = $F is not a singleton type""" # maxlog=1 _id=hash(F)
+  pullback(forwarddiff, x -> ForwardDiff.gradient(f, x), x)
+end
 
-@adjoint ForwardDiff.derivative(f, x) = pullback(forwarddiff, x -> ForwardDiff.derivative(f, x), x)
-@adjoint ForwardDiff.hessian(f, x) = pullback(forwarddiff, x -> ForwardDiff.hessian(f, x), x)
+@adjoint function ForwardDiff.jacobian(f::F, x) where F
+  Base.issingletontype(F) || @warn """`ForwardDiff.jacobian(f, x)` within Zygote cannot track gradients with respect to `f`
+  typeof(f) = $F is not a singleton type""" # maxlog=1 _id=hash(F)
+  pullback(forwarddiff, x -> ForwardDiff.jacobian(f, x), x)
+end
+
+@adjoint function ForwardDiff.derivative(f::F, x) where F
+  Base.issingletontype(F) || @warn """`ForwardDiff.derivative(f, x)` within Zygote cannot track gradients with respect to `f`
+  typeof(f) = $F is not a singleton type""" maxlog=1 _id=hash(F)
+  pullback(forwarddiff, x -> ForwardDiff.derivative(f, x), x)
+end
+
+@adjoint function ForwardDiff.hessian(f::F, x) where F
+  Base.issingletontype(F) || @warn """`ForwardDiff.hessian(f, x)` within Zygote cannot track gradients with respect to `f`
+  typeof(f) = $F is not a singleton type""" maxlog=1 _id=hash(F)
+  pullback(forwarddiff, x -> ForwardDiff.hessian(f, x), x)
+end
+

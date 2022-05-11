@@ -133,4 +133,13 @@ using ForwardDiff
   g3(x) = sum(abs2,ForwardDiff.jacobian(f,x))
   out,back = Zygote.pullback(g3,[2.0,3.2])
   @test back(1.0)[1] == ForwardDiff.gradient(g3,[2.0,3.2])
+  
+  # From https://github.com/FluxML/Zygote.jl/issues/1218
+  f1218(x::AbstractVector,y::AbstractVector) = sum(x)*sum(y)
+  gradf1218(x,y) = ForwardDiff.gradient(x->f1218(x,y), x)[1]
+  x = [0.1]
+  y = rand(5)
+  @test ForwardDiff.gradient(y->gradf1218(x,y), y) == ones(5)
+  # this returns (nothing,) -- now prints a warning
+  @test_broken Zygote.gradient(y->gradf1218(x,y), y) == ones(5)
 end
