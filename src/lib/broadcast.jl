@@ -239,8 +239,9 @@ function dual_function(f::F) where F
 end
 
 @inline function broadcast_forward(f::F, args::Vararg{Any,N}) where {F,N}
-  Base.issingletontype(F) || error("""Zygote's dual number broadcasting (as used on GPU arrays) cannot handle this function.
-      typeof(f) = $(F)""")
+  Base.issingletontype(F) || @warn ("""Zygote's dual number broadcasting (as used on GPU arrays) cannot track gradients with respect to `f`,
+      and `f` appears to be a closure, or a struct with fields (according to `issingletontype(typeof(f))`).
+      typeof(f) = $(F)""") maxlog=1 _id=hash(F)
   for a in args
       _dual_safearg(a) || error("""Zygote's dual number broadcasting (as used on GPU arrays) cannot handle this argument.
       typeof(a) = $(typeof(a))""")
