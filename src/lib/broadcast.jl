@@ -176,7 +176,7 @@ _dual_purefun(::Type{typeof(^)}) = false  # avoid DomainError from negative powe
 _dual_safearg(x::Numeric{<:Real}) = true
 _dual_safearg(x::Ref{<:Numeric{<:Real}}) = true
 _dual_safearg(x::Union{Val, Symbol, Char, AbstractString}) = true  # non-differentiable types
-_dual_safearg(x) where T = Base.issingletontype(T) || Base.issingletontype(eltype(T))
+_dual_safearg(x::T) where {T} = Base.issingletontype(T) || Base.issingletontype(eltype(T))
 
 @adjoint function broadcasted(::AbstractArrayStyle, f::F, args...) where {F}
   T = Broadcast.combine_eltypes(f, args)
