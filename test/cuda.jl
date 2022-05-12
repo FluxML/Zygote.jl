@@ -57,6 +57,10 @@ end
       return sum(abs2.(x .- y))
   end 
   @test_throws ErrorException gradient(()-> f1215(x,y), Zygote.Params([x]))
+  
+  # From #1018
+  @test gradient((x,y) -> sum((z->z^2+y[1]).(x)), [1,2,3], [4,5]) == ([2, 4, 6], [3, 0])
+  @test_throws ErrorException gradient((x,y) -> sum((z->z^2+y[1]).(x)), cu([1,2,3]), cu([4,5]))
 end
 
 @testset "sum(f, x)" begin
