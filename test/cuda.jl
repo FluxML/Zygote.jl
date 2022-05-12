@@ -48,6 +48,15 @@ end
   @test gradient(x -> sum(exp.(x)), Diagonal(a_gpu))[1] isa Diagonal
   # non-differentiables
   @test gradient((x,y) -> sum(x.^2 .+ y'), a_gpu, a_gpu .> 0)[2] === nothing
+  
+  # Errors -- #1215
+  y = complex.([4,1]) |> cu
+  x = complex.([3,2]) |> cu
+  function f1215(x, y) 
+      x = 2 .* x
+      return sum(abs2.(x .- y))
+  end 
+  @test_throws ErrorException gradient(()-> f1215(x,y), Zygote.Params([x]))
 end
 
 @testset "sum(f, x)" begin

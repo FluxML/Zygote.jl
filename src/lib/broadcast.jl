@@ -226,9 +226,17 @@ end
 import ForwardDiff
 using ForwardDiff: Dual
 
-dual(x, p) = x
 dual(x::Real, p) = Dual(x, p)
-dual(x::Bool, p) = x
+dual(x::Bool, p) = x  # safe to ignore
+function dual(x, p)
+    if Base.singletontype(typeof(x)) || ChainRulesCore.ProjectTo(x) isa ProjectTo{ChainRulesCore.NoTangent}()
+        x  # safe to ignore
+    else
+        error("Zygote's dual number broadcasting (as used on GPU arrays) cannot handle objects of type $(typeof(x))")
+    end
+end
+dual(x::Complex, p) = error("Zygote's dual number broadcasting (as used on GPU arrays) cannot handle complex numbers, sorry")
+dual(x::AbstractArray, p) = error("Zygote's dual number broadcasting (as used on GPU arrays) cannot handle arrays of arrays, sorry")
 
 function dual_function(f::F) where F
   function (args::Vararg{Any,N}) where N
