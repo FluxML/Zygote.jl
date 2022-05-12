@@ -741,12 +741,6 @@ end
   end
 end
 
-@adjoint function logdet(C::Cholesky)
-  return logdet(C), function(Δ)
-    return ((uplo=nothing, info=nothing, factors=Diagonal(2 .* Δ ./ diag(C.factors))),)
-  end
-end
-
 @adjoint function Matrix(S::UniformScaling, i::Integer, j::Integer)
   return Matrix(S, i, j), Δ -> ((λ=tr(Δ),), nothing, nothing)
 end
