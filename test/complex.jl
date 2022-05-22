@@ -58,12 +58,17 @@ fs_C_to_C_holomorphic = (cos,
 @testset "C->C holomorphic" begin
     for f in fs_C_to_C_holomorphic
         for z in (1.0+2.0im, -2.0+pi*im)
-            grad_zygote = gradient(real∘f, z)[1]
+            grad_zygote_r = gradient(real∘f, z)[1]
+            grad_zygote_i = gradient(imag∘f, z)[1]
             ε = 1e-8
             grad_fd_r = (f(z+ε)-f(z))/ε
-            grad_fd_i = (f(z+ε*im)-f(z))/(ε*im)
-            @assert abs(grad_fd_r - grad_fd_i) < sqrt(ε) # check the function is indeed holomorphic
-            @test abs(grad_zygote - conj(grad_fd_r)) < sqrt(ε)
+            grad_fd_i = (f(z + ε * im) - f(z)) / (ε * im)
+            # check the function is indeed holomorphic
+            @assert abs(grad_fd_r - grad_fd_i) < sqrt(ε)
+            # check Zygote derivatives agree with holomorphic definition
+            @test abs(grad_zygote_r + im*grad_zygote_i) < sqrt(ε)
+            # check derivative agrees with finite differences
+            @test abs(grad_zygote_r - conj(grad_fd_r)) < sqrt(ε)
         end
     end
 end
@@ -79,7 +84,7 @@ fs_C_to_C_non_holomorphic = (conj,
                              z->imag(z)^2+real(sin(z))^3*1im,
                              )
 @testset "C->C non-holomorphic" begin
-    for f in (fs_C_to_C_holomorphic...,fs_C_to_C_non_holomorphic...)
+    for f in fs_C_to_C_non_holomorphic
         for z in (1.0+2.0im, -2.0+pi*im)
             grad_zygote_r = gradient(real∘f, z)[1]
             grad_zygote_i = gradient(imag∘f, z)[1]
