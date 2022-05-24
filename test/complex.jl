@@ -63,11 +63,11 @@ fs_C_to_C_holomorphic = (cos,
             ε = 1e-8
             grad_fd_r = (f(z+ε)-f(z))/ε
             grad_fd_i = (f(z + ε * im) - f(z)) / (ε * im)
-            # check the function is indeed holomorphic
+            # Check the function is indeed holomorphic
             @assert abs(grad_fd_r - grad_fd_i) < sqrt(ε)
-            # check Zygote derivatives agree with holomorphic definition
-            @test abs(grad_zygote_r + im*grad_zygote_i) < sqrt(ε)
-            # check derivative agrees with finite differences
+            # Check Zygote derivatives agree with holomorphic definition
+            @test grad_zygote_r ≈ -im*grad_zygote_i
+            # Check derivative agrees with finite differences
             @test abs(grad_zygote_r - conj(grad_fd_r)) < sqrt(ε)
         end
     end
