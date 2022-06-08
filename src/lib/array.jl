@@ -598,7 +598,6 @@ end
     C = cholesky(Σ, check = check)
     return C, function(Δ::NamedTuple)
       issuccess(C) || throw(PosDefException(C.info))
-      println(@__LINE__)
       U, L, Ū = C.U, C.L, Δ.factors
       Σ̄ = similar(U.data)
       Σ̄ = mul!(Σ̄, Ū, U')
@@ -606,7 +605,6 @@ end
       Σ̄ = ldiv!(U, Σ̄)
       Σ̄ = CUDA.CUBLAS.trsm!('R', 'U', 'T', 'N', one(eltype(Σ)), U.data, Σ̄)
       Σ̄[diagind(Σ̄)] ./= 2
-      @info("", typeof(Σ̄), typeof(U), typeof(C))
       return (UpperTriangular(Σ̄),)
     end
   end
