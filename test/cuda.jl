@@ -1,7 +1,7 @@
 using CUDA
 using Zygote: Grads
 using LinearAlgebra
-using Random: randn!
+using Random: randn!, MersenneTwister
 CUDA.allowscalar(false)
 
 # Test GPU movement inside the call to `gradient`
@@ -140,14 +140,14 @@ end
   @test_skip gradient((x,y) -> sum(vcat(x,y)), 1f0, r, 2f0, r)[2] isa CUDA.CuArray{Float32}
 end
 
-@testset "gpu cholesky" begin
+@testset "GPU cholesky" begin
   rng, M, P, Q = MersenneTwister(123456), 13, 10, 9
   X, y = randn(rng, P, P), randn(rng, P)
   dX, dy = cu(X), cu(y)
 
   f(X, y) = begin
     C = cholesky(X*X' + I)
-    return sum(C \ y) + logdet(C)
+    return sum(C \ y)
   end
 
   @test gradient(dy -> f(dX, dy), dy)[1] isa CUDA.CuArray{Float32}
@@ -162,14 +162,4 @@ end
   @test ∇f_dev ≈ ∇f_cpu
 
   @test_throws PosDefException Zygote.pullback(X -> cholesky(dX, check = false), X)[2]((factors=dX,))
-
-  # https://github.com/FluxML/Zygote.jl/issues/932
-  # Symmetric is currenty not supported by CUDA.jl
-  # g(X, y) = begin
-  #   C = cholesky(Symmetric(X*X' + I))
-  #   return sum(C \ y) + logdet(C)
-  # end
-  # ∇g_dev = gradient(dy -> g(dX, dy), dy)[1]
-  # ∇g_cpu = gradient(y  -> g(X, y), y)[1]
-  # @test ∇g_dev ≈ ∇g_cpu
 end
