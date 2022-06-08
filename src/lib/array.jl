@@ -582,7 +582,7 @@ end
   C = cholesky(Σ, check = check)
   return C, function(Δ::NamedTuple)
     issuccess(C) || throw(PosDefException(C.info))
-    U, Ū = C.U, Δ.factors
+    U, L, Ū = C.U, C.L, Δ.factors
     Σ̄ = similar(U.data)
     Σ̄ = mul!(Σ̄, Ū, U')
     Σ̄ = copytri!(Σ̄, 'U')
@@ -590,6 +590,25 @@ end
     Σ̄ = BLAS.trsm!('R', 'U', 'T', 'N', one(eltype(Σ)), U.data, Σ̄)
     Σ̄[diagind(Σ̄)] ./= 2
     return (UpperTriangular(Σ̄),)
+  end
+end
+
+@init @require CUDA="052768ef-5323-5732-b1bb-66c8b64840ba" begin
+  Zygote.@adjoint function cholesky(Σ::Union{CUDA.CuMatrix, Symmetric{<:Real, <:CUDA.CuMatrix}}; check = true)
+    C = cholesky(Σ, check = check)
+    return C, function(Δ::NamedTuple)
+      issuccess(C) || throw(PosDefException(C.info))
+      println(@__LINE__)
+      U, L, Ū = C.U, C.L, Δ.factors
+      Σ̄ = similar(U.data)
+      Σ̄ = mul!(Σ̄, Ū, U')
+      Σ̄ = copytri!(Σ̄, 'U')
+      Σ̄ = ldiv!(U, Σ̄)
+      Σ̄ = CUDA.CUBLAS.trsm!('R', 'U', 'T', 'N', one(eltype(Σ)), U.data, Σ̄)
+      Σ̄[diagind(Σ̄)] ./= 2
+      @info("", typeof(Σ̄), typeof(U), typeof(C))
+      return (UpperTriangular(Σ̄),)
+    end
   end
 end
 
