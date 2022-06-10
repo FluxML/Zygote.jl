@@ -29,11 +29,14 @@ function accum(a::AbstractDict, b::AbstractDict)
 end
 
 @adjoint function getindex(d::AbstractDict, k)
-  d[k], function (Δ)
+  val = d[k]
+  function dict_getindex_pullback(Δ)
+    accum_param(__context__, val, Δ) === nothing && return
     grad = grad_mut(__context__, d)
     grad[k] = accum(get(grad, k, nothing), Δ)
     return (grad, nothing)
   end
+  val, dict_getindex_pullback
 end
 
 @adjoint! function setindex!(d::AbstractDict, v, k)
