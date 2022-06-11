@@ -1,5 +1,5 @@
 @testset "base.jl" begin
-    @testset "dict_param" begin
+    @testset "Dict getindex with implicit params" begin
         d = Dict{String, Vector{Float64}}("key"=>ones(4))
         fn() = d["key"][2]
         result1 = gradient(fn, Params([d["key"]]))[d["key"]]
