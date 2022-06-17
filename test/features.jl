@@ -375,6 +375,16 @@ end == (1,)
   forwarddiff(x -> x^2, x)
 end == (10,)
 
+@testset "Gradient chunking" begin
+  for chunk_threshold in 1:10:100
+    x = [1:100;]
+    @test gradient(x) do x
+      Zygote.forwarddiff(x -> x' * x, x; chunk_threshold = chunk_threshold)
+    end == (2 * x,)
+  end
+end
+
+
 @test gradient(1) do x
   if true
   elseif true

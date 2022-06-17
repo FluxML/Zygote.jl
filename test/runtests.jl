@@ -29,6 +29,7 @@ using CUDA: has_cuda
   @testset "lib" begin
     include("lib/number.jl")
     include("lib/lib.jl")
+    include("lib/base.jl")
     include("lib/array.jl")
   end
 
