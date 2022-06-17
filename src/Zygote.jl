@@ -18,6 +18,7 @@ export rrule_via_ad
 
 const Numeric{T<:Number} = Union{T, AbstractArray{<:T}}
 
+include("deprecated.jl")
 include("tools/buffer.jl")
 include("tools/builtins.jl")
 

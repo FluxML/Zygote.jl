@@ -18,7 +18,6 @@ Zygote.withgradient
 Zygote.withjacobian
 Zygote.@showgrad
 Zygote.hook
-Zygote.dropgrad
 Zygote.Buffer
 Zygote.forwarddiff
 Zygote.ignore
