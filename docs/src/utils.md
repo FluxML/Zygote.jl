@@ -20,7 +20,6 @@ Zygote.@showgrad
 Zygote.hook
 Zygote.Buffer
 Zygote.forwarddiff
-Zygote.ignore
 Zygote.checkpointed
 ```
 
