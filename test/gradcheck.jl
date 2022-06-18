@@ -819,6 +819,18 @@ end
     @test back′(C̄)[1] isa Diagonal
     @test diag(back′(C̄)[1]) ≈ diag(back(C̄)[1])
   end
+  @testset "cholesky - Hermitian" begin
+    rng, N = MersenneTwister(123456), 3
+    A = randn(rng, N, N) + im * randn(rng, N, N)
+    H = Hermitian(A * A' + I)
+    Hmat = Matrix(H)
+    y, back = Zygote.pullback(cholesky, Hmat)
+    y′, back′ = Zygote.pullback(cholesky, H)
+    C̄ = (factors=randn(rng, N, N),)
+    @test back′(C̄)[1] isa Hermitian
+    @test gradtest(B->cholesky(Hermitian(B)).U, A * A' + I)
+    @test gradtest(B->logdet(cholesky(Hermitian(B))), A * A' + I)
+  end
 end
 
 @testset "lyap" begin
