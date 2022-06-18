@@ -821,7 +821,7 @@ end
   end
   @testset "cholesky - Hermitian" begin
     rng, N = MersenneTwister(123456), 3
-    A = randn(rng, N, N) + im * randn(rng, N, N)
+    A = randn(rng, Complex{Float64}, N, N)
     H = Hermitian(A * A' + I)
     Hmat = Matrix(H)
     y, back = Zygote.pullback(cholesky, Hmat)
