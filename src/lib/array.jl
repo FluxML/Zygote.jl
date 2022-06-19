@@ -67,8 +67,8 @@ _droplike(dy::Union{LinearAlgebra.Adjoint, LinearAlgebra.Transpose}, dxv::Abstra
 
 @adjoint getindex(::Type{T}, xs...) where {T} = T[xs...], dy -> (nothing, dy...)
 
-_throw_mutation_error(details) = error("""
-Mutating arrays is not supported -- $details
+_throw_mutation_error(f, args...) = error("""
+Mutating arrays is not supported -- called $f($(join(map(typeof, args), ", ")), ...)
 This error occurs when you ask Zygote to differentiate operations that change
 the elements of arrays in place. Some common examples:
 - setting values (x .= ...)
@@ -81,17 +81,19 @@ Possible fixes:
 - avoid mutating operations (preferred)
 - hide the mutation from Zygote by wrapping the mutating call in a custom rrule
   (https://juliadiff.org/ChainRulesCore.jl/stable/rule_author/example.html)
+- if the mutation is coming from within a package (i.e. not user code),
+  then open an issue on Zygote.jl (https://github.com/FluxML/Zygote.jl/issues)
 """)
 
 @adjoint! setindex!(xs::AbstractArray, x...) = setindex!(xs, x...),
-  _ -> _throw_mutation_error("called setindex!(::$(typeof(xs)), _...)")
+  _ -> _throw_mutation_error(setindex!, xs)
 
 @adjoint! copyto!(xs, args...) = copyto!(xs, args...),
-  _ -> _throw_mutation_error("called copyto!(::$(typeof(xs)), _...)")
+  _ -> _throw_mutation_error(copyto!, xs)
 
 for f in [push!, pop!, pushfirst!, popfirst!]
   @eval @adjoint! $f(x::AbstractVector, ys...) = $f(x, ys...), 
-    _ -> _throw_mutation_error("called $($f)(::$(typeof(x)), _...)")
+    _ -> _throw_mutation_error($f, x)
 end
 
 # General
