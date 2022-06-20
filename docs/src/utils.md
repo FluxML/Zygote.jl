@@ -13,15 +13,17 @@ Zygote also provides a set of helpful utilities. These are all "user-level" tool
 in other words you could have written them easily yourself, but they live in
 Zygote for convenience.
 
+See `ChainRules.ignore_derivatives` if you want to exclude some of your code from the
+gradient calculation. This replaces previous Zygote-specific `ignore` and `dropgrad`
+functionality.
+
 ```@docs
 Zygote.withgradient
 Zygote.withjacobian
 Zygote.@showgrad
 Zygote.hook
-Zygote.dropgrad
 Zygote.Buffer
 Zygote.forwarddiff
-Zygote.ignore
 Zygote.checkpointed
 ```
 
