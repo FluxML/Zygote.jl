@@ -654,7 +654,6 @@ end
     g(X) = cholesky(X * X' + I)
     @test Zygote.pullback(g, X)[2]((factors=LowerTriangular(X),))[1] ≈
       Zygote.pullback(g, X)[2]((factors=Matrix(LowerTriangular(X)),))[1]
-    @test_throws PosDefException Zygote.pullback(X -> cholesky(X, check = false), X)[2]((factors=X,))
 
     # https://github.com/FluxML/Zygote.jl/issues/932
     @test gradcheck(rand(5, 5), rand(5)) do A, x
@@ -819,6 +818,32 @@ end
     C̄ = (factors=randn(rng, N, N),)
     @test back′(C̄)[1] isa Diagonal
     @test diag(back′(C̄)[1]) ≈ diag(back(C̄)[1])
+  end
+  @testset "cholesky - Hermitian{Complex}" begin
+    rng, N = MersenneTwister(123456), 3
+    A = randn(rng, Complex{Float64}, N, N)
+    H = Hermitian(A * A' + I)
+    Hmat = Matrix(H)
+    y, back = Zygote.pullback(cholesky, Hmat)
+    y′, back′ = Zygote.pullback(cholesky, H)
+    C̄ = (factors=randn(rng, N, N),)
+    @test only(back′(C̄)) isa Hermitian
+    # gradtest does not support complex gradients, even though the pullback exists
+    d = only(back(C̄))
+    d′ = only(back′(C̄))
+    @test (d + d')/2 ≈ d′
+  end
+  @testset "cholesky - Hermitian{Real}" begin
+    rng, N = MersenneTwister(123456), 3
+    A = randn(rng, N, N)
+    H = Hermitian(A * A' + I)
+    Hmat = Matrix(H)
+    y, back = Zygote.pullback(cholesky, Hmat)
+    y′, back′ = Zygote.pullback(cholesky, H)
+    C̄ = (factors=randn(rng, N, N),)
+    @test back′(C̄)[1] isa Hermitian
+    @test gradtest(B->cholesky(Hermitian(B)).U, Hmat)
+    @test gradtest(B->logdet(cholesky(Hermitian(B))), Hmat)
   end
 end
 

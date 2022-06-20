@@ -564,35 +564,6 @@ end
 @adjoint Matrix(A::LinearAlgebra.HermOrSym{T,S}) where {T,S} = Matrix(A),
   Δ -> (convert(S, Δ),)
 
-@adjoint function cholesky(Σ::Real)
-  C = cholesky(Σ)
-  return C, Δ::NamedTuple->(Δ.factors[1, 1] / (2 * C.U[1, 1]),)
-end
-
-@adjoint function cholesky(Σ::Diagonal; check = true)
-  C = cholesky(Σ, check = check)
-  return C, Δ::NamedTuple -> begin
-    issuccess(C) || throw(PosDefException(C.info))
-    return Diagonal(diag(Δ.factors) .* inv.(2 .* C.factors.diag)), nothing
-  end
-end
-
-# Implementation due to Seeger, Matthias, et al. "Auto-differentiating linear algebra."
-@adjoint function cholesky(Σ::Union{StridedMatrix, Symmetric{<:Real, <:StridedMatrix}}; check = true)
-  C = cholesky(Σ, check = check)
-  return C, function(Δ::NamedTuple)
-    issuccess(C) || throw(PosDefException(C.info))
-    U, Ū = C.U, Δ.factors
-    Σ̄ = similar(U.data)
-    Σ̄ = mul!(Σ̄, Ū, U')
-    Σ̄ = copytri!(Σ̄, 'U')
-    Σ̄ = ldiv!(U, Σ̄)
-    Σ̄ = BLAS.trsm!('R', 'U', 'T', 'N', one(eltype(Σ)), U.data, Σ̄)
-    Σ̄[diagind(Σ̄)] ./= 2
-    return (UpperTriangular(Σ̄),)
-  end
-end
-
 @adjoint function lyap(A::AbstractMatrix, C::AbstractMatrix)
   X = lyap(A, C)
   return X, function (X̄)

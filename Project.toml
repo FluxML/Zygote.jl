@@ -25,7 +25,7 @@ ZygoteRules = "700de1a5-db45-46bc-99cf-38207098b444"
 
 [compat]
 AbstractFFTs = "0.5, 1.0"
-ChainRules = "1.33"
+ChainRules = "1.35.3"
 ChainRulesCore = "1.9"
 ChainRulesTestUtils = "1"
 DiffRules = "1.4"
