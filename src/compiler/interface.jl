@@ -4,11 +4,11 @@ using Core: Typeof
 import Base: copy!, IdSet
 import Base.Broadcast: broadcasted, materialize!
 
-mutable struct Context <: AContext
+mutable struct Context{I} <: AContext
   cache::Union{IdDict{Any,Any},Nothing}
 end
 
-Context() = Context(nothing)
+Context() = Context{false}(nothing)
 
 cache(cx::Context) = cx.cache === nothing ? (cx.cache = IdDict()) : cx.cache
 
@@ -36,9 +36,27 @@ _pullback(f, args...) = _pullback(Context(), f, args...)
 tailmemaybe(::Nothing) = nothing
 tailmemaybe(x::Tuple) = Base.tail(x)
 
-function pullback(f, args...)
-  y, back = _pullback(f, args...)
+@inline pullback(f, args...) = pullback(f, Context(), args...)
+function pullback(f, cx::AContext, args...)
+  y, back = _pullback(cx, f, args...)
   y, Δ -> tailmemaybe(back(Δ))
+end
+function pullback(cx::Context, f, args...)
+  ChainRulesCore.ignore_derivatives() do
+    @warn """
+    Incorrect argument order for pullback, please use:
+
+      pullback(f, __context__::Context, args)
+    
+    instead of:
+
+      pullback(__context__::Context, f, args)
+    
+    This is usually caused by a call to pullback in a higher-order @adjoint.
+    The above warning will become an error in Zygote 0.7.
+    """
+  end
+  return pullback(f, cx, args...)
 end
 
 sensitivity(y::Number) = one(y)
@@ -334,21 +352,21 @@ function Base.map(f, gs1::Grads, gss::ADictOrGrads...)
 end
 
 function Base.map!(f, gsout::Grads, gss::ADictOrGrads...)
-  all(issetequal(gsout.params, keys(gs)) for gs in gss) || 
+  all(issetequal(gsout.params, keys(gs)) for gs in gss) ||
     throw(ArgumentError("map! expects Grads objects with the same Params."))
   for p in gsout.params
-    gsout[p] = f((_getformap(gs, p) for gs in gss)...) 
+    gsout[p] = f((_getformap(gs, p) for gs in gss)...)
   end
   return gsout
 end
 
 function _getformap(gs, p)
   g = gs[p]
-  isnothing(g) ? fill!(similar(p), 0) : g 
+  isnothing(g) ? fill!(similar(p), 0) : g
 end
 
 function pullback(f, ps::Params)
-  cx = Context()
+  cx = Context{true}(nothing)
   y, back = _pullback(cx, f)
   y, function (Δ)
     for p in ps

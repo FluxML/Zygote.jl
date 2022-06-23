@@ -30,6 +30,10 @@ using Base.Broadcast: Broadcasted, AbstractArrayStyle, broadcasted, materialize
 # Utilities
 # =========
 
+# ChainRules already marks this non-differentiable,
+# But inference can still give up because of the Zygote -> CR wrapper layer
+@nograd Broadcast.combine_styles
+
 accum_sum(xs; dims = :) = reduce(accum, xs, dims = dims)
 
 # Work around reducedim_init issue
@@ -82,16 +86,16 @@ _minus(::Nothing) = nothing
 @adjoint broadcasted(::typeof(*), x::Numeric, y::Numeric) = x.*y,
    Δ -> (nothing, unbroadcast(x, Δ .* conj.(y)), unbroadcast(y, Δ .* conj.(x)))
 @adjoint broadcasted(::typeof(*), x::Number, y::AbstractArray{<:Number}) =
-  _pullback(*, x, y)  # this uses dot(y,Δ) instead of sum(Δ .* conj.(y))
+  _pullback(__context__, *, x, y)  # this uses dot(y,Δ) instead of sum(Δ .* conj.(y))
 @adjoint broadcasted(::typeof(*), x::AbstractArray{<:Number}, y::Number) =
-  _pullback(*, x, y)
+  _pullback(__context__, *, x, y)
 
 @adjoint function broadcasted(::typeof(/), x::Numeric, y::Numeric)
   res = x ./ y
   res, Δ -> (nothing, unbroadcast(x, Δ ./ conj.(y)), unbroadcast(y, .-Δ .* conj.(res ./ y)))
 end
 @adjoint broadcasted(::typeof(/), x::AbstractArray{<:Number}, y::Number) =
-  _pullback(/, x, y)
+  _pullback(__context__, /, x, y)
 
 @adjoint function broadcasted(::typeof(Base.literal_pow), ::typeof(^), x::Numeric, exp::Val{p}) where p
   y = Base.literal_pow.(^, x, exp)
@@ -273,7 +277,7 @@ using GPUArraysCore  # replaces @require CUDA block, weird indenting to preserve
   # Not the ChainRules.rrule which will use the Zygote.Context and thus not be GPU compatible
   @adjoint function sum(f, xs::AbstractGPUArray; kws...)
     @assert !haskey(kws, :init) # TODO add init support (julia 1.6)
-    return pullback(__context__, (f, xs) -> sum(f.(xs); kws...), f, xs)
+    return pullback((f, xs) -> sum(f.(xs); kws...), __context__, f, xs)
   end
 
   @adjoint function Base.convert(::Type{T}, xs::Array)  where {T<:AbstractGPUArray}
