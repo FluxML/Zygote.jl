@@ -6,8 +6,6 @@ using Distributed: pmap, AbstractWorkerPool
 @adjoint Array(xs::AbstractArray) = Array(xs), ȳ -> (ȳ,)
 @adjoint Array(xs::Array) = Array(xs), ȳ -> (ȳ,)
 
-@nograd ones, zeros, Base.OneTo, Colon(), one, zero, sizehint!, count
-
 @adjoint copy(x::AbstractArray) = copy(x), ȳ -> (ȳ,)
 
 @adjoint collect(x::Tuple) = collect(x), dy -> (Tuple(dy),)
@@ -221,11 +219,6 @@ end
     (Δf, nothing, Δf_and_args[2:end]..., nothing, nothing)
   end
 end
-
-for t in subtypes(AbstractWorkerPool)
-  @nograd t
-end
-@nograd workers
 
 function _pullback(cx::AContext, ::typeof(collect), g::Base.Generator)
   y, b = ∇map(cx, g.f, g.iter)

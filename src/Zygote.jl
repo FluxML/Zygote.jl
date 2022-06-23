@@ -58,7 +58,7 @@ include("profiler/Profile.jl")
 end
 
 @init @require Colors="5ae59095-9a9b-59fe-a467-6f913c188581" begin
-  @nograd Colors.ColorTypes._parameter_upper_bound
+  @non_differentiable Colors.ColorTypes._parameter_upper_bound(::Any...)
 end
 
 using InteractiveUtils

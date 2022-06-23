@@ -9,7 +9,7 @@ end
 # TODO figure out why this made a test fail
 zerolike(x::Union{Module,Type}) = nothing
 
-# TODO: `@nograd` and `@linear`
+# TODO: `@non_differentiable` and `@linear`
 
 @tangent zerolike(x) = zerolike(x), _ -> zerolike(x)
 @tangent one(x::Number) = one(x), _ -> zero(x)

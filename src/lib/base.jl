@@ -49,8 +49,6 @@ end
 
 # Channels
 
-@nograd Channel
-
 grad_mut(ch::Channel) = Channel(ch.sz_max)
 
 @adjoint! function put!(ch::Channel, x)
@@ -156,8 +154,6 @@ end
 end
 
 @adjoint Base.nameof(x::UnionAll) = nameof(x), _ -> (nothing,)
-
-@nograd typeintersect
 
 # Base.Fix1 and Base.Fix2: https://github.com/FluxML/Zygote.jl/issues/957
 @adjoint function (g::Base.Fix1)(y)

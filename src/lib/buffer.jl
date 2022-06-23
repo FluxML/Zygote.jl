@@ -1,7 +1,7 @@
 grad_mut(b::Buffer) = fill!(similar(b.data, Any), nothing)
 grad_mut(b::Buffer{T}) where T<:Number = fill!(similar(b.data, float(T)), 0)
 
-@nograd Buffer
+@non_differentiable Buffer(::Any...)
 
 @adjoint function getindex(b::Buffer, i...)
   b[i...], function (Δ)
