@@ -11,6 +11,7 @@ makedocs(
   doctest = true,
   pages = [
         "Home" => "index.md",
+        "Limitations" => "limitations.md",
         "Custom Adjoints" => "adjoints.md",
         "Utilities" => "utils.md",
         "Complex Differentiation" => "complex.md",

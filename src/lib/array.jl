@@ -70,19 +70,12 @@ _droplike(dy::Union{LinearAlgebra.Adjoint, LinearAlgebra.Transpose}, dxv::Abstra
 _throw_mutation_error(f, args...) = error("""
 Mutating arrays is not supported -- called $f($(join(map(typeof, args), ", ")), ...)
 This error occurs when you ask Zygote to differentiate operations that change
-the elements of arrays in place. Some common examples:
-- setting values (x .= ...)
-- appending values (push!(x, v))
-- popping values (pop!(x))
-- calling mutating functions (mul!(C, A, B))
-NOTE: non-mutating functions may use mutation under the hood
-      for performance or code-reuse.
+the elements of arrays in place (e.g. setting values with x .= ...)
+
 Possible fixes:
 - avoid mutating operations (preferred)
-- hide the mutation from Zygote by wrapping the mutating call in a custom rrule
-  (https://juliadiff.org/ChainRulesCore.jl/stable/rule_author/example.html)
-- if the mutation is coming from within a package (i.e. not user code),
-  then open an issue on Zygote.jl (https://github.com/FluxML/Zygote.jl/issues)
+- or read the documentation and solutions for this error
+  https://fluxml.ai/Zygote.jl/dev/limitations.html#Array-mutation-1
 """)
 
 @adjoint! setindex!(xs::AbstractArray, x...) = setindex!(xs, x...),
