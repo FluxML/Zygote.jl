@@ -4,6 +4,9 @@ using Core: Typeof
 import Base: copy!, IdSet
 import Base.Broadcast: broadcasted, materialize!
 
+# Internal container used to track accumulated gradients of mutable types (including params).
+# Type param I ∈ (true, false) indicates whether implicit params are in use.
+# By default, this should be false unless pullback(f, ::Params) is called.
 mutable struct Context{I} <: AContext
   cache::Union{IdDict{Any,Any},Nothing}
 end
@@ -47,11 +50,11 @@ function pullback(cx::Context, f, args...)
     Incorrect argument order for pullback, please use:
 
       pullback(f, __context__::Context, args)
-    
+
     instead of:
 
       pullback(__context__::Context, f, args)
-    
+
     This is usually caused by a call to pullback in a higher-order @adjoint.
     The above warning will become an error in Zygote 0.7.
     """
