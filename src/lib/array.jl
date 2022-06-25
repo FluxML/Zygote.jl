@@ -346,24 +346,6 @@ end
 @adjoint conj(x::AbstractArray) = conj(x), r̄ -> (conj(r̄),)
 @adjoint imag(x::AbstractArray) = imag(x), ī -> (complex.(0, real.(ī)),)
 
-@adjoint function mean(xs::AbstractArray; dims = :)
-  return mean(xs, dims=dims), Δ -> (_backmean(xs,Δ,dims),)
-end
-_backmean(xs, Δ, ::Colon) = zero(xs) .+ Δ ./ length(xs)
-_backmean(xs, Δ, dims) = zero(xs) .+ Δ ./ mapreduce(i -> size(xs,i),*,dims)
-
-@adjoint function Statistics.var(xs::AbstractArray; corrected::Bool=true, dims=:, mean=mean(xs, dims=dims))
-    return Statistics.var(xs; corrected=corrected, mean=mean, dims=dims), Δ -> _backvar(xs, Δ, corrected, mean, dims)
-end
-_backvar(xs, Δ, corrected::Bool, mean, dims)         = _backvar(xs, Δ, mapreduce(i -> size(xs,i),*,dims) - corrected, mean)
-_backvar(xs, Δ, corrected::Bool, mean, ::Colon)      = _backvar(xs, Δ, length(xs) - corrected, mean)
-_backvar(xs, Δ, N::Int, mean) = (convert(eltype(xs), 2/N) .* Δ .* (xs .- mean),)
-
-@adjoint function Statistics.std(xs::AbstractArray; corrected::Bool=true, dims=:, mean=mean(xs, dims=dims))
-    s = Statistics.std(xs; corrected=corrected, mean=mean, dims=dims)
-    return s, Δ -> _backvar(xs, Δ ./ (2 .* s), corrected, mean, dims)
-end
-
 @adjoint function cumsum(xs::AbstractVector; dims::Integer = 1)
   dims == 1 || return copy(xs), Δ -> (Δ,)
   cumsum(xs), Δ -> (reverse(cumsum(reverse(Δ))),)
