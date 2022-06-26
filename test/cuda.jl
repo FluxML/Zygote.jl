@@ -89,9 +89,9 @@ end
 
 @testset "UniformScaling" begin
   r = cu(rand(3))
-  @test gradtest(r) do r
+  @test gradient(r) do r
     sum(Zygote._eyelike(r) .+ r)
-  end
+  end == (cu(fill(3.f0,3)), )
 end
 
 @testset "gradient algebra" begin
