@@ -313,33 +313,9 @@ end
   sum(xs, dims = dims), Δ -> (nothing,)
 end
 
-
 function _pullback(cx::AContext, ::typeof(prod), f, xs::AbstractArray)
   y, back = pullback(cx, ((f, xs) -> prod(f.(xs))), f, xs)
   y, ȳ -> (nothing, back(ȳ)...)
-end
-
-@adjoint function maximum(xs::AbstractArray; dims = :)
-  max, i = findmax(xs, dims = dims)
-  max, function (Δ)
-    Δ isa Real && abs(Δ) <= sqrt(eps(float(Δ))) && return nothing
-    Δ′ = zero(xs)
-    Δ′[i] = Δ
-    return (Δ′,)
-  end
-end
-
-@adjoint function minimum(xs::AbstractArray; dims = :)
-  min, i = findmin(xs, dims = dims)
-  min, function (Δ)
-    Δ′ = zero(xs)
-    Δ′[i] = Δ
-    return (Δ′,)
-  end
-end
-
-@adjoint function dropdims(xs::AbstractArray; dims)
-  dropdims(xs, dims = dims), Δ -> (reshape(Δ, size(xs)...),)
 end
 
 @adjoint real(x::AbstractArray) = real(x), r̄ -> (real(r̄),)
