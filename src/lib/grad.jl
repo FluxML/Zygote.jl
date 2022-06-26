@@ -173,12 +173,7 @@ _jvec(x::Number) = _jvec(vcat(x))
 _jvec(x) = throw(ArgumentError("jacobian expected a function which returns an array, or a scalar, got $(typeof(x))"))
 _jvec(x::AbstractArray{<:Complex}) = throw(ArgumentError("jacobian does not accept complex output"))
 
-_eyelike(y::Vector) = Matrix{eltype(y)}(I, length(y), length(y))
-function _eyelike(y::AbstractVector) # version which works on GPU
-  out = fill!(similar(y, length(y), length(y)), 0)
-  out[LinearAlgebra.diagind(out)] .= 1
-  out
-end
+_eyelike(y::AbstractVector{T}) where T = T.(I(length(y)))
 
 _gradcopy!(dst::AbstractArray, src::AbstractArray{<:Number}) = copyto!(dst, src)
 _gradcopy!(dst::AbstractArray, src::Number) = copyto!(dst, src)

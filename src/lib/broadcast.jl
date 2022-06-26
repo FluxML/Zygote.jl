@@ -272,7 +272,8 @@ end
 
   end
 
-  @adjoint (::Type{T})(xs::Array) where {T <: CUDA.CuArray} =
+  _eyelike(y::CUDA.CuVector{T}) where T = CUDA.CuArray(I(length(y)))
+  @adjoint (::Type{T})(xs::AbstractArray) where {T <: CUDA.CuArray} =
     T(xs), Δ -> (convert(Array, Δ), )
 
   @adjoint function sum(xs::CUDA.AbstractGPUArray; dims = :)

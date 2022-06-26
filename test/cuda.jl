@@ -87,6 +87,13 @@ end
   @test j2[v1] ≈ cu(res2)
 end
 
+@testset "UniformScaling" begin
+  r = cu(rand(3))
+  @test gradtest(r) do r
+    sum(Zygote._eyelike(r) .+ r)
+  end
+end
+
 @testset "gradient algebra" begin
   w, b = rand(2) |> cu, rand(2) |> cu
   x1, x2 = rand(2) |> cu, rand(2) |> cu
