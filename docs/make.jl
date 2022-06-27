@@ -8,7 +8,7 @@ using Documenter, Zygote
 
 makedocs(
   sitename="Zygote",
-  doctest = true,
+  doctest = false,
   pages = [
         "Home" => "index.md",
         "Custom Adjoints" => "adjoints.md",
