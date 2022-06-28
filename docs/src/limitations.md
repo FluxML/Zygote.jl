@@ -9,9 +9,11 @@ In this section, we will introduce examples where each of these errors occurs as
 
 ## Array mutation
 
-Array mutation is by far the most commonly encountered Zygote limitation. Unfortunately, supporting it natively in Zygote is tricky, though it may happen eventually. For now, let's focus on what counts as mutation, and how to fix it.
+Array mutation is by far the most commonly encountered Zygote limitation.
 
-Here we define a simple mutating function, `f!`, which modifies the elements of its input argument, `x`, in place.
+Automatic differentiation (AD) systems like Zygote are built on basic principles of calculus where we encounter _pure_ functions. This means that the function, ``y = f(x)``, does not modify ``x`` and only produces the output ``y`` based on ``x``. If we have a chain of functions, such as ``y = h(g(f(x)))``, we can apply the chain rule to differentiate it. AD systems are built to programmatically apply the chain rule to a series of function calls. Unfortunately, typical programs do not behave this way. We might allocate some memory, `x`, then call a function `y = f!(x)` that modifies `x` to produce the output `y`. This mutating behavior is a _side-effect_ of `f!`. Side-effects are difficult for AD systems to handle, because the must track changes to mutated variables and store older versions of the variable. For these reasons, Zygote does not handle array mutation for now.
+
+Let's explore this with a more concrete example. Here we define a simple mutating function, `f!`, which modifies the elements of its input argument, `x`, in place.
 ```julia
 function f!(x)
   x .= 2 .* x
