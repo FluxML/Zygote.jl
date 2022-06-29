@@ -67,15 +67,26 @@ _droplike(dy::Union{LinearAlgebra.Adjoint, LinearAlgebra.Transpose}, dxv::Abstra
 
 @adjoint getindex(::Type{T}, xs...) where {T} = T[xs...], dy -> (nothing, dy...)
 
+_throw_mutation_error(f, args...) = error("""
+Mutating arrays is not supported -- called $f($(join(map(typeof, args), ", ")), ...)
+This error occurs when you ask Zygote to differentiate operations that change
+the elements of arrays in place (e.g. setting values with x .= ...)
+
+Possible fixes:
+- avoid mutating operations (preferred)
+- or read the documentation and solutions for this error
+  https://fluxml.ai/Zygote.jl/dev/limitations.html#Array-mutation-1
+""")
+
 @adjoint! setindex!(xs::AbstractArray, x...) = setindex!(xs, x...),
-  _ -> error("Mutating arrays is not supported -- called setindex!(::$(typeof(xs)), _...)")
+  _ -> _throw_mutation_error(setindex!, xs)
 
 @adjoint! copyto!(xs, args...) = copyto!(xs, args...),
-  _ -> error("Mutating arrays is not supported -- called copyto!(::$(typeof(xs)), _...)")
+  _ -> _throw_mutation_error(copyto!, xs)
 
 for f in [push!, pop!, pushfirst!, popfirst!]
   @eval @adjoint! $f(x::AbstractVector, ys...) = $f(x, ys...), 
-    _ -> error("Mutating arrays is not supported -- called $($f)(::$(typeof(x)), _...)")
+    _ -> _throw_mutation_error($f, x)
 end
 
 # General
