@@ -67,15 +67,26 @@ _droplike(dy::Union{LinearAlgebra.Adjoint, LinearAlgebra.Transpose}, dxv::Abstra
 
 @adjoint getindex(::Type{T}, xs...) where {T} = T[xs...], dy -> (nothing, dy...)
 
+_throw_mutation_error(f, args...) = error("""
+Mutating arrays is not supported -- called $f($(join(map(typeof, args), ", ")), ...)
+This error occurs when you ask Zygote to differentiate operations that change
+the elements of arrays in place (e.g. setting values with x .= ...)
+
+Possible fixes:
+- avoid mutating operations (preferred)
+- or read the documentation and solutions for this error
+  https://fluxml.ai/Zygote.jl/dev/limitations.html#Array-mutation-1
+""")
+
 @adjoint! setindex!(xs::AbstractArray, x...) = setindex!(xs, x...),
-  _ -> error("Mutating arrays is not supported -- called setindex!(::$(typeof(xs)), _...)")
+  _ -> _throw_mutation_error(setindex!, xs)
 
 @adjoint! copyto!(xs, args...) = copyto!(xs, args...),
-  _ -> error("Mutating arrays is not supported -- called copyto!(::$(typeof(xs)), _...)")
+  _ -> _throw_mutation_error(copyto!, xs)
 
 for f in [push!, pop!, pushfirst!, popfirst!]
   @eval @adjoint! $f(x::AbstractVector, ys...) = $f(x, ys...), 
-    _ -> error("Mutating arrays is not supported -- called $($f)(::$(typeof(x)), _...)")
+    _ -> _throw_mutation_error($f, x)
 end
 
 # General
@@ -313,69 +324,14 @@ end
   sum(xs, dims = dims), Δ -> (nothing,)
 end
 
-
 function _pullback(cx::AContext, ::typeof(prod), f, xs::AbstractArray)
   y, back = pullback(cx, ((f, xs) -> prod(f.(xs))), f, xs)
   y, ȳ -> (nothing, back(ȳ)...)
 end
 
-@adjoint function maximum(xs::AbstractArray; dims = :)
-  max, i = findmax(xs, dims = dims)
-  max, function (Δ)
-    Δ isa Real && abs(Δ) <= sqrt(eps(float(Δ))) && return nothing
-    Δ′ = zero(xs)
-    Δ′[i] = Δ
-    return (Δ′,)
-  end
-end
-
-@adjoint function minimum(xs::AbstractArray; dims = :)
-  min, i = findmin(xs, dims = dims)
-  min, function (Δ)
-    Δ′ = zero(xs)
-    Δ′[i] = Δ
-    return (Δ′,)
-  end
-end
-
-@adjoint function dropdims(xs::AbstractArray; dims)
-  dropdims(xs, dims = dims), Δ -> (reshape(Δ, size(xs)...),)
-end
-
 @adjoint real(x::AbstractArray) = real(x), r̄ -> (real(r̄),)
 @adjoint conj(x::AbstractArray) = conj(x), r̄ -> (conj(r̄),)
 @adjoint imag(x::AbstractArray) = imag(x), ī -> (complex.(0, real.(ī)),)
-
-@adjoint function cumsum(xs::AbstractVector; dims::Integer = 1)
-  dims == 1 || return copy(xs), Δ -> (Δ,)
-  cumsum(xs), Δ -> (reverse(cumsum(reverse(Δ))),)
-end
-@adjoint function cumsum(xs::AbstractArray; dims::Integer)
-  dims <= ndims(xs) || return copy(xs), Δ -> (Δ,)
-  cumsum(xs; dims=dims), Δ -> begin
-    (reverse(cumsum(reverse(Δ, dims=dims), dims=dims), dims=dims),)
-  end
-end
-
-@adjoint eachrow(x::AbstractVecOrMat) = collect(eachrow(x)), dys -> ∇eachslice(dys, x, 1)
-@adjoint eachcol(x::AbstractVecOrMat) = collect(eachcol(x)), dys -> ∇eachslice(dys, x, 2)
-@adjoint eachslice(x::AbstractArray; dims::Integer) =
-  collect(eachslice(x; dims=dims)), dys -> ∇eachslice(dys, x, dims)
-
-function ∇eachslice(dys, x::AbstractArray, dim::Integer) where {TX}
-  i1 = findfirst(dy -> dy isa AbstractArray, dys)
-  i1 === nothing && return (zero(x),) # all slices get nothing
-  T = promote_type(eltype(dys[i1]), eltype(x))
-  dx = similar(x, T)
-  for i in axes(x, dim)
-    if dys[i] isa AbstractArray
-      copyto!(selectdim(dx,dim,i), dys[i])
-    else
-      selectdim(dx,dim,i) .= 0
-    end
-  end
-  (dx,)
-end
 
 
 # LinearAlgebra

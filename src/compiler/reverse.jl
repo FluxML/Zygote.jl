@@ -118,7 +118,10 @@ function instrument(ir::IR)
     if isexpr(ex, :foreigncall, :isdefined)
       continue
     elseif isexpr(ex, :enter, :leave)
-      error("try/catch is not supported.")
+      error("""try/catch is not supported.
+            Refer to the Zygote documentation for fixes.
+            https://fluxml.ai/Zygote.jl/dev/limitations.html#Try-catch-statements-1
+            """)
     elseif isexpr(ex, :(=))
       @assert ex.args[1] isa GlobalRef
       pr[v] = xcall(Zygote, :global_set, QuoteNode(ex.args[1]), ex.args[2])
@@ -277,7 +280,11 @@ function adjoint(pr::Primal)
         grads[ex.val] = grads[v]
       elseif isexpr(ex, GlobalRef, :call, :isdefined, :inbounds, :meta, :loopinfo)
       elseif isexpr(ex)
-        push!(rb, stmt(xcall(Base, :error, "Can't differentiate $(ex.head) expression"),
+        push!(rb, stmt(xcall(Base, :error, """
+                             Can't differentiate $(ex.head) expression.
+                             You might want to check the Zygote limitations documentation.
+                             https://fluxml.ai/Zygote.jl/dev/limitations.html
+                             """),
                        line = b[v].line))
       else # A literal value
         continue
