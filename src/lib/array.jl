@@ -337,6 +337,9 @@ end
 # LinearAlgebra
 # =============
 
+@adjoint parent(x::LinearAlgebra.Adjoint) = parent(x), ȳ -> (LinearAlgebra.Adjoint(ȳ),)
+@adjoint parent(x::LinearAlgebra.Transpose) = parent(x), ȳ -> (LinearAlgebra.Transpose(ȳ),)    
+
 function _kron(mat1::AbstractMatrix,mat2::AbstractMatrix)
     m1, n1 = size(mat1)
     mat1_rsh = reshape(mat1,(1,m1,1,n1))
