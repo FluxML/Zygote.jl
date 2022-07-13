@@ -337,33 +337,8 @@ end
 # LinearAlgebra
 # =============
 
-@adjoint function transpose(x)
-  back(Δ) = (transpose(Δ),)
-  back(Δ::NamedTuple{(:parent,)}) = (Δ.parent,)
-  return transpose(x), back
-end
-
-@adjoint function LinearAlgebra.Transpose(x)
-  back(Δ) = (LinearAlgebra.Transpose(Δ),)
-  back(Δ::NamedTuple{(:parent,)}) = (Δ.parent,)
-  return LinearAlgebra.Transpose(x), back
-end
-
-
-@adjoint function Base.adjoint(x)
-  back(Δ) = (Δ',)
-  back(Δ::NamedTuple{(:parent,)}) = (Δ.parent,)
-  return x', back
-end
-
-@adjoint function LinearAlgebra.Adjoint(x)
-  back(Δ) = (LinearAlgebra.Adjoint(Δ),)
-  back(Δ::NamedTuple{(:parent,)}) = (Δ.parent,)
-  return LinearAlgebra.Adjoint(x), back
-end
-
 @adjoint parent(x::LinearAlgebra.Adjoint) = parent(x), ȳ -> (LinearAlgebra.Adjoint(ȳ),)
-@adjoint parent(x::LinearAlgebra.Transpose) = parent(x), ȳ -> (LinearAlgebra.Transpose(ȳ),)
+@adjoint parent(x::LinearAlgebra.Transpose) = parent(x), ȳ -> (LinearAlgebra.Transpose(ȳ),)    
 
 function _kron(mat1::AbstractMatrix,mat2::AbstractMatrix)
     m1, n1 = size(mat1)
