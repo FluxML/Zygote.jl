@@ -152,15 +152,23 @@ end
 # General Fallback
 # ================
 
-# The fused reverse mode implementation is the most general but currently has
+# The ~~fused~~ reverse mode implementation is the most general but currently has
 # poor performance. It works by flattening the broadcast and mapping the call to
 # `_pullback` over the input.
-
 # However, the core call
 # broadcast(_pullback, (cx,), f, args...)
 # is already 10x slower than a simple broadcast (presumably due to inlining
 # issues, or something similar) and the other operations needed take it to about
 # 100x overhead.
+
+# https://github.com/FluxML/Zygote.jl/pull/1001 tries to use broadcast_forward (using Dual numbers)
+# whenever possible, this was previously used only for CuArrays. It is usually much faster.
+
+# https://github.com/JuliaDiff/ChainRules.jl/pull/644 implements broadcasting.
+# Its generic rule would be applied before the one defined here, with AbstractArrayStyle
+# @adjoint function broadcasted(::AbstractArrayStyle, f::F, args...) where {F}
+# but does not pass all Zygote's tests. So disable it:
+ChainRulesCore.@opt_out rrule(cfg::ZygoteRuleConfig, ::typeof(Broadcast.broadcasted), f::F, args::Vararg{Any,N}) where {F,N}
 
 @generated inclen(::NTuple{N,Any}) where N = Val(N+1)
 

@@ -18,6 +18,9 @@ such that if a suitable rule is defined later, the generated function will recom
 function has_chain_rrule(T)
   config_T, arg_Ts = Iterators.peel(T.parameters)
   configured_rrule_m = meta(Tuple{typeof(rrule), config_T, arg_Ts...})
+  
+  isnothing(configured_rrule_m) && return false, nothing  # too crude, surely
+  
   if _is_rrule_redispatcher(configured_rrule_m.method)
     # The config is not being used:
     # it is being redispatched without config, so we need the method it redispatches to
