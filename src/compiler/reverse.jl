@@ -120,7 +120,7 @@ function instrument(ir::IR)
     elseif isexpr(ex, :enter, :leave)
       error("""try/catch is not supported.
             Refer to the Zygote documentation for fixes.
-            https://fluxml.ai/Zygote.jl/dev/limitations.html#Try-catch-statements-1
+            https://fluxml.ai/Zygote.jl/latest/limitations
             """)
     elseif isexpr(ex, :(=))
       @assert ex.args[1] isa GlobalRef
@@ -283,7 +283,7 @@ function adjoint(pr::Primal)
         push!(rb, stmt(xcall(Base, :error, """
                              Can't differentiate $(ex.head) expression.
                              You might want to check the Zygote limitations documentation.
-                             https://fluxml.ai/Zygote.jl/dev/limitations.html
+                             https://fluxml.ai/Zygote.jl/latest/limitations
                              """),
                        line = b[v].line))
       else # A literal value

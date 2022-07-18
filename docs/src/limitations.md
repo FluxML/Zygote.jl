@@ -33,7 +33,7 @@ the elements of arrays in-place (e.g. setting values with x .= ...)
 Possible fixes:
 - avoid mutating operations (preferred)
 - or read the documentation and solutions for this error
-  https://fluxml.ai/Zygote.jl/dev/limitations.html#Array-mutation
+  https://fluxml.ai/Zygote.jl/latest/limitations
 
 Stacktrace:
   ...
@@ -94,7 +94,7 @@ julia> gradient(rand(3)) do x
        end
 ERROR: Compiling Tuple{typeof(tryme), Vector{Float64}}: try/catch is not supported.
 Refer to the Zygote documentation for fixes.
-https://fluxml.ai/Zygote.jl/dev/limitations.html#try-catch-statements-1
+https://fluxml.ai/Zygote.jl/latest/limitations
 
 Stacktrace:
   ...
@@ -116,7 +116,7 @@ julia> jclock(2)
 julia> gradient(jclock, rand())
 ERROR: Can't differentiate foreigncall expression
 You might want to check the Zygote limitations documentation.
-https://fluxml.ai/Zygote.jl/dev/limitations.html
+https://fluxml.ai/Zygote.jl/latest/limitations
 
 Stacktrace:
   ...

@@ -75,7 +75,7 @@ the elements of arrays in place (e.g. setting values with x .= ...)
 Possible fixes:
 - avoid mutating operations (preferred)
 - or read the documentation and solutions for this error
-  https://fluxml.ai/Zygote.jl/dev/limitations.html#Array-mutation-1
+  https://fluxml.ai/Zygote.jl/latest/limitations
 """)
 
 @adjoint! setindex!(xs::AbstractArray, x...) = setindex!(xs, x...),
