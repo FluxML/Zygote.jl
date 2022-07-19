@@ -94,7 +94,7 @@ julia> gradient(rand(3)) do x
        end
 ERROR: Compiling Tuple{typeof(tryme), Vector{Float64}}: try/catch is not supported.
 Refer to the Zygote documentation for fixes.
-https://fluxml.ai/Zygote.jl/dev/limitations.html#try-catch-statements-1
+https://fluxml.ai/Zygote.jl/dev/limitations/#try-catch-statements-1
 
 Stacktrace:
   ...
@@ -116,7 +116,7 @@ julia> jclock(2)
 julia> gradient(jclock, rand())
 ERROR: Can't differentiate foreigncall expression
 You might want to check the Zygote limitations documentation.
-https://fluxml.ai/Zygote.jl/dev/limitations.html
+https://fluxml.ai/Zygote.jl/dev/limitations/
 
 Stacktrace:
   ...
