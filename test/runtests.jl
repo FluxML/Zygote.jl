@@ -2,6 +2,7 @@ using Zygote, Test
 using Zygote: gradient, ZygoteRuleConfig
 using CUDA
 using CUDA: has_cuda
+include("gradcheck_utils.jl")
 
 @testset "all" begin  # Overall testset ensures it keeps running after failure
 
