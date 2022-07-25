@@ -253,13 +253,12 @@ end
   return y, bc_fwd_back
 end
 
-# using GPUArrays
-@init @require GPUArrays = "0c68f7d7-f131-5f86-a1c3-88cf8149b2d7" begin
-  # Ordinary broadcasting calls broadcast_forward anyway when certain its' safe,
-  # so perhaps this can be deleted? Possible edge case here:
-  # https://github.com/FluxML/Zygote.jl/pull/1018#issuecomment-873629415
+using GPUArraysCore  # replaces @require CUDA block, weird indenting to preserve git blame
 
-  @eval @adjoint broadcasted(::AbstractGPUArrayStyle, f, args...) =
+       # Ordinary broadcasting calls broadcast_forward anyway when certain its' safe,
+       # so perhaps this can be deleted? Possible edge case here:
+       # https://github.com/FluxML/Zygote.jl/pull/1018#issuecomment-873629415
+  @adjoint broadcasted(::AbstractGPUArrayStyle, f, args...) =
     broadcast_forward(f, args...)
 
   @adjoint (::Type{T})(xs::Array) where {T <: AbstractGPUArray} =
@@ -281,6 +280,4 @@ end
     Base.convert(T, xs), Δ -> (nothing, Base.convert(Array, Δ),)
   end
 
-  @eval pull_block_vert(sz, Δ::CUDA.CuArray, A::Number) = GPUArrays.@allowscalar Δ[sz]
-
-end
+  pull_block_vert(sz, Δ::AbstractGPUArray, A::Number) = @allowscalar Δ[sz]
