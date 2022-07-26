@@ -281,3 +281,4 @@ using GPUArraysCore  # replaces @require CUDA block, weird indenting to preserve
   end
 
   pull_block_vert(sz, Δ::AbstractGPUArray, A::Number) = @allowscalar Δ[sz]
+
