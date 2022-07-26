@@ -3,19 +3,19 @@ using ForwardDiff
 using Zygote: hessian_dual, hessian_reverse
 
 @testset "hessian: $hess" for hess in [hessian_dual, hessian_reverse]
-  function f(x, bias)
-    hessian = hess(x->sum(x.^3), x)
-    return hessian * x .+ bias
+  function f1(x, bias)
+    h = hess(x -> sum(x.^3), x)
+    return h * x .+ bias
   end
 
   if hess == hessian_dual
     @test hess(x -> x[1]*x[2], randn(2)) ≈ [0 1; 1 0]
     @test hess(((x,y),) -> x*y, randn(2)) ≈ [0 1; 1 0]  # original docstring version
-    @test gradient(b->sum(f(rand(3),b)),rand(3))[1] ≈ [1, 1, 1]
+    @test gradient(b->sum(f1(rand(3),b)),rand(3))[1] ≈ [1, 1, 1]
   else
     @test_broken hess(x -> x[1]*x[2], randn(2)) ≈ [0 1; 1 0]  # can't differentiate ∇getindex
     @test_broken hess(((x,y),) -> x*y, randn(2)) ≈ [0 1; 1 0]
-    @test_broken gradient(b->sum(f(rand(3),b)),rand(3))[1] ≈ [1, 1, 1] # jacobian is not differentiable
+    @test_broken gradient(b->sum(f1(rand(3),b)),rand(3))[1] ≈ [1, 1, 1] # jacobian is not differentiable
   end
   @test hess(x -> sum(x.^3), [1 2; 3 4]) ≈ Diagonal([6, 18, 12, 24])
   @test hess(sin, pi/2) ≈ -1
