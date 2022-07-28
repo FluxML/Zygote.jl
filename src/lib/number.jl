@@ -1,4 +1,11 @@
 function ChainRulesCore.rrule(
+    ::ZygoteRuleConfig, ::typeof(convert), T::Type{<:Real}, x::Real
+)
+    convert_pullback(Δ) = (NoTangent(), NoTangent(), Δ)
+    return convert(T, x), convert_pullback
+end
+
+function ChainRulesCore.rrule(
     ::ZygoteRuleConfig, ::typeof(Base.literal_pow), ::typeof(^), x::Number, ::Val{p}
 ) where {p}
     function literal_pow_pullback(Δ)
