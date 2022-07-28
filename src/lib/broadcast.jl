@@ -164,12 +164,6 @@ end
 # https://github.com/FluxML/Zygote.jl/pull/1001 tries to use broadcast_forward (using Dual numbers)
 # whenever possible, this was previously used only for CuArrays. It is usually much faster.
 
-# https://github.com/JuliaDiff/ChainRules.jl/pull/644 implements broadcasting.
-# Its generic rule would be applied before the one defined here, with AbstractArrayStyle
-# @adjoint function broadcasted(::AbstractArrayStyle, f::F, args...) where {F}
-# but does not pass all Zygote's tests. So disable it:
-ChainRulesCore.@opt_out rrule(cfg::ZygoteRuleConfig, ::typeof(Broadcast.broadcasted), f::F, args::Vararg{Any,N}) where {F,N}
-
 @generated inclen(::NTuple{N,Any}) where N = Val(N+1)
 
 # Avoid hitting special cases for `Adjoint` etc.
@@ -289,4 +283,36 @@ using GPUArraysCore  # replaces @require CUDA block, weird indenting to preserve
   end
 
   pull_block_vert(sz, Δ::AbstractGPUArray, A::Number) = @allowscalar Δ[sz]
+
+# ChainRules opt-out
+# =================
+
+# https://github.com/JuliaDiff/ChainRules.jl/pull/644 implements broadcasting.
+# Its generic rule would be applied before the one defined above, with AbstractArrayStyle:
+#   @adjoint function broadcasted(::AbstractArrayStyle, f::F, args...) where {F}
+# but does not pass all Zygote's tests. So disable it:
+ChainRulesCore.@opt_out rrule(cfg::ZygoteRuleConfig, ::typeof(Broadcast.broadcasted), f::F, args::Vararg{Any,N}) where {F,N}
+# That expands to 
+#  rrule(cfg::ZygoteRuleConfig, ::typeof(broadcasted), f::F, args::Vararg{Any, N}) where {F, N}) = nothing
+# which is now ambiguous with many other rrules defined there. So we need more opt-outs:
+
+const _NumericOrBroadcast = Union{Number, AbstractArray{<:Number}, NTuple{<:Any,Number}, Broadcast.Broadcasted}
+
+ChainRulesCore.@opt_out rrule(cfg::ZygoteRuleConfig, ::typeof(broadcasted), ::typeof(+), xs::_NumericOrBroadcast...)
+ChainRulesCore.@opt_out rrule(cfg::ZygoteRuleConfig, ::typeof(broadcasted), ::typeof(-), x::_NumericOrBroadcast, y::_NumericOrBroadcast)
+ChainRulesCore.@opt_out rrule(cfg::ZygoteRuleConfig, ::typeof(broadcasted), ::typeof(-), x::_NumericOrBroadcast)
+ChainRulesCore.@opt_out rrule(cfg::ZygoteRuleConfig, ::typeof(broadcasted), ::typeof(*), x::_NumericOrBroadcast, y::_NumericOrBroadcast)
+ChainRulesCore.@opt_out rrule(cfg::ZygoteRuleConfig, ::typeof(broadcasted), ::typeof(Base.literal_pow), ::typeof(^), x::_NumericOrBroadcast, ::Val{2})
+ChainRulesCore.@opt_out rrule(cfg::ZygoteRuleConfig, ::typeof(broadcasted), ::typeof(/), x::_NumericOrBroadcast, y::Number)
+ChainRulesCore.@opt_out rrule(cfg::ZygoteRuleConfig, ::typeof(broadcasted), ::typeof(identity), x::_NumericOrBroadcast)
+ChainRulesCore.@opt_out rrule(cfg::ZygoteRuleConfig, ::typeof(broadcasted), ::Type{T}, x::_NumericOrBroadcast) where {T<:Number}
+ChainRulesCore.@opt_out rrule(cfg::ZygoteRuleConfig, ::typeof(broadcasted), ::typeof(float), x::_NumericOrBroadcast)
+ChainRulesCore.@opt_out rrule(cfg::ZygoteRuleConfig, ::typeof(broadcasted), ::typeof(conj), x::_NumericOrBroadcast)
+ChainRulesCore.@opt_out rrule(cfg::ZygoteRuleConfig, ::typeof(broadcasted), ::typeof(adjoint), x::_NumericOrBroadcast)
+ChainRulesCore.@opt_out rrule(cfg::ZygoteRuleConfig, ::typeof(broadcasted), ::typeof(conj), x::AbstractArray{<:Real})
+ChainRulesCore.@opt_out rrule(cfg::ZygoteRuleConfig, ::typeof(broadcasted), ::typeof(adjoint), x::AbstractArray{<:Real})
+ChainRulesCore.@opt_out rrule(cfg::ZygoteRuleConfig, ::typeof(broadcasted), ::typeof(real), x::_NumericOrBroadcast)
+ChainRulesCore.@opt_out rrule(cfg::ZygoteRuleConfig, ::typeof(broadcasted), ::typeof(real), x::AbstractArray{<:Real})
+ChainRulesCore.@opt_out rrule(cfg::ZygoteRuleConfig, ::typeof(broadcasted), ::typeof(imag), x::_NumericOrBroadcast)
+ChainRulesCore.@opt_out rrule(cfg::ZygoteRuleConfig, ::typeof(broadcasted), ::typeof(complex), x::_NumericOrBroadcast)
 
