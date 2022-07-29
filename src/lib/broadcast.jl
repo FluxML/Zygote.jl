@@ -165,10 +165,13 @@ end
 # whenever possible, this was previously used only for CuArrays. It is usually much faster.
 
 # https://github.com/JuliaDiff/ChainRules.jl/pull/644 implements broadcasting.
-# Its generic rule would be applied before the one defined here, with AbstractArrayStyle
-# @adjoint function broadcasted(::AbstractArrayStyle, f::F, args...) where {F}
+# Its generic rule would be applied before the one defined here, with AbstractArrayStyle:
+#   @adjoint function broadcasted(::AbstractArrayStyle, f::F, args...) where {F}
 # but does not pass all Zygote's tests. So disable it:
-ChainRulesCore.@opt_out rrule(cfg::ZygoteRuleConfig, ::typeof(Broadcast.broadcasted), f::F, args::Vararg{Any,N}) where {F,N}
+#   @opt_out rrule(cfg::ZygoteRuleConfig, ::typeof(broadcasted), f::F, args::Vararg{Any,N}) where {F,N}
+# Using the macro to opt-out creates a nothing method of rrule, which then creates ambiguities with
+# every single broadcasting rule, like `rrule(broadcasted, relu, x)`. But Zygote checks `no_rrule` first:
+ChainRulesCore.no_rrule(cfg::ZygoteRuleConfig, ::typeof(broadcasted), f::F, args::Vararg{Any,N}) where {F,N} = nothing
 
 @generated inclen(::NTuple{N,Any}) where N = Val(N+1)
 
