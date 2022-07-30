@@ -38,8 +38,6 @@ function accum(x::RefValue, y::RefValue)
 end
 
 # Core functions
-@nograd eps, Base.eval, Core.TypeVar, Core.UnionAll, Symbol
-
 @adjoint deepcopy(x) = deepcopy(x), ȳ -> (ȳ,)
 
 @adjoint (::Type{V})(x...) where V<:Val = V(x...), _ -> nothing

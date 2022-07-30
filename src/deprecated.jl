@@ -49,3 +49,19 @@ macro ignore(ex)
         $(esc(ex))
     end)
 end
+
+using MacroTools: @q
+
+macro nograd(ex)
+  Base.depwarn(
+    "`Zygote.@nograd myfunc` is deprecated, use `ChainRulesCore.@non_differentiable myfunc(::Any...)` instead.",
+    :nograd
+  )
+  isexpr(ex, :tuple) || (ex = Expr(:tuple, ex))
+  blk = @q begin end
+  for f in ex.args
+    back = MacroTools.@q _ -> ($__source__; nothing)
+    push!(blk.args, :(@inline Zygote._pullback(::Context, ::Core.Typeof($(esc(f))), args...) = $(esc(f))(args...), $back))
+  end
+  return blk
+end
