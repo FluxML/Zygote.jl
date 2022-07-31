@@ -476,7 +476,7 @@ end
   @test_broken gradient(x -> abs2(x[1].x) + 7 * x[1].x.re, [Ref(1+im)]) == ([(x = 9.0 + 2.0im,)],)
   @test_broken gradient(x -> abs2(x[1].x) + 7 * real(x[1].x), [Ref(1+im)]) == ([(x = 9.0 + 2.0im,)],)  # worked on 0.6.0, 0.6.20
 
-  @test_broken gradient(x -> abs2(x[].x) + 7 * real(x[].x), Ref(Ref(1+im))) == ((x = 9.0 + 2.0im,),)  # gives nothing, same in 0.6.0
+  @test gradient(x -> abs2(x[].x) + 7 * real(x[].x), Ref(Ref(1+im))) == ((x = (x = 9.0 + 2.0im,),),) # gave `nothing` from 0.6.0 to 0.6.41
 
   # Array of mutables:
   @test gradient(x -> sum(getindex.(x).^2), Ref.(1:3))[1] == [(;x=2i) for i in 1:3]
@@ -488,6 +488,59 @@ end
   # Broadcasting over Ref is handled specially. Tested elsehwere too.
   @test gradient(x -> sum(sum, x .* [1,2,3]), Ref([4,5])) == ((x = [6.0, 6.0],),)
   @test gradient(x -> sum(sum, Ref(x) .* [1,2,3]), [4,5]) == ([6.0, 6.0],)
+end
+
+@testset "mutable accum_param bugs" begin
+  mutable struct Mut{T}; x::T; end
+  struct Imm{T}; x::T; end
+
+  # Indexing a tuple containing a mutable struct gave `nothing`
+  x1 = (Mut(3.0),)
+  x2 = (Imm(3.0),)
+  x3 = (Ref(3.0),)
+  @test gradient(x -> x[1].x^2, x1)[1] == ((x = 6.0,),)  # fails on v0.6.0 v0.6.41
+  @test gradient(x -> x[1].x^2, x2)[1] == ((x = 6.0,),)
+  @test gradient(x -> x[1].x^2, x3)[1] == ((x = 6.0,),)  # fails on v0.6.0 v0.6.41
+  i1 = 1
+  @test gradient(x -> x[i1].x^2, x1)[1] == ((x = 6.0,),)  # fails on v0.6.0 v0.6.41
+  @test gradient(x -> x[i1].x^2, x2)[1] == ((x = 6.0,),)
+  @test gradient(x -> x[i1].x^2, x3)[1] == ((x = 6.0,),)  # fails on v0.6.0 v0.6.41
+
+  @test gradient(x -> x[1][1].x^2, [x1])[1] == [((x = 6.0,),)]  # fails on v0.6.0 v0.6.41
+  @test gradient(x -> x[1][1].x^2, [x2])[1] == [((x = 6.0,),)]
+  @test gradient(x -> x[1][1].x^2, [x3])[1] == [((x = 6.0,),)]  # fails on v0.6.0 v0.6.41
+
+  # When `getfield` returns a mutable struct, it gave `nothing`:
+  x4 = Imm(Mut(4.0))
+  x5 = Mut(Mut(4.0))
+  x6 = Imm(Imm(4.0))
+  @test gradient(x -> x.x.x^3, x4)[1] == (x = (x = 48.0,),)  # fails on v0.6.0 v0.6.41
+  @test gradient(x -> x.x.x^3, x5)[1] == (x = (x = 48.0,),)  # fails on v0.6.0
+  @test gradient(x -> x.x.x^3, x6)[1] == (x = (x = 48.0,),)  # fails on v0.6.41
+
+  @test gradient(x -> x[2].x.x^3, [x4, x4])[1] == [nothing, (x = (x = 48.0,),)]  # fails on v0.6.0 v0.6.41
+  @test gradient(x -> x[2].x.x^3, [x4, x5])[1] == [nothing, (x = (x = 48.0,),)]  # fails on v0.6.0
+  @test gradient(x -> x[2].x.x^3, [x4, x6])[1] == [nothing, (x = (x = 48.0,),)]  # fails on v0.6.41
+
+  # Check when using implicit parameters, Params cases used to pass:
+  y1 = [3.0]
+  y2 = (Mut(y1),)
+  y3 = (Imm(y1),)
+  @test gradient(x -> sum(x[1].x)^2, y2)[1] == ((x = [6.0],),)  # fails on v0.6.0 v0.6.41
+  @test gradient(() -> sum(y2[1].x)^2, Params([y1]))[y1] == [6.0]
+  @test gradient(x -> sum(x[1].x)^2, y3)[1] == ((x = [6.0],),)
+  @test gradient(() -> sum(y3[1].x)^2, Params([y1]))[y1] == [6.0]
+
+  @test gradient(x -> sum(x[1].x .+ x[1].x)^3, y2)[1] == ((x = [216.0],),)  # fails on v0.6.0 v0.6.41
+  @test gradient(() -> sum(y2[1].x .+ y2[1].x)^3, Params([y1]))[y1] == [216.0]
+  @test gradient(x -> sum(x[1].x .+ x[1].x)^3, y3)[1] == ((x = [216.0],),)
+  @test gradient(() -> sum(y3[1].x .+ y3[1].x)^3, Params([y1]))[y1] == [216.0]
+
+  i1 = 1
+  @test gradient(x -> sum(x[i1].x .+ x[1].x)^3, y2)[1] == ((x = [216.0],),)  # fails on v0.6.0 v0.6.41
+  @test gradient(() -> sum(y2[i1].x .+ y2[1].x)^3, Params([y1]))[y1] == [216.0]
+  @test gradient(x -> sum(x[i1].x .+ x[1].x)^3, y3)[1] == ((x = [216.0],),)
+  @test gradient(() -> sum(y3[i1].x .+ y3[1].x)^3, Params([y1]))[y1] == [216.0]
 end
 
 @testset "NamedTuples" begin
@@ -517,7 +570,7 @@ end
   @test (x->10*(x => 2)[2])'(100) === nothing
 
   @test gradient(x-> (:x => x)[2], 17) == (1,)
-    
+
   d = Dict(:x=>1.0, :y=>3.0);
   @test gradient(d -> Dict(:x => d[:x])[:x], d) == (Dict(:x => 1),)
 end
@@ -546,7 +599,7 @@ end
   # zip
   if VERSION >= v"1.5"
     # On Julia 1.4 and earlier, [x/y for (x,y) in zip(10:14, 1:10)] is a DimensionMismatch,
-    # while on 1.5 - 1.7 it stops early. 
+    # while on 1.5 - 1.7 it stops early.
 
     @test gradient(10:14, 1:10) do xs, ys
       sum([x/y for (x,y) in zip(xs, ys)])
@@ -608,7 +661,7 @@ end
 
   # Iterators.Product with enumerate
   @test gradient([2 3; 4 5]) do xs
-    sum([x^i+y for (i,x) in enumerate(xs), y in xs]) 
+    sum([x^i+y for (i,x) in enumerate(xs), y in xs])
   end == ([8 112; 36 2004],)
 end
 
