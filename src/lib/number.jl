@@ -1,29 +1,69 @@
-@adjoint Base.literal_pow(::typeof(^), x::Number, ::Val{p}) where {p} =
-  Base.literal_pow(^,x,Val(p)),
-  Δ -> (nothing, Δ * conj(p * Base.literal_pow(^,x,Val(p-1))), nothing)
-
-@adjoint Base.convert(T::Type{<:Real}, x::Real) = convert(T, x), ȳ -> (nothing, ȳ)
-@adjoint (T::Type{<:Real})(x::Real) = T(x), ȳ -> (nothing, ȳ)
-
-for T in Base.uniontypes(Core.BuiltinInts)
-    @adjoint (::Type{T})(x::Core.BuiltinInts) = T(x), Δ -> (Δ,)
+function ChainRulesCore.rrule(
+    ::ZygoteRuleConfig, ::typeof(convert), T::Type{<:Real}, x::Real
+)
+    convert_pullback(Δ) = (NoTangent(), NoTangent(), Δ)
+    return convert(T, x), convert_pullback
 end
 
-@adjoint Base.:+(xs::Number...) = +(xs...), Δ -> map(_ -> Δ, xs)
+function ChainRulesCore.rrule(
+    ::ZygoteRuleConfig, ::typeof(Base.literal_pow), ::typeof(^), x::Number, ::Val{p}
+) where {p}
+    function literal_pow_pullback(Δ)
+        dx = Δ * conj(p * Base.literal_pow(^,x,Val(p-1)))
+        return (NoTangent(), NoTangent(), dx, NoTangent())
+    end
+    return Base.literal_pow(^,x,Val(p)), literal_pow_pullback
+end
 
-@adjoint a // b = (a // b, c̄ -> (c̄ * 1//b, - c̄ * a // b // b))
+function ChainRulesCore.rrule(::ZygoteRuleConfig, T::Type{<:Real}, x::Real)
+    Real_pullback(Δ) = (NoTangent(), Δ)
+    return T(x), Real_pullback
+end
+
+for T in Base.uniontypes(Core.BuiltinInts)
+    @eval function ChainRulesCore.rrule(::ZygoteRuleConfig, ::Type{$T}, x::Core.BuiltinInts)
+        IntX_pullback(Δ) = (NoTangent(), Δ)
+        return $T(x), IntX_pullback
+    end
+end
+
+function ChainRulesCore.rrule(::ZygoteRuleConfig, ::typeof(+), xs::Number...)
+    plus_pullback(Δ) = (NoTangent(), map(_ -> Δ, xs)...)
+    return +(xs...), plus_pullback
+end
+
+function ChainRulesCore.rrule(::ZygoteRuleConfig, ::typeof(//), a, b)
+    divide_pullback(r̄) = (NoTangent(), r̄ * 1//b, - r̄ * a // b // b)
+    return a // b, divide_pullback
+end
 
 # Complex Numbers
 
-@adjoint (T::Type{<:Complex})(re, im) = T(re, im), c̄ -> (nothing, real(c̄), imag(c̄))
+function ChainRulesCore.rrule(::ZygoteRuleConfig, T::Type{<:Complex}, r, i)
+    Complex_pullback(c̄) = (NoTangent(), real(c̄), imag(c̄))
+    return T(r, i), Complex_pullback
+end
 
 # we define these here because ChainRules.jl only defines them for x::Union{Real,Complex}
 
-@adjoint abs2(x::Number) = abs2(x), Δ -> (real(Δ)*(x + x),)
-@adjoint real(x::Number) = real(x), r̄ -> (real(r̄),)
-@adjoint conj(x::Number) = conj(x), r̄ -> (conj(r̄),)
-@adjoint imag(x::Number) = imag(x), ī -> (real(ī)*im,)
+function ChainRulesCore.rrule(::ZygoteRuleConfig, ::typeof(abs2), x::Number)
+    abs2_pullback(Δ) = (NoTangent(), real(Δ)*(x + x))
+    return abs2(x), abs2_pullback
+end
+
+function ChainRulesCore.rrule(::ZygoteRuleConfig, ::typeof(real), x::Number)
+    real_pullback(r̄) = (NoTangent(), real(r̄))
+    return real(x), real_pullback
+end
+
+function ChainRulesCore.rrule(::ZygoteRuleConfig, ::typeof(conj), x::Number)
+    conj_pullback(c̄) = (NoTangent(), conj(c̄))
+    return conj(x), conj_pullback
+end
 
 # for real x, ChainRules pulls back a zero real adjoint, whereas we treat x
 # as embedded in the complex numbers and pull back a pure imaginary adjoint
-@adjoint imag(x::Real) = zero(x), ī -> (real(ī)*im,)
+function ChainRulesCore.rrule(::ZygoteRuleConfig, ::typeof(imag), x::Number)
+    imag_pullback(ī) = (NoTangent(), real(ī)*im)
+    return imag(x), imag_pullback
+end
