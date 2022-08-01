@@ -1,5 +1,5 @@
 using Zygote, Test
-using Zygote: pullback, @adjoint
+using Zygote: pullback, @adjoint, Context
 
 macro test_inferred(ex)
   :(let res = nothing
@@ -160,13 +160,18 @@ end
 @testset "inference for `getproperty`" begin
     Gaussian = _Gaussian(:getproperty)
     g = Gaussian(randn(3), randn(3, 3))
-    y, back = @inferred pullback(x -> x.m, g)
-    @test y == getfield(g, :m)
-    # This type instability is due to the handling of non-bitstypes in `accum_param`
+    y_explicit, back_explicit = @inferred pullback(x -> x.m, g)
+    y_implicit, back_implicit = @inferred pullback(x -> x.m, Context{true}(nothing), g)
+    @test y_explicit == y_implicit == getfield(g, :m)
+
+    ∇args = ((m = [1.0, 0.0, 0.0], P = nothing),)
     if VERSION > v"1.7-"
-      @test Base.return_types(back, Tuple{Vector{Float64}}) == Any[Union{Tuple{Nothing}, typeof(((m = [1.0, 0.0, 0.0], P = nothing),))}]
+      # This type instability is due to the handling of non-bitstypes in `accum_param`
+      @test Base.return_types(back_implicit, Tuple{Vector{Float64}}) == Any[Union{Tuple{Nothing}, typeof(∇args)}]
+      # But the same should infer if implicit parameters are disabled
+      @test Base.return_types(back_explicit, Tuple{Vector{Float64}}) == Any[typeof(∇args)]
     end
-    @test back([1., 0, 0]) == ((m = [1.0, 0.0, 0.0], P = nothing),)
+    @test back_explicit([1., 0, 0]) == back_implicit([1., 0, 0]) == ∇args
 
     Base.getproperty(g::Gaussian, s::Symbol) = 2getfield(g, s)
     y, back = pullback(x -> x.m, g)

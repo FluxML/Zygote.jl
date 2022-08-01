@@ -21,7 +21,7 @@ accum(x, y) =
 
 accum(x, y, zs...) = accum(accum(x, y), zs...)
 
-accum(x::Tuple, ys::Tuple...) = accum.(x, ys...)
+accum(x::Tuple, ys::Tuple...) = map(accum, x, ys...)
 accum(x::AbstractArray, ys::AbstractArray...) = accum.(x, ys...)
 
 @generated function accum(x::NamedTuple, y::NamedTuple)
@@ -48,6 +48,7 @@ end
 
 @adjoint Base.typeassert(x, T) = Base.typeassert(x, T), Δ -> (Δ, nothing)
 
+accum_param(::Context{false}, _, Δ) = Δ
 @generated function accum_param(cx::Context, x, Δ)
   isbitstype(x) && return :(Δ)
   quote
