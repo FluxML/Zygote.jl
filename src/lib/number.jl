@@ -61,6 +61,8 @@ function ChainRulesCore.rrule(::ZygoteRuleConfig, ::typeof(conj), x::Number)
     return conj(x), conj_pullback
 end
 
+# for real x, ChainRules pulls back a zero real adjoint, whereas we treat x
+# as embedded in the complex numbers and pull back a pure imaginary adjoint
 function ChainRulesCore.rrule(::ZygoteRuleConfig, ::typeof(imag), x::Number)
     imag_pullback(ī) = (NoTangent(), real(ī)*im)
     return imag(x), imag_pullback
