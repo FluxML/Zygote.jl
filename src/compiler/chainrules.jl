@@ -73,7 +73,8 @@ matching_cr_sig(t, s) = matching_cr_sig(t.method.sig, s.method.sig)
 matching_cr_sig(::DataType, ::UnionAll) = false
 matching_cr_sig(::UnionAll, ::DataType) = false
 matching_cr_sig(t::Type, s::Type) = type_tuple_tail(t) == type_tuple_tail(s)
- 
+matching_cr_sig(::Any, ::Nothing) = false  # https://github.com/FluxML/Zygote.jl/issues/1234
+
 type_tuple_tail(d::DataType) = Tuple{d.parameters[2:end]...}
 function type_tuple_tail(d::UnionAll)
     body = Base.unwrap_unionall(d)
