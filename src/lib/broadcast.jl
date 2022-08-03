@@ -286,11 +286,10 @@ using GPUArraysCore  # replaces @require CUDA block, weird indenting to preserve
 
   pull_block_vert(sz, Δ::AbstractGPUArray, A::Number) = @allowscalar Δ[sz]
 
-  ∇getindex(x::CUDA.CuArray, inds::Tuple{AbstractArray{<:Integer}}) = dy -> begin
+  ∇getindex(x::T, inds::Tuple{AbstractArray{<:Integer}}) where {T <: AbstractGPUArray} = dy -> begin
     inds1_cpu = Array(inds[1])
     dx = zeros(eltype(dy), length(x))
     dxv = view(dx, inds1_cpu)
     dxv .= accum.(dxv, _droplike(Array(dy), dxv))
-    return _project(x, CUDA.CuArray(dx)), nothing
+    return _project(x, T(dx)), nothing
   end
-end
