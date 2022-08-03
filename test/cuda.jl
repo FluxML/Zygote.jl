@@ -140,3 +140,9 @@ end
   @test_skip gradient((x,y) -> sum(vcat(x,y)), 1f0, r, 2f0, r)[2] isa CUDA.CuArray{Float32}
 end
 
+@testset "repeated indexing" begin
+  f(a) = sum(view(a, [1, 1, 2]))
+  a = CUDA.CuArray([1.0f0, 1.0f0, 1.0f0])
+  @test f(a) == 3.0f0
+  @test Array(gradient(f, a)[1]) == [2.0f0, 1.0f0, 0.0f0]
+end
