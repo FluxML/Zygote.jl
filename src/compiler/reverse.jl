@@ -259,7 +259,7 @@ function passthrough_expr(ex::Expr)
     isexpr(ex, GlobalRef, :call, :isdefined, :inbounds, :meta, :loopinfo) && return true
     # ccalls and more that are safe to preserve/required for proper operation:
     # - jl_set_task_threadpoolid: added in 1.9 for @spawn
-    isexpr(ex, :foreigncall) && ex.args[1] in (:jl_set_task_threadpoolid,) && return true
+    isexpr(ex, :foreigncall) && unwrapquote(ex.args[1]) in (:jl_set_task_threadpoolid,) && return true
     return false
 end
 
