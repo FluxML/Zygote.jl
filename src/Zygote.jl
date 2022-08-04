@@ -79,4 +79,7 @@ macro profile(ex)
   end
 end
 
+using SnoopPrecompile
+@precompile_all_calls precompile()
+
 end # module
