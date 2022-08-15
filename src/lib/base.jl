@@ -119,11 +119,11 @@ end
 
 # named tuple
 @adjoint function pairs(t::NamedTuple{N}) where N
-  
+
   pairs_namedtuple_pullback(dx::NamedTuple) = (dx.data,)
 
   pairs_namedtuple_pullback(dx::Tuple{}) = (NamedTuple(),)
-  
+
   function pairs_namedtuple_pullback(Δ::Dict)
     t0 = map(zero, t)
     for (idx, v) in Δ
@@ -145,6 +145,30 @@ else
   @adjoint merge(nt::NamedTuple, dict::Dict) = pullback(merge, nt, (;dict...))
 end
 
+# Keyword arguments pretend to be a Dict, but are secretly wrapping a NamedTuple.
+# We can treat them much the same, just with some plumbing to handle the extra `itr` field.
+function _pullback(::AContext, ::typeof(getindex),
+                   ps::Iterators.Pairs{<:Any,<:Any,<:Any,<:NamedTuple}, k)
+  # So we don't close over kwarg values in the pullback
+  data = map(_ -> nothing, NamedTuple(ps))
+  function kwargs_getindex_pullback(Δ)
+    dps = (data = Base.setindex(data, Δ, k), itr = nothing)
+    return (nothing, dps, nothing)
+  end
+  return ps[k], kwargs_getindex_pullback
+end
+
+function _pullback(cx::AContext, ::typeof(literal_getindex),
+                   ps::Iterators.Pairs{<:Any,<:Any,<:Any,<:NamedTuple}, ::Val{K}) where K
+  val, gf_back = _pullback(cx, literal_getfield, NamedTuple(ps), Val(K))
+  function kwargs_literal_getindex_pullback(Δ)
+    dps = (data = gf_back(Δ)[2], itr = nothing)
+    return (nothing, dps, nothing)
+  end
+  return val, kwargs_literal_getindex_pullback
+end
+
+# Misc.
 @adjoint function Base.getfield(p::Pair, i::Int)
     function pair_getfield_pullback(Δ)
         f, s = i == 1 ? (Δ, nothing) : (nothing, Δ)
