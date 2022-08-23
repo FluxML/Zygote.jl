@@ -151,29 +151,69 @@ julia> withjacobian(cumsum, [1,2,3])
 """
 function withjacobian(f, args...)
   y, back = pullback(_jvec∘f, args...)
-  out = map(args) do x
-    T = promote_type(eltype(x), eltype(y))
-    dx = x isa AbstractArray ? similar(x, T, length(y), length(x)) :
-      x isa Number ? similar(y, T, length(y)) :
-      nothing
-  end
+  # out = map(args) do x
+  #   T = promote_type(eltype(x), eltype(y))
+  #   dx = x isa AbstractArray ? similar(x, T, length(y), length(x)) :
+  #     x isa Number ? similar(y, T, length(y)) :
+  #     nothing
+  # end
   delta = _eyelike(y)
-  for k in LinearIndices(y)
-    grads = back(delta[:,k])
-    for (dx, grad) in zip(out, grads)
-      dx isa AbstractArray || continue
-      _gradcopy!(view(dx,k,:), grad)
-    end
-  end
-  (val=y, grad=out)
+  # for k in LinearIndices(y)
+  #   grads = back(delta[:,k])
+  #   for (dx, grad) in zip(out, grads)
+  #     dx isa AbstractArray || continue
+  #     _gradcopy!(view(dx,k,:), grad)
+  #   end
+  # end
+  # grads = map(1:length(y)) do k
+  #   back(delta[:,k])
+  # end
+  grads = back.(eachcol(Float32.(delta)))
+  fixed_grads = fix_grads(grads, size(y))
+  (val = y, grad = fixed_grads)
 end
 
+function fix_grads(xs::NTuple{N, NamedTuple}, sz) where N
+  ks = keys(first(xs))
+  @assert all(x -> x == ks, keys.(xs)) "Jacobian produced NamedTuples with mismatched keys"
+  NamedTuple{ks}(fix_grads(getproperty.(xs, k), sz) for k in ks)
+end
+fix_grads(ns::NTuple{N, Nothing}, sz) where N = nothing
+fix_grads(xs::NTuple{N, AbstractArray}, sz) where N = reduce(hcat, vec.(xs))
+function fix_grads(grads::Vector{<:Tuple}, sz)
+  Tuple(fix_grads(i, sz) for i in zip(grads...))
+end
+
+# function withjacobian(f, args...)
+#   y, back = pullback(_jvec∘f, args...)
+#   out = map(args) do x
+#     T = promote_type(eltype(x), eltype(y))
+#     dx = x isa AbstractArray ? similar(x, T, length(y), length(x)) :
+#       x isa Number ? similar(y, T, length(y)) :
+#         nothing
+#   end
+#   delta = _eyelike(y)
+#   for k in LinearIndices(y)
+#     grads = back(delta[:,k])
+#     for (dx, grad) in zip(out, grads)
+#       dx isa AbstractArray || continue
+#       _gradcopy!(view(dx,k,:), grad)
+#     end
+#   end
+#   (val=y, grad=out)
+# end
+# 
 _jvec(x::AbstractArray) = vec(x)
 _jvec(x::Number) = _jvec(vcat(x))
 _jvec(x) = throw(ArgumentError("jacobian expected a function which returns an array, or a scalar, got $(typeof(x))"))
 _jvec(x::AbstractArray{<:Complex}) = throw(ArgumentError("jacobian does not accept complex output"))
 
-_eyelike(y::AbstractVector{T}) where T = T.(I(length(y)))
+_eyelike(y::Vector{T}) where T = T.(I(length(y)))
+# function _eyelike(y::AbstractVector) # version which works on GPU
+#   out = fill!(similar(y, length(y), length(y)), 0)
+#   out[LinearAlgebra.diagind(out)] .= 1
+#   out
+# end
 
 _gradcopy!(dst::AbstractArray, src::AbstractArray{<:Number}) = copyto!(dst, src)
 _gradcopy!(dst::AbstractArray, src::Number) = copyto!(dst, src)

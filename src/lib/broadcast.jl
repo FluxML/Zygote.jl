@@ -48,7 +48,7 @@ end
 function unbroadcast(x::AbstractArray, x̄)
   N = ndims(x̄)
   if length(x) == length(x̄)
-    _project(x, x̄)  # ProjectTo handles reshape, offsets, structured matrices, row vectors
+    x̄ # _project(x, x̄)  # ProjectTo handles reshape, offsets, structured matrices, row vectors
   else
     dims = ntuple(d -> size(x, d) == 1 ? d : ndims(x̄)+1, ndims(x̄))
     _project(x, accum_sum(x̄; dims = dims))
