@@ -80,6 +80,8 @@ unbroadcast(x::AbstractArray, x̄::Nothing) = nothing
 
 @adjoint broadcasted(::typeof(-), x::Numeric, y::Numeric) = x .- y,
   Δ -> (nothing, unbroadcast(x, Δ), _minus(unbroadcast(y, Δ)))
+@adjoint broadcasted(::typeof(-), x::Numeric) = .-x,
+  Δ -> (nothing, _minus(Δ))
 _minus(Δ) = -Δ
 _minus(::Nothing) = nothing
 

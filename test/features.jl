@@ -552,6 +552,17 @@ end
   @test gradient(x -> x[].a, Ref((a=1, b=2))) == ((x = (a = 1, b = nothing),),)
   @test gradient(x -> x[1][].a, [Ref((a=1, b=2)), Ref((a=3, b=4))]) == ([(x = (a = 1, b = nothing),), nothing],)
   @test gradient(x -> x[1].a, [(a=1, b=2), "three"]) == ([(a = 1, b = nothing), nothing],)
+
+  @testset "indexing kwargs" begin
+    inner_lit_index(; kwargs...) = kwargs[:x]
+    outer_lit_index(; kwargs...) = inner_lit_index(; x=kwargs[:x])
+
+    inner_dyn_index(k; kwargs...) = kwargs[k]
+    outer_dyn_index(k; kwargs...) = inner_dyn_index(k; x=kwargs[k])
+
+    @test gradient(x -> outer_lit_index(; x), 0.0) == (1.0,)
+    @test gradient((x, k) -> outer_dyn_index(k; x), 0.0, :x) == (1.0, nothing)
+  end
 end
 
 function type_test()
@@ -562,7 +573,7 @@ end
 
 @testset "Pairs" begin
   @test (x->10*pairs((a=x, b=2))[1])'(100) === 10.0
-  @test (x->10*pairs((a=x, b=2))[2])'(100) === 0
+  @test (x->10*pairs((a=x, b=2))[2])'(100) === nothing
   foo(;kw...) = 1
   @test gradient(() -> foo(a=1,b=2.0)) === ()
 
@@ -578,8 +589,8 @@ end
 @testset "kwarg splatting, pass in object" begin
   g(; kwargs...) = kwargs[:x] * kwargs[:z]
   h(somedata) = g(; somedata...)
-  @test gradient(h, (; x=3.0, y=4.0, z=2.3)) == ((x = 2.3, y = 0.0, z = 3.0),)
-  @test gradient(h, Dict(:x=>3.0, :y=>4.0, :z=>2.3)) == ((y = 0.0, z = 3.0, x = 2.3),)
+  @test gradient(h, (; x=3.0, y=4.0, z=2.3)) == ((x = 2.3, y = nothing, z = 3.0),)
+  @test gradient(h, Dict(:x=>3.0, :y=>4.0, :z=>2.3)) == ((y = nothing, z = 3.0, x = 2.3),)
 end
 
 @testset "Iterators" begin

@@ -275,6 +275,15 @@ using Zygote: ZygoteRuleConfig
             @test Zygote.gradient(x -> f_notimplemented(only(x)), [0.1]) === (nothing,)
         end
     end
+
+    # https://github.com/FluxML/Zygote.jl/issues/1234
+    @testset "rrule lookup ambiguities" begin
+      f_ambig(x, y) = x + y
+      ChainRulesCore.rrule(::typeof(f_ambig), x::Int, y) = x + y, _ -> (0, 0)
+      ChainRulesCore.rrule(::typeof(f_ambig), x, y::Int) = x + y, _ -> (0, 0)
+
+      @test_throws MethodError pullback(f_ambig, 1, 2)
+    end
 end
 
 @testset "ChainRulesCore.rrule_via_ad" begin
