@@ -591,6 +591,10 @@ end
   h(somedata) = g(; somedata...)
   @test gradient(h, (; x=3.0, y=4.0, z=2.3)) == ((x = 2.3, y = nothing, z = 3.0),)
   @test gradient(h, Dict(:x=>3.0, :y=>4.0, :z=>2.3)) == ((y = nothing, z = 3.0, x = 2.3),)
+
+  # for when no kwargs have grads backpropogated
+  no_kwarg_grad(x; kwargs...) = x[kwargs[:i]]
+  @test gradient(x -> no_kwarg_grad(x; i=1), [1]) == (1,)
 end
 
 @testset "Iterators" begin
