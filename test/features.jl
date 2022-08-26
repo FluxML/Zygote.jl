@@ -594,7 +594,7 @@ end
 
   # for when no kwargs have grads backpropogated
   no_kwarg_grad(x; kwargs...) = x[kwargs[:i]]
-  @test gradient(x -> no_kwarg_grad(x; i=1), [1]) == (1,)
+  @test gradient(x -> no_kwarg_grad(x; i=1), [1]) == ([1],)
 end
 
 @testset "Iterators" begin
