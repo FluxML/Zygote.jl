@@ -162,7 +162,7 @@ function _pullback(cx::AContext, ::typeof(literal_getindex),
                    ps::Iterators.Pairs{<:Any,<:Any,<:Any,<:NamedTuple}, ::Val{K}) where K
   val, gf_back = _pullback(cx, literal_getfield, NamedTuple(ps), Val(K))
   function kwargs_literal_getindex_pullback(Δ)
-    dps = (data = gf_back(Δ)[2], itr = nothing)
+    dps = (data = gradindex(gf_back(Δ), 2), itr = nothing)
     return (nothing, dps, nothing)
   end
   return val, kwargs_literal_getindex_pullback
