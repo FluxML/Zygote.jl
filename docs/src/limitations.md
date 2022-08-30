@@ -1,11 +1,14 @@
-# Limitations
+# Design Limitations
 
-Zygote aims to support differentiating any code you might write in Julia, but it still has a few limitations. Notably, you might encounter errors when trying to differentiate:
-- array mutation
-- `try`/`catch` statements
-- "foreign call" expressions
+Zygote aims to support differentiating any Julia code, but it still has a few limitations.
+Notably, you might encounter errors when trying to differentiate:
+- array mutation,
+- `try`/`catch` statements,
+- "foreign call" expressions.
 
-In this section, we will introduce examples where each of these errors occurs as well as possible work-arounds.
+This section gives examples where each of these errors occurs, as well as possible work-arounds.
+
+Below, it also describes some known bugs in expressions Zygote ought to be able to handle.
 
 ## Array mutation
 
@@ -123,7 +126,7 @@ Stacktrace:
 ```
 `jclock` will multiply the result of our C function by an argument. When we try to differentiate with respect to this argument, we get an `foreigncall` error.
 
-## Solutions
+# Solutions
 
 For all of the errors above, the suggested solutions are similar. You have the following possible work arounds available (in order of preference):
 1. avoid the error-inducing operation (e.g. do not use mutating functions)
@@ -148,3 +151,42 @@ julia> gradient(jclock, rand())
 ```
 
 Lastly, if the code causing problems can be fixed, but it is package code instead of your code, then you should open an issue. For functions built into Julia or its standard libraries, you can open an issue with Zygote.jl or ChainRules.jl. For functions in other packages, you can open an issue with the corresponding package issue tracker.
+
+
+# Known Bugs
+
+Zygote's issue tracker has the current list of open [bugs](https://github.com/FluxML/Zygote.jl/issues?q=is%3Aissue+is%3Aopen+label%3Abug). There are some general principles about things you may wish to avoid if you can:
+
+## `mutable struct`s
+
+Zygote has limited support for mutation, and in particular will allow you to change a field in some `mutable struct X; a; b; end` by setting `x.a = val`.
+
+However, this is buggy. Searching for ["mutable struct"](https://github.com/FluxML/Zygote.jl/issues?q=is%3Aissue+is%3Aopen+mutable+struct) on the issue tracker will return current problems.
+
+The simple solution is to use only immutable `struct`s.
+
+## Re-using variable names
+
+It is common to accumulate values in a loop by re-binding the same variable name to a new value
+many times, for example:
+```
+function mysum(x::Real, n::Int)
+  tot = 0.0
+  for i in 1:n
+    tot += x^n  # binds symbol `tot` to new value
+  end
+  return tot
+end
+```
+However, sometimes such re-binding confuses Zygote, especially if the type of the value changes. Especially if the variable is "boxed", as will happen if you re-bind from within a closure (such as the function created by a `do` block).
+
+## Second derivatives
+
+In principle Zygote supports taking derivatives of derivatives. There are, however, a few problems:
+* Quite a few of its rules are not written in a way that is itself differentiable. For instance they may work by making an array then writing into it, which is mutation of the sort forbidden above. 
+* The complexity of the code grows rapidly, as Zygote differentiates its own un-optimised output.
+* Reverse mode over reverse mode is seldom the best algorithm.
+
+The issue tracker has a label for [second order](https://github.com/FluxML/Zygote.jl/issues?q=is%3Aissue+is%3Aopen+label%3A%22second+order%22), which will outline where the bodies are buried.
+
+Often using a different AD system over Zygote is a better solution. This is what [`hessian`](@ref) does, using ForwardDiff over Zygote.
