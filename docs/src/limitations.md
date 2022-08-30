@@ -163,7 +163,9 @@ Zygote has limited support for mutation, and in particular will allow you to cha
 
 However, this is buggy. Searching for ["mutable struct"](https://github.com/FluxML/Zygote.jl/issues?q=is%3Aissue+is%3Aopen+mutable+struct) on the issue tracker will return current problems.
 
-The simple solution is to use only immutable `struct`s.
+The simple solution is to use only immutable `struct`s. 
+
+If you need to modify them, using something like `@set` from [Accessors.jl](https://github.com/JuliaObjects/Accessors.jl) should work well. This returns a new object, but does not have side-effects on other copies of it. 
 
 ## Re-using variable names
 
