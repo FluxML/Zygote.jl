@@ -14,7 +14,7 @@ makedocs(
         "Internals" => "internals.md",
         "Glossary" => "glossary.md"],
   format = Documenter.HTML(
-      prettyurls = haskey(ENV, "CI"),
+      prettyurls = get(ENV, "CI", nothing) == "true",
       assets = ["assets/flux.css"],
       analytics = "UA-36890222-9"
   )
