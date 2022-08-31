@@ -133,6 +133,10 @@ julia> gradient(colordiff, RGB(1, 0, 0), RGB(0, 1, 0))
 
 It's easy to work with even very large and complex models, and there are few ways to do this. Autograd-style models pass around a collection of weights. Depending on how you write your model, there are multiple ways to *explicity* take gradients with respect to parameters. For example, the function `linear` accepts the parameters as an argument to the model. So, we directly pass in the parameters, `θ`, as an argument to the function being differentiated.
 
+```@docs
+gradient(f, args...)
+```
+
 ```julia
 julia> linear(θ, x) = θ[:W] * x .+ θ[:b]
 linear (generic function with 1 method)
@@ -173,6 +177,10 @@ julia> dmodel = gradient(model -> sum(model(x)), model)[1]
 ```
 
 Zygote also supports another way to take gradients, via *implicit parameters*. Here the loss function takes zero arguments, but the variables of interest are indicated by a special `Params` object. The function `linear` which depends on `W` and `b` is executed when the loss function `() -> sum(linear(x))` is called, and hence this dependence is visible to Zygote:
+
+```@docs
+gradient
+```
 
 ```julia
 julia> W = rand(2, 5); b = rand(2);
