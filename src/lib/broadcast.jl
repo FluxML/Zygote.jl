@@ -195,7 +195,7 @@ _dual_safearg(x) = false
   end
   len = inclen(args)
   y∂b = _broadcast((x...) -> _pullback(__context__, f, x...), args...)
-  y = map(first, y∂b)
+  y = broadcast(first, y∂b)
   function ∇broadcasted(ȳ)
     dxs_zip = map(((_, pb), ȳ₁) -> pb(ȳ₁), y∂b, ȳ)
     dxs = ntuple(len) do i
@@ -249,7 +249,7 @@ end
   valN = Val(N)
   out = dual_function(f).(args...)
   eltype(out) <: Dual || return (out, _ -> nothing)
-  y = map(x -> x.value, out)
+  y = broadcast(x -> x.value, out)
   function bc_fwd_back(ȳ)
     dargs = ntuple(valN) do i
       unbroadcast(args[i], broadcast((y1, o1) -> y1 * o1.partials[i], ȳ, out))
