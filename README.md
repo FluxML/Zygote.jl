@@ -11,7 +11,7 @@
 
 Zygote provides source-to-source automatic differentiation (AD) in Julia, and is the next-gen AD system for the [Flux](https://github.com/FluxML/Flux.jl) differentiable programming framework. For more details and benchmarks of Zygote's technique, see [our paper](https://arxiv.org/abs/1810.07951). You may want to check out Flux for more interesting examples of Zygote usage; the documentation here focuses on internals and advanced AD usage.
 
-Zygote supports Julia 1.0 onwards, but we highly recommend using Julia 1.3 or later.
+Zygote supports Julia 1.6 onwards, but we highly recommend using Julia 1.8 or later.
 
 ```julia
 julia> using Zygote
