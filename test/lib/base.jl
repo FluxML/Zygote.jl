@@ -1,3 +1,5 @@
+using LinearAlgebra;
+
 @testset "base.jl" begin
     @testset "Dict getindex with implicit params" begin
         d = Dict{String, Vector{Float64}}("key"=>ones(4))
@@ -9,6 +11,14 @@
         result2 = gradient(fn2, Params([x]))[x]
 
         @test result1 == result2
+    end
+
+    @testset "Type preservation under broadcast" begin
+        # https://github.com/FluxML/Zygote.jl/pull/1302
+        g_simple = gradient(a->sum(broadcast(x->x+3,a)),Diagonal([1,2,3]));
+        g_hard = gradient((a,b)->sum(broadcast(x->x*b,a)),Diagonal([1,2,3]),4);
+        @test first(g_simple) isa Diagonal
+        @test first(g_hard) isa Diagonal
     end
 
     @testset "Dict iteration" begin
