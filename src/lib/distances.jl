@@ -65,7 +65,6 @@ end
 end
 
 @adjoint function pairwise(::Euclidean, X::AbstractMatrix, Y::AbstractMatrix; dims=2)
-  @show "in this other one"
   # Modify the forwards-pass slightly to ensure stability on the reverse.
   function _pairwise_euclidean(X, Y)
     δ = eps(promote_type(eltype(X), eltype(Y)))^2
