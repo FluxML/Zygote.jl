@@ -1197,10 +1197,21 @@ end
         Δ = randn(P, P)
         X = repeat(randn(rng, D), 1, P)
 
+        # Single input matrix
         Δ_fd = FiniteDifferences.j′vp(
           FiniteDifferences.central_fdm(5, 1), X -> pairwise(metric, X; dims=2), Δ, X
         )
         _, pb = Zygote.pullback(X -> pairwise(metric, X; dims=2), X)
+
+        # This is impressively inaccurate, but at least it doesn't produce a NaN.
+        @test first(Δ_fd) ≈ first(pb(Δ)) atol=1e-3 rtol=1e-3
+
+        # Two input matrices
+        Y = copy(X)
+        Δ_fd = FiniteDifferences.j′vp(
+          FiniteDifferences.central_fdm(5, 1), X -> pairwise(metric, X, Y; dims=2), Δ, X
+        )
+        _, pb = Zygote.pullback(X -> pairwise(metric, X, Y; dims=2), X)
 
         # This is impressively inaccurate, but at least it doesn't produce a NaN.
         @test first(Δ_fd) ≈ first(pb(Δ)) atol=1e-3 rtol=1e-3
