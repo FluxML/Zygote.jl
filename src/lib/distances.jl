@@ -80,7 +80,7 @@ end
 
 @adjoint function pairwise(::Euclidean, X::AbstractMatrix; dims=2)
 
-  _conditional(d, δ) = d > δ ? sqrt(d) : zero(δ)
+  _conditional(d, δ) = d > δ ? sqrt(d) : zero(d)
 
   function _pairwise_euclidean(X)
     δ = eps(eltype(X))^2
