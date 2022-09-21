@@ -1,5 +1,6 @@
 <p align="center">
-<img width="400px" src="https://raw.githubusercontent.com/FluxML/fluxml.github.io/master/zygote.png"/>
+  <img width="400px" src="https://raw.githubusercontent.com/FluxML/Zygote.jl/master/docs/src/assets/logo.png#gh-light-mode-only"/>
+  <img width="400px" src="https://raw.githubusercontent.com/FluxML/Zygote.jl/master/docs/src/assets/logo-dark.png#gh-dark-mode-only"/>
 </p>
 
 <!-- [![Build Status](https://travis-ci.org/FluxML/Zygote.jl.svg?branch=master)](https://travis-ci.org/FluxML/Zygote.jl) -->
