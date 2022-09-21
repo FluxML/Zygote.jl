@@ -69,8 +69,8 @@ _sqrt_if_positive(d, δ) = d > δ ? sqrt(d) : zero(d)
 @adjoint function pairwise(dist::Euclidean, X::AbstractMatrix, Y::AbstractMatrix; dims=2)
   # Modify the forwards-pass slightly to ensure stability on the reverse.
   function _pairwise_euclidean(sqdist::SqEuclidean, X, Y)
-    δ = eps(promote_type(eltype(X), eltype(Y)))^2
     D2 = pairwise(sqdist, X, Y; dims=dims)
+    δ = eps(eltype(D2))
     return _sqrt_if_positive.(D2, δ)
   end
   return pullback(_pairwise_euclidean, SqEuclidean(dist.thresh), X, Y)
@@ -79,8 +79,8 @@ end
 @adjoint function pairwise(dist::Euclidean, X::AbstractMatrix; dims=2)
   # Modify the forwards-pass slightly to ensure stability on the reverse.
   function _pairwise_euclidean(sqdist::SqEuclidean, X)
-    δ = eps(eltype(X))^2
     D2 = pairwise(sqdist, X; dims=dims)
+    δ = eps(eltype(D2))
     return _sqrt_if_positive.(D2, δ)
   end
   return pullback(_pairwise_euclidean, SqEuclidean(dist.thresh), X)
