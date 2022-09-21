@@ -5,15 +5,16 @@ makedocs(
   sitename="Zygote",
   doctest = false,
   pages = [
-        "Home" => "index.md",
-        "Limitations" => "limitations.md",
-        "Custom Adjoints" => "adjoints.md",
-        "Utilities" => "utils.md",
-        "Complex Differentiation" => "complex.md",
-        "Profiling" => "profiling.md",
-        "Internals" => "internals.md",
-        "Glossary" => "glossary.md"],
-  format = Documenter.HTML(
+    "Home" => "index.md",
+    "Limitations" => "limitations.md",
+    "Custom Adjoints" => "adjoints.md",
+    "Utilities" => "utils.md",
+    "Complex Differentiation" => "complex.md",
+    "Profiling" => "profiling.md",
+    "Internals" => "internals.md",
+    "Glossary" => "glossary.md"],
+    format = Documenter.HTML(
+      sidebar_sitename = false,
       prettyurls = get(ENV, "CI", nothing) == "true",
       assets = ["assets/flux.css"],
       analytics = "UA-36890222-9"
