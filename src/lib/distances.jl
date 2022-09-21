@@ -64,31 +64,24 @@ end
   end
 end
 
-@adjoint function pairwise(::Euclidean, X::AbstractMatrix, Y::AbstractMatrix; dims=2)
+_sqrt_if_positive(d, δ) = d > δ ? sqrt(d) : zero(d)
 
+@adjoint function pairwise(dist::Euclidean, X::AbstractMatrix, Y::AbstractMatrix; dims=2)
   # Modify the forwards-pass slightly to ensure stability on the reverse.
-  function _pairwise_euclidean(X, Y)
+  function _pairwise_euclidean(sqdist::SqEuclidean, X, Y)
     δ = eps(promote_type(eltype(X), eltype(Y)))^2
-    return sqrt.(max.(pairwise(SqEuclidean(), X, Y; dims=dims), δ))
+    D2 = pairwise(sqdist, X, Y; dims=dims)
+    return _sqrt_if_positive.(D2, δ)
   end
-  D, back = pullback(_pairwise_euclidean, X, Y)
-
-  return D, function(Δ)
-    return (nothing, back(Δ)...)
-  end
+  return pullback(_pairwise_euclidean, SqEuclidean(dist.thresh), X, Y)
 end
 
-@adjoint function pairwise(::Euclidean, X::AbstractMatrix; dims=2)
-
-  _conditional(d, δ) = d > δ ? sqrt(d) : zero(d)
-
-  function _pairwise_euclidean(X)
+@adjoint function pairwise(dist::Euclidean, X::AbstractMatrix; dims=2)
+  # Modify the forwards-pass slightly to ensure stability on the reverse.
+  function _pairwise_euclidean(sqdist::SqEuclidean, X)
     δ = eps(eltype(X))^2
-    D2 = pairwise(SqEuclidean(), X; dims=dims)
-    return _conditional.(D2, δ)
+    D2 = pairwise(sqdist, X; dims=dims)
+    return _sqrt_if_positive.(D2, δ)
   end
-  D, back = pullback(_pairwise_euclidean, X)
-
-  _pairwise_pullback(Δ) = (nothing, back(Δ)...)
-  return D, _pairwise_pullback
+  return pullback(_pairwise_euclidean, SqEuclidean(dist.thresh), X)
 end
