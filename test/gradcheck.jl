@@ -1192,6 +1192,19 @@ end
         # This is impressively inaccurate, but at least it doesn't produce a NaN.
         @test first(Δ_fd) ≈ first(pb(Δ)) atol=1e-3 rtol=1e-3
       end
+
+      @testset "repeated X" begin
+        Δ = randn(P, P)
+        X = repeat(randn(rng, D), 1, P)
+
+        Δ_fd = FiniteDifferences.j′vp(
+          FiniteDifferences.central_fdm(5, 1), X -> pairwise(metric, X; dims=2), Δ, X
+        )
+        _, pb = Zygote.pullback(X -> pairwise(metric, X; dims=2), X)
+
+        # This is impressively inaccurate, but at least it doesn't produce a NaN.
+        @test first(Δ_fd) ≈ first(pb(Δ)) atol=1e-3 rtol=1e-3
+      end
     end
 
     @testset "binary pairwise - X and Y close" begin

@@ -79,11 +79,16 @@ end
 end
 
 @adjoint function pairwise(::Euclidean, X::AbstractMatrix; dims=2)
-  D, back = pullback(X -> pairwise(SqEuclidean(), X; dims = dims), X)
-  D .= sqrt.(D)
-  return D, function(Δ)
-    Δ = Δ ./ (2 .* max.(D, eps(eltype(D))))
-    Δ[diagind(Δ)] .= 0
-    return (nothing, first(back(Δ)))
+
+  _conditional(d, δ) = d > δ ? sqrt(d) : zero(d)
+
+  function _pairwise_euclidean(X)
+    δ = eps(eltype(X))^2
+    D2 = pairwise(SqEuclidean(), X; dims=dims)
+    return _conditional.(D2, δ)
   end
+  D, back = pullback(_pairwise_euclidean, X)
+
+  _pairwise_pullback(Δ) = (nothing, back(Δ)...)
+  return D, _pairwise_pullback
 end
