@@ -37,7 +37,13 @@ end
 _pullback(f, args...) = _pullback(Context(), f, args...)
 
 tailmemaybe(::Nothing) = nothing
-tailmemaybe(x::Tuple) = Base.tail(x)
+tailmemaybe(x::Tuple) = unthunk_tangent(Base.tail(x))
+
+# unthunking is essentially an identity operation on a lazy value, but
+# `@adjoint unthunk_tangent(x) = unthunk_tangent(x), ȳ -> (ȳ,)` is not enough to make
+# nested AD work, so define
+@adjoint tailmemaybe(xs::Tuple) = tailmemaybe(xs), x̄s -> ((nothing, x̄s...),)
+
 
 """
     pullback(f, args...)
@@ -468,7 +474,7 @@ function pullback(f, ps::Params)
       cache(cx)[p] = nothing
     end
     back(Δ)
-    Grads(cx.cache, ps) # TODO make a copy
+    Grads(IdDict([k => unthunk_tangent(v) for (k, v) in cx.cache]), ps) # TODO make a copy
   end
 end
 

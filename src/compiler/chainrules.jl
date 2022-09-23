@@ -1,3 +1,6 @@
+@inline unthunk_tangent(x::AbstractThunk) = unthunk(x)
+@inline unthunk_tangent(x::AbstractArray{<:AbstractThunk}) = map(unthunk, x)
+
 struct ZygoteRuleConfig{CTX<:AContext} <: RuleConfig{Union{HasReverseMode,NoForwardsMode}}
   context::CTX
 end
@@ -107,7 +110,6 @@ is_kwfunc(k, ::Type{<:NamedTuple}, f, args...) = k===Core.kwftype(f)
 Convert `x` from the differentials types ChainRules uses to the format Zygote uses internally.
 """
 @inline wrap_chainrules_output(x) = x
-@inline wrap_chainrules_output(x::AbstractThunk) = wrap_chainrules_output(unthunk(x))  # For now we are just not going to deal with thunks
 @inline wrap_chainrules_output(x::Tuple) = map(wrap_chainrules_output, x)
 # Zygote convention: even if many AbstractZero partials (i.e. multi-input function), make just 1 nothing.
 @inline wrap_chainrules_output(x::Tuple{Vararg{ChainRules.AbstractZero}}) = nothing
