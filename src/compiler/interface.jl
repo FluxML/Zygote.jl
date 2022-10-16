@@ -143,6 +143,8 @@ end
 Gradient with implicit parameters. Takes a zero-argument function,
 and returns a dictionary-like container, whose keys are arrays `x in ps`.
 
+See also [`withgradient`](@ref) to keep the value `loss()`.
+
 ```jldoctest; setup=:(using Zygote)
 julia> x = [1 2 3; 4 5 6]; y = [7, 8]; z = [1, 10, 100];
 
