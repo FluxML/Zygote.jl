@@ -153,7 +153,7 @@ julia> gradient(jclock, rand())
 Lastly, if the code causing problems can be fixed, but it is package code instead of your code, then you should open an issue. For functions built into Julia or its standard libraries, you can open an issue with Zygote.jl or ChainRules.jl. For functions in other packages, you can open an issue with the corresponding package issue tracker.
 
 
-# Known Bugs
+# Known Issues
 
 Zygote's issue tracker has the current list of open [bugs](https://github.com/FluxML/Zygote.jl/issues?q=is%3Aissue+is%3Aopen+label%3Abug). There are some general principles about things you may wish to avoid if you can:
 
@@ -161,7 +161,7 @@ Zygote's issue tracker has the current list of open [bugs](https://github.com/Fl
 
 Zygote has limited support for mutation, and in particular will allow you to change a field in some `mutable struct X; a; b; end` by setting `x.a = val`.
 
-However, this is buggy. Searching for ["mutable struct"](https://github.com/FluxML/Zygote.jl/issues?q=is%3Aissue+is%3Aopen+mutable+struct) on the issue tracker will return current problems.
+However, this has [many limitations](https://github.com/FluxML/Zygote.jl/issues?q=is%3Aissue+is%3Aopen+mutable+struct) and should be avoided if possible.
 
 The simple solution is to use only immutable `struct`s. 
 
@@ -191,4 +191,6 @@ In principle Zygote supports taking derivatives of derivatives. There are, howev
 
 The issue tracker has a label for [second order](https://github.com/FluxML/Zygote.jl/issues?q=is%3Aissue+is%3Aopen+label%3A%22second+order%22), which will outline where the bodies are buried.
 
-Often using a different AD system over Zygote is a better solution. This is what [`hessian`](@ref) does, using ForwardDiff over Zygote.
+Often using a different AD system over Zygote is a better solution.
+This is what [`hessian`](@ref) does, using ForwardDiff over Zygote, but other combinations are possible.
+(Note that rules defined here mean that Zygote over ForwardDiff is translated to ForwardDiff over ForwardDiff.)
