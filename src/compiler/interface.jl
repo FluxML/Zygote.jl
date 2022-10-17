@@ -115,8 +115,17 @@ as a named tuple.
 julia> y, ∇ = withgradient(/, 1, 2)
 (val = 0.5, grad = (0.5, -0.25))
 
-julia> ∇ == gradient(/, 1, 2)
+julia> ∇ == gradient(/, 1, 2)  # explicit mode
 true
+
+julia> w = [3.0];
+
+julia> res = withgradient(() -> sum(abs2, w), Params([w]))  # implicit mode
+(val = 9.0, grad = Grads(...))
+
+julia> res.grad[w]
+1-element Vector{Float64}:
+ 6.0
 ```
 """
 function withgradient(f, args...)
@@ -133,6 +142,8 @@ end
 
 Gradient with implicit parameters. Takes a zero-argument function,
 and returns a dictionary-like container, whose keys are arrays `x in ps`.
+
+See also [`withgradient`](@ref) to keep the value `loss()`.
 
 ```jldoctest; setup=:(using Zygote)
 julia> x = [1 2 3; 4 5 6]; y = [7, 8]; z = [1, 10, 100];
