@@ -26,7 +26,7 @@ end
   g_gpu = gradient(x -> v(x, 7), a_gpu)[1]
   @test g_gpu isa CuArray
   @test g_gpu |> collect ≈ g
-  
+
   w(x) = sum(broadcast(log, x))
   g = gradient(x -> w(x), a)[1]
   g_gpu = gradient(x -> w(x), a_gpu)[1]
@@ -38,7 +38,7 @@ end
   @test gradient(x -> sum(x .> 3), a_gpu) == (nothing,)
   g3 = gradient(x -> sum(x .^ 3) / count(x .> 3), a)[1]              # was Can't differentiate gc_preserve_end expression
   @test_skip cu(g3) ≈ gradient(x -> sum(x .^ 3) / sum(x .> 3), a_gpu)[1]  # was KernelException -- not fixed by PR #1018
-  @test cu(g3) ≈ gradient(x -> sum(x .^ 3) / count(x .> 3), a_gpu)[1] 
+  @test cu(g3) ≈ gradient(x -> sum(x .^ 3) / count(x .> 3), a_gpu)[1]
 
   # Projection: eltype preservation:
   @test gradient(x -> 2.3 * sum(x.^4), a_gpu)[1] isa CuArray{Float32}
@@ -90,40 +90,40 @@ end
 @testset "gradient algebra" begin
   w, b = rand(2) |> cu, rand(2) |> cu
   x1, x2 = rand(2) |> cu, rand(2) |> cu
- 
-  gs1 = gradient(() -> sum(w .* x1), Params([w])) 
-  gs2 = gradient(() -> sum(w .* x2), Params([w])) 
+
+  gs1 = gradient(() -> sum(w .* x1), Params([w]))
+  gs2 = gradient(() -> sum(w .* x2), Params([w]))
 
   @test .- gs1 isa Grads
-  @test gs1 .- gs2 isa Grads 
+  @test gs1 .- gs2 isa Grads
   @test .+ gs1 isa Grads
-  @test gs1 .+ gs2 isa Grads 
-  @test 2 .* gs1 isa Grads 
+  @test gs1 .+ gs2 isa Grads
+  @test 2 .* gs1 isa Grads
   @test (2 .* gs1)[w] ≈ 2 * gs1[w]
-  @test gs1 .* 2 isa Grads 
-  @test gs1 ./ 2 isa Grads  
-  @test (gs1 .+ gs2)[w] ≈ gs1[w] .+ gs2[w] 
+  @test gs1 .* 2 isa Grads
+  @test gs1 ./ 2 isa Grads
+  @test (gs1 .+ gs2)[w] ≈ gs1[w] .+ gs2[w]
 
   gs12 = gs1 .+ gs2
   gs1 .+= gs2
-  @test gs12[w] ≈ gs1[w] 
+  @test gs12[w] ≈ gs1[w]
 
   gs3 = gradient(() -> sum(w .* x1), Params([w, b])) # grad nothing with respect to b
-  gs4 = gradient(() -> sum(w .* x2 .+ b), Params([w, b])) 
+  gs4 = gradient(() -> sum(w .* x2 .+ b), Params([w, b]))
 
   @test .- gs3 isa Grads
-  @test gs3 .- gs4 isa Grads 
+  @test gs3 .- gs4 isa Grads
   @test .+ gs3 isa Grads
-  @test gs3 .+ gs4 isa Grads 
-  @test 2 .* gs3 isa Grads 
-  @test gs3 .* 2 isa Grads 
-  @test gs3 ./ 2 isa Grads  
+  @test gs3 .+ gs4 isa Grads
+  @test 2 .* gs3 isa Grads
+  @test gs3 .* 2 isa Grads
+  @test gs3 ./ 2 isa Grads
   @test (gs3 .+ gs4)[w] ≈ gs3[w] .+ gs4[w]
-  @test (gs3 .+ gs4)[b] ≈ gs4[b] 
-  
+  @test (gs3 .+ gs4)[b] ≈ gs4[b]
+
   @test gs3 .+ IdDict(w => similar(w), b => similar(b)) isa Grads
   gs3 .+= IdDict(p => randn!(similar(p)) for p in keys(gs3))
-  @test gs3 isa Grads 
+  @test gs3 isa Grads
 
   @test_throws ArgumentError gs1 .+ gs4
 end
@@ -140,3 +140,25 @@ end
   @test_skip gradient((x,y) -> sum(vcat(x,y)), 1f0, r, 2f0, r)[2] isa CUDA.CuArray{Float32}
 end
 
+
+@testset "CUDA complex broadcasting" begin
+    # Issue #995 test
+    x = rand(Float32, 50)
+    y = complex(rand(Float32, 50))
+
+    xgpu = cu(x)
+    ygpu = cu(y)
+
+    f995(A) = norm(@. A*xgpu*ygpu)
+    g1 = Zygote.gradient(f995, 1f0)
+    gradcheck(f995, 1f0)
+
+    # Issue 961 and 1121 and 1215
+    g1 = Zygote.gradient(x->sum(abs2, x), ygpu)
+    g2 = Zygote.gradient(x->sum(abs2.(x)), ygpu)
+    g3 = Zygote.graient(x->sum(abs2, x), y)
+    @test g1 isa CUDA.CuArray{Float32}
+    @test g2 isa CUDA.CuArray{Float32}
+    @test g1 ≈ g2
+    @test g1 ≈ g3
+end
