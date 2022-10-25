@@ -275,16 +275,17 @@ function dual_function(f::F) where F
 
 @inline function broadcast_forward(f, args::Vararg{Any,N}) where N
   out = dual_function(f).(args...)
-  eltype(out) <: Union{Dual, Complex} || return (out, _ -> nothing)
+  T = eltype(out)
+  T <: Union{Dual, Complex} || return (out, _ -> nothing)
   if any(eltype(a) <: Complex for a in args)
-    _broadcast_forward_complex(out, args...)
+    _broadcast_forward_complex(T, out, args...)
   else
-    _broadcast_forward(out, args...)
+    _broadcast_forward(T, out, args...)
   end
 end
 
 # Real input and real output
-function _broadcast_forward(out::AbstractArray{<:Dual}, args::Vararg{Any, N}) where {N}
+function _broadcast_forward(::Type{<:Dual}, out, args::Vararg{Any, N}) where {N}
   valN = Val(N)
   y = broadcast(x -> x.value, out)
   function bc_fwd_back(ȳ)
@@ -297,7 +298,7 @@ function _broadcast_forward(out::AbstractArray{<:Dual}, args::Vararg{Any, N}) wh
 end
 
 # This handles complex output and real input
-function _broadcast_forward(out::AbstractArray{<:Complex}, args::Vararg{Any, N}) where {N}
+function _broadcast_forward(::Type{<:Complex}, out, args::Vararg{Any, N}) where {N}
     valN = Val(N)
     y = broadcast(x -> Complex.(real(x).value, imag(x).value), out)
     function bc_fwd_back(ȳ)
@@ -311,7 +312,7 @@ function _broadcast_forward(out::AbstractArray{<:Complex}, args::Vararg{Any, N})
 
 # This handles complex input and real output we use the gradient definition from ChainRules here
 # since it agrees with what Zygote did for real(x).
-function _broadcast_forward_complex(out::AbstractArray{<:Dual}, args::Vararg{Any, N}) where {N}
+function _broadcast_forward_complex(::Type{<:Dual}, out, args::Vararg{Any, N}) where {N}
     valN = Val(N)
     y = broadcast(x -> x.value, out)
     function bc_fwd_back(ȳ)
@@ -329,15 +330,16 @@ end
 
 # If we assume that
 # f(x + iy) = u(x,y) + iv(x,y)
-# them we do the following for the adjoint
-# Δu ∂/∂xu + Δv∂/∂x  v + i(Δu∂/∂yu + Δv ∂/∂y v)
+# then we do the following for the adjoint
+# Δu ∂u/∂x + Δv∂v/∂x + i(Δu∂u/∂y + Δv ∂v/∂y )
+# this follows https://juliadiff.org/ChainRulesCore.jl/stable/maths/complex.html
 function _adjoint_complex(Δz, df, i)
     Δu, Δv = reim(Δz)
     du, dv = reim(df)
     return Complex(Δu*du.partials[i] + Δv*dv.partials[i], Δu*du.partials[i+N] + Δv*dv.partials[i+N])
 end
 
-function _broadcast_forward_complex(out::AbstractArray{<:Complex}, args::Vararg{Any, N}) where {N}
+function _broadcast_forward_complex(::Type{<:Complex}, out, args::Vararg{Any, N}) where {N}
     valN = Val(N)
     y = broadcast(x -> Complex.(real(x).value, imag(x).value), out)
     function bc_fwd_back(ȳ)
