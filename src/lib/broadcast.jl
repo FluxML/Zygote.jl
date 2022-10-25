@@ -120,8 +120,8 @@ end
 @adjoint broadcasted(::typeof(imag), x::Numeric) =
   imag.(x), z̄ -> (nothing, im .* real.(z̄))
 
-@adjoint broadcasted(::typeof(abs2), x::Numeric) =
-  abs2.(x), z̄ -> (nothing, 2 .* real.(z̄) .* x)
+# @adjoint broadcasted(::typeof(abs2), x::Numeric) =
+#   abs2.(x), z̄ -> (nothing, 2 .* real.(z̄) .* x)
 
 @adjoint function broadcasted(::typeof(+), a::AbstractArray{<:Number}, b::Bool)
   y = b === false ? a : a .+ b
@@ -235,37 +235,57 @@ end
 import ForwardDiff
 using ForwardDiff: Dual
 
-# Updated to use proposal from 961
-dual(x, p, pc=()) = x
-dual(x::Real, p, pc=()) = Dual(x, p)
-dual(x::Bool, p, pc=()) = x
-dual(x::Complex, p, pc) = Complex(Dual(real(x), p), Dual(imag(x), pc))
 
-# Updated to use proposal from 961
+# We do this because it ensures type stability so it compiles nicely on the gpu
+dual(x, i, N) = x
+dual(x::Bool, i, ::Val{N}) where {N} = x
+dual(x::Real, i, ::Val{N}) where {N} = Dual(x, ntuple(j-> i==j, Val(N)))
+# For complex since ForwardDiff.jl doesn't play nicely with complex numbers we
+# construct a Complex dual number and tag the real and imaginary parts separately
+function dual(x::Complex, i, ::Val{N}) where {N}
+    re_dual = Dual(real(x), ntuple(j->i==j, Val(2N)))
+    im_dual = Dual(imag(x), ntuple(j->(N+i)==j, Val(2N)))
+    return Complex(re_dual, im_dual)
+end
+
 function dual_function(f::F) where F
-  function (args::Vararg{Any,N}) where N
-    if any(a isa Complex for a in args)
-        ds = map(args, ntuple(identity, Val(N))) do x, i
-            dual(x, ntuple(j -> i==j, Val(2N)), ntuple(j -> N+i==j, Val(2N)))
-        end
-        return f(ds...)
-    else
-        ds = map(args, ntuple(identity,Val(N))) do x, i
-        dual(x, ntuple(j -> i==j, Val(N)))
-        end
-        return f(ds...)
+    function (args::Vararg{Any,N}) where N
+      ds = map(args, ntuple(identity,Val(N))) do x, i
+        tmp = dual(x, i, Val(N))
+        return tmp
+      end
+      return f(ds...)
     end
   end
-end
+
+#   @inline function broadcast_forward(f, args::Vararg{Any,N}) where N
+#     valN = Val(N)
+#     out = dual_function(f).(args...)
+#     eltype(out) <: Dual || return (out, _ -> nothing)
+#     y = broadcast(x -> x.value, out)
+#     function bc_fwd_back(ȳ)
+#       dargs = ntuple(valN) do i
+#         unbroadcast(args[i], broadcast((y1, o1) -> y1 * o1.partials[i], ȳ, out))
+#       end
+#       (nothing, nothing, dargs...) # nothings for broadcasted & f
+#     end
+#     return y, bc_fwd_back
+#   end
+
 
 @inline function broadcast_forward(f, args::Vararg{Any,N}) where N
   out = dual_function(f).(args...)
   eltype(out) <: Union{Dual, Complex} || return (out, _ -> nothing)
-  if any(eltype(a) <: Complex for a in args)
-    _broadcast_forward_complex(out, args...)
-  else
+  ifelse(
+    any(eltype(a) isa Complex for a in args),
+    _broadcast_forward_complex(out, args...),
     _broadcast_forward(out, args...)
-  end
+    )
+#   if any(eltype(a) <: Complex for a in args)
+#     _broadcast_forward_complex(out, args...)
+#   else
+#     _broadcast_forward(out, args...)
+#   end
 end
 
 # Real input and real output
@@ -281,21 +301,21 @@ function _broadcast_forward(out::AbstractArray{<:Dual}, args::Vararg{Any, N}) wh
   return y, bc_fwd_back
 end
 
-# This handles complex output and real input and uses the definition from
-# ChainRules.jl's section on complex numbers
-function _broadcast_forward(out::AbstractArray{<:Complex{<:Dual}}, args::Vararg{Any, N}) where {N}
-  valN = Val(N)
-  y = broadcast(x -> Complex.(real(x).value, imag(x).value), out)
-  function bc_fwd_back(ȳ)
-    dargs = ntuple(valN) do i
-      unbroadcast(args[i], broadcast((y1, o1) -> (real(y1)*real(o1).partials[i] + imag(y1)*imag(o1).partials[i]), ȳ, out))
+# This handles complex output and real input
+function _broadcast_forward(out::AbstractArray{<:Complex}, args::Vararg{Any, N}) where {N}
+    valN = Val(N)
+    y = broadcast(x -> Complex.(real(x).value, imag(x).value), out)
+    function bc_fwd_back(ȳ)
+      dargs = ntuple(valN) do i
+        unbroadcast(args[i], broadcast((y1, o1) -> (real(y1)*real(o1).partials[i] + imag(y1)*imag(o1).partials[i]), ȳ, out))
+      end
+      (nothing, nothing, dargs...) # nothings for broadcasted & f
     end
-    (nothing, nothing, dargs...) # nothings for broadcasted & f
+    return y, bc_fwd_back
   end
-  return y, bc_fwd_back
-end
 
-# This handles complex input and real output
+# This handles complex input and real output we use the gradient definition from ChainRules here
+# since it agrees with what Zygote did for real(x).
 function _broadcast_forward_complex(out::AbstractArray{<:Dual}, args::Vararg{Any, N}) where {N}
     valN = Val(N)
     y = broadcast(x -> x.value, out)
@@ -308,8 +328,8 @@ function _broadcast_forward_complex(out::AbstractArray{<:Dual}, args::Vararg{Any
     return y, bc_fwd_back
 end
 
-# This is for complex input and complex output
-# I am a little confused what derivative we want to use here so it hasn't been implemented
+# # # This is for complex input and complex output
+# # # I am a little confused what derivative we want to use here so it hasn't been implemented
 function _broadcast_forward_complex(out::AbstractArray{<:Complex}, args::Vararg{Any, N}) where {N}
     throw("Complex output and input not supported in Zygote broadcast_forward")
 end
