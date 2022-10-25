@@ -120,8 +120,8 @@ end
 @adjoint broadcasted(::typeof(imag), x::Numeric) =
   imag.(x), z̄ -> (nothing, im .* real.(z̄))
 
-# @adjoint broadcasted(::typeof(abs2), x::Numeric) =
-#   abs2.(x), z̄ -> (nothing, 2 .* real.(z̄) .* x)
+@adjoint broadcasted(::typeof(abs2), x::Numeric) =
+  abs2.(x), z̄ -> (nothing, 2 .* real.(z̄) .* x)
 
 @adjoint function broadcasted(::typeof(+), a::AbstractArray{<:Number}, b::Bool)
   y = b === false ? a : a .+ b
@@ -276,16 +276,11 @@ function dual_function(f::F) where F
 @inline function broadcast_forward(f, args::Vararg{Any,N}) where N
   out = dual_function(f).(args...)
   eltype(out) <: Union{Dual, Complex} || return (out, _ -> nothing)
-  ifelse(
-    any(eltype(a) isa Complex for a in args),
-    _broadcast_forward_complex(out, args...),
+  if any(eltype(a) <: Complex for a in args)
+    _broadcast_forward_complex(out, args...)
+  else
     _broadcast_forward(out, args...)
-    )
-#   if any(eltype(a) <: Complex for a in args)
-#     _broadcast_forward_complex(out, args...)
-#   else
-#     _broadcast_forward(out, args...)
-#   end
+  end
 end
 
 # Real input and real output
@@ -329,9 +324,29 @@ function _broadcast_forward_complex(out::AbstractArray{<:Dual}, args::Vararg{Any
 end
 
 # # # This is for complex input and complex output
-# # # I am a little confused what derivative we want to use here so it hasn't been implemented
+# # # I am a little confused what derivative we want to use here but this should match
+# what is done for all the tests
+
+# If we assume that
+# f(x + iy) = u(x,y) + iv(x,y)
+# them we do the following for the adjoint
+# Δu ∂/∂xu + Δv∂/∂x  v + i(Δu∂/∂yu + Δv ∂/∂y v)
+function _adjoint_complex(Δz, df, i)
+    Δu, Δv = reim(Δz)
+    du, dv = reim(df)
+    return Complex(Δu*du.partials[i] + Δv*dv.partials[i], Δu*du.partials[i+N] + Δv*dv.partials[i+N])
+end
+
 function _broadcast_forward_complex(out::AbstractArray{<:Complex}, args::Vararg{Any, N}) where {N}
-    throw("Complex output and input not supported in Zygote broadcast_forward")
+    valN = Val(N)
+    y = broadcast(x -> Complex.(real(x).value, imag(x).value), out)
+    function bc_fwd_back(ȳ)
+      dargs = ntuple(valN) do i
+        unbroadcast(args[i], broadcast((y1, o1) -> _adjoint_complex(y1, o1, i), ȳ, out))
+      end
+      (nothing, nothing, dargs...) # nothings for broadcasted & f
+    end
+    return y, bc_fwd_back
 end
 
 using GPUArraysCore  # replaces @require CUDA block, weird indenting to preserve git blame
