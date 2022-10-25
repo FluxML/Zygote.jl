@@ -142,23 +142,19 @@ end
 
 
 @testset "CUDA complex broadcasting" begin
-    # Issue #995 test
+    # Issue 961 and 1121 and 1215
     x = rand(Float32, 50)
     y = complex(rand(Float32, 50))
 
     xgpu = cu(x)
     ygpu = cu(y)
 
-    f995(A) = norm(@. A*xgpu*ygpu)
-    g1 = Zygote.gradient(f995, 1f0)
-    gradcheck(f995, 1f0)
 
-    # Issue 961 and 1121 and 1215
-    g1 = Zygote.gradient(x->sum(abs2, x), ygpu)
-    g2 = Zygote.gradient(x->sum(abs2.(x)), ygpu)
-    g3 = Zygote.graient(x->sum(abs2, x), y)
-    @test g1 isa CUDA.CuArray{Float32}
-    @test g2 isa CUDA.CuArray{Float32}
-    @test g1 ≈ g2
-    @test g1 ≈ g3
+    g1 = Zygote.gradient(x->sum(abs2, x), ygpu)[1]
+    g2 = Zygote.gradient(x->sum(abs2.(x)), ygpu)[1]
+    g3 = Zygote.gradient(x->sum(abs2, x), y)[1]
+    @test g1 isa CUDA.CuArray{ComplexF32}
+    @test g2 isa CUDA.CuArray{ComplexF32}
+    @test collect(g1) ≈ collect(g2)
+    @test collect(g1) ≈ g3
 end
