@@ -258,20 +258,6 @@ function dual_function(f::F) where F
     end
   end
 
-#   @inline function broadcast_forward(f, args::Vararg{Any,N}) where N
-#     valN = Val(N)
-#     out = dual_function(f).(args...)
-#     eltype(out) <: Dual || return (out, _ -> nothing)
-#     y = broadcast(x -> x.value, out)
-#     function bc_fwd_back(ȳ)
-#       dargs = ntuple(valN) do i
-#         unbroadcast(args[i], broadcast((y1, o1) -> y1 * o1.partials[i], ȳ, out))
-#       end
-#       (nothing, nothing, dargs...) # nothings for broadcasted & f
-#     end
-#     return y, bc_fwd_back
-#   end
-
 
 @inline function broadcast_forward(f, args::Vararg{Any,N}) where N
   out = dual_function(f).(args...)
