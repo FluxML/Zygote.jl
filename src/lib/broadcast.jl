@@ -238,19 +238,19 @@ using ForwardDiff: Dual
 
 # We do this because it ensures type stability so it compiles nicely on the gpu
 dual(x, i, N) = x
-dual(x::Bool, i, ::Val{N}) where {N} = x
-dual(x::Real, i, ::Val{N}) where {N} = Dual(x, ntuple(j-> i==j, Val(N)))
+dual(x::Bool, i, N) = x
+dual(x::Real, i, N) = Dual(x, ntuple(j-> i==j, N))
 # For complex since ForwardDiff.jl doesn't play nicely with complex numbers we
 # construct a Complex dual number and tag the real and imaginary parts separately
-function dual(x::Complex, i, ::Val{N}) where {N}
-    re_dual = Dual(real(x), ntuple(j->i==j, Val(2N)))
-    im_dual = Dual(imag(x), ntuple(j->(N+i)==j, Val(2N)))
+function dual(x::Complex, i, N)
+    re_dual = Dual(real(x), ntuple(==(i), 2N))
+    im_dual = Dual(imag(x), ntuple(==(N+i), 2N))
     return Complex(re_dual, im_dual)
 end
 
 function dual_function(f::F) where F
     function (args::Vararg{Any,N}) where N
-      ds = map(args, ntuple(identity,Val(N))) do x, i
+      ds = map(args, ntuple(identity,N)) do x, i
         tmp = dual(x, i, Val(N))
         return tmp
       end
