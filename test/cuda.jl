@@ -2,6 +2,7 @@ using CUDA
 using Zygote: Grads
 using LinearAlgebra
 using Random: randn!
+using FiniteDifferences
 CUDA.allowscalar(false)
 
 # Test GPU movement inside the call to `gradient`
@@ -144,11 +145,10 @@ end
 @testset "CUDA complex broadcasting" begin
     # Issue 961 and 1121 and 1215
     x = rand(Float32, 50)
-    y = complex(rand(Float32, 50))
+    y = rand(ComplexF32, 50)
 
     xgpu = cu(x)
     ygpu = cu(y)
-
 
     g1 = Zygote.gradient(x->sum(abs2, x), ygpu)[1]
     g2 = Zygote.gradient(x->sum(abs2.(x)), ygpu)[1]
@@ -157,4 +157,22 @@ end
     @test g2 isa CUDA.CuArray{ComplexF32}
     @test collect(g1) ≈ collect(g2)
     @test collect(g1) ≈ g3
+
+
+
+    # Test real and complex mixed derivates
+    fm1(x,y) = sum(abs2, x.^2 .*y .+ y)
+
+    m = central_fdm(5,1)
+    gx_fd, gy_fd = grad(m, fm1, x, y)
+
+    # Test mixed derivatives on CUDA
+    gx_gpu, gy_gpu = Zygote.gradient(fm1, xgpu, ygpu)
+    gx_cpu, gy_cpu = Zygote.gradient(fm1, x, y)
+    @test collect(gx_gpu) ≈ gx_cpu
+    @test collect(gy_gpu) ≈ gy_cpu
+
+    @test collect(gx_cpu) ≈ gx_fd
+    @test collect(gx_cpu) ≈ gx_fd
+
 end
