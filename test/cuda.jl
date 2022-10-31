@@ -2,7 +2,7 @@ using CUDA
 using Zygote: Grads
 using LinearAlgebra
 using Random: randn!
-using FiniteDifferences
+import FiniteDifferences
 CUDA.allowscalar(false)
 
 # Test GPU movement inside the call to `gradient`
@@ -163,8 +163,8 @@ end
     # Test real and complex mixed derivates
     fm1(x,y) = sum(abs2, x.^2 .*y .+ y)
 
-    m = central_fdm(5,1)
-    gx_fd, gy_fd = grad(m, fm1, x, y)
+    m = FiniteDifferences.central_fdm(5,1)
+    gx_fd, gy_fd = FiniteDifferences.grad(m, fm1, x, y)
 
     # Test mixed derivatives on CUDA
     gx_gpu, gy_gpu = Zygote.gradient(fm1, xgpu, ygpu)
