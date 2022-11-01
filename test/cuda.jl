@@ -7,6 +7,7 @@ CUDA.allowscalar(false)
 
 function gradcheck_gpu(f, xs...)
     grad_zygote = gradient(f, xs...)
+    #@inferred gradient(f, xs...)
     m = FiniteDifferences.central_fdm(5,1)
     grad_finite_difference = FiniteDifferences.grad(m, f, collect.(xs)...)
     return all(isapprox.(collect.(grad_zygote), grad_finite_difference))
@@ -155,8 +156,8 @@ end
     x = rand(Float32, 50)
     y = rand(ComplexF32, 50)
 
-    xgpu = cu(x)
-    ygpu = cu(y)
+    xgpu =cu(x)
+    ygpu =cu(y)
 
     g1 = Zygote.gradient(x->sum(abs2, x), ygpu)[1]
     g2 = Zygote.gradient(x->sum(abs2.(x)), ygpu)[1]
@@ -167,6 +168,8 @@ end
     @test collect(g1) ≈ g3
 
 
+    r3 = Float32.(inv.(2:4))
+    c3 = ComplexF32.(inv.(5:7) .+ im ./ (8:10))
 
 
     @test gradcheck_gpu((x,y)->sum(abs2, x.^2  .+ y), xgpu, ygpu)
@@ -175,7 +178,10 @@ end
     @test gradcheck_gpu((x,y)->sum(abs, cos.(x) .+ sin.(conj.(y))), xgpu, ygpu)
     @test gradcheck_gpu((x,y)->sum(abs, cos.(x) .+ sin.(conj.(y))), xgpu, ygpu)
     @test gradcheck_gpu((x,y)->sum(abs, exp.(x) .+ imag.(y)), xgpu, ygpu)
-    @test gradcheck_gpu((x,y)->sum(abs, exp.(x) .+ log.(y)), xgpu, ygpu)
+    # @test gradient(c -> sum(abs2, imag.(sqrt.(c .+ im))), c3)[1] ≈ [-0.4124833f0 + 0.49228126f0im, -0.4258298f0 + 0.49446818f0im, -0.43560573f0 + 0.49583605f0im]
+    # @inferred gradient(c -> sum(abs2, imag.(sqrt.(c .+ im))), c3)
+    @test gradient((r,c) -> sum(abs2, @. sin(conj(c)/r' - im) - imag(c + tanh(r/c'))), r3, c3)[2] ≈ [2.9423256f0 + 63.7845f0im, -2.7483354f0 + 55.08628f0im, -9.976982f0 + 48.902283f0im]
+    @inferred gradient((r,c) -> sum(abs2, @. sin(conj(c)/r' - im) - imag(c + tanh(r/c'))), r3, c3)
 
 
     # m = FiniteDifferences.central_fdm(5,1)

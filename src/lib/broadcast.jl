@@ -235,7 +235,7 @@ end
 # Forward Mode -- necessary for CUDA, also used as a fast path above
 
 import ForwardDiff
-using ForwardDiff: Dual, Partials
+using ForwardDiff: Dual, Partials, value, partials
 
 
 # We do this because it ensures type stability so it compiles nicely on the gpu
@@ -250,16 +250,21 @@ using ForwardDiff: Dual, Partials
     # For complex since ForwardDiff.jl doesn't play nicely with complex numbers we
 # construct a Complex dual number and tag the real and imaginary parts separately
 @inline function dual(x::Complex{T}, i, ::Val{N}) where {T<:Real,N}
-    re_dual = Dual{T}(T(real(x)), Partials{2N,T}(ntuple(==(i), Val(2N))))
-    im_dual = Dual{T}(T(imag(x)), Partials{2N,T}(ntuple(==(N+i), Val(2N))))
+    re_dual = Dual{T}(T(real(x)), Partials{2N,T}(ntuple(==(i), 2N)))
+    im_dual = Dual{T}(T(imag(x)), Partials{2N,T}(ntuple(==(N+i), 2N)))
     return Complex(re_dual, im_dual)
+end
+
+function dualize(args::Vararg{Any, N}) where {N}
+    ds = map(args, ntuple(identity,N)) do x, i
+        return dual(x, i, Val(N))
+      end
+      return ds
 end
 
 function dual_function(f::F) where F
     function (args::Vararg{Any,N}) where N
-      ds = map(args, ntuple(identity,N)) do x, i
-        return dual(x, i, Val(N))
-      end
+      ds = dualize(args...)
       return f(ds...)
     end
   end
@@ -279,10 +284,10 @@ end
 # Real input and real output
 function _broadcast_forward(::Type{<:Dual}, out, args::Vararg{Any, N}) where {N}
   valN = Val(N)
-  y = broadcast(x -> x.value, out)
+  y = broadcast(x -> value(x), out)
   function bc_fwd_back(ȳ)
     dargs = ntuple(valN) do i
-      unbroadcast(args[i], broadcast((y1, o1) -> y1 * o1.partials[i], ȳ, out))
+      unbroadcast(args[i], broadcast((y1, o1) -> y1 * partials(o1,i), ȳ, out))
     end
     (nothing, nothing, dargs...) # nothings for broadcasted & f
   end
@@ -292,10 +297,10 @@ end
 # This handles complex output and real input
 function _broadcast_forward(::Type{<:Complex}, out, args::Vararg{Any, N}) where {N}
     valN = Val(N)
-    y = broadcast(x -> Complex.(real(x).value, imag(x).value), out)
+    y = broadcast(x -> Complex.(value(real(x)), value(imag(x))), out)
     function bc_fwd_back(ȳ)
       dargs = ntuple(valN) do i
-        unbroadcast(args[i], broadcast((y1, o1) -> (real(y1)*real(o1).partials[i] + imag(y1)*imag(o1).partials[i]), ȳ, out))
+        unbroadcast(args[i], broadcast((y1, o1) -> (real(y1)*partials(real(o1),i) + imag(y1)*partials(imag(o1), i)), ȳ, out))
       end
       (nothing, nothing, dargs...) # nothings for broadcasted & f
     end
@@ -306,10 +311,10 @@ function _broadcast_forward(::Type{<:Complex}, out, args::Vararg{Any, N}) where 
 # since it agrees with what Zygote did for real(x).
 @inline function _broadcast_forward_complex(::Type{<:Dual}, out, args::Vararg{Any, N}) where {N}
     valN = Val(N)
-    y = broadcast(x -> x.value, out)
+    y = broadcast(x -> value(x), out)
     function bc_fwd_back(ȳ)
       dargs = ntuple(valN) do i
-        unbroadcast(args[i], broadcast((y1, o1) -> y1 * Complex(o1.partials[i], o1.partials[i+N]), ȳ, out))
+        unbroadcast(args[i], broadcast((y1, o1) -> y1 * Complex(partials(o1, i), partials(o1, i+N)), ȳ, out))
       end
       (nothing, nothing, dargs...) # nothings for broadcasted & f
     end
