@@ -5,6 +5,14 @@ using Random: randn!
 import FiniteDifferences
 CUDA.allowscalar(false)
 
+function gradcheck_gpu(f, xs...)
+    grad_zygote = gradient(f, xs...)
+    m = FiniteDifferences.central_fdm(5,1)
+    grad_finite_difference = FiniteDifferences.grad(m, f, collect.(xs)...)
+    return all(isapprox.(collect.(grad_zygote), grad_finite_difference))
+  end
+
+
 # Test GPU movement inside the call to `gradient`
 @testset "GPU movement" begin
   r = rand(Float32, 3,3)
@@ -160,19 +168,26 @@ end
 
 
 
-    # Test real and complex mixed derivates
-    fm1(x,y) = sum(abs2, x.^2 .*y .+ y)
 
-    m = FiniteDifferences.central_fdm(5,1)
-    gx_fd, gy_fd = FiniteDifferences.grad(m, fm1, x, y)
+    @test gradcheck_gpu((x,y)->sum(abs2, x.^2  .+ y), xgpu, ygpu)
+    @test gradcheck_gpu((x,y)->sum(abs2, cos.(x) .+ sin.(y)), xgpu, ygpu)
+    @test gradcheck_gpu((x,y)->sum(abs, cos.(x).*sin.(y)), xgpu, ygpu)
+    @test gradcheck_gpu((x,y)->sum(abs, cos.(x) .+ sin.(conj.(y))), xgpu, ygpu)
+    @test gradcheck_gpu((x,y)->sum(abs, cos.(x) .+ sin.(conj.(y))), xgpu, ygpu)
+    @test gradcheck_gpu((x,y)->sum(abs, exp.(x) .+ imag.(y)), xgpu, ygpu)
+    @test gradcheck_gpu((x,y)->sum(abs, exp.(x) .+ log.(y)), xgpu, ygpu)
 
-    # Test mixed derivatives on CUDA
-    gx_gpu, gy_gpu = Zygote.gradient(fm1, xgpu, ygpu)
-    gx_cpu, gy_cpu = Zygote.gradient(fm1, x, y)
-    @test collect(gx_gpu) ≈ gx_cpu
-    @test collect(gy_gpu) ≈ gy_cpu
 
-    @test collect(gx_cpu) ≈ gx_fd
-    @test collect(gx_cpu) ≈ gx_fd
+    # m = FiniteDifferences.central_fdm(5,1)
+    # gx_fd, gy_fd = FiniteDifferences.grad(m, fm1, x, y)
+
+    # # Test mixed derivatives on CUDA
+    # gx_gpu, gy_gpu = Zygote.gradient(fm1, xgpu, ygpu)
+    # gx_cpu, gy_cpu = Zygote.gradient(fm1, x, y)
+    # @test collect(gx_gpu) ≈ gx_cpu
+    # @test collect(gy_gpu) ≈ gy_cpu
+
+    # @test collect(gx_cpu) ≈ gx_fd
+    # @test collect(gx_cpu) ≈ gx_fd
 
 end

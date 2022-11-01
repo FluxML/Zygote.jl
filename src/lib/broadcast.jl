@@ -184,6 +184,8 @@ _dual_purefun(::Type) = false
 _dual_purefun(::Type{typeof(^)}) = false  # avoid DomainError from negative powers
 
 _dual_safearg(x::Numeric{<:Real}) = true
+_dual_safearg(x::Numeric{<:Complex}) = true
+_dual_safearg(x::Ref{<:Numeric{<:Complex}}) = true
 _dual_safearg(x::Ref{<:Numeric{<:Real}}) = true
 _dual_safearg(x::Union{Type,Val,Symbol}) = true  # non-differentiable types
 _dual_safearg(x) = false
@@ -233,26 +235,30 @@ end
 # Forward Mode -- necessary for CUDA, also used as a fast path above
 
 import ForwardDiff
-using ForwardDiff: Dual
+using ForwardDiff: Dual, Partials
 
 
 # We do this because it ensures type stability so it compiles nicely on the gpu
-dual(x, i, N) = x
-dual(x::Bool, i, N) = x
-dual(x::Real, i, N) = Dual(x, ntuple(j-> i==j, N))
-# For complex since ForwardDiff.jl doesn't play nicely with complex numbers we
+@inline dual(x, i, ::Val) = x
+@inline dual(x::Bool, i, ::Val) = x
+@inline dual(x::Real, i, ::Val{N}) where {N} = Dual{typeof(x)}(x, ntuple(j -> (i==j & j < (N+1)), 2N))
+# function dual(x::Real, i, ::Val{N}) where {N}
+#     re = Dual(x, ntuple(j -> i==j, 2*N))
+#     im = Dual(zero(x), ntuple(j -> i==j, 2*N))
+#     return Complex(re, im)
+# end
+    # For complex since ForwardDiff.jl doesn't play nicely with complex numbers we
 # construct a Complex dual number and tag the real and imaginary parts separately
-function dual(x::Complex, i, N)
-    re_dual = Dual(real(x), ntuple(==(i), 2N))
-    im_dual = Dual(imag(x), ntuple(==(N+i), 2N))
+@inline function dual(x::Complex{T}, i, ::Val{N}) where {T<:Real,N}
+    re_dual = Dual{T}(T(real(x)), Partials{2N,T}(ntuple(==(i), Val(2N))))
+    im_dual = Dual{T}(T(imag(x)), Partials{2N,T}(ntuple(==(N+i), Val(2N))))
     return Complex(re_dual, im_dual)
 end
 
 function dual_function(f::F) where F
     function (args::Vararg{Any,N}) where N
       ds = map(args, ntuple(identity,N)) do x, i
-        tmp = dual(x, i, Val(N))
-        return tmp
+        return dual(x, i, Val(N))
       end
       return f(ds...)
     end
@@ -298,7 +304,7 @@ function _broadcast_forward(::Type{<:Complex}, out, args::Vararg{Any, N}) where 
 
 # This handles complex input and real output we use the gradient definition from ChainRules here
 # since it agrees with what Zygote did for real(x).
-function _broadcast_forward_complex(::Type{<:Dual}, out, args::Vararg{Any, N}) where {N}
+@inline function _broadcast_forward_complex(::Type{<:Dual}, out, args::Vararg{Any, N}) where {N}
     valN = Val(N)
     y = broadcast(x -> x.value, out)
     function bc_fwd_back(ȳ)
@@ -319,7 +325,7 @@ end
 # then we do the following for the adjoint
 # Δu ∂u/∂x + Δv∂v/∂x + i(Δu∂u/∂y + Δv ∂v/∂y )
 # this follows https://juliadiff.org/ChainRulesCore.jl/stable/maths/complex.html
-function _adjoint_complex(Δz, df, i)
+function _adjoint_complex(N, Δz, df, i)
     Δu, Δv = reim(Δz)
     du, dv = reim(df)
     return Complex(Δu*du.partials[i] + Δv*dv.partials[i], Δu*du.partials[i+N] + Δv*dv.partials[i+N])
@@ -330,7 +336,7 @@ function _broadcast_forward_complex(::Type{<:Complex}, out, args::Vararg{Any, N}
     y = broadcast(x -> Complex.(real(x).value, imag(x).value), out)
     function bc_fwd_back(ȳ)
       dargs = ntuple(valN) do i
-        unbroadcast(args[i], broadcast((y1, o1) -> _adjoint_complex(y1, o1, i), ȳ, out))
+        unbroadcast(args[i], broadcast((y1, o1) -> _adjoint_complex(N, y1, o1, i), ȳ, out))
       end
       (nothing, nothing, dargs...) # nothings for broadcasted & f
     end
