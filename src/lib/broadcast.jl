@@ -185,8 +185,8 @@ _dual_purefun(::Type{typeof(^)}) = false  # avoid DomainError from negative powe
 
 _dual_safearg(x::Numeric{<:Real}) = true
 _dual_safearg(x::Numeric{<:Complex}) = true
-_dual_safearg(x::Ref{<:Numeric{<:Complex}}) = true
 _dual_safearg(x::Ref{<:Numeric{<:Real}}) = true
+_dual_safearg(x::Ref{<:Numeric{<:Complex}}) = true
 _dual_safearg(x::Union{Type,Val,Symbol}) = true  # non-differentiable types
 _dual_safearg(x) = false
 
@@ -239,9 +239,9 @@ using ForwardDiff: Dual, Partials, value, partials
 
 
 # We do this because it ensures type stability so it compiles nicely on the gpu
-@inline dual(x, i, ::Val) = x
-@inline dual(x::Bool, i, ::Val) = x
-@inline dual(x::Real, i, ::Val{N}) where {N} = Dual{typeof(x)}(x, ntuple(j -> (i==j & j < (N+1)), 2N))
+@inline dual(x, i, ::Val{N}) where {N} = x
+@inline dual(x::Bool, i, ::Val{N}) where {N} = x
+@inline dual(x::Real, i, ::Val{N}) where {N} = Dual(x, ntuple(==(i), 2N))
 # function dual(x::Real, i, ::Val{N}) where {N}
 #     re = Dual(x, ntuple(j -> i==j, 2*N))
 #     im = Dual(zero(x), ntuple(j -> i==j, 2*N))
@@ -249,9 +249,9 @@ using ForwardDiff: Dual, Partials, value, partials
 # end
     # For complex since ForwardDiff.jl doesn't play nicely with complex numbers we
 # construct a Complex dual number and tag the real and imaginary parts separately
-@inline function dual(x::Complex{T}, i, ::Val{N}) where {T<:Real,N}
-    re_dual = Dual{T}(T(real(x)), Partials{2N,T}(ntuple(==(i), 2N)))
-    im_dual = Dual{T}(T(imag(x)), Partials{2N,T}(ntuple(==(N+i), 2N)))
+@inline function dual(x::Complex{T}, i, ::Val{N}) where {T,N}
+    re_dual = Dual(real(x), ntuple(==(i), 2N))
+    im_dual = Dual(imag(x), ntuple(==(N+i), 2N))
     return Complex(re_dual, im_dual)
 end
 
