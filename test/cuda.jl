@@ -168,20 +168,33 @@ end
     @test collect(g1) ≈ g3
 
 
-    r3 = Float32.(inv.(2:4))
-    c3 = ComplexF32.(inv.(5:7) .+ im ./ (8:10))
+    r3 = cu(Float32.(inv.(2:4)))
+    c3 = cu(ComplexF32.(inv.(5:7) .+ im ./ (8:10)))
 
 
+    # These check _broadcast_forward(::Type{<:Dual}, ...)
     @test gradcheck_gpu((x,y)->sum(abs2, x.^2  .+ y), xgpu, ygpu)
+    @test gradcheck_gpu((x,y)->sum(abs, exp.(x) .+ imag.(y)), xgpu, ygpu)
+
+    # These check _broadcast_forward_complex(::Type{<:Complex}, ...)
     @test gradcheck_gpu((x,y)->sum(abs2, cos.(x) .+ sin.(y)), xgpu, ygpu)
     @test gradcheck_gpu((x,y)->sum(abs, cos.(x).*sin.(y)), xgpu, ygpu)
     @test gradcheck_gpu((x,y)->sum(abs, cos.(x) .+ sin.(conj.(y))), xgpu, ygpu)
     @test gradcheck_gpu((x,y)->sum(abs, cos.(x) .+ sin.(conj.(y))), xgpu, ygpu)
-    @test gradcheck_gpu((x,y)->sum(abs, exp.(x) .+ imag.(y)), xgpu, ygpu)
-    # @test gradient(c -> sum(abs2, imag.(sqrt.(c .+ im))), c3)[1] ≈ [-0.4124833f0 + 0.49228126f0im, -0.4258298f0 + 0.49446818f0im, -0.43560573f0 + 0.49583605f0im]
+    @test gradient(c -> sum(abs2, imag.(sqrt.(c .+ im))), c3)[1] ≈ [-0.4124833f0 + 0.49228126f0im, -0.4258298f0 + 0.49446818f0im, -0.43560573f0 + 0.49583605f0im]
     # @inferred gradient(c -> sum(abs2, imag.(sqrt.(c .+ im))), c3)
     @test gradient((r,c) -> sum(abs2, @. sin(conj(c)/r' - im) - imag(c + tanh(r/c'))), r3, c3)[2] ≈ [2.9423256f0 + 63.7845f0im, -2.7483354f0 + 55.08628f0im, -9.976982f0 + 48.902283f0im]
     @inferred gradient((r,c) -> sum(abs2, @. sin(conj(c)/r' - im) - imag(c + tanh(r/c'))), r3, c3)
+
+    # These check _broadcast_forward(::Type{<:Complex}, ...)
+    @test gradcheck_gpu(x->sum(real, cis.(x)), xgpu)
+    @test gradcheck_gpu(x->sum(real, cispi.(x)), xgpu)
+
+    # These check _broadcast_forward_complex(::Type{<:Dual}, ...)
+    @test gradcheck_gpu(x->sum(real, x.^2 .+ abs.(sinh.(conj.(x)))), ygpu)
+
+
+
 
 
     # m = FiniteDifferences.central_fdm(5,1)
