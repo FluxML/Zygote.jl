@@ -241,12 +241,7 @@ using ForwardDiff: Dual, Partials, value, partials
 # We do this because it ensures type stability so it compiles nicely on the gpu
 @inline dual(x, i, ::Val{N}) where {N} = x
 @inline dual(x::Bool, i, ::Val{N}) where {N} = x
-@inline dual(x::Real, i, ::Val{N}) where {N} = Dual(x, ntuple(==(i), 2N))
-# function dual(x::Real, i, ::Val{N}) where {N}
-#     re = Dual(x, ntuple(j -> i==j, 2*N))
-#     im = Dual(zero(x), ntuple(j -> i==j, 2*N))
-#     return Complex(re, im)
-# end
+@inline dual(x::Real, i, ::Val{N}) where {N} = Dual(x, ntuple(==(i), N))
     # For complex since ForwardDiff.jl doesn't play nicely with complex numbers we
 # construct a Complex dual number and tag the real and imaginary parts separately
 @inline function dual(x::Complex{T}, i, ::Val{N}) where {T,N}
@@ -254,6 +249,8 @@ using ForwardDiff: Dual, Partials, value, partials
     im_dual = Dual(imag(x), ntuple(==(N+i), 2N))
     return Complex(re_dual, im_dual)
 end
+
+
 
 function dualize(args::Vararg{Any, N}) where {N}
     ds = map(args, ntuple(identity,N)) do x, i
