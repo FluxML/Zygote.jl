@@ -259,7 +259,7 @@ function dualize(args::Vararg{Any, N}) where {N}
       return ds
 end
 
-function dual_function(f::F) where F
+@inline function dual_function(f::F) where F
     function (args::Vararg{Any,N}) where N
       ds = dualize(args...)
       return f(ds...)
@@ -279,7 +279,7 @@ function dual_function(f::F) where F
 end
 
 # Real input and real output
-function _broadcast_forward(::Type{<:Dual}, out, args::Vararg{Any, N}) where {N}
+@inline function _broadcast_forward(::Type{<:Dual}, out, args::Vararg{Any, N}) where {N}
   valN = Val(N)
   y = broadcast(x -> value(x), out)
   function bc_fwd_back(ȳ)
@@ -292,9 +292,9 @@ function _broadcast_forward(::Type{<:Dual}, out, args::Vararg{Any, N}) where {N}
 end
 
 # This handles complex output and real input
-function _broadcast_forward(::Type{<:Complex}, out, args::Vararg{Any, N}) where {N}
+@inline function _broadcast_forward(::Type{<:Complex}, out, args::Vararg{Any, N}) where {N}
     valN = Val(N)
-    y = broadcast(x -> Complex.(value(real(x)), value(imag(x))), out)
+    y = broadcast(x -> Complex(value(real(x)), value(imag(x))), out)
     function bc_fwd_back(ȳ)
       dargs = ntuple(valN) do i
         unbroadcast(args[i], broadcast((y1, o1) -> (real(y1)*partials(real(o1),i) + imag(y1)*partials(imag(o1), i)), ȳ, out))
@@ -333,9 +333,9 @@ function _adjoint_complex(N, Δz, df, i)
     return Complex(Δu*du.partials[i] + Δv*dv.partials[i], Δu*du.partials[i+N] + Δv*dv.partials[i+N])
 end
 
-function _broadcast_forward_complex(::Type{<:Complex}, out, args::Vararg{Any, N}) where {N}
+@inline function _broadcast_forward_complex(::Type{<:Complex}, out, args::Vararg{Any, N}) where {N}
     valN = Val(N)
-    y = broadcast(x -> Complex.(real(x).value, imag(x).value), out)
+    y = broadcast(x -> Complex(value(real(x)), value(imag(x))), out)
     function bc_fwd_back(ȳ)
       dargs = ntuple(valN) do i
         unbroadcast(args[i], broadcast((y1, o1) -> _adjoint_complex(N, y1, o1, i), ȳ, out))
