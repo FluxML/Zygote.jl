@@ -184,8 +184,8 @@ end
     @test gradcheck_gpu((r,c) -> sum(abs2, sin.(conj.(c)./transpose(r) .- im) .- imag.(c .+ tanh.(r./c'))), r3, c3)
 
     # Commented out for now because of the ldexp bug
-    # @test gradcheck_gpu(c -> sum(abs2, imag.(sqrt.(c .+ im))), c3)
-    # @test gradcheck_gpu(r -> sum(abs2, log.(1 .+ im .* r)./2), r3)
+    @test gradcheck_gpu(c -> sum(abs2, imag.(sqrt.(c .+ im))), c3)
+    @test gradcheck_gpu(r -> sum(abs2, log.(1 .+ im .* r)./2), r3)
 
 
     # These check _broadcast_forward(::Type{<:Complex}, ...)
