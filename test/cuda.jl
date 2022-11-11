@@ -9,7 +9,7 @@ function gradcheck_gpu(f, xs...)
     grad_zygote = gradient(f, xs...)
     m = FiniteDifferences.central_fdm(5,1)
     grad_finite_difference = FiniteDifferences.grad(m, f, collect.(xs)...)
-    return all(isapprox.(collect.(grad_zygote), grad_finite_difference))
+    return all(isapprox.(collect.(grad_zygote), grad_finite_difference, atol=1e-5))
 end
 
 
