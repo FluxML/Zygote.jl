@@ -7,11 +7,10 @@ CUDA.allowscalar(false)
 
 function gradcheck_gpu(f, xs...)
     grad_zygote = gradient(f, xs...)
-    #@inferred gradient(f, xs...)
     m = FiniteDifferences.central_fdm(5,1)
     grad_finite_difference = FiniteDifferences.grad(m, f, collect.(xs)...)
     return all(isapprox.(collect.(grad_zygote), grad_finite_difference))
-  end
+end
 
 
 # Test GPU movement inside the call to `gradient`
@@ -183,7 +182,7 @@ end
     @test gradcheck_gpu((x,y)->sum(abs, cos.(x) .+ sin.(conj.(y))), xgpu, ygpu)
     @test gradcheck_gpu((r,c) -> sum(abs2, sin.(conj.(c)./transpose(r) .- im) .- imag.(c .+ tanh.(r./c'))), r3, c3)
 
-    # Commented out for now because of the ldexp bug
+    # Painful test!
     @test gradcheck_gpu(c -> sum(abs2, imag.(sqrt.(c .+ im))), c3)
     @test gradcheck_gpu(r -> sum(abs2, log.(1 .+ im .* r)./2), r3)
 
@@ -193,7 +192,7 @@ end
     @test gradcheck_gpu(x->sum(real, cispi.(x)), xgpu)
 
     # These check _broadcast_forward_complex(::Type{<:Dual}, ...)
-    @test gradcheck_gpu(x->sum(real, x.^2 .+ abs.(sinh.(conj.(x)))), ygpu)
+    @test gradcheck_gpu(x->sum(imag, x.^2 .+ abs.(sinh.(conj.(x)))), ygpu)
 
 
 end
