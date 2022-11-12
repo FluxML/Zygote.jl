@@ -9,7 +9,7 @@ function gradcheck_gpu(f, xs...)
     grad_zygote = gradient(f, xs...)
     m = FiniteDifferences.central_fdm(5,1)
     grad_finite_difference = FiniteDifferences.grad(m, f, collect.(xs)...)
-    return all(isapprox.(collect.(grad_zygote), grad_finite_difference, atol=1e-5))
+    return all(isapprox.(collect.(grad_zygote), grad_finite_difference))
 end
 
 
@@ -152,8 +152,8 @@ end
 
 @testset "CUDA complex broadcasting" begin
     # Issue 961 and 1121 and 1215
-    x = rand(Float32, 50)
-    y = rand(ComplexF32, 50)
+    x = 2*rand(Float32, 10) .- 1f0
+    y = 2*rand(ComplexF32, 10) .- 1f0
 
     xgpu =cu(x)
     ygpu =cu(y)
