@@ -239,18 +239,17 @@ using ForwardDiff: Dual, Partials, value, partials
 
 
 # We do this because it ensures type stability so it compiles nicely on the gpu
+# The val is needed for some type stability
 @inline dual(x, i, ::Val{N}) where {N} = x
 @inline dual(x::Bool, i, ::Val{N}) where {N} = x
 @inline dual(x::Real, i, ::Val{N}) where {N} = Dual(x, ntuple(==(i), N))
-    # For complex since ForwardDiff.jl doesn't play nicely with complex numbers we
+# For complex since ForwardDiff.jl doesn't play nicely with complex numbers we
 # construct a Complex dual number and tag the real and imaginary parts separately
 @inline function dual(x::Complex{T}, i, ::Val{N}) where {T,N}
     re_dual = Dual(real(x), ntuple(==(i), 2N))
     im_dual = Dual(imag(x), ntuple(==(N+i), 2N))
     return Complex(re_dual, im_dual)
 end
-
-
 
 function dualize(args::Vararg{Any, N}) where {N}
     ds = map(args, ntuple(identity,N)) do x, i
@@ -278,7 +277,7 @@ end
   end
 end
 
-# Real input and real output
+# Real input and real output pullback
 @inline function _broadcast_forward(::Type{<:Dual}, out, args::Vararg{Any, N}) where {N}
   valN = Val(N)
   y = broadcast(x -> value(x), out)
@@ -291,7 +290,7 @@ end
   return y, bc_fwd_back
 end
 
-# This handles complex output and real input
+# This handles the complex output and real input pullback
 @inline function _broadcast_forward(::Type{<:Complex}, out, args::Vararg{Any, N}) where {N}
     valN = Val(N)
     y = broadcast(x -> Complex(value(real(x)), value(imag(x))), out)
@@ -304,7 +303,7 @@ end
     return y, bc_fwd_back
   end
 
-# This handles complex input and real output we use the gradient definition from ChainRules here
+# This handles complex input and real output. We use the gradient definition from ChainRules here
 # since it agrees with what Zygote did for real(x).
 @inline function _broadcast_forward_complex(::Type{<:Dual}, out, args::Vararg{Any, N}) where {N}
     valN = Val(N)
@@ -319,9 +318,6 @@ end
 end
 
 # # # This is for complex input and complex output
-# # # I am a little confused what derivative we want to use here but this should match
-# what is done for all the tests
-
 # If we assume that
 # f(x + iy) = u(x,y) + iv(x,y)
 # then we do the following for the adjoint
@@ -330,7 +326,7 @@ end
 function _adjoint_complex(N, Δz, df, i)
     Δu, Δv = reim(Δz)
     du, dv = reim(df)
-    return Complex(Δu*du.partials[i] + Δv*dv.partials[i], Δu*du.partials[i+N] + Δv*dv.partials[i+N])
+    return Complex(Δu*partials(du, i) + Δv*partials(dv, i), Δu*partials(du, i+N) + Δv*partials(dv, i+N))
 end
 
 @inline function _broadcast_forward_complex(::Type{<:Complex}, out, args::Vararg{Any, N}) where {N}
