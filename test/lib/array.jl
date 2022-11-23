@@ -24,19 +24,26 @@ end
         d = Dict(1 => 5, 2 => 6)
         k = 2
         i = findfirst(p -> p[1] == k, collect(d))
+        g = gradient(d -> collect(d)[i][2], d)[1]
+        @test g isa Dict{Int64, <:Union{Nothing, Int64}}
+        @test g[k] == 1
 
-        @test gradient(d -> collect(d)[i][2], d)[1][k] == 1
-        @test gradient(d -> sum(v^2 for (_,v) in collect(d)), d) == (Dict(1 => 10, 2 => 12),)
+        g = gradient(d -> sum(v^2 for (_,v) in collect(d)), d)[1]
+        @test g isa Dict{Int,Int}
+        @test g == Dict(1 => 10, 2 => 12)
     end
 
     @testset "NamedTuple" begin
         t = (a=1, b=2)
-        @test gradient(d -> sum(x^2 for x in collect(d)), t) == ((a = 2, b = 4),)
+        g = gradient(d -> sum(x^2 for x in collect(d)), t)[1]
+        @test g isa NamedTuple{(:a, :b), Tuple{Float64, Float64}}
+        @test  g == (a = 2, b = 4)
     end
 end
 
 @testset "dictionary comprehension" begin
     d = Dict(1 => 5, 2 => 6)
-    @test gradient(d -> sum([v^2 for (_,v) in d]), d) == (Dict(1 => 10, 2 => 12),)
+    g = gradient(d -> sum([v^2 for (_,v) in d]), d)[1]
+    @test g isa Dict{Int, Int}
+    @test  g == Dict(1 => 10, 2 => 12)
 end
-
