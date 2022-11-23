@@ -242,7 +242,7 @@ function _pullback(cx::AContext, ::typeof(collect), g::Base.Generator)
   y, collect_pullback
 end
 
-collect_if_dict(x::Dict) = collect(values(x)), collect(keys(x))
+collect_if_dict(x::Dict) = collect(x), collect(keys(x))
 collect_if_dict(x) = x, nothing
 
 reconstruct_if_dict(x̄, _keys::Nothing) = x̄

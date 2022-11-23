@@ -34,3 +34,9 @@ end
         @test gradient(d -> sum(x^2 for x in collect(d)), t) == ((a = 2, b = 4),)
     end
 end
+
+@testset "dictionary comprehension" begin
+    d = Dict(1 => 5, 2 => 6)
+    @test gradient(d -> sum([v^2 for (_,v) in d]), d) == (Dict(1 => 10, 2 => 12),)
+end
+
