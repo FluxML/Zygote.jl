@@ -809,4 +809,14 @@ end
   # issue #717
   @test gradient(x -> (() -> x[:y])(), Dict(:y => 0.4)) == (Dict(:y => 1.0),)
   @test gradient(x -> sum(x.data["x"]), ntd)[1] == (; data = Dict("x" => ones(2)))
+
+  # issue #760
+  function f760(x)
+    d = Dict()
+    for i in 1:4
+        push!(d, i=>i^x)
+    end
+    sum(values(d))
+  end
+  @test gradient(f, 3)[1] ≈ 123.93054835019153
 end
