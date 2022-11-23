@@ -804,3 +804,9 @@ end
   @test gradient(xs -> sum(map(x->x.im^2, xs)), [1+2im,3])[1] == [4im, 0]
   @test gradient(xs -> mapreduce(x->x.im^2, +, xs), [1+2im,3])[1] == [4im, 0]
 end
+
+@testset "Dict" begin
+  # issue #717
+  @test gradient(x -> (() -> x[:y])(), Dict(:y => 0.4)) == (Dict(:y => 1.0),)
+  @test gradient(x -> sum(x.data["x"]), ntd)[1] == (; data = Dict("x" => ones(2)))
+end
