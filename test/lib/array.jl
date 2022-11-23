@@ -45,5 +45,19 @@ end
     d = Dict(1 => 5, 2 => 6)
     g = gradient(d -> sum([v^2 for (_,v) in d]), d)[1]
     @test g isa Dict{Int, Int}
-    @test  g == Dict(1 => 10, 2 => 12)
+    @test g == Dict(1 => 10, 2 => 12)
+
+
+    w = randn(5)
+    function f_generator(w)
+        d = Dict{Int, Float64}(i => v for (i,v) in enumerate(w))
+        sum(v for (_, v) in d)
+    end
+    @test gradient(f_generator, w)[1] == ones(5)
+
+    function f_comprehension(w)
+        d = Dict{Int, Float64}(i => v for (i,v) in enumerate(w))
+        sum(v for (_, v) in d)
+    end
+    @test gradient(f_comprehension, w)[1] == ones(5)
 end
