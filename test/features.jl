@@ -808,6 +808,8 @@ end
 @testset "Dict" begin
   # issue #717
   @test gradient(x -> (() -> x[:y])(), Dict(:y => 0.4)) == (Dict(:y => 1.0),)
+
+  ntd = (; data = Dict("x" => rand(2)))
   @test gradient(x -> sum(x.data["x"]), ntd)[1] == (; data = Dict("x" => ones(2)))
 
   # issue #760
@@ -818,5 +820,5 @@ end
     end
     sum(values(d))
   end
-  @test gradient(f, 3)[1] ≈ 123.93054835019153
+  @test gradient(f760, 3)[1] ≈ 123.93054835019153
 end
