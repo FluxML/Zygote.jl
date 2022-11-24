@@ -40,7 +40,7 @@ end
     end
 
     @testset "Tuple" begin
-        t = (a=1, b=2)
+        t = (1, 2)
         g = gradient(d -> sum(x^2 for x in collect(d)), t)[1]
         @test g === (2.0, 4.0)
     end
