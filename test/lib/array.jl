@@ -36,8 +36,7 @@ end
     @testset "NamedTuple" begin
         t = (a=1, b=2)
         g = gradient(d -> sum(x^2 for x in collect(d)), t)[1]
-        @test g isa NamedTuple{(:a, :b), Tuple{Float64, Float64}}
-        @test  g == (a = 2, b = 4)
+        @test g === (a = 2.0, b = 4.0)
     end
 end
 
