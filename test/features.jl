@@ -1,5 +1,6 @@
-using Zygote, Test
+using Zygote, Test, LinearAlgebra
 using Zygote: Params, gradient, forwarddiff
+using FillArrays: Fill
 
 @testset "gradient checkpointing" begin
 
@@ -744,6 +745,18 @@ end
   loss(x) = sum(abs2, net(x))
   @test gradient(loss, ones(10,10))[1] == fill(131072, 10, 10)
   @test 150_000_000 > @allocated gradient(loss, ones(1000,1000))
+  
+  # https://github.com/FluxML/Zygote.jl/issues/1233
+  function defensiveupdate(d, a)
+    nd = deepcopy(d)
+    nd[1] = d[1] * a
+    return nd
+  end
+  d = Dict(i => ones(1) for i in 1:2)
+  @test gradient(d) do d
+    nd = defensiveupdate(d, 5)
+    return sum(nd[1]) + sum(nd[2])
+  end[1] == Dict(1 => Fill(5, 1), 2 => Fill(1, 1))
 end
 
 @testset "tricky broadcasting" begin
