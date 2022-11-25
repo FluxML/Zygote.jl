@@ -23,7 +23,7 @@ end
   collect(x), collect_array_pullback
 end
 
-@adjoint function collect(d::AbstractDict)
+@adjoint function collect(d::Dict)
   _keys = collect(keys(d))
   collect_dict_pullback(Δ) = (reconstruct_if_dict(Δ, _keys),)
   collect(d), collect_dict_pullback
