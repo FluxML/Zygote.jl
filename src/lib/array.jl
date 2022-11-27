@@ -8,8 +8,26 @@ using Distributed: pmap, AbstractWorkerPool
 
 @adjoint copy(x::AbstractArray) = copy(x), ȳ -> (ȳ,)
 
-@adjoint collect(x::Tuple) = collect(x), dy -> (Tuple(dy),)
-@adjoint collect(x::AbstractArray) = collect(x), dy -> (dy,)
+@adjoint function collect(x::Tuple)
+  collect_tuple_pullback(dy) = (Tuple(dy),) 
+  collect(x), collect_tuple_pullback
+end
+
+@adjoint function collect(x::NamedTuple{names}) where names
+  collect_namedtuple_pullback(dy) = (NamedTuple{names}(Tuple(dy)),) 
+  collect(x), collect_namedtuple_pullback
+end
+
+@adjoint function collect(x::AbstractArray)
+  collect_array_pullback(dy) = (dy,)
+  collect(x), collect_array_pullback
+end
+
+@adjoint function collect(d::Dict)
+  _keys = collect(keys(d))
+  collect_dict_pullback(Δ) = (reconstruct_if_dict(Δ, _keys),)
+  collect(d), collect_dict_pullback
+end
 
 # Array Constructors
 @adjoint function (::Type{T})(x::Number, sz) where {T <: Fill}
@@ -211,13 +229,31 @@ end
 end
 
 function _pullback(cx::AContext, ::typeof(collect), g::Base.Generator)
-  y, b = ∇map(cx, g.f, g.iter)
-  back(::Nothing) = nothing
-  function back(ȳ)
-    f̄, x̄ = b(ȳ)
+  giter, _keys = collect_if_dict(g.iter) # map is not defined for dictionaries
+  y, map_pullback = ∇map(cx, g.f, giter)
+
+  collect_pullback(::Nothing) = nothing
+
+  function collect_pullback(ȳ)
+    f̄, x̄ = map_pullback(ȳ)
+    x̄ = reconstruct_if_dict(x̄, _keys) # return a dictionary if needed
     (nothing, (f = f̄, iter = x̄),)
   end
-  y, back
+  y, collect_pullback
+end
+
+collect_if_dict(x::Dict) = collect(x), collect(keys(x))
+collect_if_dict(x) = x, nothing
+
+reconstruct_if_dict(x̄, _keys::Nothing) = x̄
+
+function reconstruct_if_dict(x̄, _keys)
+  # This reverses `collect_if_dict`, which returns `_keys::Nothing` if x is not a Dict
+  @assert x̄ isa AbstractVector{<:Union{Nothing, NamedTuple{(:first,:second)}}}
+  # we don't compute gradients with respect to keys 
+  # @assert all(x -> x === nothing || x[1] == 0 || x[1] === nothing, x̄)
+  d̄ = Dict(k => isnothing(x) ? nothing : x[2] for (x, k) in zip(x̄, _keys))
+  return d̄ 
 end
 
 @adjoint iterate(r::UnitRange, i...) = iterate(r, i...), _ -> nothing
