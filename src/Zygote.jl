@@ -79,7 +79,8 @@ macro profile(ex)
   end
 end
 
-using SnoopPrecompile
-@precompile_all_calls precompile()
+## reverted due to https://github.com/SciML/DiffEqFlux.jl/issues/783
+# using SnoopPrecompile
+# @precompile_all_calls precompile()
 
 end # module
