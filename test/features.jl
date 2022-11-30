@@ -1,5 +1,6 @@
-using Zygote, Test
+using Zygote, Test, LinearAlgebra
 using Zygote: Params, gradient, forwarddiff
+using FillArrays: Fill
 
 @testset "gradient checkpointing" begin
 
@@ -744,6 +745,18 @@ end
   loss(x) = sum(abs2, net(x))
   @test gradient(loss, ones(10,10))[1] == fill(131072, 10, 10)
   @test 150_000_000 > @allocated gradient(loss, ones(1000,1000))
+  
+  # https://github.com/FluxML/Zygote.jl/issues/1233
+  function defensiveupdate(d, a)
+    nd = deepcopy(d)
+    nd[1] = d[1] * a
+    return nd
+  end
+  d = Dict(i => ones(1) for i in 1:2)
+  @test gradient(d) do d
+    nd = defensiveupdate(d, 5)
+    return sum(nd[1]) + sum(nd[2])
+  end[1] == Dict(1 => Fill(5, 1), 2 => Fill(1, 1))
 end
 
 @testset "tricky broadcasting" begin
@@ -803,4 +816,22 @@ end
   @test gradient(xs -> sum((x->x.im^2), xs), [1+2im,3])[1] == [4im, 0]
   @test gradient(xs -> sum(map(x->x.im^2, xs)), [1+2im,3])[1] == [4im, 0]
   @test gradient(xs -> mapreduce(x->x.im^2, +, xs), [1+2im,3])[1] == [4im, 0]
+end
+
+@testset "Dict" begin
+  # issue #717
+  @test gradient(x -> (() -> x[:y])(), Dict(:y => 0.4)) == (Dict(:y => 1.0),)
+
+  ntd = (; data = Dict("x" => rand(2)))
+  @test gradient(x -> sum(x.data["x"]), ntd)[1] == (; data = Dict("x" => ones(2)))
+
+  # issue #760
+  function f760(x)
+    d = Dict()
+    for i in 1:4
+        push!(d, i=>i^x)
+    end
+    sum(values(d))
+  end
+  @test gradient(f760, 3)[1] ≈ 123.93054835019153
 end

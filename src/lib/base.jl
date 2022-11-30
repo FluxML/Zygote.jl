@@ -24,8 +24,8 @@ grad_mut(d::IdDict) = IdDict()
 
 # TODO perhaps look up mutable gradients in `pullback`
 function accum(a::AbstractDict, b::AbstractDict)
-  @assert a === b
-  return a
+  a === b && return a # Mutating case
+  return merge(a, b)
 end
 
 @adjoint function getindex(d::AbstractDict, k)
