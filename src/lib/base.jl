@@ -232,18 +232,46 @@ end
     return _pullback(__context__, fallback_Fix2, y)
 end
 
-function ChainRulesCore.rrule(::typeof(Dict), xs::Pair...)
+# function ChainRulesCore.rrule(::typeof(Dict), xs::Pair...)
+#   function Dict_pullback(Δ)
+#     return (NoTangent(), ((first=ZeroTangent(), second=get(Δ, x[1], ZeroTangent())) for x in xs)...)
+#   end
+#   return Dict(xs...), Dict_pullback
+# end
+
+# function ChainRulesCore.rrule(::typeof(Dict), xs::AbstractVector{<:Pair})
+#   function Dict_pullback(Δ)
+#     x̄s = [(first=ZeroTangent(), second=get(Δ, x[1], ZeroTangent())) for x in xs]
+#     return (NoTangent(), x̄s)
+#   end
+#   return Dict(xs), Dict_pullback
+# end
+
+
+function Zygote._pullback(::AContext, ::typeof(Dict), xs::Pair...)
   function Dict_pullback(Δ)
-    return (NoTangent(), ((first=ZeroTangent(), second=get(Δ, x[1], ZeroTangent())) for x in xs)...)
+    return (nothing, ((first=nothing, second=get(Δ, x[1], nothing)) for x in xs)...)
   end
   return Dict(xs...), Dict_pullback
 end
 
-# xs iterable of pairs
-function ChainRulesCore.rrule(::typeof(Dict), xs)
+function Zygote._pullback(::AContext, ::typeof(Dict), xs::AbstractVector{<:Pair})
   function Dict_pullback(Δ)
-    x̄s = [(first=ZeroTangent(), second=get(Δ, x[1], ZeroTangent())) for x in xs]
-    return (NoTangent(), x̄s)
+    x̄s = [(first=nothing, second=get(Δ, x[1], nothing)) for x in xs]
+    return (nothing, x̄s)
   end
   return Dict(xs), Dict_pullback
+end
+
+# iterable of pairs / generator
+function _pullback(cx::AContext, ::typeof(Dict),  xs)
+  a, pba = _pullback(cx, collect, xs)
+  y, pby = _pullback(cx, Dict, a)
+  function Dict_pullback(Δ)
+    Δa = pby(Δ)[2]
+    @show a Δa Δ
+    Δxs = pba(Δa)
+    return (nothing, Δxs)
+  end
+  return y, Dict_pullback
 end
