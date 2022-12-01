@@ -231,3 +231,19 @@ end
     fallback_Fix2(y) = f(y, x)
     return _pullback(__context__, fallback_Fix2, y)
 end
+
+function ChainRulesCore.rrule(::typeof(Dict), xs::Pair...)
+  function Dict_pullback(Δ)
+    return (NoTangent(), ((first=ZeroTangent(), second=get(Δ, x[1], ZeroTangent())) for x in xs)...)
+  end
+  return Dict(xs...), Dict_pullback
+end
+
+# xs iterable of pairs
+function ChainRulesCore.rrule(::typeof(Dict), xs)
+  function Dict_pullback(Δ)
+    x̄s = [(first=ZeroTangent(), second=get(Δ, x[1], ZeroTangent())) for x in xs]
+    return (NoTangent(), x̄s)
+  end
+  return Dict(xs), Dict_pullback
+end
