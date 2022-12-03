@@ -2045,3 +2045,23 @@ end
   h(x) = sum(abs2, g(x))
   @test gradient(h, x)[1] isa typeof(x)
 end
+
+@testset "Zygote issue 796" begin
+    function foo(z::Float64)
+        x = 1.0
+        y = 1.0 + z
+        j = 1
+        while abs(x - y) > 1e-6
+            tmp = (x + y) / 2
+            x = y
+            y = tmp
+            j += 1
+        end
+        return y
+    end
+
+    @test gradcheck(foo, 0.0)
+    @test gradcheck(foo, 2.0)
+    @test gradcheck(foo, -2.0)
+    @test gradcheck(foo, 1024.0)
+end
