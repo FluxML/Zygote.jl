@@ -2046,7 +2046,7 @@ end
   @test gradient(h, x)[1] isa typeof(x)
 end
 
-@testset "Zygote issue 796" begin
+@testset "Zygote #796" begin
     function foo(z::Float64)
         x = 1.0
         y = 1.0 + z
