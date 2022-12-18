@@ -191,7 +191,7 @@ _dual_safearg(x) = false
   if T == Bool
     return (f.(args...), _ -> nothing)
   elseif T <: Real && isconcretetype(T) && _dual_purefun(F) && all(_dual_safearg, args) && !isderiving()
-    return broadcast_forward(f, args...)
+    return broadcast_forward(__context__, f, args...)
   end
   len = inclen(args)
   y∂b = _broadcast((x...) -> _pullback(__context__, f, x...), args...)
@@ -201,6 +201,8 @@ _dual_safearg(x) = false
     dxs = ntuple(len) do i
       collapse_nothings(map(StaticGetter{i}(), dxs_zip))
     end
+    maybe_final(__context__, y∂b)
+    maybe_final(__context__, dxs_zip)
     (nothing, accum_sum(dxs[1]), map(unbroadcast, args, Base.tail(dxs))...)
   end
   return y, ∇broadcasted
@@ -245,7 +247,7 @@ function dual_function(f::F) where F
   end
 end
 
-@inline function broadcast_forward(f, args::Vararg{Any,N}) where N
+@inline function broadcast_forward(cx::Context, f, args::Vararg{Any,N}) where N
   valN = Val(N)
   out = dual_function(f).(args...)
   eltype(out) <: Dual || return (out, _ -> nothing)
@@ -254,6 +256,7 @@ end
     dargs = ntuple(valN) do i
       unbroadcast(args[i], broadcast((y1, o1) -> y1 * o1.partials[i], ȳ, out))
     end
+    maybe_final(cx, out)  # finalize for CUDA, when not inside jacobian
     (nothing, nothing, dargs...) # nothings for broadcasted & f
   end
   return y, bc_fwd_back
@@ -265,7 +268,7 @@ using GPUArraysCore  # replaces @require CUDA block, weird indenting to preserve
        # so perhaps this can be deleted? Possible edge case here:
        # https://github.com/FluxML/Zygote.jl/pull/1018#issuecomment-873629415
   @adjoint broadcasted(::AbstractGPUArrayStyle, f, args...) =
-    broadcast_forward(f, args...)
+    broadcast_forward(__context__, f, args...)
 
   @adjoint (::Type{T})(xs::Array) where {T <: AbstractGPUArray} =
     T(xs), Δ -> (convert(Array, Δ), )

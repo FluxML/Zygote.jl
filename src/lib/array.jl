@@ -191,7 +191,7 @@ for (mapfunc,∇mapfunc) in [(:map,:∇map),(:pmap,:∇pmap)]
     ys = map(first, ys_and_backs)
     arg_ax = map(_tryaxes, args)
     function map_back(Δ)
-      if Base.issingletontype(F) && length(args) == 1
+      ∇s = if Base.issingletontype(F) && length(args) == 1
         Δarg = $mapfunc(((_,pb), δ) -> last_or_nothing(pb(δ)), ys_and_backs, Δ) # No unzip needed
         (nothing, Δarg)
       elseif Base.issingletontype(F)
@@ -207,6 +207,8 @@ for (mapfunc,∇mapfunc) in [(:map,:∇map),(:pmap,:∇pmap)]
         Δargs = map(_restore, Δf_and_args[2:end], arg_ax)
         (Δf, Δargs...)
       end
+      maybe_final(cx, ys_and_backs)
+      ∇s
     end
     map_back(::Nothing) = nothing
     return ys, map_back
