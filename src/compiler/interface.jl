@@ -112,19 +112,16 @@ Base.adjoint(f::Function) = x -> begin  # still piracy! avoids projection for le
   back(sensitivity(y))[1]
 end
 
-# This is inserted into @adjoint by ZygoteRules,
-# which has a 2-arg do-nothing method.
+# This is inserted into @adjoint_final by ZygoteRules
 @inline maybe_final(::Context{false,true}, x) = maybe_final(x)
 # The goal is to free CuArrays promptly. 
 @inline maybe_final(x::DenseArray) = finalize(x)
-# Don't waste time on other things, e.g. @btime finalize(nothing) is about 40ns
-@inline maybe_final(x) = nothing
 
-# Without an @adjoint rule, some hessian tests fail:
+# Without an @adjoint rule for this, some hessian tests fail:
 # Can't differentiate foreigncall expression $(Expr(:foreigncall, :(:jl_finalize_th), Nothing
 # And if it in fact finalises, then other 2nd derivative tests fail. So do nothing:
 @adjoint maybe_final(x) = nothing, _ -> nothing
-# @adjoint maybe_final(::Context{false,true}, x) = nothing, _ -> nothing
+@adjoint maybe_final(::Context{false,true}, x) = nothing, _ -> nothing
 
 # Probably just for testing:
 maybe_final(x::Vector) = resize!(x, 0)

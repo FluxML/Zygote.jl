@@ -68,6 +68,17 @@ unbroadcast(x::Tuple{<:Any}, x̄::Nothing) = nothing
 
 unbroadcast(x::AbstractArray, x̄::Nothing) = nothing
 
+# This variant is used only when we are certain x̄ is newly created
+unbroadcast_final(::Context, x, x̄) = unbroadcast(x, x̄)
+unbroadcast_final(::Context{false,true}, x, x̄::Nothing) = nothing
+function unbroadcast_final(::Context{false,true}, x, x̄)
+  dx = unbroadcast(x, x̄)
+  if length(x) != length(x̄)
+    maybe_final(x̄)
+  end
+  dx
+end
+
 # Split Reverse Mode
 # ==================
 
@@ -75,38 +86,38 @@ unbroadcast(x::AbstractArray, x̄::Nothing) = nothing
 # to do CSE, then broadcast-ify the expression so that the closure captures the
 # right arrays.
 
-@adjoint broadcasted(::typeof(+), xs::Numeric...) =
+@adjoint_final broadcasted(::typeof(+), xs::Numeric...) =
   broadcast(+, xs...), ȳ -> (nothing, map(x -> unbroadcast(x, ȳ), xs)...)
 
-@adjoint broadcasted(::typeof(-), x::Numeric, y::Numeric) = x .- y,
+@adjoint_final broadcasted(::typeof(-), x::Numeric, y::Numeric) = x .- y,
   Δ -> (nothing, unbroadcast(x, Δ), _minus(unbroadcast(y, Δ)))
-@adjoint broadcasted(::typeof(-), x::Numeric) = .-x,
+@adjoint_final broadcasted(::typeof(-), x::Numeric) = .-x,
   Δ -> (nothing, _minus(Δ))
 _minus(Δ) = -Δ
 _minus(::Nothing) = nothing
 
-@adjoint broadcasted(::typeof(*), x::Numeric, y::Numeric) = x.*y,
-   Δ -> (nothing, unbroadcast(x, Δ .* conj.(y)), unbroadcast(y, Δ .* conj.(x)))
-@adjoint broadcasted(::typeof(*), x::Number, y::AbstractArray{<:Number}) =
+@adjoint_final broadcasted(::typeof(*), x::Numeric, y::Numeric) = x.*y,
+   Δ -> (nothing, unbroadcast_final(__context__, x, Δ .* conj.(y)), unbroadcast_final(__context__, y, Δ .* conj.(x)))
+@adjoint_final broadcasted(::typeof(*), x::Number, y::AbstractArray{<:Number}) =
   _pullback(__context__, *, x, y)  # this uses dot(y,Δ) instead of sum(Δ .* conj.(y))
-@adjoint broadcasted(::typeof(*), x::AbstractArray{<:Number}, y::Number) =
+@adjoint_final broadcasted(::typeof(*), x::AbstractArray{<:Number}, y::Number) =
   _pullback(__context__, *, x, y)
 
-@adjoint function broadcasted(::typeof(/), x::Numeric, y::Numeric)
+@adjoint_final function broadcasted(::typeof(/), x::Numeric, y::Numeric)
   res = x ./ y
-  res, Δ -> (nothing, unbroadcast(x, Δ ./ conj.(y)), unbroadcast(y, .-Δ .* conj.(res ./ y)))
+  res, Δ -> (nothing, unbroadcast_final(__context__, x, Δ ./ conj.(y)), unbroadcast_final(__context__, y, .-Δ .* conj.(res ./ y)))
 end
-@adjoint broadcasted(::typeof(/), x::AbstractArray{<:Number}, y::Number) =
+@adjoint_final broadcasted(::typeof(/), x::AbstractArray{<:Number}, y::Number) =
   _pullback(__context__, /, x, y)
 
-@adjoint function broadcasted(::typeof(Base.literal_pow), ::typeof(^), x::Numeric, exp::Val{p}) where p
+@adjoint_final function broadcasted(::typeof(Base.literal_pow), ::typeof(^), x::Numeric, exp::Val{p}) where p
   y = Base.literal_pow.(^, x, exp)
   y, ȳ -> (nothing, nothing, ȳ .* p .* conj.(x .^ (p - 1)), nothing)
 end
 
 @adjoint broadcasted(::typeof(identity), x::Numeric) = x, Δ -> (nothing, Δ)
 
-@adjoint function broadcasted(::typeof(tanh), x::Numeric)
+@adjoint_final function broadcasted(::typeof(tanh), x::Numeric)
   y = tanh.(x)
   y, ȳ -> (nothing, ȳ .* conj.(1 .- y.^2))
 end
@@ -120,6 +131,7 @@ end
 @adjoint broadcasted(::typeof(imag), x::Numeric) =
   imag.(x), z̄ -> (nothing, im .* real.(z̄))
 
+# These cannot use @adjoint_final, as they may return their input
 @adjoint function broadcasted(::typeof(+), a::AbstractArray{<:Number}, b::Bool)
   y = b === false ? a : a .+ b
   y, Δ -> (nothing, Δ, nothing)
@@ -152,7 +164,7 @@ end
   end
 end
 
-@adjoint broadcasted(::Type{T}, x::Numeric) where {T<:Number} =
+@adjoint_final broadcasted(::Type{T}, x::Numeric) where {T<:Number} =
   T.(x), ȳ -> (nothing, _project(x, ȳ),)
 
 # General Fallback
@@ -185,7 +197,7 @@ _dual_safearg(x::Ref{<:Numeric{<:Real}}) = true
 _dual_safearg(x::Union{Type,Val,Symbol}) = true  # non-differentiable types
 _dual_safearg(x) = false
 
-@adjoint function broadcasted(::AbstractArrayStyle, f::F, args...) where {F}
+@adjoint_final function broadcasted(::AbstractArrayStyle, f::F, args...) where {F}
   T = Broadcast.combine_eltypes(f, args)
   # Avoid generic broadcasting in two easy cases:
   if T == Bool
@@ -254,7 +266,7 @@ end
   y = broadcast(x -> x.value, out)
   function bc_fwd_back(ȳ)
     dargs = ntuple(valN) do i
-      unbroadcast(args[i], broadcast((y1, o1) -> y1 * o1.partials[i], ȳ, out))
+      unbroadcast_final(cx, args[i], broadcast((y1, o1) -> y1 * o1.partials[i], ȳ, out))
     end
     maybe_final(cx, out)  # finalize for CUDA, when not inside jacobian
     (nothing, nothing, dargs...) # nothings for broadcasted & f
@@ -267,20 +279,20 @@ using GPUArraysCore  # replaces @require CUDA block, weird indenting to preserve
        # Ordinary broadcasting calls broadcast_forward anyway when certain its' safe,
        # so perhaps this can be deleted? Possible edge case here:
        # https://github.com/FluxML/Zygote.jl/pull/1018#issuecomment-873629415
-  @adjoint broadcasted(::AbstractGPUArrayStyle, f, args...) =
+  @adjoint_final broadcasted(::AbstractGPUArrayStyle, f, args...) =
     broadcast_forward(__context__, f, args...)
 
-  @adjoint (::Type{T})(xs::Array) where {T <: AbstractGPUArray} =
+  @adjoint_final (::Type{T})(xs::Array) where {T <: AbstractGPUArray} =
     T(xs), Δ -> (convert(Array, Δ), )
 
-  @adjoint function sum(xs::AbstractGPUArray; dims = :)
+  @adjoint_final function sum(xs::AbstractGPUArray; dims = :)
     placeholder = similar(xs)
     sum(xs, dims = dims), Δ -> (placeholder .= Δ,)
   end
 
   # Make sure sum(f, ::CuArray) uses broadcase through forward-mode defined above
   # Not the ChainRules.rrule which will use the Zygote.Context and thus not be GPU compatible
-  @adjoint function sum(f, xs::AbstractGPUArray; kws...)
+  @adjoint_final function sum(f, xs::AbstractGPUArray; kws...)
     @assert !haskey(kws, :init) # TODO add init support (julia 1.6)
     return pullback((f, xs) -> sum(f.(xs); kws...), __context__, f, xs)
   end

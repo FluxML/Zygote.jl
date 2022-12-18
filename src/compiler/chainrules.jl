@@ -273,7 +273,7 @@ function ChainRulesCore.rrule_via_ad(config::ZygoteRuleConfig{C}, f_args...; kwa
     free = only_once(C) ? y : nothing
     function ad_pullback(Δ)
       ∇s = zygote2differential(pb(wrap_chainrules_output(Δ)), f_args)
-      maybe_final(@show free)
+      maybe_final(free)
       ∇s
     end
     return y, ad_pullback
