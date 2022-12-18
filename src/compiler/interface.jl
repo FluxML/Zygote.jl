@@ -112,7 +112,8 @@ Base.adjoint(f::Function) = x -> begin  # still piracy! avoids projection for le
   back(sensitivity(y))[1]
 end
 
-@inline maybe_final(cx, y) = nothing
+# This is inserted into @adjoint by ZygoteRules,
+# which has a 2-arg do-nothing method.
 @inline maybe_final(::Context{false,true}, x) = maybe_final(x)
 # The goal is to free CuArrays promptly. 
 @inline maybe_final(x::DenseArray) = finalize(x)

@@ -41,7 +41,7 @@ MacroTools = "0.5"
 NaNMath = "0.3, 1"
 Requires = "1.1"
 SpecialFunctions = "1.6, 2"
-ZygoteRules = "0.2.1"
+ZygoteRules = "0.2.3"
 julia = "1.6"
 
 [extras]
