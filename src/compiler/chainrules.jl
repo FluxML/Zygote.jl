@@ -3,6 +3,7 @@ struct ZygoteRuleConfig{CTX<:AContext} <: RuleConfig{Union{HasReverseMode,NoForw
 end
 ZygoteRuleConfig() = ZygoteRuleConfig(Context())
 
+@inline only_once(::Type{<:AContext}) = false  # can't directly use Context{true,true} as not defined yet
 
 _is_rrule_redispatcher(m::Method) = m.sig == Tuple{typeof(rrule), RuleConfig, Vararg}
 

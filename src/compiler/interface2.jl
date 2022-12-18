@@ -17,6 +17,8 @@ end
     chain_rrule_f = :chain_rrule
   end
 
+  # Here ZygoteRuleConfig{Zygote.Context{false, true}} is passed to chain_rrule
+
   hascr, cr_edge = has_chain_rrule(cr_T)
   hascr && return :($chain_rrule_f(ZygoteRuleConfig(ctx), f, args...))
 

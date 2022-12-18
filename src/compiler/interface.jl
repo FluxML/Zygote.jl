@@ -7,13 +7,19 @@ import Base.Broadcast: broadcasted, materialize!
 # Internal container used to track accumulated gradients of mutable types (including params).
 # Type param I ∈ (true, false) indicates whether implicit params are in use.
 # By default, this should be false unless pullback(f, ::Params) is called.
-mutable struct Context{I} <: AContext
+# Type parameter O ∈ (true, false) indecates whether we know the reverse pass will be
+# run at most once (e.g. within gradient), defaults to false (for pullback, and jacobain).
+mutable struct Context{I,O} <: AContext
   cache::Union{IdDict{Any,Any},Nothing}
 end
 
-Context() = Context{false}(nothing)
+Context() = Context{false,false}(nothing)
+Context{I}(cache=nothing) where {I} = Context{I,false}(cache)
+Context{I,O}() where {I,O} = Context{I,O}(nothing)
 
 cache(cx::Context) = cx.cache === nothing ? (cx.cache = IdDict()) : cx.cache
+
+@inline only_once(::Type{<:Context{true,true}}) = true
 
 struct Pullback{S,T}
   t::T
@@ -93,7 +99,9 @@ julia> gradient([7, 11], 0, 1) do x, y, d
 ```
 """
 function gradient(f, args...)
-  y, back = pullback(f, args...)
+  # Type parameters for Context are implicit=false, once=true
+  cx = Context{false,true}(nothing)
+  y, back = pullback(f, cx, args...)
   grad = back(sensitivity(y))
   isnothing(grad) ? nothing : map(_project, args, grad)
 end
@@ -129,40 +137,16 @@ julia> res.grad[w]
 ```
 """
 function withgradient(f, args...)
-  y, back = pullback(f, args...)
+  # Type parameters for Context are implicit=false, once=true
+  cx = Context{false,true}()
+  y, back = pullback(f, cx, args...)
   grad = back(sensitivity(y))
   results = isnothing(grad) ? map(_ -> nothing, args) : map(_project, args, grad)
   (val=y, grad=results)
 end
 
+
 # Param-style wrappers
-
-"""
-    gradient(() -> loss(), ps::Params) -> Grads
-
-Gradient with implicit parameters. Takes a zero-argument function,
-and returns a dictionary-like container, whose keys are arrays `x in ps`.
-
-See also [`withgradient`](@ref) to keep the value `loss()`.
-
-```jldoctest; setup=:(using Zygote)
-julia> x = [1 2 3; 4 5 6]; y = [7, 8]; z = [1, 10, 100];
-
-julia> g = gradient(Params([x, y])) do
-         sum(x .* y .* z')
-       end
-Grads(...)
-
-julia> g[x]
-2×3 Matrix{Float64}:
- 7.0  70.0  700.0
- 8.0  80.0  800.0
-
-julia> haskey(g, z)  # only x and y are parameters
-false
-```
-"""
-gradient
 
 """
     Params([A, B])
@@ -389,6 +373,58 @@ function pullback(f, ps::Params)
     back(Δ)
     Grads(cx.cache, ps) # TODO make a copy
   end
+end
+
+"""
+    gradient(() -> loss(), ps::Params) -> Grads
+
+Gradient with implicit parameters. Takes a zero-argument function,
+and returns a dictionary-like container, whose keys are arrays `x in ps`.
+
+See also [`withgradient`](@ref) to keep the value `loss()`.
+
+```jldoctest; setup=:(using Zygote)
+julia> x = [1 2 3; 4 5 6]; y = [7, 8]; z = [1, 10, 100];
+
+julia> g = gradient(Params([x, y])) do
+         sum(x .* y .* z')
+       end
+Grads(...)
+
+julia> g[x]
+2×3 Matrix{Float64}:
+ 7.0  70.0  700.0
+ 8.0  80.0  800.0
+
+julia> haskey(g, z)  # only x and y are parameters
+false
+```
+"""
+function gradient(f, ps::Params)
+  y, back = pullback(f, ps)
+  back(sensitivity(y))
+end
+
+"""
+    withgradient(f, ps::Params) -> Grads
+
+Returns both the value of the function and the [`gradient`](@ref),
+as a named tuple. 
+
+```jldoctest; setup=:(using Zygote)
+julia> w = [3.0];
+
+julia> res = withgradient(() -> sum(abs2, w), Params([w]))  # implicit mode
+(val = 9.0, grad = Grads(...))
+
+julia> res.grad[w]
+1-element Vector{Float64}:
+ 6.0
+```
+"""
+function withgradient(f, ps::Params)
+  y, back = pullback(f, ps)
+  (val=y, grad=back(sensitivity(y)))
 end
 
 # Code Reflection
