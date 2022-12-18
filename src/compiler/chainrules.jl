@@ -196,17 +196,26 @@ _project(x::AbstractArray, dx::Tuple) = _project(x, reshape(collect(dx), axes(x)
 (project::ProjectTo{AbstractArray})(dx::Tangent) = dx
 
 """
-  ZBack{F}(back) <: Function
+  ZBack{Y,F}(y, back) <: Function
 
 Wrapper for a ChainRules pullback `back`, that causes it to follow Zygote conventions.
 (A functor here is used rather than a closure to avoid boxing issues);
+Now captures the forward result to call `finalize(y)` when done, if `only_once` says this is safe.
 """
-struct ZBack{F} <: Function
+struct ZBack{Y,F} <: Function
+  fwd::Y
   back::F
 end
-@inline (s::ZBack)(dy) = wrap_chainrules_output(s.back(wrap_chainrules_input(dy)))
+@inline (s::ZBack{Nothing})(dy) = wrap_chainrules_output(s.back(wrap_chainrules_input(dy)))
+@inline function (s::ZBack)(dy)
+  ∇s = wrap_chainrules_output(s.back(wrap_chainrules_input(dy)))
+  maybe_final(y)
+  ∇s
+end
+
 # `nothing->nothing` can be deleted after https://github.com/FluxML/Zygote.jl/issues/603
 # though it might be worth keeping as a performance optimization (benchmarking pending)
+@inline (s::ZBack{Nothing})(::Nothing) = nothing
 @inline (s::ZBack)(::Nothing) = nothing
 
 """
@@ -215,9 +224,11 @@ end
 Returns a the (primal) value of `f(args...)` and a pullback, by invoking `ChainRulesCore.rrule(f, args...)`.
 The pullback is appropriately wrapped up to follow Zygote conventions.
 """
-@inline function chain_rrule(config, f, args...)
+# @inline function chain_rrule(config::ZygoteRuleConfig{Context{I,O}}, f::F, args...) where {I,O,F}
+@inline function chain_rrule(config::ZygoteRuleConfig{C}, f::F, args...) where {C,F}
   y, back = rrule(config, f, args...)
-  return y, ZBack(back)
+  free = only_once(C) ? y : nothing
+  return y, ZBack(free, back)
 end
 
 
@@ -227,10 +238,12 @@ end
 As per [`chain_rrule`](@ref) but with support for kwargs.
 `kwf` should be the kwfunc matching to `f`, and `kwargs` are a `NamedTuple` of keyword arguments.
 """
-@inline function chain_rrule_kw(config, kwf, kwargs, f, args...)
+# @inline function chain_rrule_kw(config::ZygoteRuleConfig{Context{I,O}}, kwf, kwargs, f::F, args...) where {I,O,F}
+@inline function chain_rrule_kw(config::ZygoteRuleConfig{C}, kwf, kwargs, f::F, args...) where {C,F}
   y, back = rrule(config, f, args...; kwargs...)
+  free = only_once(C) ? y : nothing
   function kw_zpullback(dy)
-    dxs = ZBack(back)(dy)
+    dxs = ZBack(free, back)(dy)
     if dxs === nothing  # if dxs is nothing, then all partiaols are nothing
       # Zygote convention is a single nothing no mather how partials, if all are nothing
       return nothing
@@ -241,7 +254,8 @@ As per [`chain_rrule`](@ref) but with support for kwargs.
   return y, kw_zpullback
 end
 
-function ChainRulesCore.rrule_via_ad(config::ZygoteRuleConfig, f_args...; kwargs...)
+# function ChainRulesCore.rrule_via_ad(config::ZygoteRuleConfig{Context{I,O}}, f_args...; kwargs...) where {I,O}
+function ChainRulesCore.rrule_via_ad(config::ZygoteRuleConfig{C}, f_args...; kwargs...) where {C}
     # first check whether there is an `rrule` which handles this directly
     direcct = rrule(config, f_args...; kwargs...)
     direcct === nothing || return direcct
@@ -256,7 +270,12 @@ function ChainRulesCore.rrule_via_ad(config::ZygoteRuleConfig, f_args...; kwargs
         _pullback(config.context, f_args...)
     end
 
-    ad_pullback(Δ) = zygote2differential(pb(wrap_chainrules_output(Δ)), f_args)
+    free = only_once(C) ? y : nothing
+    function ad_pullback(Δ)
+      ∇s = zygote2differential(pb(wrap_chainrules_output(Δ)), f_args)
+      maybe_final(@show free)
+      ∇s
+    end
     return y, ad_pullback
 end
 
