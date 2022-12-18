@@ -270,8 +270,11 @@ end
   @test gradtest(dot, randn(rng, 10, 3), randn(rng, 10, 3))
 end
 
-@test gradtest(kron, rand(5), rand(3))
-@test gradtest(kron, rand(5), rand(3), rand(8))
+if VERSION < v"1.9-"  # kron(::Vector...) no longer reshapes, needs a rule:
+  # https://github.com/JuliaDiff/ChainRules.jl/issues/684
+  @test gradtest(kron, rand(5), rand(3))
+  @test gradtest(kron, rand(5), rand(3), rand(8))
+end
 @test gradtest(kron, rand(5,1), rand(3,1))
 @test gradtest(kron, rand(5,1), rand(3,1), rand(8,1))
 @test gradtest(kron, rand(5,2), rand(3,2), rand(8,2))
