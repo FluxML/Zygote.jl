@@ -19,7 +19,7 @@ Context{I,O}() where {I,O} = Context{I,O}(nothing)
 
 cache(cx::Context) = cx.cache === nothing ? (cx.cache = IdDict()) : cx.cache
 
-@inline only_once(::Type{<:Context{true,true}}) = true
+@inline only_once(::Type{<:Context{<:Any,true}}) = true
 
 struct Pullback{S,T}
   t::T
@@ -113,7 +113,7 @@ Base.adjoint(f::Function) = x -> begin  # still piracy! avoids projection for le
 end
 
 # This is inserted into @adjoint_final by ZygoteRules
-@inline maybe_final(::Context{false,true}, x) = maybe_final(x)
+@inline maybe_final(::Context{<:Any,true}, x) = maybe_final(x)
 # The goal is to free CuArrays promptly. 
 @inline maybe_final(x::DenseArray) = finalize(x)
 
@@ -121,7 +121,7 @@ end
 # Can't differentiate foreigncall expression $(Expr(:foreigncall, :(:jl_finalize_th), Nothing
 # And if it in fact finalises, then other 2nd derivative tests fail. So do nothing:
 @adjoint maybe_final(x) = nothing, _ -> nothing
-@adjoint maybe_final(::Context{false,true}, x) = nothing, _ -> nothing
+@adjoint maybe_final(::Context, x) = nothing, _ -> nothing
 
 # Probably just for testing:
 maybe_final(x::Vector) = resize!(x, 0)

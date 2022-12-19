@@ -209,7 +209,7 @@ end
 @inline (s::ZBack{Nothing})(dy) = wrap_chainrules_output(s.back(wrap_chainrules_input(dy)))
 @inline function (s::ZBack)(dy)
   ∇s = wrap_chainrules_output(s.back(wrap_chainrules_input(dy)))
-  maybe_final(y)
+  maybe_final(s.fwd)
   ∇s
 end
 
