@@ -1523,6 +1523,18 @@ using Zygote: Buffer
     prod(copy(b))
   end == (3,)
 
+  # backwards pass Buffer widening (#1349)
+  @test Zygote.hessian(1.) do A
+    buf = Zygote.Buffer([0, 0])
+    buf[:] = [1, 2]
+    sum(A^2 .* copy(buf))
+  end == 6
+  @test Zygote.hessian(1.) do A
+    buf = Zygote.Buffer([0, 0])
+    buf[1] = 1
+    A^2 * buf[1]
+  end == 2
+
   # Buffer storing arrays test
   W1 = ones(3, 3)
   W2 = ones(3, 3)

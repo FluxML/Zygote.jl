@@ -264,14 +264,7 @@ end
 
 grad_mut(x) = Ref{Any}(nt_nothing(x))
 
-function grad_mut(cx::Context, x)
-  ch = cache(cx)
-  if haskey(ch, x)
-    ch[x]
-  else
-    ch[x] = grad_mut(x)
-  end
-end
+grad_mut(cx::Context, x) = get!(() -> grad_mut(x), cache(cx), x)
 
 @adjoint! function setfield!(x, f, val)
   y = setfield!(x, f, val)
