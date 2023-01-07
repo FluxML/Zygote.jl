@@ -264,7 +264,17 @@ end
 
 grad_mut(x) = Ref{Any}(nt_nothing(x))
 
-grad_mut(cx::Context, x) = get!(() -> grad_mut(x), cache(cx), x)
+grad_mut(cx::Context, x) = _get!(() -> grad_mut(x), cache(cx), x)
+
+# needed for reverse-over-reverse pending rrule for Base.get!
+function _get!(default::Base.Callable, ch, x)
+  if haskey(ch, x)
+    ch[x]
+  else
+    ch[x] = default()
+  end
+end
+
 
 @adjoint! function setfield!(x, f, val)
   y = setfield!(x, f, val)
