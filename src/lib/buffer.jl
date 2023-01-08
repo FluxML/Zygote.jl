@@ -1,11 +1,13 @@
-grad_mut(b::Buffer) = fill!(similar(b.data, Any), nothing)
-grad_mut(b::Buffer{T}) where T<:Number = fill!(similar(b.data, float(T)), 0)
+grad_mut(cx::Context, b::Buffer, ::Type=Union{}) =
+  _get!(() -> fill!(similar(b.data, Any), nothing), cache(cx), b)
+grad_mut(cx::Context, b::Buffer{T}, ::Type{S}=Union{}) where {T<:Number, S} =
+  _get!(() -> fill!(similar(b.data, float(promote_type(T, S))), 0), cache(cx), b)
 
 @non_differentiable Buffer(::Any...)
 
 @adjoint function getindex(b::Buffer, i...)
-  b[i...], function (Δ)
-    grad = grad_mut(__context__, b)
+  b[i...], function (Δ::S) where {S}
+    grad = grad_mut(__context__, b, S)
     grad[i...] = accum(grad[i...], Δ)
     return
   end
@@ -48,7 +50,7 @@ _pullback(cx::AContext, ::typeof(Broadcast.materialize!), b::Buffer, x::Abstract
   res = copy(b)
 
   function copy_sensitivity(b̄)
-    grad_mut(__context__, b)[:] .= vec(b̄)
+    grad_mut(__context__, b, eltype(b̄))[:] .= vec(b̄)
     return
   end
 
