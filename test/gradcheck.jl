@@ -2,7 +2,7 @@ using Zygote, Test, Random, LinearAlgebra, Statistics, SparseArrays, FillArrays,
     AbstractFFTs, FFTW, Distances
 using Zygote: gradient
 using Base.Broadcast: broadcast_shape
-using Distributed: pmap, CachingPool, workers
+using Distributed: pmap, CachingPool, workers, nworkers
 import FiniteDifferences
 
 function ngradient(f, xs::AbstractArray...)
@@ -279,7 +279,7 @@ end
 for mapfunc in [map,pmap]
   @testset "$mapfunc" begin
     @test gradtest(xs -> sum(mapfunc(x -> x^2, xs)), rand(2,3))
-    @test gradtest((xss...) -> sum(mapfunc((xs...) -> sqrt(sum(xs.^2)), xss...)), [rand(5) for _ in 1:6]...)
+    @test gradtest((xss...) -> sum(mapfunc((xs...) -> sqrt(sum(xs.^2)), xss...)), [rand(5) for _ in 1:6]...) # test multiple collections
     function foo(y)
       bar = (x) -> x*y
       sum(mapfunc(bar, 1:5))
@@ -287,49 +287,49 @@ for mapfunc in [map,pmap]
     @test gradtest(foo, 3)
     @test gradient(v -> sum([x for x in v]), [1.1,2.2,3.3]) == ([1, 1, 1],)
   end
+end
 
-  @testset "Tuple adjoint" begin
-    x = randn(3)
-    _, pb = Zygote.pullback(x -> map(abs2, x), x)
-    Δy = randn(3)
-    @test first(pb((Δy..., ))) ≈ first(pb(Δy))
+@testset "Tuple adjoint" begin
+  x = randn(3)
+  _, pb = Zygote.pullback(x -> map(abs2, x), x)
+  Δy = randn(3)
+  @test first(pb((Δy..., ))) ≈ first(pb(Δy))
+end
+
+@testset "empty tuples" begin
+  out, pb = Zygote.pullback(map, -, ())
+  @test pb(out) === (nothing, ())
+
+  out, pb = Zygote.pullback(map, +, (), ())
+  @test pb(()) === (nothing, (), ())
+
+  function build_foo(z)
+    foo(x) = x * z
+    return foo
   end
+  out, pb = Zygote.pullback(map, build_foo(5.0), ())
+  @test pb(()) === (nothing, ())
+end
 
-  @testset "empty tuples" begin
-    out, pb = Zygote.pullback(map, -, ())
-    @test pb(out) === (nothing, ())
+@testset "Vector{Nothing} cotangent" begin
+  Δ = Vector{Nothing}(nothing, 5)
 
-    out, pb = Zygote.pullback(map, +, (), ())
-    @test pb(()) === (nothing, (), ())
+  # Unary stateless
+  out, pb = Zygote.pullback(map, -, randn(5))
+  @test pb(Δ)[2] isa Vector{Nothing}
 
-    function build_foo(z)
-      foo(x) = x * z
-      return foo
-    end
-    out, pb = Zygote.pullback(map, build_foo(5.0), ())
-    @test pb(()) === (nothing, ())
+  # Binary stateless
+  out, pb = Zygote.pullback(map, +, randn(5), randn(5))
+  @test pb(Δ)[2] isa Vector{Nothing}
+  @test pb(Δ)[3] isa Vector{Nothing}
+
+  # Stateful
+  function build_foo(z)
+    foo(x) = x * z
+    return foo
   end
-
-  @testset "Vector{Nothing} cotangent" begin
-    Δ = Vector{Nothing}(nothing, 5)
-
-    # Unary stateless
-    out, pb = Zygote.pullback(map, -, randn(5))
-    @test pb(Δ)[2] isa Vector{Nothing}
-
-    # Binary stateless
-    out, pb = Zygote.pullback(map, +, randn(5), randn(5))
-    @test pb(Δ)[2] isa Vector{Nothing}
-    @test pb(Δ)[3] isa Vector{Nothing}
-
-    # Stateful
-    function build_foo(z)
-      foo(x) = x * z
-      return foo
-    end
-    out, pb = Zygote.pullback(map, build_foo(5.0), randn(5))
-    @test pb(Δ)[2] isa Vector{Nothing}
-  end
+  out, pb = Zygote.pullback(map, build_foo(5.0), randn(5))
+  @test pb(Δ)[2] isa Vector{Nothing}
 end
 
 # Check that map infers correctly. pmap still doesn't infer.
@@ -364,7 +364,7 @@ end
   @test gradient(x -> map(+, x, [1,2,3])[1], (4,5,6,99)) == ((1.0, 0.0, 0.0, nothing),)
 end
 
-@testset "Alternative Pmap Dispatch" begin
+@testset "pmap with caching pool" begin
     cache_and_map(f,xs...) = pmap(f, CachingPool(workers()), xs...; batch_size = 1)
     @test gradtest(xs -> sum(cache_and_map(x -> x^2, xs)), rand(2,3))
     @test gradtest((xss...) -> sum(cache_and_map((xs...) -> sqrt(sum(xs.^2)), xss...)), [rand(5) for _ in 1:6]...)
@@ -374,6 +374,28 @@ end
     end
     @test gradtest(foo, 3)
     @test gradient(v -> sum([x for x in v]), [1.1,2.2,3.3]) == ([1, 1, 1],)
+end
+
+# more elaborate tests of pmap rule
+@testset "multiple pmaps" begin
+  function sequential(xs)
+    ys = pmap(x -> x^2, xs)
+    sum(pmap(y -> y^3, ys))
+  end
+  @test gradtest(sequential, rand(2,3))
+
+  function nested(xs)
+    X = [xs[:, i] for i in 1:size(xs)[2]]
+    inner(arr) = sum(pmap(x -> x^2, arr))
+    sum(pmap(inner, X))
+  end
+  xs  = rand(10, clamp(nworkers() - 1, 1, 2)) # only set outer iterations > 1 if we won't exhaust worker pool
+  @test gradtest(nested, xs)
+end
+
+@testset "pmap kwargs" begin
+    @test gradtest(xs -> pmap(x -> x^2, xs, batch_size=2), rand(4)) # batch_size > 1
+    @test gradtest(xs -> pmap(x -> x^2, xs, distributed=false), rand(4)) # distributed = false
 end
 
 @testset "Stateful Map" begin
