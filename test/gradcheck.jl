@@ -1552,6 +1552,47 @@ using Zygote: Buffer
   @test ∇W1 == W1
   @test ∇W2 == W2
   @test ∇x == 6 .* x
+
+  @testset "incorrect promotion (#1352)" begin
+    u = [0.75, 0.5]
+    p = [-1.5, 0.05, 0.2, 0.01]
+
+    # in-place
+    function g1352!(du, u, p, t)
+      du[1, 1] = p[3] * u[1] + p[4] * u[2]
+      du[1, 2] = p[3] * u[1] + p[4] * u[2]
+      du[2, 1] = p[4] * u[1] + p[3] * u[2]
+      du[2, 2] = p[4] * u[1] + p[3] * u[2]
+      return nothing
+    end
+    du1_inplace, back_inplace = Zygote.pullback(u, p) do u, p
+      du = Zygote.Buffer(Matrix{Float64}(undef, 2, 2))
+      g1352!(du, u, p, 1.0)
+      return copy(du[:, 1])
+    end
+
+    # out-of-place
+    function g1352(u, p, t)
+      du11 = p[3] * u[1] + p[4] * u[2]
+      du12 = p[3] * u[1] + p[4] * u[2]
+      du21 = p[4] * u[1] + p[3] * u[2]
+      du22 = p[4] * u[1] + p[3] * u[2]
+      return [du11 du12
+              du21 du22]
+    end
+    du1, back = Zygote.pullback(u, p) do u, p
+      du = g1352(u, p, 1.0)
+      return du[:, 1]
+    end
+
+    # comparison
+    @test du1_inplace ≈ du1
+    v = randn(2)
+    ∇u_inplace, ∇p_inplace = back_inplace(v)
+    ∇u, ∇p = back(v)
+    @test ∇u_inplace ≈ ∇u
+    @test ∇p_inplace ≈ ∇p
+  end
 end
 
 @testset "AbstractArray Addition / Subtraction / Negation" begin
