@@ -1,13 +1,14 @@
 grad_mut(cx::Context, b::Buffer, ::Type=Union{}) =
   _get!(() -> fill!(similar(b.data, Any), nothing), cache(cx), b)
+# S is the eltype we are about to set into the buffer accumulator, so allocte wide enough
 grad_mut(cx::Context, b::Buffer{T}, ::Type{S}=Union{}) where {T<:Number, S<:Number} =
   _get!(() -> fill!(similar(b.data, float(promote_type(T, S))), 0), cache(cx), b)
 
 @non_differentiable Buffer(::Any...)
 
 @adjoint function getindex(b::Buffer, i...)
-  b[i...], function (Δ::S) where {S}
-    grad = grad_mut(__context__, b, S)
+  b[i...], function (Δ)
+    grad = grad_mut(__context__, b, eltype(Δ))
     grad[i...] = accum(grad[i...], Δ)
     return
   end
