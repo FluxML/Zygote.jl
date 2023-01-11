@@ -1,6 +1,6 @@
 grad_mut(cx::Context, b::Buffer, ::Type=Union{}) =
   _get!(() -> fill!(similar(b.data, Any), nothing), cache(cx), b)
-grad_mut(cx::Context, b::Buffer{T}, ::Type{S}=Union{}) where {T<:Number, S} =
+grad_mut(cx::Context, b::Buffer{T}, ::Type{S}=Union{}) where {T<:Number, S<:Number} =
   _get!(() -> fill!(similar(b.data, float(promote_type(T, S))), 0), cache(cx), b)
 
 @non_differentiable Buffer(::Any...)
