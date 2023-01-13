@@ -203,9 +203,8 @@ _dual_safearg(x) = false
   y = broadcast(first, y∂b)
   function ∇broadcasted(ȳ)
     dxs_zip = map(((_, pb), ȳ₁) -> pb(ȳ₁), y∂b, ȳ)
-    dxs = ntuple(len) do i
-      collapse_nothings(map(StaticGetter{i}(), dxs_zip))
-    end
+    getters = ntuple(i -> StaticGetter{i}(), len)
+    dxs = map(g -> collapse_nothings(map(g, dxs_zip)), getters)
     (nothing, accum_sum(dxs[1]), map(unbroadcast, args, Base.tail(dxs))...)
   end
   return y, ∇broadcasted
