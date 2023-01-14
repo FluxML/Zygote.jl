@@ -745,7 +745,7 @@ end
   loss(x) = sum(abs2, net(x))
   @test gradient(loss, ones(10,10))[1] == fill(131072, 10, 10)
   @test 150_000_000 > @allocated gradient(loss, ones(1000,1000))
-  
+
   # https://github.com/FluxML/Zygote.jl/issues/1233
   function defensiveupdate(d, a)
     nd = deepcopy(d)
@@ -816,6 +816,21 @@ end
   @test gradient(xs -> sum((x->x.im^2), xs), [1+2im,3])[1] == [4im, 0]
   @test gradient(xs -> sum(map(x->x.im^2, xs)), [1+2im,3])[1] == [4im, 0]
   @test gradient(xs -> mapreduce(x->x.im^2, +, xs), [1+2im,3])[1] == [4im, 0]
+end
+
+@testset "broadcast fallbacks" begin
+  # https://github.com/FluxML/Zygote.jl/issues/1359
+  struct MyFloat64 <: Number
+    n::Float64
+  end
+
+  Base.exp(f::MyFloat64) = MyFloat64(exp(f.n))
+  Base.conj(f::MyFloat64) = MyFloat64(conj(f.n))
+  Base.:*(x::MyFloat64, y::MyFloat64) = MyFloat64(x.n * y.n)
+
+  x = MyFloat64[1., 2., 3.]
+  result, pb = @inferred Zygote.pullback(Base.broadcasted, Base.Broadcast.DefaultArrayStyle{1}(), exp, x)
+  @inferred pb(MyFloat64[1., 1., 1.])
 end
 
 @testset "Dict" begin
