@@ -278,11 +278,20 @@ using Zygote: ZygoteRuleConfig
 
     # https://github.com/FluxML/Zygote.jl/issues/1234
     @testset "rrule lookup ambiguities" begin
-      f_ambig(x, y) = x + y
-      ChainRulesCore.rrule(::typeof(f_ambig), x::Int, y) = x + y, _ -> (0, 0)
-      ChainRulesCore.rrule(::typeof(f_ambig), x, y::Int) = x + y, _ -> (0, 0)
+      @testset "unconfigured" begin
+        f_ambig(x, y) = x + y
+        ChainRulesCore.rrule(::typeof(f_ambig), x::Int, y) = x + y, _ -> (0, 0)
+        ChainRulesCore.rrule(::typeof(f_ambig), x, y::Int) = x + y, _ -> (0, 0)
 
-      @test_throws MethodError pullback(f_ambig, 1, 2)
+        @test_throws MethodError pullback(f_ambig, 1, 2)
+      end
+      @testset "configured" begin
+        h_ambig(x, y) = x + y
+        ChainRulesCore.rrule(::ZygoteRuleConfig, ::typeof(h_ambig), x, y) = x + y, _ -> (0, 0)
+        ChainRulesCore.rrule(::RuleConfig, ::typeof(h_ambig), x::Int, y::Int) = x + y, _ -> (0, 0)
+
+        @test_throws MethodError pullback(h_ambig, 1, 2)
+      end
     end
 end
 
