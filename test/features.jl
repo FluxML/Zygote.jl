@@ -681,6 +681,14 @@ end
   end == ([8 112; 36 2004],)
 end
 
+@testset "PyCall custom @adjoint" begin
+  import PyCall
+  math = PyCall.pyimport("math")
+  pysin(x) = math.sin(x)
+  Zygote.@adjoint pysin(x) = math.sin(x), (δ) -> (δ * math.cos(x), )
+  @test Zygote.gradient(pysin, 1.5) == Zygote.gradient(sin, 1.5)
+end
+
 # https://github.com/JuliaDiff/ChainRules.jl/issues/257
 @testset "Keyword Argument Passing" begin
   struct Type1{VJP}

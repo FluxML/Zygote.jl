@@ -50,7 +50,8 @@ ChainRulesTestUtils = "cdddcdb0-9152-4a09-a978-84456f9df70a"
 Distances = "b4f34e82-e78d-54a5-968a-f98e89d6e8f7"
 FFTW = "7a1cc6ca-52ef-59f5-83cd-3a7055c09341"
 FiniteDifferences = "26cc04aa-876d-5657-8c51-4c34ba976000"
+PyCall = "438e738f-606a-5dbb-bf0a-cddfbfd45ab0"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["ChainRulesTestUtils", "CUDA", "Distances", "FFTW", "FiniteDifferences", "Test"]
+test = ["ChainRulesTestUtils", "CUDA", "Distances", "FFTW", "FiniteDifferences", "PyCall", "Test"]
