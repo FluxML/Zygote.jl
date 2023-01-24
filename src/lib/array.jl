@@ -6,12 +6,28 @@ using Distributed: pmap, AbstractWorkerPool
 @adjoint Array(xs::AbstractArray) = Array(xs), ȳ -> (ȳ,)
 @adjoint Array(xs::Array) = Array(xs), ȳ -> (ȳ,)
 
-@nograd ones, zeros, Base.OneTo, Colon(), one, zero, sizehint!, count
-
 @adjoint copy(x::AbstractArray) = copy(x), ȳ -> (ȳ,)
 
-@adjoint collect(x::Tuple) = collect(x), dy -> (Tuple(dy),)
-@adjoint collect(x::AbstractArray) = collect(x), dy -> (dy,)
+@adjoint function collect(x::Tuple)
+  collect_tuple_pullback(dy) = (Tuple(dy),) 
+  collect(x), collect_tuple_pullback
+end
+
+@adjoint function collect(x::NamedTuple{names}) where names
+  collect_namedtuple_pullback(dy) = (NamedTuple{names}(Tuple(dy)),) 
+  collect(x), collect_namedtuple_pullback
+end
+
+@adjoint function collect(x::AbstractArray)
+  collect_array_pullback(dy) = (dy,)
+  collect(x), collect_array_pullback
+end
+
+@adjoint function collect(d::Dict)
+  _keys = collect(keys(d))
+  collect_dict_pullback(Δ) = (reconstruct_if_dict(Δ, _keys),)
+  collect(d), collect_dict_pullback
+end
 
 # Array Constructors
 @adjoint function (::Type{T})(x::Number, sz) where {T <: Fill}
@@ -67,15 +83,26 @@ _droplike(dy::Union{LinearAlgebra.Adjoint, LinearAlgebra.Transpose}, dxv::Abstra
 
 @adjoint getindex(::Type{T}, xs...) where {T} = T[xs...], dy -> (nothing, dy...)
 
+_throw_mutation_error(f, args...) = error("""
+Mutating arrays is not supported -- called $f($(join(map(typeof, args), ", ")), ...)
+This error occurs when you ask Zygote to differentiate operations that change
+the elements of arrays in place (e.g. setting values with x .= ...)
+
+Possible fixes:
+- avoid mutating operations (preferred)
+- or read the documentation and solutions for this error
+  https://fluxml.ai/Zygote.jl/latest/limitations
+""")
+
 @adjoint! setindex!(xs::AbstractArray, x...) = setindex!(xs, x...),
-  _ -> error("Mutating arrays is not supported -- called setindex!(::$(typeof(xs)), _...)")
+  _ -> _throw_mutation_error(setindex!, xs)
 
 @adjoint! copyto!(xs, args...) = copyto!(xs, args...),
-  _ -> error("Mutating arrays is not supported -- called copyto!(::$(typeof(xs)), _...)")
+  _ -> _throw_mutation_error(copyto!, xs)
 
 for f in [push!, pop!, pushfirst!, popfirst!]
   @eval @adjoint! $f(x::AbstractVector, ys...) = $f(x, ys...), 
-    _ -> error("Mutating arrays is not supported -- called $($f)(::$(typeof(x)), _...)")
+    _ -> _throw_mutation_error($f, x)
 end
 
 # General
@@ -94,40 +121,6 @@ end
 
 @adjoint reshape(xs, dims...) = reshape(xs, dims...),
   Δ -> (reshape(Δ, size(xs)),map(_->nothing,dims)...)
-
-@adjoint function hvcat(rows::Tuple{Vararg{Int}}, xs::Number...)
-  hvcat(rows, xs...), ȳ -> (nothing, permutedims(ȳ)...)
-end
-
-pull_block_vert(sz, Δ, A::Number) = Δ[sz]
-pull_block_vert(sz, Δ, A::AbstractVector) = Δ[sz-length(A)+1:sz]
-pull_block_vert(sz, Δ, A::AbstractMatrix) = Δ[sz-size(A, 1)+1:sz, :]
-@adjoint function vcat(A::Union{AbstractVector, AbstractMatrix, Number}...)
-  sz = cumsum([size.(A, 1)...])
-  return vcat(A...), Δ->(map(n->pull_block_vert(sz[n], Δ, A[n]), eachindex(A))...,)
-end
-@adjoint vcat(xs::Number...) = vcat(xs...), Δ -> (Δ...,)
-
-pull_block_horz(sz, Δ, A::AbstractVector) = Δ[:, sz]
-pull_block_horz(sz, Δ, A::AbstractMatrix) = Δ[:, sz-size(A, 2)+1:sz]
-@adjoint function hcat(A::Union{AbstractVector, AbstractMatrix}...)
-  sz = cumsum([size.(A, 2)...])
-  return hcat(A...), Δ->(map(n->pull_block_horz(sz[n], Δ, A[n]), eachindex(A))...,)
-end
-@adjoint hcat(xs::Number...) = hcat(xs...), Δ -> (Δ...,)
-
-@adjoint function cat(Xs...; dims)
-  cat(Xs...; dims = dims), Δ -> begin
-    start = ntuple(_ -> 0, ndims(Δ))
-    catdims = Base.dims2cat(dims)
-    dXs = map(Xs) do x
-      move = ntuple(d -> (d<=length(catdims) && catdims[d]) ? size(x,d) : 0, ndims(Δ))
-      x_in_Δ = ntuple(d -> (d<=length(catdims) && catdims[d]) ? (start[d]+1:start[d]+move[d]) : Colon(), ndims(Δ))
-      start = start .+ move
-      dx = Δ[x_in_Δ...]
-    end
-  end
-end
 
 @adjoint function repeat(xs; inner=ntuple(_->1, ndims(xs)), outer=ntuple(_->1, ndims(xs)))
   repeat(xs, inner = inner, outer = outer), function (Δ)
@@ -235,19 +228,32 @@ end
   end
 end
 
-for t in subtypes(AbstractWorkerPool)
-  @nograd t
-end
-@nograd workers
-
 function _pullback(cx::AContext, ::typeof(collect), g::Base.Generator)
-  y, b = ∇map(cx, g.f, g.iter)
-  back(::Nothing) = nothing
-  function back(ȳ)
-    f̄, x̄ = b(ȳ)
+  giter, _keys = collect_if_dict(g.iter) # map is not defined for dictionaries
+  y, map_pullback = ∇map(cx, g.f, giter)
+
+  collect_pullback(::Nothing) = nothing
+
+  function collect_pullback(ȳ)
+    f̄, x̄ = map_pullback(ȳ)
+    x̄ = reconstruct_if_dict(x̄, _keys) # return a dictionary if needed
     (nothing, (f = f̄, iter = x̄),)
   end
-  y, back
+  y, collect_pullback
+end
+
+collect_if_dict(x::Dict) = collect(x), collect(keys(x))
+collect_if_dict(x) = x, nothing
+
+reconstruct_if_dict(x̄, _keys::Nothing) = x̄
+
+function reconstruct_if_dict(x̄, _keys)
+  # This reverses `collect_if_dict`, which returns `_keys::Nothing` if x is not a Dict
+  @assert x̄ isa AbstractVector{<:Union{Nothing, NamedTuple{(:first,:second)}}}
+  # we don't compute gradients with respect to keys 
+  # @assert all(x -> x === nothing || x[1] == 0 || x[1] === nothing, x̄)
+  d̄ = Dict(k => isnothing(x) ? nothing : x[2] for (x, k) in zip(x̄, _keys))
+  return d̄ 
 end
 
 @adjoint iterate(r::UnitRange, i...) = iterate(r, i...), _ -> nothing
@@ -319,126 +325,28 @@ end
 
 @adjoint function sum(f, xs::AbstractArray{<:AbstractArray}; kws...)
   @assert !haskey(kws, :init) # TODO add init support (julia 1.6)
-  return pullback(__context__, (f, xs) -> sum(f.(xs); kws...), f, xs)
+  return pullback((f, xs) -> sum(f.(xs); kws...), __context__, f, xs)
 end
 
 @adjoint function sum(xs::AbstractArray{Bool}; dims = :)
   sum(xs, dims = dims), Δ -> (nothing,)
 end
 
-
 function _pullback(cx::AContext, ::typeof(prod), f, xs::AbstractArray)
-  y, back = pullback(cx, ((f, xs) -> prod(f.(xs))), f, xs)
+  y, back = pullback((f, xs) -> prod(f.(xs)), cx, f, xs)
   y, ȳ -> (nothing, back(ȳ)...)
-end
-
-@adjoint function maximum(xs::AbstractArray; dims = :)
-  max, i = findmax(xs, dims = dims)
-  max, function (Δ)
-    Δ isa Real && abs(Δ) <= sqrt(eps(float(Δ))) && return nothing
-    Δ′ = zero(xs)
-    Δ′[i] = Δ
-    return (Δ′,)
-  end
-end
-
-@adjoint function minimum(xs::AbstractArray; dims = :)
-  min, i = findmin(xs, dims = dims)
-  min, function (Δ)
-    Δ′ = zero(xs)
-    Δ′[i] = Δ
-    return (Δ′,)
-  end
-end
-
-@adjoint function dropdims(xs::AbstractArray; dims)
-  dropdims(xs, dims = dims), Δ -> (reshape(Δ, size(xs)...),)
 end
 
 @adjoint real(x::AbstractArray) = real(x), r̄ -> (real(r̄),)
 @adjoint conj(x::AbstractArray) = conj(x), r̄ -> (conj(r̄),)
 @adjoint imag(x::AbstractArray) = imag(x), ī -> (complex.(0, real.(ī)),)
 
-@adjoint function mean(xs::AbstractArray; dims = :)
-  return mean(xs, dims=dims), Δ -> (_backmean(xs,Δ,dims),)
-end
-_backmean(xs, Δ, ::Colon) = zero(xs) .+ Δ ./ length(xs)
-_backmean(xs, Δ, dims) = zero(xs) .+ Δ ./ mapreduce(i -> size(xs,i),*,dims)
-
-@adjoint function Statistics.var(xs::AbstractArray; corrected::Bool=true, dims=:, mean=mean(xs, dims=dims))
-    return Statistics.var(xs; corrected=corrected, mean=mean, dims=dims), Δ -> _backvar(xs, Δ, corrected, mean, dims)
-end
-_backvar(xs, Δ, corrected::Bool, mean, dims)         = _backvar(xs, Δ, mapreduce(i -> size(xs,i),*,dims) - corrected, mean)
-_backvar(xs, Δ, corrected::Bool, mean, ::Colon)      = _backvar(xs, Δ, length(xs) - corrected, mean)
-_backvar(xs, Δ, N::Int, mean) = (convert(eltype(xs), 2/N) .* Δ .* (xs .- mean),)
-
-@adjoint function Statistics.std(xs::AbstractArray; corrected::Bool=true, dims=:, mean=mean(xs, dims=dims))
-    s = Statistics.std(xs; corrected=corrected, mean=mean, dims=dims)
-    return s, Δ -> _backvar(xs, Δ ./ (2 .* s), corrected, mean, dims)
-end
-
-@adjoint function cumsum(xs::AbstractVector; dims::Integer = 1)
-  dims == 1 || return copy(xs), Δ -> (Δ,)
-  cumsum(xs), Δ -> (reverse(cumsum(reverse(Δ))),)
-end
-@adjoint function cumsum(xs::AbstractArray; dims::Integer)
-  dims <= ndims(xs) || return copy(xs), Δ -> (Δ,)
-  cumsum(xs; dims=dims), Δ -> begin
-    (reverse(cumsum(reverse(Δ, dims=dims), dims=dims), dims=dims),)
-  end
-end
-
-@adjoint eachrow(x::AbstractVecOrMat) = collect(eachrow(x)), dys -> ∇eachslice(dys, x, 1)
-@adjoint eachcol(x::AbstractVecOrMat) = collect(eachcol(x)), dys -> ∇eachslice(dys, x, 2)
-@adjoint eachslice(x::AbstractArray; dims::Integer) =
-  collect(eachslice(x; dims=dims)), dys -> ∇eachslice(dys, x, dims)
-
-function ∇eachslice(dys, x::AbstractArray, dim::Integer) where {TX}
-  i1 = findfirst(dy -> dy isa AbstractArray, dys)
-  i1 === nothing && return (zero(x),) # all slices get nothing
-  T = promote_type(eltype(dys[i1]), eltype(x))
-  dx = similar(x, T)
-  for i in axes(x, dim)
-    if dys[i] isa AbstractArray
-      copyto!(selectdim(dx,dim,i), dys[i])
-    else
-      selectdim(dx,dim,i) .= 0
-    end
-  end
-  (dx,)
-end
-
 
 # LinearAlgebra
 # =============
 
-@adjoint function transpose(x)
-  back(Δ) = (transpose(Δ),)
-  back(Δ::NamedTuple{(:parent,)}) = (Δ.parent,)
-  return transpose(x), back
-end
-
-@adjoint function LinearAlgebra.Transpose(x)
-  back(Δ) = (LinearAlgebra.Transpose(Δ),)
-  back(Δ::NamedTuple{(:parent,)}) = (Δ.parent,)
-  return LinearAlgebra.Transpose(x), back
-end
-
-
-@adjoint function Base.adjoint(x)
-  back(Δ) = (Δ',)
-  back(Δ::NamedTuple{(:parent,)}) = (Δ.parent,)
-  return x', back
-end
-
-@adjoint function LinearAlgebra.Adjoint(x)
-  back(Δ) = (LinearAlgebra.Adjoint(Δ),)
-  back(Δ::NamedTuple{(:parent,)}) = (Δ.parent,)
-  return LinearAlgebra.Adjoint(x), back
-end
-
 @adjoint parent(x::LinearAlgebra.Adjoint) = parent(x), ȳ -> (LinearAlgebra.Adjoint(ȳ),)
-@adjoint parent(x::LinearAlgebra.Transpose) = parent(x), ȳ -> (LinearAlgebra.Transpose(ȳ),)
+@adjoint parent(x::LinearAlgebra.Transpose) = parent(x), ȳ -> (LinearAlgebra.Transpose(ȳ),)    
 
 function _kron(mat1::AbstractMatrix,mat2::AbstractMatrix)
     m1, n1 = size(mat1)
@@ -576,35 +484,6 @@ end
   Δ -> (nothing, convert(S, Δ),)
 @adjoint Matrix(A::LinearAlgebra.HermOrSym{T,S}) where {T,S} = Matrix(A),
   Δ -> (convert(S, Δ),)
-
-@adjoint function cholesky(Σ::Real)
-  C = cholesky(Σ)
-  return C, Δ::NamedTuple->(Δ.factors[1, 1] / (2 * C.U[1, 1]),)
-end
-
-@adjoint function cholesky(Σ::Diagonal; check = true)
-  C = cholesky(Σ, check = check)
-  return C, Δ::NamedTuple -> begin
-    issuccess(C) || throw(PosDefException(C.info))
-    return Diagonal(diag(Δ.factors) .* inv.(2 .* C.factors.diag)), nothing
-  end
-end
-
-# Implementation due to Seeger, Matthias, et al. "Auto-differentiating linear algebra."
-@adjoint function cholesky(Σ::Union{StridedMatrix, Symmetric{<:Real, <:StridedMatrix}}; check = true)
-  C = cholesky(Σ, check = check)
-  return C, function(Δ::NamedTuple)
-    issuccess(C) || throw(PosDefException(C.info))
-    U, Ū = C.U, Δ.factors
-    Σ̄ = similar(U.data)
-    Σ̄ = mul!(Σ̄, Ū, U')
-    Σ̄ = copytri!(Σ̄, 'U')
-    Σ̄ = ldiv!(U, Σ̄)
-    Σ̄ = BLAS.trsm!('R', 'U', 'T', 'N', one(eltype(Σ)), U.data, Σ̄)
-    Σ̄[diagind(Σ̄)] ./= 2
-    return (UpperTriangular(Σ̄),)
-  end
-end
 
 @adjoint function lyap(A::AbstractMatrix, C::AbstractMatrix)
   X = lyap(A, C)
@@ -751,12 +630,6 @@ end
   return literal_getproperty(C, Val(:L)), function(Δ)
     Δ_factors = C.uplo == 'L' ? LowerTriangular(Δ) : UpperTriangular(copy(Δ'))
     return ((uplo=nothing, info=nothing, factors=Δ_factors),)
-  end
-end
-
-@adjoint function logdet(C::Cholesky)
-  return logdet(C), function(Δ)
-    return ((uplo=nothing, info=nothing, factors=Diagonal(2 .* Δ ./ diag(C.factors))),)
   end
 end
 

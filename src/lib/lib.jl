@@ -21,7 +21,7 @@ accum(x, y) =
 
 accum(x, y, zs...) = accum(accum(x, y), zs...)
 
-accum(x::Tuple, ys::Tuple...) = accum.(x, ys...)
+accum(x::Tuple, ys::Tuple...) = map(accum, x, ys...)
 accum(x::AbstractArray, ys::AbstractArray...) = accum.(x, ys...)
 
 @generated function accum(x::NamedTuple, y::NamedTuple)
@@ -38,8 +38,6 @@ function accum(x::RefValue, y::RefValue)
 end
 
 # Core functions
-@nograd eps, Base.eval, Core.TypeVar, Core.UnionAll, Symbol
-
 @adjoint deepcopy(x) = deepcopy(x), ȳ -> (ȳ,)
 
 @adjoint (::Type{V})(x...) where V<:Val = V(x...), _ -> nothing
@@ -50,6 +48,7 @@ end
 
 @adjoint Base.typeassert(x, T) = Base.typeassert(x, T), Δ -> (Δ, nothing)
 
+accum_param(::Context{false}, _, Δ) = Δ
 @generated function accum_param(cx::Context, x, Δ)
   isbitstype(x) && return :(Δ)
   quote
@@ -81,8 +80,12 @@ unwrap(ref, x) = x
 end
 
 function global_set(ref, val)
-  ccall(:jl_set_global, Cvoid, (Any, Any, Any),
-        ref.mod, ref.name, val)
+  @static if VERSION < v"1.9.0-DEV.265"
+    ccall(:jl_set_global, Cvoid, (Any, Any, Any),
+          ref.mod, ref.name, val)
+  else
+    setglobal!(ref.mod, ref.name, val)
+  end
 end
 
 @adjoint! function global_set(ref, x)
@@ -261,14 +264,17 @@ end
 
 grad_mut(x) = Ref{Any}(nt_nothing(x))
 
-function grad_mut(cx::Context, x)
-  ch = cache(cx)
+grad_mut(cx::Context, x) = _get!(() -> grad_mut(x), cache(cx), x)
+
+# needed for reverse-over-reverse pending rrule for Base.get!
+function _get!(default::Base.Callable, ch, x)
   if haskey(ch, x)
     ch[x]
   else
-    ch[x] = grad_mut(x)
+    ch[x] = default()
   end
 end
+
 
 @adjoint! function setfield!(x, f, val)
   y = setfield!(x, f, val)

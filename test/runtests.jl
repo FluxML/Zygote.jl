@@ -14,6 +14,10 @@ using CUDA: has_cuda
     @warn "CUDA not found - Skipping CUDA Tests"
   end
 
+  @testset "deprecated.jl" begin
+    include("deprecated.jl")
+  end
+
   @testset "Interface" begin
     include("interface.jl")
   end
@@ -29,6 +33,7 @@ using CUDA: has_cuda
   @testset "lib" begin
     include("lib/number.jl")
     include("lib/lib.jl")
+    include("lib/base.jl")
     include("lib/array.jl")
   end
 

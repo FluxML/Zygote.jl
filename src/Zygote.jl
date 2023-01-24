@@ -18,6 +18,7 @@ export rrule_via_ad
 
 const Numeric{T<:Number} = Union{T, AbstractArray{<:T}}
 
+include("deprecated.jl")
 include("tools/buffer.jl")
 include("tools/builtins.jl")
 
@@ -41,8 +42,8 @@ include("lib/broadcast.jl")
 include("lib/forward.jl")
 include("lib/utils.jl")
 include("lib/range.jl")
+include("lib/logexpfunctions.jl")
 @init @require Distances="b4f34e82-e78d-54a5-968a-f98e89d6e8f7" include("lib/distances.jl")
-@init @require LogExpFunctions="2ab3a3ac-af41-5b50-aa03-7779005ae688" include("lib/logexpfunctions.jl")
 
 # we need to define this late, so that the genfuncs see lib.jl
 # Move using statements out of this file to help with sysimage building
@@ -57,7 +58,7 @@ include("profiler/Profile.jl")
 end
 
 @init @require Colors="5ae59095-9a9b-59fe-a467-6f913c188581" begin
-  @nograd Colors.ColorTypes._parameter_upper_bound
+  @non_differentiable Colors.ColorTypes._parameter_upper_bound(::Any...)
 end
 
 using InteractiveUtils
@@ -77,5 +78,9 @@ macro profile(ex)
     Profile.juno(Profile.profile(back))
   end
 end
+
+## reverted due to https://github.com/SciML/DiffEqFlux.jl/issues/783
+# using SnoopPrecompile
+# @precompile_all_calls precompile()
 
 end # module

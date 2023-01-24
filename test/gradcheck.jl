@@ -501,6 +501,12 @@ end
   @test gradtest(x -> maximum(x, dims=[1, 2]), rand(2, 3, 4))
 
   @test gradient(x -> 1 / maximum(x), [1., 2, 3])[1] == [0, 0, -1/9]
+  
+  # issue 1224, second order
+  f1244(w, x) = sum(maximum((w * x).^2, dims=1))
+  g1244(w, x) = sum(gradient(f1244, w, x)[2].^2)
+  h1244(w, x) = gradient(g1244, w, x)[2]
+  @test h1244([1 2 3; 4 5 6.0], [7,8,9.0]) ≈ [300608, 375760, 450912]
 end
 
 @testset "minimum" begin
@@ -654,7 +660,6 @@ end
     g(X) = cholesky(X * X' + I)
     @test Zygote.pullback(g, X)[2]((factors=LowerTriangular(X),))[1] ≈
       Zygote.pullback(g, X)[2]((factors=Matrix(LowerTriangular(X)),))[1]
-    @test_throws PosDefException Zygote.pullback(X -> cholesky(X, check = false), X)[2]((factors=X,))
 
     # https://github.com/FluxML/Zygote.jl/issues/932
     @test gradcheck(rand(5, 5), rand(5)) do A, x
@@ -819,6 +824,32 @@ end
     C̄ = (factors=randn(rng, N, N),)
     @test back′(C̄)[1] isa Diagonal
     @test diag(back′(C̄)[1]) ≈ diag(back(C̄)[1])
+  end
+  @testset "cholesky - Hermitian{Complex}" begin
+    rng, N = MersenneTwister(123456), 3
+    A = randn(rng, Complex{Float64}, N, N)
+    H = Hermitian(A * A' + I)
+    Hmat = Matrix(H)
+    y, back = Zygote.pullback(cholesky, Hmat)
+    y′, back′ = Zygote.pullback(cholesky, H)
+    C̄ = (factors=randn(rng, N, N),)
+    @test only(back′(C̄)) isa Hermitian
+    # gradtest does not support complex gradients, even though the pullback exists
+    d = only(back(C̄))
+    d′ = only(back′(C̄))
+    @test (d + d')/2 ≈ d′
+  end
+  @testset "cholesky - Hermitian{Real}" begin
+    rng, N = MersenneTwister(123456), 3
+    A = randn(rng, N, N)
+    H = Hermitian(A * A' + I)
+    Hmat = Matrix(H)
+    y, back = Zygote.pullback(cholesky, Hmat)
+    y′, back′ = Zygote.pullback(cholesky, H)
+    C̄ = (factors=randn(rng, N, N),)
+    @test back′(C̄)[1] isa Hermitian
+    @test gradtest(B->cholesky(Hermitian(B)).U, Hmat)
+    @test gradtest(B->logdet(cholesky(Hermitian(B))), Hmat)
   end
 end
 
@@ -1161,6 +1192,30 @@ end
         # This is impressively inaccurate, but at least it doesn't produce a NaN.
         @test first(Δ_fd) ≈ first(pb(Δ)) atol=1e-3 rtol=1e-3
       end
+
+      @testset "repeated X" begin
+        Δ = randn(P, P)
+        X = repeat(randn(rng, D), 1, P)
+
+        # Single input matrix
+        Δ_fd = FiniteDifferences.j′vp(
+          FiniteDifferences.central_fdm(5, 1), X -> pairwise(metric, X; dims=2), Δ, X
+        )
+        _, pb = Zygote.pullback(X -> pairwise(metric, X; dims=2), X)
+
+        # This is impressively inaccurate, but at least it doesn't produce a NaN.
+        @test first(Δ_fd) ≈ first(pb(Δ)) atol=1e-3 rtol=1e-3
+
+        # Two input matrices
+        Y = copy(X)
+        Δ_fd = FiniteDifferences.j′vp(
+          FiniteDifferences.central_fdm(5, 1), X -> pairwise(metric, X, Y; dims=2), Δ, X
+        )
+        _, pb = Zygote.pullback(X -> pairwise(metric, X, Y; dims=2), X)
+
+        # This is impressively inaccurate, but at least it doesn't produce a NaN.
+        @test first(Δ_fd) ≈ first(pb(Δ)) atol=1e-3 rtol=1e-3
+      end
     end
 
     @testset "binary pairwise - X and Y close" begin
@@ -1468,6 +1523,18 @@ using Zygote: Buffer
     prod(copy(b))
   end == (3,)
 
+  # backwards pass Buffer widening (#1349)
+  @test Zygote.hessian(1.) do A
+    buf = Zygote.Buffer([0, 0])
+    buf[:] = [1, 2]
+    sum(A^2 .* copy(buf))
+  end == 6
+  @test Zygote.hessian(1.) do A
+    buf = Zygote.Buffer([0, 0])
+    buf[1] = 1
+    A^2 * buf[1]
+  end == 2
+
   # Buffer storing arrays test
   W1 = ones(3, 3)
   W2 = ones(3, 3)
@@ -1485,6 +1552,47 @@ using Zygote: Buffer
   @test ∇W1 == W1
   @test ∇W2 == W2
   @test ∇x == 6 .* x
+
+  @testset "incorrect promotion (#1352)" begin
+    u = [0.75, 0.5]
+    p = [-1.5, 0.05, 0.2, 0.01]
+
+    # in-place
+    function g1352!(du, u, p, t)
+      du[1, 1] = p[3] * u[1] + p[4] * u[2]
+      du[1, 2] = p[3] * u[1] + p[4] * u[2]
+      du[2, 1] = p[4] * u[1] + p[3] * u[2]
+      du[2, 2] = p[4] * u[1] + p[3] * u[2]
+      return nothing
+    end
+    du1_inplace, back_inplace = Zygote.pullback(u, p) do u, p
+      du = Zygote.Buffer(Matrix{Float64}(undef, 2, 2))
+      g1352!(du, u, p, 1.0)
+      return copy(du[:, 1])
+    end
+
+    # out-of-place
+    function g1352(u, p, t)
+      du11 = p[3] * u[1] + p[4] * u[2]
+      du12 = p[3] * u[1] + p[4] * u[2]
+      du21 = p[4] * u[1] + p[3] * u[2]
+      du22 = p[4] * u[1] + p[3] * u[2]
+      return [du11 du12
+              du21 du22]
+    end
+    du1, back = Zygote.pullback(u, p) do u, p
+      du = g1352(u, p, 1.0)
+      return du[:, 1]
+    end
+
+    # comparison
+    @test du1_inplace ≈ du1
+    v = randn(2)
+    ∇u_inplace, ∇p_inplace = back_inplace(v)
+    ∇u, ∇p = back(v)
+    @test ∇u_inplace ≈ ∇u
+    @test ∇p_inplace ≈ ∇p
+  end
 end
 
 @testset "AbstractArray Addition / Subtraction / Negation" begin
@@ -1681,14 +1789,6 @@ end
   @test gradient(x -> findfirst(ismissing, x), [1, missing]) == (nothing,)
   @test gradient(x -> findlast(ismissing, x), [1, missing]) == (nothing,)
   @test gradient(x -> findall(ismissing, x)[1], [1, missing]) == (nothing,)
-
-
-  @test gradient(x -> Zygote.ignore(() -> x*x), 1) == (nothing,)
-  @test gradient(x -> Zygote.@ignore(x*x), 1) == (nothing,)
-  @test gradient(1) do x
-    y = Zygote.@ignore x
-    x * y
-  end == (1,)
 end
 
 @testset "fastmath" begin
@@ -1997,4 +2097,20 @@ end
   g(x) = sum.((f,), x)
   h(x) = sum(abs2, g(x))
   @test gradient(h, x)[1] isa typeof(x)
+end
+
+@testset "Zygote #796" begin
+    function foo(z::Float64)
+        x = 1.0
+        y = 1.0 + z
+        while abs(x - y) > 1e-6
+            y, x = (x + y) / 2, y
+        end
+        return y
+    end
+
+    @test gradcheck(foo ∘ first, [0.0])
+    @test gradcheck(foo ∘ first, [2.0])
+    @test gradcheck(foo ∘ first, [-1e-5])
+    @test gradient(foo, 1024.0)[1] ≈ 2//3
 end

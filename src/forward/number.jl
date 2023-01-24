@@ -1,21 +1,23 @@
-using DiffRules, SpecialFunctions, NaNMath
+using DiffRules, SpecialFunctions, NaNMath, LogExpFunctions
 using Base.FastMath: fast_op, make_fastmath
 
 # TODO use CSE here
 
-for (M, f, arity) in DiffRules.diffrules()
-  arity == 1 || continue
-  dx = DiffRules.diffrule(M, f, :x)
-  @eval begin
-    @tangent $M.$f(x::Number) = $M.$f(x), ẋ -> ẋ * $dx
+for (M, f, arity) in DiffRules.diffrules(; filter_modules=nothing)
+  if !(isdefined(@__MODULE__, M) && isdefined(getfield(@__MODULE__, M), f))
+    @warn "$M.$f is not available and hence rule for it can not be defined"
+    continue  # Skip rules for methods not defined in the current scope
   end
-end
-
-for (M, f, arity) in DiffRules.diffrules()
-  arity == 2 || continue
-  da, db = DiffRules.diffrule(M, f, :a, :b)
-  @eval begin
-    @tangent $M.$f(a::Number, b::Number) = $M.$f(a, b), (ȧ, ḃ) -> ȧ*$da + ḃ*$db
+  if arity == 1
+    dx = DiffRules.diffrule(M, f, :x)
+    @eval begin
+      @tangent $M.$f(x::Number) = $M.$f(x), ẋ -> ẋ * $dx
+    end
+  elseif arity == 2
+    da, db = DiffRules.diffrule(M, f, :a, :b)
+    @eval begin
+      @tangent $M.$f(a::Number, b::Number) = $M.$f(a, b), (ȧ, ḃ) -> ȧ*$da + ḃ*$db
+    end
   end
 end
 

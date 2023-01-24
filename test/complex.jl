@@ -58,12 +58,17 @@ fs_C_to_C_holomorphic = (cos,
 @testset "C->C holomorphic" begin
     for f in fs_C_to_C_holomorphic
         for z in (1.0+2.0im, -2.0+pi*im)
-            grad_zygote = gradient(real∘f, z)[1]
+            grad_zygote_r = gradient(real∘f, z)[1]
+            grad_zygote_i = gradient(imag∘f, z)[1]
             ε = 1e-8
             grad_fd_r = (f(z+ε)-f(z))/ε
-            grad_fd_i = (f(z+ε*im)-f(z))/(ε*im)
-            @assert abs(grad_fd_r - grad_fd_i) < sqrt(ε) # check the function is indeed holomorphic
-            @test abs(grad_zygote - conj(grad_fd_r)) < sqrt(ε)
+            grad_fd_i = (f(z + ε * im) - f(z)) / (ε * im)
+            # Check the function is indeed holomorphic
+            @assert abs(grad_fd_r - grad_fd_i) < sqrt(ε)
+            # Check Zygote derivatives agree with holomorphic definition
+            @test grad_zygote_r ≈ -im*grad_zygote_i
+            # Check derivative agrees with finite differences
+            @test abs(grad_zygote_r - conj(grad_fd_r)) < sqrt(ε)
         end
     end
 end
@@ -76,14 +81,20 @@ fs_C_to_C_non_holomorphic = (conj,
                              z->im*abs2(z),
                              z->z'z,
                              z->conj(z)*z^2,
+                             z->imag(z)^2+real(sin(z))^3*1im,
                              )
 @testset "C->C non-holomorphic" begin
-    for f in (fs_C_to_C_holomorphic...,fs_C_to_C_holomorphic...)
+    for f in fs_C_to_C_non_holomorphic
         for z in (1.0+2.0im, -2.0+pi*im)
-            grad_zygote = gradient(real∘f, z)[1]
+            grad_zygote_r = gradient(real∘f, z)[1]
+            grad_zygote_i = gradient(imag∘f, z)[1]
             ε = 1e-8
-            grad_fd = real(f(z+ε)-f(z))/ε + im*real(f(z+ε*im)-f(z))/ε
-            @test abs(grad_zygote - grad_fd) < sqrt(ε)
+            grad_fd_r = real(f(z+ε)-f(z))/ε + im*real(f(z+ε*im)-f(z))/ε
+            grad_fd_i = imag(f(z+ε)-f(z))/ε + im*imag(f(z+ε*im)-f(z))/ε
+            # Check derivative of both real and imaginary parts of f as these may differ
+            # for non-holomorphic functions
+            @test abs(grad_zygote_r - grad_fd_r) < sqrt(ε)
+            @test abs(grad_zygote_i - grad_fd_i) < sqrt(ε)
         end
     end
 end
@@ -109,4 +120,3 @@ end
     end
     @test Zygote.hessian(fun, collect(1:9)) ≈ [14 0 0 0 0 0 2 0 0; 0 16 0 0 0 0 0 4 0; 0 0 18 0 0 0 0 0 6; 0 0 0 14 0 0 8 0 0; 0 0 0 0 16 0 0 10 0; 0 0 0 0 0 18 0 0 12; 2 0 0 8 0 0 0 0 0; 0 4 0 0 10 0 0 0 0; 0 0 6 0 0 12 0 0 0]
 end
-

@@ -65,26 +65,28 @@ function rrule(::ZygoteRuleConfig, ::typeof(colwise), s::Euclidean, x::AbstractM
   end
 end
 
-function rrule(config::ZygoteRuleConfig, ::typeof(pairwise), ::Euclidean, X::AbstractMatrix, Y::AbstractMatrix; dims=2)
+_sqrt_if_positive(d, δ) = d > δ ? sqrt(d) : zero(d)
 
+function rrule(config::ZygoteRuleConfig, ::typeof(pairwise), dist::Euclidean, X::AbstractMatrix, Y::AbstractMatrix; dims=2)
   # Modify the forwards-pass slightly to ensure stability on the reverse.
-  function _pairwise_euclidean(X, Y)
-    δ = eps(promote_type(eltype(X), eltype(Y)))^2
-    return sqrt.(max.(pairwise(SqEuclidean(), X, Y; dims=dims), δ))
+  function _pairwise_euclidean(sqdist::SqEuclidean, X, Y)
+    D2 = pairwise(sqdist, X, Y; dims)
+    δ = eps(eltype(D2))
+    return _sqrt_if_positive.(D2, δ)
   end
-  D, back = rrule_via_ad(config, _pairwise_euclidean, X, Y)
-
-  return D, function(Δ)
-    return (NoTangent(), NoTangent(), back(Δ)...)
-  end
+  D, back = rrule_via_ad(config, _pairwise_euclidean, SqEuclidean(dist.thresh), X, Y)
+  pairwise_Euclidean_rrule(Δ) = (NoTangent(), back(Δ)...)
+  return D, pairwise_Euclidean_rrule
 end
 
-function rrule(config::ZygoteRuleConfig, ::typeof(pairwise), ::Euclidean, X::AbstractMatrix; dims=2)
-  D, back = rrule_via_ad(config, X -> pairwise(SqEuclidean(), X; dims = dims), X)
-  D .= sqrt.(D)
-  return D, function(Δ)
-    Δ = Δ ./ (2 .* max.(D, eps(eltype(D))))
-    Δ[diagind(Δ)] .= 0
-    return (NoTangent(), NoTangent(), first(back(Δ)))
+function rrule(config::ZygoteRuleConfig, ::typeof(pairwise), dist::Euclidean, X::AbstractMatrix; dims=2)
+  # Modify the forwards-pass slightly to ensure stability on the reverse.
+  function _pairwise_euclidean(sqdist::SqEuclidean, X)
+    D2 = pairwise(sqdist, X; dims)
+    δ = eps(eltype(D2))
+    return _sqrt_if_positive.(D2, δ)
   end
+  D, back = rrule_via_ad(config, _pairwise_euclidean, SqEuclidean(dist.thresh), X)
+  pairwise_Euclidean_rrule(Δ) = (NoTangent(), back(Δ)...)
+  return D, pairwise_Euclidean_rrule
 end

@@ -39,12 +39,9 @@ function forward_jacobian(f, x, ::Val{N}) where N
   return y, J
 end
 
-function forward_jacobian(f, x)
-  if length(x) < ForwardDiff.DEFAULT_CHUNK_THRESHOLD
-    forward_jacobian(f, x, Val(length(x)))
-  else
-    forward_jacobian(f, x, Val(ForwardDiff.DEFAULT_CHUNK_THRESHOLD))
-  end
+function forward_jacobian(f, x; chunk_threshold = ForwardDiff.DEFAULT_CHUNK_THRESHOLD)
+    chunk_size = min(length(x), chunk_threshold)
+    forward_jacobian(f, x, Val(chunk_size))
 end
 
 vec_scalar(x) = vec(x)
@@ -82,10 +79,11 @@ function forward_diag(f, x::AbstractArray)
 end
 
 """
-    forwarddiff(f, x) -> f(x)
+    forwarddiff(f, x; chunk_threshold = ForwardDiff.DEFAULT_CHUNK_THRESHOLD) -> f(x)
 
 Runs `f(x)` as usual, but instructs Zygote to differentiate `f` using forward
-mode, rather than the usual reverse mode.
+mode, rather than the usual reverse mode. The `chunk_threshold` argument controls
+the maximum chunk size (c.f. ForwardDiff documentation).
 
 Forward mode takes time linear in `length(x)` but only has constant memory
 overhead, and is very efficient for scalars, so in some cases this can be a
@@ -130,17 +128,41 @@ gradient(2, 3) do a, b
 end
 ```
 """
-forwarddiff(f, x) = f(x)
+forwarddiff(f, x; chunk_threshold = ForwardDiff.DEFAULT_CHUNK_THRESHOLD) = f(x)
 
-@adjoint function forwarddiff(f, x)
-  y, J = forward_jacobian(f, x)
-  return y, ȳ -> (nothing, reshape_scalar(x, J*vec_scalar(ȳ)))
+@adjoint function forwarddiff(f, x; chunk_threshold = ForwardDiff.DEFAULT_CHUNK_THRESHOLD)
+  y, J = forward_jacobian(f, x; chunk_threshold = chunk_threshold)
+  return y, ȳ -> (nothing, reshape_scalar(x, J * vec_scalar(ȳ)))
 end
 
-# Use this to allow second derivatives -- this is forward-over-forward, 
+# Use this to allow second derivatives -- this is forward-over-forward,
 # see  https://github.com/FluxML/Zygote.jl/issues/769  for a forward-over-reverse proposal
-@adjoint ForwardDiff.gradient(f, x) = pullback(forwarddiff, x -> ForwardDiff.gradient(f, x), x)
-@adjoint ForwardDiff.jacobian(f, x) = pullback(forwarddiff, x -> ForwardDiff.jacobian(f, x), x)
+@adjoint function ForwardDiff.gradient(f, x)
+  F = typeof(f)
+  Base.issingletontype(F) || @warn """`ForwardDiff.gradient(f, x)` within Zygote cannot track gradients with respect to `f`,
+  and `f` appears to be a closure, or a struct with fields (according to `issingletontype(typeof(f))`).
+  typeof(f) = $F""" maxlog=1 _id=hash(F)
+  pullback(forwarddiff, x -> ForwardDiff.gradient(f, x), x)
+end
 
-@adjoint ForwardDiff.derivative(f, x) = pullback(forwarddiff, x -> ForwardDiff.derivative(f, x), x)
-@adjoint ForwardDiff.hessian(f, x) = pullback(forwarddiff, x -> ForwardDiff.hessian(f, x), x)
+@adjoint function ForwardDiff.jacobian(f::F, x) where F
+  Base.issingletontype(F) || @warn """`ForwardDiff.jacobian(f, x)` within Zygote cannot track gradients with respect to `f`,
+  and `f` appears to be a closure, or a struct with fields (according to `issingletontype(typeof(f))`).
+  typeof(f) = $F""" maxlog=1 _id=hash(F)
+  pullback(forwarddiff, x -> ForwardDiff.jacobian(f, x), x)
+end
+
+@adjoint function ForwardDiff.derivative(f::F, x) where F
+  Base.issingletontype(F) || @warn """`ForwardDiff.derivative(f, x)` within Zygote cannot track gradients with respect to `f`,
+  and `f` appears to be a closure, or a struct with fields (according to `issingletontype(typeof(f))`).
+  typeof(f) = $F""" maxlog=1 _id=hash(F)
+  pullback(forwarddiff, x -> ForwardDiff.derivative(f, x), x)
+end
+
+@adjoint function ForwardDiff.hessian(f::F, x) where F
+  Base.issingletontype(F) || @warn """`ForwardDiff.hessian(f, x)` within Zygote cannot track gradients with respect to `f`,
+  and `f` appears to be a closure, or a struct with fields (according to `issingletontype(typeof(f))`).
+  typeof(f) = $F""" maxlog=1 _id=hash(F)
+  pullback(forwarddiff, x -> ForwardDiff.hessian(f, x), x)
+end
+

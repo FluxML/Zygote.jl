@@ -1,5 +1,4 @@
-using .LogExpFunctions: xlogx, xlogy, logistic, logit, log1psq, log1pexp,
-    logsumexp, logaddexp, logsubexp
+using LogExpFunctions: xlogx, xlogy, logistic, log1pexp, logsumexp, logaddexp, logsubexp
 using Base.Broadcast: broadcasted
 
 @adjoint function xlogx(x::Real)
@@ -20,29 +19,9 @@ function ∇xlogx(x::Numeric)
     return result, dx
 end
 
-@adjoint function logistic(x::Real)
-    y = logistic(x)
-    return y, Δ->(Δ * y * (1 - y),)
-end
-
-@adjoint logit(x::Real) = logit(x), Δ->(Δ / (x * (1 - x)),)
-
-@adjoint log1psq(x::Real) = log1psq(x), Δ->(Δ * 2x / (1 + abs2(x)),)
-
-@adjoint function log1pexp(x::Real)
-    dx = ∂log1pexp(x)
-    return log1pexp(x), δ -> (δ * dx,)
-end
 @adjoint function broadcasted(::typeof(log1pexp), x::Numeric)
-    dx = ∂log1pexp.(x)
+    dx = logistic.(x)
     return log1pexp.(x), δ -> (nothing, unbroadcast(x, δ .* dx))
-end
-∂log1pexp(x::Real)    = x < 18.0 ? logistic(x) : x < 33.3 ? one(x) - exp(-x) : oftype(exp(x), 1)
-∂log1pexp(x::Float32) = x < 9f0  ? logistic(x) : x < 16f0 ? one(x) - exp(-x) : oftype(exp(x), 1)
-
-@adjoint function logsumexp(X::AbstractArray{<:Real}; dims=:)
-    lse = logsumexp(X; dims=dims)
-    return lse, Δ -> (Δ .* exp.(X .- lse),)
 end
 
 @adjoint function xlogy(x::Real, y::Real)

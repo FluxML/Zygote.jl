@@ -1,5 +1,6 @@
-using Zygote, Test
+using Zygote, Test, LinearAlgebra
 using Zygote: Params, gradient, forwarddiff
+using FillArrays: Fill
 
 @testset "gradient checkpointing" begin
 
@@ -375,6 +376,16 @@ end == (1,)
   forwarddiff(x -> x^2, x)
 end == (10,)
 
+@testset "Gradient chunking" begin
+  for chunk_threshold in 1:10:100
+    x = [1:100;]
+    @test gradient(x) do x
+      Zygote.forwarddiff(x -> x' * x, x; chunk_threshold = chunk_threshold)
+    end == (2 * x,)
+  end
+end
+
+
 @test gradient(1) do x
   if true
   elseif true
@@ -466,7 +477,7 @@ end
   @test_broken gradient(x -> abs2(x[1].x) + 7 * x[1].x.re, [Ref(1+im)]) == ([(x = 9.0 + 2.0im,)],)
   @test_broken gradient(x -> abs2(x[1].x) + 7 * real(x[1].x), [Ref(1+im)]) == ([(x = 9.0 + 2.0im,)],)  # worked on 0.6.0, 0.6.20
 
-  @test_broken gradient(x -> abs2(x[].x) + 7 * real(x[].x), Ref(Ref(1+im))) == ((x = 9.0 + 2.0im,),)  # gives nothing, same in 0.6.0
+  @test gradient(x -> abs2(x[].x) + 7 * real(x[].x), Ref(Ref(1+im))) == ((x = (x = 9.0 + 2.0im,),),) # gave `nothing` from 0.6.0 to 0.6.41
 
   # Array of mutables:
   @test gradient(x -> sum(getindex.(x).^2), Ref.(1:3))[1] == [(;x=2i) for i in 1:3]
@@ -480,6 +491,59 @@ end
   @test gradient(x -> sum(sum, Ref(x) .* [1,2,3]), [4,5]) == ([6.0, 6.0],)
 end
 
+@testset "mutable accum_param bugs" begin
+  mutable struct Mut{T}; x::T; end
+  struct Imm{T}; x::T; end
+
+  # Indexing a tuple containing a mutable struct gave `nothing`
+  x1 = (Mut(3.0),)
+  x2 = (Imm(3.0),)
+  x3 = (Ref(3.0),)
+  @test gradient(x -> x[1].x^2, x1)[1] == ((x = 6.0,),)  # fails on v0.6.0 v0.6.41
+  @test gradient(x -> x[1].x^2, x2)[1] == ((x = 6.0,),)
+  @test gradient(x -> x[1].x^2, x3)[1] == ((x = 6.0,),)  # fails on v0.6.0 v0.6.41
+  i1 = 1
+  @test gradient(x -> x[i1].x^2, x1)[1] == ((x = 6.0,),)  # fails on v0.6.0 v0.6.41
+  @test gradient(x -> x[i1].x^2, x2)[1] == ((x = 6.0,),)
+  @test gradient(x -> x[i1].x^2, x3)[1] == ((x = 6.0,),)  # fails on v0.6.0 v0.6.41
+
+  @test gradient(x -> x[1][1].x^2, [x1])[1] == [((x = 6.0,),)]  # fails on v0.6.0 v0.6.41
+  @test gradient(x -> x[1][1].x^2, [x2])[1] == [((x = 6.0,),)]
+  @test gradient(x -> x[1][1].x^2, [x3])[1] == [((x = 6.0,),)]  # fails on v0.6.0 v0.6.41
+
+  # When `getfield` returns a mutable struct, it gave `nothing`:
+  x4 = Imm(Mut(4.0))
+  x5 = Mut(Mut(4.0))
+  x6 = Imm(Imm(4.0))
+  @test gradient(x -> x.x.x^3, x4)[1] == (x = (x = 48.0,),)  # fails on v0.6.0 v0.6.41
+  @test gradient(x -> x.x.x^3, x5)[1] == (x = (x = 48.0,),)  # fails on v0.6.0
+  @test gradient(x -> x.x.x^3, x6)[1] == (x = (x = 48.0,),)  # fails on v0.6.41
+
+  @test gradient(x -> x[2].x.x^3, [x4, x4])[1] == [nothing, (x = (x = 48.0,),)]  # fails on v0.6.0 v0.6.41
+  @test gradient(x -> x[2].x.x^3, [x4, x5])[1] == [nothing, (x = (x = 48.0,),)]  # fails on v0.6.0
+  @test gradient(x -> x[2].x.x^3, [x4, x6])[1] == [nothing, (x = (x = 48.0,),)]  # fails on v0.6.41
+
+  # Check when using implicit parameters, Params cases used to pass:
+  y1 = [3.0]
+  y2 = (Mut(y1),)
+  y3 = (Imm(y1),)
+  @test gradient(x -> sum(x[1].x)^2, y2)[1] == ((x = [6.0],),)  # fails on v0.6.0 v0.6.41
+  @test gradient(() -> sum(y2[1].x)^2, Params([y1]))[y1] == [6.0]
+  @test gradient(x -> sum(x[1].x)^2, y3)[1] == ((x = [6.0],),)
+  @test gradient(() -> sum(y3[1].x)^2, Params([y1]))[y1] == [6.0]
+
+  @test gradient(x -> sum(x[1].x .+ x[1].x)^3, y2)[1] == ((x = [216.0],),)  # fails on v0.6.0 v0.6.41
+  @test gradient(() -> sum(y2[1].x .+ y2[1].x)^3, Params([y1]))[y1] == [216.0]
+  @test gradient(x -> sum(x[1].x .+ x[1].x)^3, y3)[1] == ((x = [216.0],),)
+  @test gradient(() -> sum(y3[1].x .+ y3[1].x)^3, Params([y1]))[y1] == [216.0]
+
+  i1 = 1
+  @test gradient(x -> sum(x[i1].x .+ x[1].x)^3, y2)[1] == ((x = [216.0],),)  # fails on v0.6.0 v0.6.41
+  @test gradient(() -> sum(y2[i1].x .+ y2[1].x)^3, Params([y1]))[y1] == [216.0]
+  @test gradient(x -> sum(x[i1].x .+ x[1].x)^3, y3)[1] == ((x = [216.0],),)
+  @test gradient(() -> sum(y3[i1].x .+ y3[1].x)^3, Params([y1]))[y1] == [216.0]
+end
+
 @testset "NamedTuples" begin
   @test gradient(x -> x.a, (a=1, b=2)) == ((a = 1, b = nothing),)
   @test gradient(x -> x[1].a, [(a=1, b=2)]) == ([(a = 1, b = nothing)],)
@@ -489,6 +553,17 @@ end
   @test gradient(x -> x[].a, Ref((a=1, b=2))) == ((x = (a = 1, b = nothing),),)
   @test gradient(x -> x[1][].a, [Ref((a=1, b=2)), Ref((a=3, b=4))]) == ([(x = (a = 1, b = nothing),), nothing],)
   @test gradient(x -> x[1].a, [(a=1, b=2), "three"]) == ([(a = 1, b = nothing), nothing],)
+
+  @testset "indexing kwargs" begin
+    inner_lit_index(; kwargs...) = kwargs[:x]
+    outer_lit_index(; kwargs...) = inner_lit_index(; x=kwargs[:x])
+
+    inner_dyn_index(k; kwargs...) = kwargs[k]
+    outer_dyn_index(k; kwargs...) = inner_dyn_index(k; x=kwargs[k])
+
+    @test gradient(x -> outer_lit_index(; x), 0.0) == (1.0,)
+    @test gradient((x, k) -> outer_dyn_index(k; x), 0.0, :x) == (1.0, nothing)
+  end
 end
 
 function type_test()
@@ -499,7 +574,7 @@ end
 
 @testset "Pairs" begin
   @test (x->10*pairs((a=x, b=2))[1])'(100) === 10.0
-  @test (x->10*pairs((a=x, b=2))[2])'(100) === 0
+  @test (x->10*pairs((a=x, b=2))[2])'(100) === nothing
   foo(;kw...) = 1
   @test gradient(() -> foo(a=1,b=2.0)) === ()
 
@@ -507,7 +582,7 @@ end
   @test (x->10*(x => 2)[2])'(100) === nothing
 
   @test gradient(x-> (:x => x)[2], 17) == (1,)
-    
+
   d = Dict(:x=>1.0, :y=>3.0);
   @test gradient(d -> Dict(:x => d[:x])[:x], d) == (Dict(:x => 1),)
 end
@@ -515,8 +590,12 @@ end
 @testset "kwarg splatting, pass in object" begin
   g(; kwargs...) = kwargs[:x] * kwargs[:z]
   h(somedata) = g(; somedata...)
-  @test gradient(h, (; x=3.0, y=4.0, z=2.3)) == ((x = 2.3, y = 0.0, z = 3.0),)
-  @test gradient(h, Dict(:x=>3.0, :y=>4.0, :z=>2.3)) == ((y = 0.0, z = 3.0, x = 2.3),)
+  @test gradient(h, (; x=3.0, y=4.0, z=2.3)) == ((x = 2.3, y = nothing, z = 3.0),)
+  @test gradient(h, Dict(:x=>3.0, :y=>4.0, :z=>2.3)) == ((y = nothing, z = 3.0, x = 2.3),)
+
+  # for when no kwargs have grads backpropogated
+  no_kwarg_grad(x; kwargs...) = x[kwargs[:i]]
+  @test gradient(x -> no_kwarg_grad(x; i=1), [1]) == ([1],)
 end
 
 @testset "Iterators" begin
@@ -536,7 +615,7 @@ end
   # zip
   if VERSION >= v"1.5"
     # On Julia 1.4 and earlier, [x/y for (x,y) in zip(10:14, 1:10)] is a DimensionMismatch,
-    # while on 1.5 - 1.7 it stops early. 
+    # while on 1.5 - 1.7 it stops early.
 
     @test gradient(10:14, 1:10) do xs, ys
       sum([x/y for (x,y) in zip(xs, ys)])
@@ -598,7 +677,7 @@ end
 
   # Iterators.Product with enumerate
   @test gradient([2 3; 4 5]) do xs
-    sum([x^i+y for (i,x) in enumerate(xs), y in xs]) 
+    sum([x^i+y for (i,x) in enumerate(xs), y in xs])
   end == ([8 112; 36 2004],)
 end
 
@@ -666,6 +745,18 @@ end
   loss(x) = sum(abs2, net(x))
   @test gradient(loss, ones(10,10))[1] == fill(131072, 10, 10)
   @test 150_000_000 > @allocated gradient(loss, ones(1000,1000))
+
+  # https://github.com/FluxML/Zygote.jl/issues/1233
+  function defensiveupdate(d, a)
+    nd = deepcopy(d)
+    nd[1] = d[1] * a
+    return nd
+  end
+  d = Dict(i => ones(1) for i in 1:2)
+  @test gradient(d) do d
+    nd = defensiveupdate(d, 5)
+    return sum(nd[1]) + sum(nd[2])
+  end[1] == Dict(1 => Fill(5, 1), 2 => Fill(1, 1))
 end
 
 @testset "tricky broadcasting" begin
@@ -725,4 +816,37 @@ end
   @test gradient(xs -> sum((x->x.im^2), xs), [1+2im,3])[1] == [4im, 0]
   @test gradient(xs -> sum(map(x->x.im^2, xs)), [1+2im,3])[1] == [4im, 0]
   @test gradient(xs -> mapreduce(x->x.im^2, +, xs), [1+2im,3])[1] == [4im, 0]
+end
+
+@testset "broadcast fallbacks" begin
+  # https://github.com/FluxML/Zygote.jl/issues/1359
+  struct MyFloat64 <: Number
+    n::Float64
+  end
+
+  Base.exp(f::MyFloat64) = MyFloat64(exp(f.n))
+  Base.conj(f::MyFloat64) = MyFloat64(conj(f.n))
+  Base.:*(x::MyFloat64, y::MyFloat64) = MyFloat64(x.n * y.n)
+
+  x = MyFloat64[1., 2., 3.]
+  result, pb = @inferred Zygote.pullback(Base.broadcasted, Base.Broadcast.DefaultArrayStyle{1}(), exp, x)
+  @inferred pb(MyFloat64[1., 1., 1.])
+end
+
+@testset "Dict" begin
+  # issue #717
+  @test gradient(x -> (() -> x[:y])(), Dict(:y => 0.4)) == (Dict(:y => 1.0),)
+
+  ntd = (; data = Dict("x" => rand(2)))
+  @test gradient(x -> sum(x.data["x"]), ntd)[1] == (; data = Dict("x" => ones(2)))
+
+  # issue #760
+  function f760(x)
+    d = Dict()
+    for i in 1:4
+        push!(d, i=>i^x)
+    end
+    sum(values(d))
+  end
+  @test gradient(f760, 3)[1] ≈ 123.93054835019153
 end

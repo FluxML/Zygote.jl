@@ -24,16 +24,19 @@ grad_mut(d::IdDict) = IdDict()
 
 # TODO perhaps look up mutable gradients in `pullback`
 function accum(a::AbstractDict, b::AbstractDict)
-  @assert a === b
-  return a
+  a === b && return a # Mutating case
+  return merge(a, b)
 end
 
 @adjoint function getindex(d::AbstractDict, k)
-  d[k], function (Δ)
+  val = d[k]
+  function dict_getindex_pullback(Δ)
+    accum_param(__context__, val, Δ) === nothing && return
     grad = grad_mut(__context__, d)
     grad[k] = accum(get(grad, k, nothing), Δ)
     return (grad, nothing)
   end
+  val, dict_getindex_pullback
 end
 
 @adjoint! function setindex!(d::AbstractDict, v, k)
@@ -44,9 +47,46 @@ end
   end
 end
 
-# Channels
+# This rule behaves much like the getindex adjoint,
+# just with an (internal) ordinal index instead of a key.
+function _pullback(cx::AContext, ::typeof(iterate), d::Dict, i)
+  iter = iterate(d, i)
+  function dict_iterate_pullback(Δ)
+    (iter === nothing || Δ === nothing) && return
+    k, v = iter[1]
+    _, dv = Δ[1]
+    accum_param(cx, v, dv) === nothing && return
+    grad = grad_mut(cx, d)
+    grad[k] = accum(get(grad, k, nothing), dv)
+    return (nothing, grad, nothing)
+  end
+  return iter, dict_iterate_pullback
+end
 
-@nograd Channel
+# ...while this one is to avoid duplicating code or differentiating skip_deleted.
+# The alternative would be to write a rule for the private _iterate(::Dict, i).
+function _pullback(cx::AContext, ::typeof(iterate), d::Dict)
+  # Calculation of i is the same used in iterate(::Dict)
+  return _pullback(cx, iterate, d, Base.skip_deleted(d, d.idxfloor))
+end
+
+function _pullback(cx::AContext, ::typeof(iterate), vi::Base.ValueIterator{<:Dict}, i::Int)
+  iter = iterate(vi, i)
+  function values_iterate_pullback(Δ)
+    (iter === nothing || Δ === nothing) && return
+    v, dv = iter[1], Δ[1]
+    accum_param(cx, v, dv) === nothing && return
+    # Same as vi.dict.keys[i], but without reaching into Dict internals.
+    # Iterating the dict instead of keys() is to hit the rules above in nested AD.
+    k = iterate(vi.dict, i)[1][1]
+    grad = grad_mut(cx, vi.dict)
+    grad[k] = accum(get(grad, k, nothing), dv)
+    return (nothing, (; dict = grad), nothing)
+  end
+  return iter, values_iterate_pullback
+end
+
+# Channels
 
 grad_mut(ch::Channel) = Channel(ch.sz_max)
 
@@ -118,11 +158,11 @@ end
 
 # named tuple
 @adjoint function pairs(t::NamedTuple{N}) where N
-  
+
   pairs_namedtuple_pullback(dx::NamedTuple) = (dx.data,)
 
   pairs_namedtuple_pullback(dx::Tuple{}) = (NamedTuple(),)
-  
+
   function pairs_namedtuple_pullback(Δ::Dict)
     t0 = map(zero, t)
     for (idx, v) in Δ
@@ -144,6 +184,30 @@ else
   @adjoint merge(nt::NamedTuple, dict::Dict) = pullback(merge, nt, (;dict...))
 end
 
+# Keyword arguments pretend to be a Dict, but are secretly wrapping a NamedTuple.
+# We can treat them much the same, just with some plumbing to handle the extra `itr` field.
+function _pullback(::AContext, ::typeof(getindex),
+                   ps::Iterators.Pairs{<:Any,<:Any,<:Any,<:NamedTuple}, k)
+  # So we don't close over kwarg values in the pullback
+  data = map(_ -> nothing, NamedTuple(ps))
+  function kwargs_getindex_pullback(Δ)
+    dps = (data = Base.setindex(data, Δ, k), itr = nothing)
+    return (nothing, dps, nothing)
+  end
+  return ps[k], kwargs_getindex_pullback
+end
+
+function _pullback(cx::AContext, ::typeof(literal_getindex),
+                   ps::Iterators.Pairs{<:Any,<:Any,<:Any,<:NamedTuple}, ::Val{K}) where K
+  val, gf_back = _pullback(cx, literal_getfield, NamedTuple(ps), Val(K))
+  function kwargs_literal_getindex_pullback(Δ)
+    dps = (data = gradindex(gf_back(Δ), 2), itr = nothing)
+    return (nothing, dps, nothing)
+  end
+  return val, kwargs_literal_getindex_pullback
+end
+
+# Misc.
 @adjoint function Base.getfield(p::Pair, i::Int)
     function pair_getfield_pullback(Δ)
         f, s = i == 1 ? (Δ, nothing) : (nothing, Δ)
@@ -153,8 +217,6 @@ end
 end
 
 @adjoint Base.nameof(x::UnionAll) = nameof(x), _ -> (nothing,)
-
-@nograd typeintersect
 
 # Base.Fix1 and Base.Fix2: https://github.com/FluxML/Zygote.jl/issues/957
 @adjoint function (g::Base.Fix1)(y)
