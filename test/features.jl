@@ -681,8 +681,6 @@ end
   end == ([8 112; 36 2004],)
 end
 
-@testset "pycall" begin
-    
 @testset "PyCall custom @adjoint" begin
   import PyCall
   math = PyCall.pyimport("math")
