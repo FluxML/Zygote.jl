@@ -75,7 +75,7 @@ function rrule(config::ZygoteRuleConfig, ::typeof(pairwise), dist::Euclidean, X:
     return _sqrt_if_positive.(D2, δ)
   end
   D, back = rrule_via_ad(config, _pairwise_euclidean, SqEuclidean(dist.thresh), X, Y)
-  pairwise_Euclidean_rrule(Δ) = (NoTangent(), back(Δ)...)
+  pairwise_Euclidean_rrule = back
   return D, pairwise_Euclidean_rrule
 end
 
@@ -87,6 +87,6 @@ function rrule(config::ZygoteRuleConfig, ::typeof(pairwise), dist::Euclidean, X:
     return _sqrt_if_positive.(D2, δ)
   end
   D, back = rrule_via_ad(config, _pairwise_euclidean, SqEuclidean(dist.thresh), X)
-  pairwise_Euclidean_rrule(Δ) = (NoTangent(), back(Δ)...)
+  pairwise_Euclidean_rrule = back
   return D, pairwise_Euclidean_rrule
 end
