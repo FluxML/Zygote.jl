@@ -42,7 +42,7 @@ function rrule(::ZygoteRuleConfig, ::typeof(pairwise), s::SqEuclidean, x::Abstra
 end
 
 ∇pairwise(s, x, f) =
-  function_pairwise_sqeuclidean(Δ)
+  function pairwise_sqeuclidean_rrule(Δ)
     d1 = Diagonal(vec(sum(Δ; dims=1)))
     d2 = Diagonal(vec(sum(Δ; dims=2)))
     return NoTangent(), NoTangent(), x * (2 .* (d1 .+ d2 .- Δ .- transpose(Δ))) |> f
