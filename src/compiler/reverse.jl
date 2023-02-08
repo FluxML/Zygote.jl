@@ -37,11 +37,18 @@ is_getproperty(ex) = iscall(ex, Base, :getproperty)
 # argument is a literal or not.
 function instrument_getproperty!(ir, v, ex)
   if is_getproperty(ex)
-    if ex.args[3] isa Union{QuoteNode,Integer}
-      ir[v] = xcall(Zygote, :literal_getproperty, ex.args[2], Val(unwrapquote(ex.args[3])))
+    obj, prop = ex.args[2], ex.args[3]
+    if obj isa Module && prop isa QuoteNode && isconst(obj, unwrapquote(prop))
+      # Metaprogramming can generate getproperty(::Module, ...) calls.
+      # Like other types, these are type unstable without constprop.
+      # However, literal_getproperty's heuristic is also not general enough for modules.
+      # Thankfully, we can skip instrumenting these if they're const properties.
+      ex
+    elseif prop isa Union{QuoteNode,Integer}
+      ir[v] = xcall(Zygote, :literal_getproperty, obj, Val(unwrapquote(prop)))
     else
-      f = insert!(ir, v, :(Val($(ex.args[3]))))
-      ir[v] = xcall(Zygote, :literal_getproperty, ex.args[2], f)
+      f = insert!(ir, v, :(Val($(prop))))
+      ir[v] = xcall(Zygote, :literal_getproperty, obj, f)
     end
   else
     ex
@@ -169,7 +176,22 @@ ignored_f(f) = f in (GlobalRef(Base, :not_int),
 ignored_f(ir, f) = ignored_f(f)
 ignored_f(ir, f::Variable) = ignored_f(get(ir, f, nothing))
 
-ignored(ir, ex) = isexpr(ex, :call) && ignored_f(ir, ex.args[1])
+function ignored(ir, ex)
+  isexpr(ex, :call) || return false
+  f = ex.args[1]
+  ignored_f(ir, f) && return true
+  if f isa Variable && haskey(ir, f)
+    f = ir[f].expr
+  end
+  if f == GlobalRef(Base, :getproperty) && length(ex.args) >= 3
+    obj, prop = ex.args[2], ex.args[3]
+    # Metaprogramming can generate getproperty(::Module, ...) calls.
+    # These are type unstable without constprop, which transforming to _pullback breaks.
+    # However, we can skip differentiating these if they're const properties.
+    obj isa Module && prop isa QuoteNode && isconst(obj, unwrapquote(prop)) && return true
+  end
+  return false
+end
 ignored(ir, ex::Variable) = ignored(ir, ir[ex])
 
 function primal(ir::IR)
