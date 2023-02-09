@@ -397,7 +397,7 @@ end == (2,)
 global_param = 3
 
 @testset "Global Params" begin
-  cx = Zygote.Context()
+  cx = Zygote.Context{true}(nothing) # only makes sense with implicit params
   y, back = Zygote._pullback(cx, x -> x*global_param, 2)
   @test y == 6
   @test back(1) == (nothing, 3)

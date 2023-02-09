@@ -34,27 +34,100 @@ xtuple(xs...) = xcall(:tuple, xs...)
 
 concrete(T::DataType) = T
 concrete(::Type{Type{T}}) where T = typeof(T)
-concrete(T) = Any
+concrete(@nospecialize _) = Any
 
 runonce(b) = b.id in (1, length(b.ir.blocks))
 
-function forward_stacks!(adj, F)
-  stks, recs = [], []
-  pr = adj.primal
-  for b in blocks(pr), α in alphauses(block(adj.adjoint, b.id))
-    if runonce(b)
-      push!(recs, Variable(α))
-    else
-      stk = pushfirst!(pr, xstack(Any))
-      push!(recs, stk)
-      push!(b, xcall(Zygote, :_push!, stk, Variable(α)))
+# TODO use a more efficient algorithm such as Johnson (1975)
+# https://epubs.siam.org/doi/abs/10.1137/0204007
+self_reaching(cfg, bid, visited = BitSet()) = reaches(cfg, bid, bid, visited)
+function reaches(cfg, from, to, visited)
+  for succ in cfg[from]
+    if succ === to
+      return true
+    elseif succ ∉ visited
+      push!(visited, succ)
+      if reaches(cfg, succ, to, visited)
+        return true
+      end
     end
-    push!(stks, (b.id, alpha(α)))
   end
-  args = arguments(pr)[3:end]
+  return false
+end
+
+function forward_stacks!(adj, F)
+  stks, recs = Tuple{Int, Alpha, Bool}[], Variable[]
+  pr = adj.primal
+  blks = blocks(pr)
+  last_block = length(blks)
+  cfg = IRTools.CFG(pr)
+  cfgᵀ = cfg'
+  doms = IRTools.dominators(cfg)
+
+  reaching_visited = BitSet()
+  in_loop = map(1:last_block) do b
+    empty!(reaching_visited)
+    self_reaching(cfg, b, reaching_visited)
+  end
+  alphavars = Dict{Alpha, Variable}()
+  alpha_blocks = [α => b.id for b in blks for α in alphauses(block(adj.adjoint, b.id))]
+  for b in Iterators.reverse(blks)
+    filter!(alpha_blocks) do (α, bid)
+      if b.id in doms[bid]
+        # If a block dominates this block, α is guaranteed to be present here
+        αvar = Variable(α)
+        for br in branches(b)
+          map!(a -> a === α ? αvar : a, br.args, br.args)
+        end
+        push!(recs, b.id === last_block ? αvar : alphavars[α])
+        push!(stks, (bid, α, false))
+      elseif in_loop[bid]
+        # This block is in a loop, so we're forced to insert stacks
+        # Note: all alphas in loops will have stacks after the first iteration
+        stk = pushfirst!(pr, xstack(Any))
+        push!(recs, stk)
+        push!(block(pr, bid), xcall(Zygote, :_push!, stk, Variable(α)))
+        push!(stks, (bid, α, true))
+      else
+        # Fallback case, propagate alpha back through the CFG
+        argvar = nothing
+        if b.id > 1
+          # Need to make sure all predecessors have a branch to add arguments to
+          IRTools.explicitbranch!(b)
+          argvar = argument!(b, insert=false)
+        end
+        if b.id === last_block
+          # This alpha has been threaded all the way through to the exit block
+          alphavars[α] = argvar
+        end
+        for br in branches(b)
+          map!(a -> a === α ? argvar : a, br.args, br.args)
+        end
+        for pred in cfgᵀ[b.id]
+          pred >= b.id && continue # TODO is this needed?
+          pred_branches = branches(block(pr, pred))
+          idx = findfirst(br -> br.block === b.id, pred_branches)
+          if idx === nothing
+            throw(error("Predecessor $pred of block $(b.id) has no branch to $(b.id)"))
+          end
+          branch_here = pred_branches[idx]
+          push!(branch_here.args, α)
+        end
+        # We're not done with this alpha yet, revisit in predecessors
+        return true
+      end
+      return false
+    end
+    # Prune any alphas that don't exist on this path through the CFG
+    for br in branches(b)
+      map!(a -> a isa Alpha ? nothing : a, br.args, br.args)
+    end
+  end
+  @assert isempty(alpha_blocks)
+
   rec = push!(pr, xtuple(recs...))
+  # Pullback{F,Any} reduces specialisation
   P = length(pr.blocks) == 1 ? Pullback{F} : Pullback{F,Any}
-  # P = Pullback{F,Any} # reduce specialisation
   rec = push!(pr, Expr(:call, P, rec))
   ret = xtuple(pr.blocks[end].branches[end].args[1], rec)
   ret = push!(pr, ret)
@@ -62,22 +135,29 @@ function forward_stacks!(adj, F)
   return pr, stks
 end
 
+# Helps constrain pullback function type in the backwards pass
+# If we had the type, we could make this a PiNode
+notnothing(::Nothing) = error()
+notnothing(x) = x
+
 function reverse_stacks!(adj, stks)
   ir = adj.adjoint
-  entry = blocks(ir)[end]
+  blcks = blocks(ir)
+  entry = blcks[end]
   self = argument!(entry, at = 1)
-  t = pushfirst!(blocks(ir)[end], xcall(:getfield, self, QuoteNode(:t)))
-  repl = Dict()
-  runonce(b) = b.id in (1, length(ir.blocks))
-  for b in blocks(ir)
-    for (i, (b′, α)) in enumerate(stks)
+  t = pushfirst!(entry, xcall(:getfield, self, QuoteNode(:t)))
+  repl = Dict{Alpha,Variable}()
+  for b in blcks
+    for (i, (b′, α, use_stack)) in enumerate(stks)
       b.id == b′ || continue
-      if runonce(b)
-        val = insertafter!(ir, t, xcall(:getindex, t, i))
-      else
-        stk = push!(entry, xcall(:getindex, t, i))
-        stk = push!(entry, xcall(Zygote, :Stack, stk))
+      # i.e. recs[i] from forward_stacks!
+      val = insertafter!(ir, t, xcall(:getindex, t, i))
+      if use_stack
+        stk = push!(entry, xcall(Zygote, :Stack, val))
         val = pushfirst!(b, xcall(:pop!, stk))
+      elseif !runonce(b)
+        # The first and last blocks always run, so this check is redundant there
+        val = pushfirst!(b, xcall(Zygote, :notnothing, val))
       end
       repl[α] = val
     end
@@ -87,6 +167,7 @@ end
 
 function stacks!(adj, T)
   forw, stks = forward_stacks!(adj, T)
+  IRTools.domorder!(forw)
   back = reverse_stacks!(adj, stks)
   permute!(back, length(back.blocks):-1:1)
   IRTools.domorder!(back)

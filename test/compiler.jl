@@ -1,4 +1,4 @@
-using Zygote, Test
+using Zygote, IRTools, Test
 using Zygote: pullback, @adjoint, Context
 
 macro test_inferred(ex)
@@ -18,24 +18,22 @@ end
 
 bad(x) = x
 @adjoint bad(x) = x, Δ -> error("bad")
+bad_adjoint_line = @__LINE__() - 1 # source location of above
 
 function badly(x)
   x = x + 1
   x = bad(x)
   return x
 end
+bad_pullback_line = @__LINE__() - 3 # should match source location of Pullback
 
 y, back = pullback(badly, 2)
 @test y == 3
 @test_throws Exception back(1)
-bt = try back(1) catch e stacktrace(catch_backtrace()) end
 
-@test trace_contains(bt, nothing, "compiler.jl", 20)
-if VERSION >= v"1.6-"
-  @test_broken trace_contains(bt, :badly, "compiler.jl", 24)
-else
-  @test trace_contains(bt, :badly, "compiler.jl", 24)
-end
+bt = try back(1) catch e stacktrace(catch_backtrace()) end
+@test trace_contains(bt, nothing, "compiler.jl", bad_adjoint_line)
+@test trace_contains(bt, nothing, "compiler.jl", bad_pullback_line)
 
 # Type inference checks
 
@@ -58,10 +56,9 @@ y, back = @test_inferred pullback(f, 5)
 y, back = @test_inferred pullback(Core._apply, +, (1, 2, 3))
 @test_inferred back(1)
 
-# TODO fix bcast inference
-# bcast(x) = x .* 5
-# y, back = @test_inferred pullback(bcast, [1,2,3])
-# @test_inferred back([1,1,1])
+bcast(x) = x .* 5
+y, back = @test_inferred pullback(bcast, [1,2,3])
+@test_inferred back([1,1,1])
 
 foo = let a = 4
   x -> x*a
@@ -89,6 +86,45 @@ str_repr = String(take!(buf))
 struct Funky
     x
     y
+end
+
+@testset "stack elision" begin
+  function isstackfree(T)
+    _, forw, back = Zygote._generate_pullback_via_decomposition(T)
+    for (_, stmt) in forw
+      expr = stmt.expr
+      expr.head == :call && first(expr.args) == GlobalRef(Zygote, :_push!) && return false
+    end
+    for (_, stmt) in back
+      expr = stmt.expr
+      expr.head == :call && first(expr.args) == GlobalRef(Zygote, :Stack) && return false
+    end
+    return true
+  end
+
+  function knockoff_pow(x, n)
+    n == 0 && return 1
+    n == 1 && return x
+    n == 2 && return x * x
+    n == 3 && return x * x * x
+    return x ^ n
+  end
+
+  function roundabout_trig(x, fancy_sin, fancy_cos, fancy_tan)
+    if fancy_tan
+      s = fancy_sin ? inv(csc(x)) : sin(x)
+      c = fancy_cos ? inv(sec(x)) : cos(x)
+      s += 0
+      c *= 1
+      return s / c
+    else
+      return tan(x)
+    end
+  end
+
+  @test !isstackfree(Tuple{typeof(pow), Int, Int})
+  @test isstackfree(Tuple{typeof(knockoff_pow), Int, Int})
+  @test isstackfree(Tuple{typeof(roundabout_trig), Float64, Bool, Bool, Bool})
 end
 
 @testset "issue #851" begin
@@ -128,7 +164,7 @@ end
   d_two = Zygote.pullback(two_svds, X)[2](Δoutput)
   d_one = Zygote.pullback(one_svd, X)[2](Δoutput)
   @test d_one == d_two
-end 
+end
 
 # this test fails if adjoint for literal_getproperty is added
 # https://github.com/FluxML/Zygote.jl/issues/922#issuecomment-804128905

@@ -33,10 +33,10 @@ end
   meta, forw, _ = g
   argnames!(meta, Symbol("#self#"), :ctx, :f, :args)
   forw = varargs!(meta, forw, 3)
-  # IRTools.verify(forw)
+  # verify(forw)
   forw = slots!(pis!(inlineable!(forw)))
   # be ready to swap to using chainrule if one is declared
-  cr_edge != nothing && edge!(meta, cr_edge)
+  cr_edge !== nothing && edge!(meta, cr_edge)
   return update!(meta.code, forw)
 end
 
@@ -53,7 +53,7 @@ end
   end
   meta, _, back = g
   argnames!(meta, Symbol("#self#"), :Δ)
-  # IRTools.verify(back)
+  # verify(back)
   back = slots!(inlineable!(back))
   return update!(meta.code, back)
 end
