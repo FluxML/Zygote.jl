@@ -401,6 +401,22 @@ end
   @test gradient((x,y) -> sum(map(*,x,y)), (1,2,3,4,5), [1 2; 3 4]) == ((1,3,2,4,nothing), [1 3; 2 4])
 end
 
+@testset "map: issye 1374" begin
+  # The code to reverse iteration in map was very sloppy, could reverse fwd & not reverse, wtf.
+  # https://github.com/FluxML/Zygote.jl/issues/1374
+  struct Affine1374
+    W
+    b
+  end
+  (m::Affine1374)(x) = [sum(x.*r) for r in eachrow(m.W)] + m.b
+  m = Affine1374(zeros(3,3), zeros(3,1))
+  x = [ 1.0,  2.0,  3.0]
+  y = [-1.0, -2.0, -3.0]
+  l1374(y,ŷ) = sum(abs2.(y - ŷ))/2
+  grads = gradient(m -> l1374(y,m(x)), m)
+  @test grads[1].W ≈ [1 2 3; 2 4 6; 3 6 9]
+end
+
 @testset "sort" begin
   @test gradtest(sort, 5)
   correct = [

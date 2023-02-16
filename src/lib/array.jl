@@ -165,12 +165,14 @@ end
 # needed for stateful functions.
 # See https://github.com/FluxML/Flux.jl/issues/1209
 # Should be generalized to abstract array, but reverse takes a dims keyword there
+
+# That lead to https://github.com/FluxML/Zygote.jl/issues/1374
+# ... and post-1.6 dims is not required to reverse arrays.
 _tryreverse(m, backs, Δ) = backs, Δ
-function _tryreverse(m::typeof(map), backs, Δ::Union{AbstractVector, Tuple})
-  return reverse(backs), reverse(Δ)
-end
+_tryreverse(m::typeof(map), backs, Δ) = reverse(backs), reverse(Δ)
+
 _tryreverse(m, x) = x
-_tryreverse(m::typeof(map), x::Union{AbstractVector, Tuple}) = reverse(x)
+_tryreverse(m::typeof(map), x) = reverse(x)
 
 # With mismatched lengths, map stops early. With mismatched shapes, it makes a vector.
 # So we keep axes(x) to restore gradient dx to its full length & correct shape.
