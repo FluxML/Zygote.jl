@@ -161,16 +161,14 @@ function unzip(tuples)
   _unzip(tuples, Val(N))
 end
 
-# Reverse iteration order when ∇map is applied to vector,
-# needed for stateful functions.
-# See https://github.com/FluxML/Flux.jl/issues/1209
-# Should be generalized to abstract array, but reverse takes a dims keyword there
+# Reverse iteration order in ∇map, for stateful functions.
+# This is also used by comprehensions, which do guarantee iteration order.
+# Not done for pmap, presumably because all is lost if you are relying on its order.
 _tryreverse(m, backs, Δ) = backs, Δ
-function _tryreverse(m::typeof(map), backs, Δ::Union{AbstractVector, Tuple})
-  return reverse(backs), reverse(Δ)
-end
+_tryreverse(m::typeof(map), backs, Δ) = reverse(backs), reverse(Δ)
+
 _tryreverse(m, x) = x
-_tryreverse(m::typeof(map), x::Union{AbstractVector, Tuple}) = reverse(x)
+_tryreverse(m::typeof(map), x) = reverse(x)
 
 # With mismatched lengths, map stops early. With mismatched shapes, it makes a vector.
 # So we keep axes(x) to restore gradient dx to its full length & correct shape.
