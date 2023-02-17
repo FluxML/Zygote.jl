@@ -161,13 +161,9 @@ function unzip(tuples)
   _unzip(tuples, Val(N))
 end
 
-# Reverse iteration order when ∇map is applied to vector,
-# needed for stateful functions.
-# See https://github.com/FluxML/Flux.jl/issues/1209
-# Should be generalized to abstract array, but reverse takes a dims keyword there
-
-# That lead to https://github.com/FluxML/Zygote.jl/issues/1374
-# ... and post-1.6 dims is not required to reverse arrays.
+# Reverse iteration order in ∇map, for stateful functions.
+# This is also used by comprehensions, which do guarantee iteration order.
+# Not done for pmap, presumably because all is lost if you are relying on its order.
 _tryreverse(m, backs, Δ) = backs, Δ
 _tryreverse(m::typeof(map), backs, Δ) = reverse(backs), reverse(Δ)
 
