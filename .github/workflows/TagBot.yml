@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       lookback:
-        default: 30
+        default: 3
 permissions:
   actions: read
   checks: read
