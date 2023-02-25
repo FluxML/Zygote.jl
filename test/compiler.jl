@@ -128,7 +128,7 @@ end
   d_two = Zygote.pullback(two_svds, X)[2](Δoutput)
   d_one = Zygote.pullback(one_svd, X)[2](Δoutput)
   @test d_one == d_two
-end 
+end
 
 # this test fails if adjoint for literal_getproperty is added
 # https://github.com/FluxML/Zygote.jl/issues/922#issuecomment-804128905
@@ -156,6 +156,13 @@ function _Gaussian(suffix::Symbol)
         $name
     end
 end
+
+module MyMod
+  const C = 1
+  func(a, b) = a * b
+end
+
+@eval usesmod(x) = Base.getproperty($MyMod, :func)(x, Base.getproperty($MyMod, :C))
 
 @testset "inference for `getproperty`" begin
     Gaussian = _Gaussian(:getproperty)
@@ -204,6 +211,10 @@ end
     y, back = @inferred pullback(x -> x.m, g)
     @test y == getfield(g, :m)
     @test @inferred(back(1.0)) == ((m = 1.0, P = nothing),)
+
+
+    # Const properties on modules should be lowered as-is (not differentiated)
+    @test @inferred gradient(usesmod, 1)[1] == 1.0
 end
 
 # issue 897

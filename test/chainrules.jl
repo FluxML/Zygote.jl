@@ -366,8 +366,10 @@ end
         test_rrule(ZygoteRuleConfig(), sum, cbrt, randn(5); rrule_f=rrule_via_ad)
 
         # but x -> cbrt(x) has no rule, so will be done by Zygote
-        test_rrule(ZygoteRuleConfig(), sum, x -> cbrt(x), randn(5))
-        test_rrule(ZygoteRuleConfig(), sum, x -> cbrt(x), randn(5); rrule_f=rrule_via_ad)
+        # increased tolerances because these are occasionally flaky at rtol=1e-9
+        test_rrule(ZygoteRuleConfig(), sum, x -> cbrt(x), randn(5); rtol=1e-8)
+        test_rrule(ZygoteRuleConfig(), sum, x -> cbrt(x), randn(5); rtol=1e-8,
+                   rrule_f=rrule_via_ad)
     end
 
     # See https://github.com/FluxML/Zygote.jl/issues/1078
