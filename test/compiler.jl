@@ -17,8 +17,10 @@ trace_contains(st, func, file, line) = any(st) do fr
 end
 
 bad(x) = x
+const bad_def_line = (@__LINE__) + 1
 @adjoint bad(x) = x, Δ -> error("bad")
 
+const bad_call_line = (@__LINE__) + 3
 function badly(x)
   x = x + 1
   x = bad(x)
@@ -30,11 +32,11 @@ y, back = pullback(badly, 2)
 @test_throws Exception back(1)
 bt = try back(1) catch e stacktrace(catch_backtrace()) end
 
-@test trace_contains(bt, nothing, "compiler.jl", 20)
-if VERSION >= v"1.6-"
-  @test_broken trace_contains(bt, :badly, "compiler.jl", 24)
+@test trace_contains(bt, nothing, "compiler.jl", bad_def_line)
+if VERSION <= v"1.6-" || VERSION >= v"1.10-"
+  @test trace_contains(bt, :badly, "compiler.jl", bad_call_line)
 else
-  @test trace_contains(bt, :badly, "compiler.jl", 24)
+  @test_broken trace_contains(bt, :badly, "compiler.jl", bad_call_line)
 end
 
 # Type inference checks
