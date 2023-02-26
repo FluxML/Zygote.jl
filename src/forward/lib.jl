@@ -9,6 +9,9 @@ end
 # TODO figure out why this made a test fail
 zerolike(x::Union{Module,Type}) = nothing
 
+# Required to not get an UndefRefError on 1.10
+zerolike(x::GlobalRef) = nothing
+
 # TODO: `@non_differentiable` and `@linear`
 
 @tangent zerolike(x) = zerolike(x), _ -> zerolike(x)
