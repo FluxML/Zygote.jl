@@ -9,12 +9,12 @@ using Distributed: pmap, AbstractWorkerPool
 @adjoint copy(x::AbstractArray) = copy(x), ȳ -> (ȳ,)
 
 @adjoint function collect(x::Tuple)
-  collect_tuple_pullback(dy) = (Tuple(dy),) 
+  collect_tuple_pullback(dy) = (Tuple(dy),)
   collect(x), collect_tuple_pullback
 end
 
 @adjoint function collect(x::NamedTuple{names}) where names
-  collect_namedtuple_pullback(dy) = (NamedTuple{names}(Tuple(dy)),) 
+  collect_namedtuple_pullback(dy) = (NamedTuple{names}(Tuple(dy)),)
   collect(x), collect_namedtuple_pullback
 end
 
@@ -101,7 +101,7 @@ Possible fixes:
   _ -> _throw_mutation_error(copyto!, xs)
 
 for f in [push!, pop!, pushfirst!, popfirst!]
-  @eval @adjoint! $f(x::AbstractVector, ys...) = $f(x, ys...), 
+  @eval @adjoint! $f(x::AbstractVector, ys...) = $f(x, ys...),
     _ -> _throw_mutation_error($f, x)
 end
 
@@ -248,10 +248,10 @@ reconstruct_if_dict(x̄, _keys::Nothing) = x̄
 function reconstruct_if_dict(x̄, _keys)
   # This reverses `collect_if_dict`, which returns `_keys::Nothing` if x is not a Dict
   @assert x̄ isa AbstractVector{<:Union{Nothing, NamedTuple{(:first,:second)}}}
-  # we don't compute gradients with respect to keys 
+  # we don't compute gradients with respect to keys
   # @assert all(x -> x === nothing || x[1] == 0 || x[1] === nothing, x̄)
   d̄ = Dict(k => isnothing(x) ? nothing : x[2] for (x, k) in zip(x̄, _keys))
-  return d̄ 
+  return d̄
 end
 
 @adjoint iterate(r::UnitRange, i...) = iterate(r, i...), _ -> nothing
@@ -344,7 +344,7 @@ end
 # =============
 
 @adjoint parent(x::LinearAlgebra.Adjoint) = parent(x), ȳ -> (LinearAlgebra.Adjoint(ȳ),)
-@adjoint parent(x::LinearAlgebra.Transpose) = parent(x), ȳ -> (LinearAlgebra.Transpose(ȳ),)    
+@adjoint parent(x::LinearAlgebra.Transpose) = parent(x), ȳ -> (LinearAlgebra.Transpose(ȳ),)
 
 function _kron(mat1::AbstractMatrix,mat2::AbstractMatrix)
     m1, n1 = size(mat1)
@@ -355,8 +355,10 @@ function _kron(mat1::AbstractMatrix,mat2::AbstractMatrix)
 
     return reshape(mat1_rsh.*mat2_rsh, (m1*m2,n1*n2))
 end
+_kron(a::AbstractVector, b::AbstractVector) = vec(_kron(reshape(a, :, 1), reshape(b, :, 1)))
 
 @adjoint kron(a::AbstractMatrix, b::AbstractMatrix) = pullback(_kron, a, b)
+@adjoint kron(a::AbstractVector, b::AbstractVector) = pullback(_kron, a, b)
 
 @adjoint logabsdet(xs::AbstractMatrix) = logabsdet(xs), Δ -> (Δ[1] * inv(xs)',)
 
