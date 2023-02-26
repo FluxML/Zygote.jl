@@ -83,10 +83,14 @@ y, back = @test_inferred pullback(((a,b),) -> a, (5, 10))
 
 # testcase for issue #808
 # testing that methods(Base.show) does not throw. Having something more specific would be too fragile
-buf = IOBuffer()
-Base.show(buf, methods(Base.show))
-str_repr = String(take!(buf))
-@test !isempty(str_repr)
+show_err = try
+  buf = IOBuffer()
+  Base.show(buf, methods(Base.show))
+  nothing
+catch ex
+  ex
+end
+@test show_err === nothing
 
 struct Funky
     x
