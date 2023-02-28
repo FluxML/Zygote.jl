@@ -6,6 +6,7 @@ or a Hessian (by taking a second derivative).
 ```@docs
 Zygote.jacobian
 Zygote.hessian
+Zygote.hessian_reverse
 Zygote.diaghessian
 ```
 
