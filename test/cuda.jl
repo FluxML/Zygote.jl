@@ -1,6 +1,5 @@
 using CUDA
 using Zygote: Grads
-using LinearAlgebra
 using Random: randn!
 import FiniteDifferences
 CUDA.allowscalar(false)

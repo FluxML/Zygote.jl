@@ -4,7 +4,7 @@ using LinearAlgebra, Statistics
 using LinearAlgebra: copytri!, AbstractTriangular
 
 import ZygoteRules: @adjoint, @adjoint!, AContext, adjoint, _pullback, pullback,
-  literal_getproperty, literal_getfield
+  literal_getproperty, literal_getfield, unthunk_tangent
 
 using ChainRulesCore
 using ChainRules: ChainRules, rrule, unthunk, canonicalize

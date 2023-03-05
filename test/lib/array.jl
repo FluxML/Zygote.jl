@@ -1,5 +1,4 @@
 using ChainRulesTestUtils
-using LinearAlgebra
 using Zygote: ZygoteRuleConfig, _pullback
 
 # issue 897

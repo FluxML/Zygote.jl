@@ -178,10 +178,9 @@ end
 # For merge between NamedTuple and Dict, we will just convert the Dict to a NamedTuple.
 # and then call `pullback`, which should overall be pretty efficient code generated,
 # and it avoids trying to AD the problematic generic `merge(::NamedTuple, ::iter)` method which uses `push!`.
-if VERSION >= v"1.6"
-  @adjoint merge(nt::NamedTuple, dict::Dict) = pullback(merge, nt, NamedTuple(dict))
-else
-  @adjoint merge(nt::NamedTuple, dict::Dict) = pullback(merge, nt, (;dict...))
+function _pullback(cx::AContext, ::typeof(merge), a::NamedTuple, b::Dict{Symbol})
+  res, back = _pullback(cx, merge, a, NamedTuple(b))
+  return res, back ∘ unthunk_tangent
 end
 
 # Keyword arguments pretend to be a Dict, but are secretly wrapping a NamedTuple.

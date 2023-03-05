@@ -30,9 +30,13 @@ using Base.Broadcast: Broadcasted, AbstractArrayStyle, broadcasted, materialize
 # Utilities
 # =========
 
-# ChainRules already marks this non-differentiable,
-# But inference can still give up because of the Zygote -> CR wrapper layer
-@nograd Broadcast.combine_styles
+# ChainRules already marks this non-differentiable,# But inference can still give up because of the Zygote -> CR wrapper layer.
+# This has been desugared from the (deprecated) @nograd macro.
+@inline function Zygote._pullback(::AContext, ::typeof(Broadcast.combine_styles), args...)
+  dargs = ntuple(_ -> nothing, length(args) + 1)
+  combine_styles_pullback(_) = dargs
+  return Broadcast.combine_styles(args...), combine_styles_pullback
+end
 
 accum_sum(xs; dims = :) = reduce(accum, xs, dims = dims)
 
@@ -358,9 +362,12 @@ using GPUArraysCore  # replaces @require CUDA block, weird indenting to preserve
 
   # Make sure sum(f, ::CuArray) uses broadcase through forward-mode defined above
   # Not the ChainRules.rrule which will use the Zygote.Context and thus not be GPU compatible
-  @adjoint function sum(f, xs::AbstractGPUArray; kws...)
+  function _pullback(cx::AContext, ::Core.kwftype(typeof(sum)), kws, ::typeof(sum), f,
+                     xs::AbstractGPUArray)
     @assert !haskey(kws, :init) # TODO add init support (julia 1.6)
-    return pullback((f, xs) -> sum(f.(xs); kws...), __context__, f, xs)
+    res, back = _pullback(cx, (f, xs) -> sum(f.(xs); kws...), f, xs)
+    sum_gpuarray_pullback(Δ) = last(back(unthunk_tangent(Δ)))
+    return res, sum_gpuarray_pullback
   end
 
   @adjoint function Base.convert(::Type{T}, xs::Array)  where {T<:AbstractGPUArray}

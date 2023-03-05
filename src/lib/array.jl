@@ -279,7 +279,10 @@ end
   enumerate(xs), back
 end
 
-@adjoint Iterators.Filter(f, x) = pullback(filter, f, collect(x))
+function _pullback(cx::AContext, ::Type{<:Iterators.Filter}, f, x)
+  res, back = _pullback(cx, filter, f, collect(x))
+  return res, back ∘ unthunk_tangent
+end
 
 _ndims(::Base.HasShape{d}) where {d} = d
 _ndims(x) = Base.IteratorSize(x) isa Base.HasShape ? _ndims(Base.IteratorSize(x)) : 1
@@ -321,18 +324,12 @@ end
   end
 end
 
-@adjoint function sum(f, xs::AbstractArray{<:AbstractArray}; kws...)
-  @assert !haskey(kws, :init) # TODO add init support (julia 1.6)
-  return pullback((f, xs) -> sum(f.(xs); kws...), __context__, f, xs)
-end
-
 @adjoint function sum(xs::AbstractArray{Bool}; dims = :)
   sum(xs, dims = dims), Δ -> (nothing,)
 end
 
 function _pullback(cx::AContext, ::typeof(prod), f, xs::AbstractArray)
-  y, back = pullback((f, xs) -> prod(f.(xs)), cx, f, xs)
-  y, ȳ -> (nothing, back(ȳ)...)
+  return _pullback(cx, (f, xs) -> prod(f.(xs)), f, xs)
 end
 
 @adjoint real(x::AbstractArray) = real(x), r̄ -> (real(r̄),)
@@ -357,8 +354,14 @@ function _kron(mat1::AbstractMatrix,mat2::AbstractMatrix)
 end
 _kron(a::AbstractVector, b::AbstractVector) = vec(_kron(reshape(a, :, 1), reshape(b, :, 1)))
 
-@adjoint kron(a::AbstractMatrix, b::AbstractMatrix) = pullback(_kron, a, b)
-@adjoint kron(a::AbstractVector, b::AbstractVector) = pullback(_kron, a, b)
+function _pullback(cx::AContext, ::typeof(kron), a::AbstractVector, b::AbstractVector)
+  res, back = _pullback(cx, _kron, a, b)
+  return res, back ∘ unthunk_tangent
+end
+function _pullback(cx::AContext, ::typeof(kron), a::AbstractMatrix, b::AbstractMatrix)
+  res, back = _pullback(cx, _kron, a, b)
+  return res, back ∘ unthunk_tangent
+end
 
 @adjoint logabsdet(xs::AbstractMatrix) = logabsdet(xs), Δ -> (Δ[1] * inv(xs)',)
 
@@ -431,15 +434,6 @@ end
 @adjoint LinearAlgebra.UpperTriangular(A) = UpperTriangular(A), Δ->(UpperTriangular(Δ),)
 @adjoint LinearAlgebra.UnitLowerTriangular(A) = UnitLowerTriangular(A), Δ->(UnitLowerTriangular(Δ)-I,)
 @adjoint LinearAlgebra.UnitUpperTriangular(A) = UnitUpperTriangular(A), Δ->(UnitUpperTriangular(Δ)-I,)
-
-# This is basically a hack while we don't have a working `ldiv!`.
-@adjoint function \(A::Cholesky, B::AbstractVecOrMat)
-  Y, back = Zygote.pullback((U, B)->U \ (U' \ B), A.U, B)
-  return Y, function(Ȳ)
-    Ā_factors, B̄ = back(Ȳ)
-    return ((uplo=nothing, info=nothing, factors=Ā_factors), B̄)
-  end
-end
 
 function _symmetric_back(Δ, uplo)
   L, U, D = LowerTriangular(Δ), UpperTriangular(Δ), Diagonal(Δ)
@@ -572,14 +566,14 @@ _hermsympow(A::Hermitian, p::Integer) = A^p
 
 @adjoint function _hermsympow(A::Hermitian, p::Integer)
   if p < 0
-    B, back = Zygote.pullback(A->Base.power_by_squaring(inv(A), -p), A)
+    B, back = _pullback(__context__, A -> Base.power_by_squaring(inv(A), -p), A)
   else
-    B, back = Zygote.pullback(A->Base.power_by_squaring(A, p), A)
+    B, back = _pullback(__context__, A -> Base.power_by_squaring(A, p), A)
   end
   Ω = Hermitian(_realifydiag!(B))
   return Ω, function (Ω̄)
     B̄ = _hermitian_back(Ω̄, 'U')
-    Ā = back(B̄)[1]
+    Ā = last(back(B̄))
     return (Ā, nothing)
   end
 end
@@ -812,8 +806,8 @@ end
 # =======================
 
 @adjoint function broadcasted(op, r::AbstractFill{<:Real})
-  y, _back = Zygote.pullback(op, getindex_value(r))
-  back(Δ::AbstractFill) = (nothing, Fill(_back(getindex_value(Δ))[1], size(r)))
-  back(Δ::AbstractArray) = (nothing, getindex.(_back.(Δ), 1))
+  y, _back = _pullback(__context__, op, getindex_value(r))
+  back(Δ::AbstractFill) = (nothing, Fill(last(_back(getindex_value(Δ))), size(r)))
+  back(Δ::AbstractArray) = (nothing, last.(_back.(Δ)))
   return Fill(y, size(r)), back
 end
