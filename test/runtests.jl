@@ -1,4 +1,4 @@
-using Zygote, Test
+using Zygote, Test, LinearAlgebra
 using Zygote: gradient, ZygoteRuleConfig
 using CUDA
 using CUDA: has_cuda

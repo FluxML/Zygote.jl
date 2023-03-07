@@ -1,5 +1,3 @@
-using LinearAlgebra;
-
 @testset "base.jl" begin
     @testset "Dict getindex with implicit params" begin
         d = Dict{String, Vector{Float64}}("key"=>ones(4))

@@ -1,4 +1,3 @@
-using LinearAlgebra
 using ForwardDiff
 using Zygote: hessian_dual, hessian_reverse
 
