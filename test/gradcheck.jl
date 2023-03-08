@@ -1624,10 +1624,11 @@ end
   # Eventually these rules and tests will be moved to AbstractFFTs.jl
   # Rules for direct invocation of [i,r,b]fft have already been defined in
   # https://github.com/JuliaMath/AbstractFFTs.jl/pull/58
-  # however these apply only if the full method signature (including `region`) is used.
-  # Otherwise, rules for multiplication and left division by a AbstractFFTs.Plan
-  # are required, which will be implemented in
+
+  # ChainRules involing AbstractFFTs.Plan are not yet part of AbstractFFTs,
+  # but there is a WIP PR:
   # https://github.com/JuliaMath/AbstractFFTs.jl/pull/67
+  # After the above is merged, this testset can probably be removed entirely.
 
   findicateMat(i,j,n1,n2) = [(k==i) && (l==j) ? 1.0 : 0.0 for k=1:n1,
                              l=1:n2]
@@ -1641,11 +1642,11 @@ end
       indicateMat = [(k==i) && (l==j) ? 1.0 : 0.0 for k=1:size(X, 1),
                      l=1:size(X,2)]
       # gradient of ifft(fft) must be (approximately) 1 (for various cases)
-      @test gradient((X)->real.(ifft(fft(X, (1, 2)), (1, 2))[i, j]), X)[1] ≈ indicateMat
+      @test gradient((X)->real.(ifft(fft(X))[i, j]), X)[1] ≈ indicateMat
       # same for the inverse
-      @test gradient((X̂)->real.(fft(ifft(X̂, (1, 2)), (1, 2))[i, j]), X̂)[1] ≈ indicateMat
+      @test gradient((X̂)->real.(fft(ifft(X̂))[i, j]), X̂)[1] ≈ indicateMat
       # same for rfft(irfft)
-      @test gradient((X)->real.(irfft(rfft(X, (1, 2)), size(X,1), (1, 2)))[i, j], X)[1] ≈ real.(indicateMat)
+      @test gradient((X)->real.(irfft(rfft(X), size(X,1)))[i, j], X)[1] ≈ real.(indicateMat)
       # rfft isn't actually surjective, so rfft(irfft) can't really be tested this way.
 
       # the gradients are actually just evaluating the inverse transform on the
