@@ -4,6 +4,8 @@ steps:
       - JuliaCI/julia#v1:
           version: "1.6"
       - JuliaCI/julia-test#v1: ~
+    command:
+      - mkdir -p "${JULIA_DEPOT_PATH}/conda/3/x86_64"
     agents:
       queue: "juliagpu"
       cuda: "*"
@@ -14,6 +16,8 @@ steps:
       - JuliaCI/julia#v1:
           version: "1"
       - JuliaCI/julia-test#v1: ~
+    command:
+      - mkdir -p "${JULIA_DEPOT_PATH}/conda/3/x86_64"
     agents:
       queue: "juliagpu"
       cuda: "*"
