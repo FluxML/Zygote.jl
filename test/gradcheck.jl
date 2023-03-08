@@ -1625,7 +1625,7 @@ end
   # Rules for direct invocation of [i,r,b]fft have already been defined in
   # https://github.com/JuliaMath/AbstractFFTs.jl/pull/58
 
-  # ChainRules involing AbstractFFTs.Plan are not yet part of AbstractFFTs,
+  # ChainRules involving AbstractFFTs.Plan are not yet part of AbstractFFTs,
   # but there is a WIP PR:
   # https://github.com/JuliaMath/AbstractFFTs.jl/pull/67
   # After the above is merged, this testset can probably be removed entirely.
