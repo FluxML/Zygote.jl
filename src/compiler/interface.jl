@@ -132,8 +132,7 @@ julia> res.grad[w]
 function withgradient(f, args...)
   y, back = pullback(f, args...)
   grad = back(sensitivity(y))
-  results = isnothing(grad) ? map(_ -> nothing, args) : map(_project, args, grad)
-  (val=y, grad=results)
+  (val=y, grad=_project(args, grad))
 end
 
 # Param-style wrappers
