@@ -8,8 +8,6 @@ else
     using ..Tracker: Tracker, TrackedArray, TrackedReal
 end
 
-using Tracker: TrackedArray, TrackedReal
-
 Zygote.unwrap(x::Union{TrackedArray,TrackedReal}) = Tracker.data(x)
 
 Zygote.pullback(f, ps::Tracker.Params) = pullback(f, ZygtParams(ps))
