@@ -1,4 +1,16 @@
-using .Distances
+module ZygoteDistancesExt
+
+if isdefined(Base, :get_extension)
+    using Zygote
+    using Distances
+    using LinearAlgebra
+else
+    using ..Zygote
+    using ..Distances
+    using ..LinearAlgebra
+end
+
+using Zygote: @adjoint, @adjoint, AContext, _pullback
 
 @adjoint function (::SqEuclidean)(x::AbstractVector, y::AbstractVector)
   δ = x .- y
@@ -66,7 +78,7 @@ end
 
 _sqrt_if_positive(d, δ) = d > δ ? sqrt(d) : zero(d)
 
-function _pullback(cx::AContext, ::Core.kwftype(typeof(pairwise)),
+function Zygote._pullback(cx::AContext, ::Core.kwftype(typeof(pairwise)),
                    kws::@NamedTuple{dims::Int}, ::typeof(pairwise), dist::Euclidean,
                    X::AbstractMatrix, Y::AbstractMatrix)
   # Modify the forwards-pass slightly to ensure stability on the reverse.
@@ -81,7 +93,7 @@ function _pullback(cx::AContext, ::Core.kwftype(typeof(pairwise)),
   return res, pairwise_Euclidean_pullback
 end
 
-function _pullback(cx::AContext, ::Core.kwftype(typeof(pairwise)),
+function Zygote._pullback(cx::AContext, ::Core.kwftype(typeof(pairwise)),
                    kws::@NamedTuple{dims::Int}, ::typeof(pairwise), dist::Euclidean,
                    X::AbstractMatrix)
   # Modify the forwards-pass slightly to ensure stability on the reverse.
@@ -94,4 +106,6 @@ function _pullback(cx::AContext, ::Core.kwftype(typeof(pairwise)),
   res, back = _pullback(cx, _pairwise_euclidean, SqEuclidean(dist.thresh), X)
   pairwise_Euclidean_pullback(Δ) = (nothing, nothing, back(unthunk_tangent(Δ))...)
   return res, pairwise_Euclidean_pullback
+end
+
 end
