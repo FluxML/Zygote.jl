@@ -229,7 +229,7 @@ reconstruct_if_dict(x̄, _keys::Nothing) = x̄
 
 function reconstruct_if_dict(x̄, _keys)
   # This reverses `collect_if_dict`, which returns `_keys::Nothing` if x is not a Dict
-  @assert x̄ isa AbstractVector{<:Union{Nothing, AbstractZero, NamedTuple{(:first,:second)}}}
+  @assert x̄ isa AbstractVector # {<:Union{Nothing, AbstractZero, NamedTuple{(:first,:second)}}}
   # we don't compute gradients with respect to keys
   # @assert all(x -> x === nothing || x[1] == 0 || x[1] === nothing, x̄)
   d̄ = Dict(k => x === nothing || x isa AbstractZero ? x : x[2] for (x, k) in zip(x̄, _keys))
@@ -428,6 +428,7 @@ _symmetric_back(Δ::LowerTriangular, uplo) = collect(uplo == 'U' ? transpose(Δ)
 
 @adjoint function Symmetric(A::AbstractMatrix, uplo=:U)
   S = Symmetric(A, uplo)
+  back(Δ::AbstractZero) = (Δ, nothing)
   back(Δ::AbstractMatrix) = (_symmetric_back(Δ, S.uplo), nothing)
   back(Δ::NamedTuple) = (_symmetric_back(Δ.data, S.uplo), nothing)
   return S, back
@@ -452,6 +453,7 @@ end
 
 @adjoint function LinearAlgebra.Hermitian(A::AbstractMatrix, uplo=:U)
   H = Hermitian(A, uplo)
+  back(Δ::AbstractZero) = (Δ, nothing)
   back(Δ::AbstractMatrix) = (_hermitian_back(Δ, H.uplo), nothing)
   back(Δ::NamedTuple) = (_hermitian_back(Δ.data, H.uplo), nothing)
   return H, back

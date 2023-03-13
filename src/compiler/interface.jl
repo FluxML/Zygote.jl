@@ -185,7 +185,7 @@ Params(xs::Tuple) = Params(collect(xs))
 
 Base.in(x, ps::Params) = x in ps.params
 
-Base.map(::typeof(_project), args::Tuple{Params}, grad) = grad  # skip _project in gradient(f, ::Params)
+_project(::Tuple{Params}, grad) = grad  # skip _project in gradient(f, ::Params)
 
 function Base.union!(ps::Params, itrs...)
   foreach(itr -> foreach(x -> push!(ps, x), itr), itrs)
