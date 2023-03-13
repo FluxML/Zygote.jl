@@ -1,5 +1,5 @@
 using Zygote, Test, Random, LinearAlgebra, Statistics, SparseArrays, FillArrays,
-    AbstractFFTs, FFTW, Distances
+    AbstractFFTs, FFTW, Distances, ChainRulesCore
 using Zygote: gradient
 using Base.Broadcast: broadcast_shape
 using Distributed: pmap, CachingPool, workers
@@ -38,6 +38,7 @@ _joinreim(A) = A
 
 function _dropimaggrad(A)
   back(Δ) = real(Δ)
+  back(Δ::AbstractZero) = Δ
   back(Δ::Nothing) = nothing
   return Zygote.hook(back, A)
 end
