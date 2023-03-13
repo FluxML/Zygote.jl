@@ -150,7 +150,6 @@ Convert `dx` from the format Zygote uses internally to differentials types Chain
 @inline wrap_chainrules_input(::Nothing) = ChainRules.ZeroTangent()
 @inline wrap_chainrules_input(::Tuple{Vararg{Nothing}}) = ChainRules.ZeroTangent()
 @inline wrap_chainrules_input(::AbstractArray{Nothing}) = ChainRules.ZeroTangent()
-@inline wrap_chainrules_input(::AbstractArray{<:AbstractZero}) = ChainRules.ZeroTangent()
 @inline function wrap_chainrules_input(dxs::Union{Tuple, NamedTuple})
   xp = map(wrap_chainrules_input, dxs)
   # This produces Tangent{Any} since it does not get to see the primal, `x`.
@@ -382,6 +381,7 @@ end
 differential2zygote(dxs::AbstractArray{<:Number}) = dxs
 differential2zygote(dxs::AbstractArray{<:AbstractArray{<:Number}}) = dxs
 differential2zygote(dxs::AbstractArray) = map(differential2zygote, dxs)
+differential2zygote(dxs::Dict) = Dict(k => differential2zygote(v) for (k, v) in dxs)
 
 # Mostly used in rule genfuncs
 _iszerotype(T) = T === Nothing || T <: AbstractZero

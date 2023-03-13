@@ -315,8 +315,16 @@ function _pullback(cx::AContext, ::typeof(prod), f, xs::AbstractArray)
   return _pullback(cx, (f, xs) -> prod(f.(xs)), f, xs)
 end
 
-@adjoint real(x::AbstractArray) = real(x), r̄ -> (real(r̄),)
-@adjoint conj(x::AbstractArray) = conj(x), r̄ -> (conj(r̄),)
+@adjoint function real(x::AbstractArray)
+  real_array_pullback(r̄::AbstractZero) = (r̄,)
+  real_array_pullback(r̄) = (real(r̄),)
+  return real(x), real_array_pullback
+end
+@adjoint function conj(x::AbstractArray)
+  conj_array_pullback(r̄::AbstractZero) = (r̄,)
+  conj_array_pullback(r̄) = (conj(r̄),)
+  return conj(x), conj_array_pullback
+end
 @adjoint imag(x::AbstractArray) = imag(x), ī -> (complex.(0, real.(ī)),)
 
 
