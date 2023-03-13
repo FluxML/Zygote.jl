@@ -109,10 +109,6 @@ Convert `x` from the differentials types ChainRules uses to the format Zygote us
 @inline wrap_chainrules_output(x) = x
 @inline wrap_chainrules_output(x::AbstractThunk) = wrap_chainrules_output(unthunk(x))  # For now we are just not going to deal with thunks
 @inline wrap_chainrules_output(x::Tuple) = map(wrap_chainrules_output, x)
-# Zygote convention: even if many AbstractZero partials (i.e. multi-input function), make just 1 nothing.
-@inline wrap_chainrules_output(x::Tuple{Vararg{ChainRules.AbstractZero}}) = nothing
-@inline wrap_chainrules_output(x::ChainRules.AbstractZero) = nothing
-@inline wrap_chainrules_output(x::ChainRulesCore.NotImplemented) = nothing
 for T_outer in (:Tuple, :NamedTuple)
   # we create separate methods rather than using a `Union` + an `if` so that we avoid a
   # branch that changes output type, because nested AD on that kinda thing makes Zygote less
@@ -125,6 +121,8 @@ end
 wrap_chainrules_output(dxs::AbstractArray{<:Number}) = dxs
 wrap_chainrules_output(dxs::AbstractArray{<:AbstractArray{<:Number}}) = dxs
 wrap_chainrules_output(dxs::AbstractArray) = map(wrap_chainrules_output, dxs)
+
+
 #=
 # As an optimisation, we can convert by `reinterpret` for bitstypes, e.g. arrays of tuples of numbers
 @inline function wrap_chainrules_output(dxs::AbstractArray{<:ChainRules.Tangent{<:Any, B}}) where {B}
@@ -186,8 +184,11 @@ Also handles some Zygote-specific corrections, such as `x::Array, dx::Tuple`.
 Safe to apply to arbitrary input.
 """
 @inline function _project(x, dx)
-  wrap_chainrules_output(ProjectTo(x)(zygote2differential(dx, x)))
+  differential2zygote(ProjectTo(x)(zygote2differential(dx, x)))
 end
+
+_project(_, dx::Nothing) = nothing
+_project(x::Tuple, dx::Tuple) = map(_project, x, dx)
 
 # Restore splatted arrays
 _project(x::AbstractArray, dx::Tuple) = _project(x, reshape(collect(dx), axes(x)))
@@ -350,3 +351,42 @@ z2d(dx::NamedTuple{L,S}, primal::AbstractDict) where {L,S<:Tuple{Vararg{Union{Nu
 end
 
 z2d(dx::Ref, primal) = z2d(dx[], primal)  # mutable structs
+
+
+"""
+    differential2zygote(dx)
+
+Convert input `dx` from ChainRules differential types to the Zygote format.
+This is similar to `wrap_chainrules_output(dx)`, but converts zero types.
+"""
+@inline differential2zygote(@nospecialize(x)) = x
+@inline differential2zygote(::AbstractZero) = nothing
+@inline differential2zygote(::ChainRulesCore.NotImplemented) = nothing
+@inline differential2zygote(x::AbstractThunk) = differential2zygote(unthunk(x))  # For now we are just not going to deal with thunks
+for T_outer in (:Tuple, :NamedTuple)
+  # we create separate methods rather than using a `Union` + an `if` so that we avoid a
+  # branch that changes output type, because nested AD on that kinda thing makes Zygote less
+  # than happy.
+  @eval @inline differential2zygote(x::$T_outer) = map(differential2zygote, x)
+  @eval @inline function differential2zygote(x::Tangent{<:Any, <:$T_outer})
+    # this is accessing ChainRulesCore internals, but it is prob safe enough, and it is fastest
+    inner = ChainRulesCore.backing(canonicalize(x))
+    return differential2zygote(inner)
+  end
+end
+# Zygote convention: even if many AbstractZero partials (i.e. multi-input function), make just 1 nothing.
+@inline differential2zygote(::Tuple{Vararg{AbstractZero}}) = nothing
+@inline differential2zygote(::Tuple{}) = ()  # Edge case split off from the above method
+
+differential2zygote(dxs::AbstractArray{<:Number}) = dxs
+differential2zygote(dxs::AbstractArray{<:AbstractArray{<:Number}}) = dxs
+differential2zygote(dxs::AbstractArray) = map(differential2zygote, dxs)
+
+# Mostly used in rule genfuncs
+_iszerotype(T) = T === Nothing || T <: AbstractZero
+
+# Note: safe piracy to make @adjoint definitions work
+ZygoteRules.gradtuple0(x::AbstractZero) = x
+ZygoteRules.gradtuple1(x::AbstractZero) = x
+ZygoteRules.gradtuple2(x::AbstractZero) = x
+ZygoteRules.gradtuple3(x::AbstractZero) = x

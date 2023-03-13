@@ -42,7 +42,8 @@ tailmemaybe(x::Tuple) = Base.tail(x)
 @inline pullback(f, args...) = pullback(f, Context(), args...)
 function pullback(f, cx::AContext, args...)
   y, back = _pullback(cx, f, args...)
-  y, Δ -> tailmemaybe(back(Δ))
+  wrapped_back(Δ) = tailmemaybe(differential2zygote(back(Δ)))
+  y, wrapped_back
 end
 function pullback(cx::Context, f, args...)
   ChainRulesCore.ignore_derivatives() do
@@ -95,7 +96,7 @@ julia> gradient([7, 11], 0, 1) do x, y, d
 function gradient(f, args...)
   y, back = pullback(f, args...)
   grad = back(sensitivity(y))
-  isnothing(grad) ? nothing : map(_project, args, grad)
+  return _project(args, grad)
 end
 
 # Base.adjoint(f::Function) = x -> gradient(f, x)[1]  # piracy!

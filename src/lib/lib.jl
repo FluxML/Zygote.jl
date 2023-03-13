@@ -166,7 +166,11 @@ end
   first(xs), Δ -> ((Δ, drest...),)
 end
 
-@adjoint Base.tail(xs::Tuple) = tail(xs), x̄s -> ((nothing, x̄s...),)
+@adjoint function Base.tail(xs::Tuple)
+  Tuple_tail_pullback(x̄s::AbstractZero) = (x̄s,)
+  Tuple_tail_pullback(x̄s) = ((nothing, x̄s...),)
+  return tail(xs), Tuple_tail_pullback
+end
 
 _empty(x) = length(x)
 _empty(x::Union{Tuple,NamedTuple}) = map(_->nothing, x)
@@ -229,11 +233,14 @@ end
   val = getfield(x, f)
   function back(Δ)
     accum_param(__context__, val, Δ) === nothing && return
+    # Const properties on modules are considered non-differentiable
+    x isa Module && isconst(x, f) && return
     if isimmutable(x)
       dx = (; nt_nothing(x)..., pair(Val(f), Δ, x)...)
       (_project(x, dx), nothing)
     else
       dx = grad_mut(__context__, x)
+      # @show dx
       dx[] = (; dx[]..., pair(Val(f), accum(getfield(dx[], f), Δ))...)
       return (dx,nothing)
     end
@@ -305,24 +312,28 @@ end
 end
 
 # TODO captured mutables + multiple calls to `back`
-@generated function (back::Jnew{T,G,false})(Δ::Union{NamedTuple,Nothing,RefValue}) where {T,G}
-  !ismutabletype(T) && Δ == Nothing && return :nothing
-  Δ = G == Nothing ? :Δ :
-      Δ <: RefValue ? :(back.g[]) :
-      :(accum(back.g[], Δ))
+@generated function (back::Jnew{T,G,false})(Δ::Union{NamedTuple,Nothing,RefValue,AbstractZero}) where {T,G}
+  !ismutabletype(T) && _iszerotype(Δ) && return :Δ
+  Δ = if _iszerotype(G)
+    :Δ
+  elseif Δ <: RefValue
+    :(back.g[])
+  else
+    :(accum(back.g[], Δ))
+  end
   quote
     x̄ = $Δ
-    $(G == Nothing || :(back.g[] = nt_nothing($Δ)))
+    $(_iszerotype(G) || :(back.g[] = nt_nothing($Δ)))
     (nothing, $(map(f -> :(x̄.$f), fieldnames(T))...))
   end
 end
 
-@generated function (back::Jnew{T,G,true})(Δ::Union{NamedTuple,Nothing,RefValue}) where {T,G}
-  !ismutabletype(T) && Δ == Nothing && return :nothing
-  Δ = G == Nothing ? :Δ : :(back.g)
+@generated function (back::Jnew{T,G,true})(Δ::Union{NamedTuple,Nothing,RefValue,AbstractZero}) where {T,G}
+  !ismutabletype(T) && _iszerotype(Δ) && return :Δ
+  Δ = _iszerotype(G) ? :Δ : :(back.g)
   quote
     x̄ = $Δ
-    $(G == Nothing || :($Δ = nt_nothing($Δ)))
+    $(_iszerotype(G) || :($Δ = nt_nothing($Δ)))
     (nothing, ($(map(f -> :(x̄.$f), fieldnames(T))...),))
   end
 end
