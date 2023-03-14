@@ -175,7 +175,7 @@ _tryreverse(m::typeof(map), x) = _reverse(x)
 # Fallback
 _reverse(x) = reverse(x)
 
-# Known cases in the standard library on which `reverse` errors (issue #355)
+# Known cases in the standard library on which `reverse` errors (issue #1393)
 _reverse(x::LowerTriangular) = UpperTriangular(reverse(parent(x)))
 _reverse(x::UpperTriangular) = LowerTriangular(reverse(parent(x)))
 _reverse(x::UnitLowerTriangular) = UnitUpperTriangular(reverse(parent(x)))
