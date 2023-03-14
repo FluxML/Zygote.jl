@@ -65,3 +65,13 @@ end
     end
     @test gradient(f_comprehension, w)[1] == ones(5)
 end
+
+@testset "_reverse" begin
+    m = [1 2 3; 4 5 6; 7 8 9]
+    @testset for wrapper in [
+        Hermitian, Symmetric, LowerDiagonal, UpperDiagonal, 
+    ]
+        M = wrapper(m)
+        @test collect(_reverse(M)) == _reverse(collect(M))
+    end
+end
