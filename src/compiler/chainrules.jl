@@ -327,7 +327,7 @@ function z2d(delta::NamedTuple, primal::T) where T  # arbitrart struct
         return NoTangent()  # collapse all-zero case
       else
         backing = NamedTuple{$fnames}(inner)
-        return canonicalize(Tangent{T, typeof(backing)}(backing))
+        return Tangent{T, typeof(backing)}(backing)
       end
     end
   else
@@ -339,7 +339,7 @@ function z2d(delta::NamedTuple, primal::T) where T  # arbitrart struct
       return NoTangent()  # collapse all-zero case
     else
       backing = NamedTuple{fnames}(inner)
-      return canonicalize(Tangent{T, typeof(backing)}(backing))
+      return Tangent{T, typeof(backing)}(backing)
     end
   end
 end
