@@ -2,6 +2,8 @@ using Random, FillArrays, AbstractFFTs
 using FillArrays: AbstractFill, getindex_value
 using Base.Broadcast: broadcasted, broadcast_shape
 using Distributed: pmap, AbstractWorkerPool
+using LinearAlgebra: Diagonal, Hermitian, LowerTriangular, UpperTriangular
+using LinearAlgebra: UnitLowerTriangular, UnitUpperTriangular
 
 @adjoint Array(xs::AbstractArray) = Array(xs), ȳ -> (ȳ,)
 @adjoint Array(xs::Array) = Array(xs), ȳ -> (ȳ,)
@@ -165,10 +167,21 @@ end
 # This is also used by comprehensions, which do guarantee iteration order.
 # Not done for pmap, presumably because all is lost if you are relying on its order.
 _tryreverse(m, backs, Δ) = backs, Δ
-_tryreverse(m::typeof(map), backs, Δ) = reverse(backs), reverse(Δ)
+_tryreverse(m::typeof(map), backs, Δ) = _reverse(backs), _reverse(Δ)
 
 _tryreverse(m, x) = x
-_tryreverse(m::typeof(map), x) = reverse(x)
+_tryreverse(m::typeof(map), x) = _reverse(x)
+
+# Fallback
+_reverse(x) = reverse(x)
+
+# Known cases in the standard library on which `reverse` errors (issue #355)
+_reverse(x::LowerTriangular) = UpperTriangular(reverse(parent(x)))
+_reverse(x::UpperTriangular) = LowerTriangular(reverse(parent(x)))
+_reverse(x::UnitLowerTriangular) = UnitUpperTriangular(reverse(parent(x)))
+_reverse(x::UnitUpperTriangular) = UnitLowerTriangular(reverse(parent(x)))
+_reverse(x::Hermitian) = Hermitian(reverse(collect(x)))
+_reverse(x::Symmetric) = Symmetric(reverse(collect(x)))
 
 # With mismatched lengths, map stops early. With mismatched shapes, it makes a vector.
 # So we keep axes(x) to restore gradient dx to its full length & correct shape.
