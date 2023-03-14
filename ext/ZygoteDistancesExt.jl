@@ -89,7 +89,7 @@ function Zygote._pullback(cx::AContext, ::Core.kwftype(typeof(pairwise)),
     return _sqrt_if_positive.(D2, δ)
   end
   res, back = _pullback(cx, _pairwise_euclidean, SqEuclidean(dist.thresh), X, Y)
-  pairwise_Euclidean_pullback(Δ) = (nothing, nothing, back(unthunk_tangent(Δ))...)
+  pairwise_Euclidean_pullback(Δ) = (nothing, nothing, back(Zygote.unthunk_tangent(Δ))...)
   return res, pairwise_Euclidean_pullback
 end
 
@@ -104,7 +104,7 @@ function Zygote._pullback(cx::AContext, ::Core.kwftype(typeof(pairwise)),
     return _sqrt_if_positive.(D2, δ)
   end
   res, back = _pullback(cx, _pairwise_euclidean, SqEuclidean(dist.thresh), X)
-  pairwise_Euclidean_pullback(Δ) = (nothing, nothing, back(unthunk_tangent(Δ))...)
+  pairwise_Euclidean_pullback(Δ) = (nothing, nothing, back(Zygote.unthunk_tangent(Δ))...)
   return res, pairwise_Euclidean_pullback
 end
 
