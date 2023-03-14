@@ -10,7 +10,7 @@ else
     using ..LinearAlgebra
 end
 
-using Zygote: @adjoint, @adjoint, AContext, _pullback
+using Zygote: @adjoint, AContext, _pullback
 
 @adjoint function (::SqEuclidean)(x::AbstractVector, y::AbstractVector)
   δ = x .- y
