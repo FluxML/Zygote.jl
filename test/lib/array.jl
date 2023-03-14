@@ -68,7 +68,7 @@ end
 
 @testset "_reverse" begin
     m = [1 2 3; 4 5 6; 7 8 9]
-    @testset for wrapper in [
+    @testset "$wrapper" for wrapper in [
         Hermitian, Symmetric, LowerDiagonal, UpperDiagonal, 
     ]
         M = wrapper(m)
