@@ -180,8 +180,8 @@ _reverse(x::LowerTriangular) = UpperTriangular(reverse(parent(x)))
 _reverse(x::UpperTriangular) = LowerTriangular(reverse(parent(x)))
 _reverse(x::UnitLowerTriangular) = UnitUpperTriangular(reverse(parent(x)))
 _reverse(x::UnitUpperTriangular) = UnitLowerTriangular(reverse(parent(x)))
-_reverse(x::Hermitian) = Hermitian(reverse(collect(x)))
-_reverse(x::Symmetric) = Symmetric(reverse(collect(x)))
+_reverse(x::Hermitian) = Hermitian(_reverse(x.data), x.uplo == 'U' ? :L : :U)
+_reverse(x::Symmetric) = Symmetric(_reverse(x.data), x.uplo == 'U' ? :L : :U)
 
 # With mismatched lengths, map stops early. With mismatched shapes, it makes a vector.
 # So we keep axes(x) to restore gradient dx to its full length & correct shape.
