@@ -1,4 +1,6 @@
 using ChainRulesTestUtils
+using LinearAlgebra: Diagonal, Hermitian, LowerTriangular, UpperTriangular
+using LinearAlgebra: UnitLowerTriangular, UnitUpperTriangular
 using Zygote: ZygoteRuleConfig, _pullback
 
 # issue 897
@@ -74,5 +76,23 @@ end
     ]
         M = wrapper(m)
         @test collect(_reverse(M)) == _reverse(collect(M))
+    end
+end
+
+@testset "rrule for `map`" begin
+    @testset "MWE from #1393" begin
+        # https://github.com/FluxML/Zygote.jl/issues/1393#issuecomment-1468496804
+        struct Foo1393 x::Float64 end
+        (f::Foo1393)(x) = f.x * x
+        x = randn(5, 5)
+        out, pb = Zygote.pullback(x -> map(Foo1393(5.0), x), x)
+        @testset "$wrapper" for wrapper in [
+            Hermitian, Symmetric, LowerTriangular, UpperTriangular,
+            UnitLowerTriangular, UnitUpperTriangular,
+        ]
+            m = wrapper(rand(5, 5))
+            res = only(pb(m))
+            @test res == 5m
+        end
     end
 end
