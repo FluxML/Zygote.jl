@@ -17,6 +17,7 @@ steps:
           version: "1"
       - JuliaCI/julia-test#v1: ~
     command:
+      - ls "$${JULIA_DEPOT_PATH}"
       - mkdir -p "$${JULIA_DEPOT_PATH}/conda/3/x86_64"
     agents:
       queue: "juliagpu"
