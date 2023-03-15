@@ -1,7 +1,7 @@
 using ChainRulesTestUtils
 using LinearAlgebra: Diagonal, Hermitian, LowerTriangular, UpperTriangular
 using LinearAlgebra: UnitLowerTriangular, UnitUpperTriangular
-using Zygote: ZygoteRuleConfig, _pullback
+using Zygote: ZygoteRuleConfig, _pullback, _reverse
 
 # issue 897
 
