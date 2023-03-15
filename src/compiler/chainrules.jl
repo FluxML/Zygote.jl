@@ -312,6 +312,19 @@ end
 # Right now it uses a NamedTuple but not for fields of the AbstractDict struct
 z2d(dx::NamedTuple, primal::AbstractDict) = dx
 
+function _z2d_struct_fallback(delta::NamedTuple, primal::T) where T
+  fnames = fieldnames(T)
+  deltas = map(n -> get(delta, n, nothing), fnames)
+  primals = map(n -> getfield(primal, n), fnames)
+  inner = map(z2d, deltas, primals)  # recurse into fields
+  if inner isa Tuple{Vararg{AbstractZero}}
+    return NoTangent()  # collapse all-zero case
+  else
+    backing = NamedTuple{fnames}(inner)
+    return Tangent{T, typeof(backing)}(backing)
+  end
+end
+
 function z2d(delta::NamedTuple, primal::T) where T  # arbitrart struct
   if @generated
     fnames = fieldnames(T)
@@ -331,16 +344,7 @@ function z2d(delta::NamedTuple, primal::T) where T  # arbitrart struct
       end
     end
   else
-    fnames = fieldnames(T)
-    deltas = map(n -> get(delta, n, nothing), fnames)
-    primals = map(n -> getfield(primal, n), fnames)
-    inner = map(z2d, deltas, primals)  # recurse into fields
-    if inner isa Tuple{Vararg{AbstractZero}}
-      return NoTangent()  # collapse all-zero case
-    else
-      backing = NamedTuple{fnames}(inner)
-      return Tangent{T, typeof(backing)}(backing)
-    end
+    return _z2d_struct_fallback(delta, primal)
   end
 end
 

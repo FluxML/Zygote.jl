@@ -412,4 +412,11 @@ end
         @test Zygote.z2d((; x=(; re=1)), Ref(3.0+im)) == nested
         @test Zygote.z2d((; x=(; re=nothing)), Ref(3.0+im)) === NoTangent()
     end
+
+    x = (c = (a = randn(3,3), b = rand(3)), d = randn(5))
+    z2d_compiled = Zygote.z2d(x, x)
+    z2d_fallback = Zygote._z2d_struct_fallback(x, x)
+    @test z2d_compiled.d === z2d_fallback.d
+    @test z2d_compiled.c.a === z2d_fallback.c.a
+    @test z2d_compiled.c.b === z2d_fallback.c.b
 end
