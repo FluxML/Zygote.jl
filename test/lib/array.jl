@@ -1,5 +1,7 @@
 using ChainRulesTestUtils
-using Zygote: ZygoteRuleConfig, _pullback
+using LinearAlgebra: Diagonal, Hermitian, LowerTriangular, UpperTriangular
+using LinearAlgebra: UnitLowerTriangular, UnitUpperTriangular
+using Zygote: ZygoteRuleConfig, _pullback, _reverse
 
 # issue 897
 
@@ -64,4 +66,33 @@ end
         sum(v for (_, v) in d)
     end
     @test gradient(f_comprehension, w)[1] == ones(5)
+end
+
+@testset "_reverse" begin
+    m = [1 2 3; 4 5 6; 7 8 9]
+    @testset "$wrapper" for wrapper in [
+        Hermitian, Symmetric, LowerTriangular, UpperTriangular,
+        UnitLowerTriangular, UnitUpperTriangular,
+    ]
+        M = wrapper(m)
+        @test collect(_reverse(M)) == _reverse(collect(M))
+    end
+end
+
+@testset "rrule for `map`" begin
+    @testset "MWE from #1393" begin
+        # https://github.com/FluxML/Zygote.jl/issues/1393#issuecomment-1468496804
+        struct Foo1393 x::Float64 end
+        (f::Foo1393)(x) = f.x * x
+        x = randn(5, 5)
+        out, pb = Zygote.pullback(x -> map(Foo1393(5.0), x), x)
+        @testset "$wrapper" for wrapper in [
+            Hermitian, Symmetric, LowerTriangular, UpperTriangular,
+            UnitLowerTriangular, UnitUpperTriangular,
+        ]
+            m = wrapper(rand(5, 5))
+            res = only(pb(m))
+            @test res == 5m
+        end
+    end
 end
