@@ -69,8 +69,8 @@ end
 @testset "_reverse" begin
     m = [1 2 3; 4 5 6; 7 8 9]
     @testset "$wrapper" for wrapper in [
-        Hermitian, Symmetric, LowerDiagonal, UpperDiagonal,
-        UnitLowerDiagonal, UnitUpperDiagonal,
+        Hermitian, Symmetric, LowerTriangular, UpperTriangular,
+        UnitLowerTriangular, UnitUpperTriangular,
     ]
         M = wrapper(m)
         @test collect(_reverse(M)) == _reverse(collect(M))
