@@ -684,7 +684,7 @@ end
 @testset "PyCall custom @adjoint" begin
   # Trigger Python install if required. Required for Buildkite CI!
   import Conda
-  Conda.list() 
+  Conda.list()
 
   import PyCall
   math = PyCall.pyimport("math")
