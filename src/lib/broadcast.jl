@@ -284,6 +284,7 @@ end
 @inline function _broadcast_forward(::Type{<:Dual}, out, args::Vararg{Any, N}) where {N}
   valN = Val(N)
   y = broadcast(x -> value(x), out)
+  bc_fwd_back(ȳ::AbstractZero) = ȳ
   function bc_fwd_back(ȳ)
     dargs = ntuple(valN) do i
       unbroadcast(args[i], broadcast((y1, o1) -> y1 * partials(o1,i), ȳ, out))
@@ -297,6 +298,7 @@ end
 @inline function _broadcast_forward(::Type{<:Complex}, out, args::Vararg{Any, N}) where {N}
     valN = Val(N)
     y = broadcast(x -> Complex(value(real(x)), value(imag(x))), out)
+    bc_fwd_back(ȳ::AbstractZero) = ȳ
     function bc_fwd_back(ȳ)
       dargs = ntuple(valN) do i
         unbroadcast(args[i], broadcast((y1, o1) -> (real(y1)*partials(real(o1),i) + imag(y1)*partials(imag(o1), i)), ȳ, out))
@@ -311,6 +313,7 @@ end
 @inline function _broadcast_forward_complex(::Type{<:Dual}, out, args::Vararg{Any, N}) where {N}
     valN = Val(N)
     y = broadcast(x -> value(x), out)
+    bc_fwd_back(ȳ::AbstractZero) = ȳ
     function bc_fwd_back(ȳ)
       dargs = ntuple(valN) do i
         unbroadcast(args[i], broadcast((y1, o1) -> y1 * Complex(partials(o1, i), partials(o1, i+N)), ȳ, out))
@@ -335,6 +338,7 @@ end
 @inline function _broadcast_forward_complex(::Type{<:Complex}, out, args::Vararg{Any, N}) where {N}
     valN = Val(N)
     y = broadcast(x -> Complex(value(real(x)), value(imag(x))), out)
+    bc_fwd_back(ȳ::AbstractZero) = ȳ
     function bc_fwd_back(ȳ)
       dargs = ntuple(valN) do i
         unbroadcast(args[i], broadcast((y1, o1) -> _adjoint_complex(N, y1, o1, i), ȳ, out))

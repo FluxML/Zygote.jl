@@ -6,6 +6,7 @@ using IRTools: IR, Variable, Pipe, xcall, var, prewalk, postwalk,
 @inline tuple_va(N, xs) = xs
 @inline tuple_va(N, x, xs...) = (x, tuple_va(N, xs...)...)
 @inline tuple_va(::Val{N}, ::Nothing) where N = ntuple(_ -> nothing, Val(N))
+@inline tuple_va(::Val{N}, x::AbstractZero) where N = ntuple(_ -> x, Val(N))
 
 iscall(x, m::Module, n::Symbol) = isexpr(x, :call) && x.args[1] == GlobalRef(m, n)
 
