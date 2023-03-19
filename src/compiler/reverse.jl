@@ -99,7 +99,7 @@ function instrument_getindex!(ir, v, ex)
 end
 
 function instrument_iterate!(ir, v, ex)
-  func = trylookup(ir.from, ex.args[1])
+  func = ex.args[1]
   if func == GlobalRef(Base, :indexed_iterate) && length(ex.args) >= 3
     obj, idx, rest = ex.args[2], trylookup(ir.from, ex.args[3]), ex.args[4:end]
     if idx isa Union{QuoteNode,Integer}
