@@ -162,6 +162,14 @@ end
 @adjoint broadcasted(::Type{T}, x::Numeric) where {T<:Number} =
   T.(x), ȳ -> (nothing, _project(x, ȳ),)
 
+
+# Fix https://github.com/FluxML/Zygote.jl/issues/1399 by ensuring we avoid a lazier CR rule
+# https://github.com/JuliaDiff/ChainRules.jl/blob/5855c10bdbe691fc07822752f5b5865b9cea44d3/src/rulesets/Base/broadcast.jl#L199
+@adjoint function broadcasted(::typeof(*), x::Numeric, y::Numeric, zs::Numeric...)
+  y, back = _broadcast_generic(__context__, *, x, y, zs...)
+  return y, Base.tail∘back
+end
+
 # General Fallback
 # ================
 
@@ -194,7 +202,8 @@ _dual_safearg(x::Ref{<:Numeric{<:Complex}}) = true
 _dual_safearg(x::Union{Type,Val,Symbol}) = true  # non-differentiable types
 _dual_safearg(x) = false
 
-@adjoint function broadcasted(::AbstractArrayStyle, f::F, args...) where {F}
+@adjoint broadcasted(::AbstractArrayStyle, f::F, args...) where {F} = _broadcast_generic(__context__, f, args...)
+@inline function _broadcast_generic(__context__, f::F, args...) where {F}
   T = Broadcast.combine_eltypes(f, args)
   # Avoid generic broadcasting in two easy cases:
   if T == Bool
