@@ -2122,3 +2122,33 @@ end
     @test gradcheck(foo ∘ first, [-1e-5])
     @test gradient(foo, 1024.0)[1] ≈ 2//3
 end
+
+@testset "Zygote #1399" begin
+  function f1(t)  # this works
+    r = 5.0  # (changed to make answers the same)
+    sum(@. exp(-t*r))
+  end
+  @test gradient(f1, [1.0, 0.2])[1] ≈ [-0.03368973499542734, -1.8393972058572117]
+
+  function f2(t)  # this works, too
+    sum(@. exp(-t*5))
+  end
+  @test gradient(f2, [1.0, 0.2])[1] ≈ [-0.03368973499542734, -1.8393972058572117]
+
+  function f3(t)  # but this didn't work
+    r = 1.0
+    sum(@. exp(-t*r*5))
+  end
+  @test gradient(f3, [1.0, 0.2])[1] ≈ [-0.03368973499542734, -1.8393972058572117]
+
+  # Also test 4-arg case
+  function f4(t)
+    r = -0.5
+    sum(@. exp(t*r*5*2))
+  end
+  @test gradient(f4, [1.0, 0.2])[1] ≈ [-0.03368973499542734, -1.8393972058572117]
+
+  # Check that trivial scalar broadcast hasn't gone weird:
+  @test gradient(x -> @.(x * x * x), 2.0) == gradient(x -> x * (x * x), 2.0)
+  @test gradient(x -> @.(3.0*x*2.0*x), 2.0) == gradient(x -> 6(x^2), 2.0)
+end
