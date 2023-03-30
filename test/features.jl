@@ -322,7 +322,7 @@ end[1] == 5
 
 @test gradient(x -> one(eltype(x)), rand(10))[1] === nothing
 
-# Thre-way control flow merge
+# Three-way control flow merge
 @test gradient(1) do x
   if x > 0
     x *= 2
@@ -486,7 +486,7 @@ end
   @test gradient(x -> (getindex.(x).^2)[1], Ref.(1:3))[1][1] == (x=2.0,)  # rest are (x = 0.0,), but nothing would be OK too
   @test gradient(x -> (prod.(getindex.(x)))[1], Ref.(eachcol([1 2; 3 4])))[1][1] == (x = [3.0, 1.0],)
 
-  # Broadcasting over Ref is handled specially. Tested elsehwere too.
+  # Broadcasting over Ref is handled specially. Tested elsewhere too.
   @test gradient(x -> sum(sum, x .* [1,2,3]), Ref([4,5])) == ((x = [6.0, 6.0],),)
   @test gradient(x -> sum(sum, Ref(x) .* [1,2,3]), [4,5]) == ([6.0, 6.0],)
 end

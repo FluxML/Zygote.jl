@@ -131,7 +131,7 @@ julia> gradient(colordiff, RGB(1, 0, 0), RGB(0, 1, 0))
 
 ## Explicit and Implicit Parameters
 
-It's easy to work with even very large and complex models, and there are few ways to do this. Autograd-style models pass around a collection of weights. Depending on how you write your model, there are multiple ways to *explicity* take gradients with respect to parameters. For example, the function `linear` accepts the parameters as an argument to the model. So, we directly pass in the parameters, `θ`, as an argument to the function being differentiated.
+It's easy to work with even very large and complex models, and there are few ways to do this. Autograd-style models pass around a collection of weights. Depending on how you write your model, there are multiple ways to *explicitly* take gradients with respect to parameters. For example, the function `linear` accepts the parameters as an argument to the model. So, we directly pass in the parameters, `θ`, as an argument to the function being differentiated.
 
 ```@docs
 gradient(f, args...)

@@ -11,7 +11,7 @@ Use gradient checkpointing on the call `f(xs...)`. This means that
 `checkpointed(f, xs...) === f(xs...)`, but when computing the derivative
 intermediate results from the forward pass of `f` will not be stored. Instead the forward
 pass will be repeated, when computing the derivative.
-This saves memory at the cost of increasing exectution time.
+This saves memory at the cost of increasing execution time.
 
 !!! warning
     If `f` is not a pure function, `checkpointed` will likely give wrong results.

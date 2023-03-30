@@ -369,7 +369,7 @@ using GPUArraysCore  # replaces @require CUDA block, weird indenting to preserve
     sum(xs, dims = dims), Δ -> (placeholder .= Δ,)
   end
 
-  # Make sure sum(f, ::CuArray) uses broadcase through forward-mode defined above
+  # Make sure sum(f, ::CuArray) uses broadcast through forward-mode defined above
   # Not the ChainRules.rrule which will use the Zygote.Context and thus not be GPU compatible
   function _pullback(cx::AContext, ::typeof(sum), f, xs::AbstractGPUArray)
     res, back = _pullback(cx, (f, xs) -> sum(f.(xs)), f, xs)

@@ -168,7 +168,7 @@ gradient
     Params([A, B])
 
 Container for implicit parameters, used when differentiating
-a zero-argument funtion `() -> loss(A, B)` with respect to `A, B`.
+a zero-argument function `() -> loss(A, B)` with respect to `A, B`.
 """
 struct Params{B <: Buffer}
   order::B

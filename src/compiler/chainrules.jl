@@ -56,7 +56,7 @@ function has_chain_rrule(T)
   # It can be seen that checking if it matches is the correct way to decide if we should use the rrule or not.
 
 
-  if !is_ambig && matching_cr_sig(no_rrule_m, rrule_m)  # Not ambigious, and opted-out.
+  if !is_ambig && matching_cr_sig(no_rrule_m, rrule_m)  # Not ambiguous, and opted-out.
     # Return instance for configured_rrule_m as that will be invalidated 
     # directly if configured rule added, or indirectly if unconfigured rule added
     # Do not need an edge for `no_rrule` as no addition of methods to that can cause this
@@ -64,7 +64,7 @@ function has_chain_rrule(T)
     # using the rrule, so not using more rules wouldn't change anything.
     return false, configured_rrule_m.instance
   else
-    # Either is ambigious, and we should try to use it, and then error
+    # Either is ambiguous, and we should try to use it, and then error
     # or we are uses a rrule, no need to add any edges for `rrule`, as it will generate 
     # code with natural edges if a new method is defined there.
     # We also do not need an edge to `no_rrule`, as any time a method is added to `no_rrule`
@@ -78,7 +78,7 @@ matching_cr_sig(t, s) = matching_cr_sig(t.method.sig, s.method.sig)
 matching_cr_sig(::DataType, ::UnionAll) = false
 matching_cr_sig(::UnionAll, ::DataType) = false
 matching_cr_sig(t::Type, s::Type) = type_tuple_tail(t) == type_tuple_tail(s)
-matching_cr_sig(::Any, ::Nothing) = false  # ambigious https://github.com/FluxML/Zygote.jl/issues/1234
+matching_cr_sig(::Any, ::Nothing) = false  # ambiguous https://github.com/FluxML/Zygote.jl/issues/1234
 
 type_tuple_tail(d::DataType) = Tuple{d.parameters[2:end]...}
 function type_tuple_tail(d::UnionAll)
