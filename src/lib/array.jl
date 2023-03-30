@@ -608,7 +608,7 @@ end
 # ChainRules has this also but does not use FillArrays, so we have our own definition
 # for improved performance. See https://github.com/JuliaDiff/ChainRules.jl/issues/46
 Zygote.@adjoint function LinearAlgebra.tr(x::AbstractMatrix)
-  # x is a squre matrix checked by tr,
+  # x is a square matrix checked by tr,
   # so we could just use Eye(size(x, 1))
   # to create a Diagonal
   tr(x), function (Δ::Number)

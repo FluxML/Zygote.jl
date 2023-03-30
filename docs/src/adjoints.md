@@ -7,7 +7,7 @@
     To define custom sensitivities using ChainRulesCore, define a `ChainRulesCore.rrule(f, args...; kwargs...)`. Head to [ChainRules project's documentation](https://www.juliadiff.org/ChainRulesCore.jl/stable/) for more information.
     **If you are defining your custom adjoints using ChainRulesCore then you do not need to read this page**, and can consider it as documenting a legacy feature.
 
-    This page exists to descibe how Zygote works, and how adjoints can be directly defined for Zygote.
+    This page exists to describe how Zygote works, and how adjoints can be directly defined for Zygote.
     Defining adjoints this way does not make them accessible to other AD systems, but does let you do things that directly depend on how Zygote works.
     It allows for specific definitions of adjoints that are only defined for Zygote (which might work differently to more generic definitions defined for all AD).
 
