@@ -48,7 +48,7 @@ We got an error message and a long stacktrace. The error informs us that our cod
 
 !!! warning
 
-    Non-mutating functions may also use mutation under the hood. This can be done for performance reasons or code re-use.
+    Non-mutating functions might also use mutation under the hood. This can be done for performance reasons or code re-use.
 
 ```julia
 function g!(x, y)
