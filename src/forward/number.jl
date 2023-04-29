@@ -38,7 +38,7 @@ for f in [>, <, ==, ===, !=, in]
   @eval @tangent $f(a, b) = $f(a, b), (_, _) -> false
 end
 
-@tangent convert(T::Type{<:Real}, x::Real) = convert(T, x), (_, ẋ) -> convert(T, ẋ)
+@tangent pyconvert(T::Type{<:Real}, x::Real) = pyconvert(T, x), (_, ẋ) -> pyconvert(T, ẋ)
 
 @tangent function Colon()(xs...)
   c = Colon()(xs...)

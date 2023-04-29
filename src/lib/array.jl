@@ -487,10 +487,10 @@ end
   return H, back
 end
 
-@adjoint convert(::Type{R}, A::LinearAlgebra.HermOrSym{T,S}) where {T,S,R<:Array} = convert(R, A),
-  Δ -> (nothing, convert(S, Δ),)
+@adjoint pyconvert(::Type{R}, A::LinearAlgebra.HermOrSym{T,S}) where {T,S,R<:Array} = pyconvert(R, A),
+  Δ -> (nothing, pyconvert(S, Δ),)
 @adjoint Matrix(A::LinearAlgebra.HermOrSym{T,S}) where {T,S} = Matrix(A),
-  Δ -> (convert(S, Δ),)
+  Δ -> (pyconvert(S, Δ),)
 
 @adjoint function lyap(A::AbstractMatrix, C::AbstractMatrix)
   X = lyap(A, C)

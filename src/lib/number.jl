@@ -1,8 +1,8 @@
 function ChainRulesCore.rrule(
-    ::ZygoteRuleConfig, ::typeof(convert), T::Type{<:Real}, x::Real
+    ::ZygoteRuleConfig, ::typeof(pyconvert), T::Type{<:Real}, x::Real
 )
-    convert_pullback(Δ) = (NoTangent(), NoTangent(), Δ)
-    return convert(T, x), convert_pullback
+    pyconvert_pullback(Δ) = (NoTangent(), NoTangent(), Δ)
+    return pyconvert(T, x), pyconvert_pullback
 end
 
 function ChainRulesCore.rrule(

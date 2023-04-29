@@ -362,7 +362,7 @@ using GPUArraysCore  # replaces @require CUDA block, weird indenting to preserve
     broadcast_forward(f, args...)
 
   @adjoint (::Type{T})(xs::Array) where {T <: AbstractGPUArray} =
-    T(xs), Δ -> (convert(Array, Δ), )
+    T(xs), Δ -> (pyconvert(Array, Δ), )
 
   @adjoint function sum(xs::AbstractGPUArray; dims = :)
     placeholder = similar(xs)
@@ -383,8 +383,8 @@ using GPUArraysCore  # replaces @require CUDA block, weird indenting to preserve
     return res, sum_gpuarray_kw_pullback
   end
 
-  @adjoint function Base.convert(::Type{T}, xs::Array)  where {T<:AbstractGPUArray}
-    Base.convert(T, xs), Δ -> (nothing, Base.convert(Array, Δ),)
+  @adjoint function Base.pyconvert(::Type{T}, xs::Array)  where {T<:AbstractGPUArray}
+    Base.pyconvert(T, xs), Δ -> (nothing, Base.pyconvert(Array, Δ),)
   end
 
   pull_block_vert(sz, Δ::AbstractGPUArray, A::Number) = @allowscalar Δ[sz]

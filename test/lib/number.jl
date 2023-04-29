@@ -10,10 +10,10 @@
   @testset "basics" begin
     @test gradient(Base.literal_pow, ^, 3//2, Val(-5))[2] isa Rational
 
-    @test gradient(convert, Rational, 3.14) == (nothing, 1.0)
-    @test gradient(convert, Rational, 2.3) == (nothing, 1.0)
-    @test gradient(convert, UInt64, 2) == (nothing, 1.0)
-    @test gradient(convert, BigFloat, π) == (nothing, 1.0)
+    @test gradient(pyconvert, Rational, 3.14) == (nothing, 1.0)
+    @test gradient(pyconvert, Rational, 2.3) == (nothing, 1.0)
+    @test gradient(pyconvert, UInt64, 2) == (nothing, 1.0)
+    @test gradient(pyconvert, BigFloat, π) == (nothing, 1.0)
 
     @test gradient(Rational, 2) == (1//1,)
 
