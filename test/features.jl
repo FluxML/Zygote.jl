@@ -686,8 +686,9 @@ end
   import Conda
   Conda.list()
 
-  import PyCall
-  math = PyCall.pyimport("math")
+  add PythonCall
+  using PythonCall
+  math = pyimport("math")
   pysin(x) = math.sin(x)
   Zygote.@adjoint pysin(x) = math.sin(x), (δ) -> (δ * math.cos(x), )
   @test Zygote.gradient(pysin, 1.5) == Zygote.gradient(sin, 1.5)
