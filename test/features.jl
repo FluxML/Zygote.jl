@@ -866,3 +866,21 @@ end
   end
   @test gradient(f760, 3)[1] ≈ 123.93054835019153
 end
+
+@testset "withgradient" begin
+  @test withgradient([1,2,4]) do x
+    z = 1 ./ x
+    sum(z), z
+  end == (val = (1.75, [1.0, 0.5, 0.25]), grad = ([-1.0, -0.25, -0.0625],))
+
+  @test withgradient(3.0, 4.0) do x, y
+    (div = x/y, mul = x*y)
+  end == (val = (div = 0.75, mul = 12.0), grad = (0.25, -0.1875))
+
+  f3(x) = sum(sin, x), sum(cos, x), sum(tan, x)
+  g1 = gradient(first∘f3, [1,2,3.0])
+  y2, g2 = withgradient(first∘f3, [1,2,3.0])
+  y3, g3 = withgradient(f3, [1,2,3.0])
+  @test g1[1] ≈ g2[1] ≈ g3[1]
+end
+
