@@ -115,10 +115,8 @@ as a named tuple.
 julia> y, ∇ = withgradient(/, 1, 2)
 (val = 0.5, grad = (0.5, -0.25))
 
-julia> ∇ == gradient(/, 1, 2)  # explicit mode
+julia> ∇ == gradient(/, 1, 2)
 true
-
-julia> w = [3.0];
 ```
 
 If `f` returns a Tuple or NamedTuple, then it calculates
@@ -140,7 +138,9 @@ julia> withgradient(3.0, 4.0) do x, y
 Also supports implicit mode:
 
 ```jldoctest; setup=:(using Zygote)
-julia> res = withgradient(() -> sum(abs2, w), Params([w]))  # implicit mode
+julia> w = [3.0];
+
+julia> res = withgradient(() -> sum(abs2, w), Params([w]))
 (val = 9.0, grad = Grads(...))
 
 julia> res.grad[w]
