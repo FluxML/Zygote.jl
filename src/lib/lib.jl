@@ -206,11 +206,12 @@ if VERSION >= v"1.4.0-DEV.304"
   @adjoint! function Core._apply_iterate(::typeof(iterate), f, args...)
     y, back = Core._apply(_pullback, (__context__, f), args...)
     st = map(_empty, args)
-    y, function (Δ)
+    function _apply_iterate_pullback(Δ)
       Δ = back(Δ)
-      Δ === nothing ? nothing :
-        (nothing, first(Δ), unapply(st, Base.tail(Δ))...)
+      Δ isa Union{Nothing,AbstractZero} && return Δ
+      return (nothing, first(Δ), unapply(st, Base.tail(Δ))...)
     end
+    return y, _apply_iterate_pullback
   end
 end
 
