@@ -358,7 +358,8 @@ z2d(dx::Ref, primal) = z2d(dx[], primal)  # mutable structs
     differential2zygote(dx)
 
 Convert input `dx` from ChainRules differential types to the Zygote format.
-This is similar to `wrap_chainrules_output(dx)`, but converts zero types.
+This is similar to `wrap_chainrules_output(dx)`, but converts zero types,
+and recursively converts Tangents.
 """
 @inline differential2zygote(@nospecialize(x)) = x
 @inline differential2zygote(::AbstractZero) = nothing
