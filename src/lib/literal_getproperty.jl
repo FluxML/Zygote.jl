@@ -41,6 +41,8 @@ end
 
 
 # ugly hack to make differentiating `getproperty` infer a lot better
+if VERSION < v"1.10.0-DEV.873"
+# XXX: still needed on 1.10? if so, make this generator propagate world ages
 @generated function _pullback(cx::AContext, ::typeof(literal_getproperty), x, ::Val{f}) where f
     sig(x) = Tuple{x, typeof(f)}
     rrule_sig(x) = Tuple{typeof(getproperty), x, typeof(f)}
@@ -83,4 +85,6 @@ end
             _pullback(cx, getproperty, x, $(QuoteNode(f)))
         end
     end
+end
+
 end
