@@ -15,25 +15,25 @@ The first return value is `true` if the `rrule` exists, `false` otherwise.
 If it does not, then the second argument is a list of edges to attach to the CodeInfo for a generated function,
 such that if a suitable rule is defined later, the generated function will recompile.
 """
-function has_chain_rrule(T)
+function has_chain_rrule(T, world)
   config_T, arg_Ts = Iterators.peel(T.parameters)
-  configured_rrule_m = meta(Tuple{typeof(rrule), config_T, arg_Ts...})
+  configured_rrule_m = meta(Tuple{typeof(rrule), config_T, arg_Ts...}; world)
   is_ambig = configured_rrule_m === nothing  # this means there was an ambiguity error, on configured_rrule
 
 
   if !is_ambig && _is_rrule_redispatcher(configured_rrule_m.method)
     # The config is not being used:
     # it is being redispatched without config, so we need the method it redispatches to
-    rrule_m = meta(Tuple{typeof(rrule), arg_Ts...})
+    rrule_m = meta(Tuple{typeof(rrule), arg_Ts...}; world)
     # Thus any no_rrule that might apply must also not have a config because if there was a
     # no_rrule with a config that applied then there would also be a rrule with config that applied
-    no_rrule_m = meta(Tuple{typeof(ChainRulesCore.no_rrule), arg_Ts...})
+    no_rrule_m = meta(Tuple{typeof(ChainRulesCore.no_rrule), arg_Ts...}; world)
   else
     # Not being redispatched: it does have a config
     rrule_m = configured_rrule_m
     # Thus any no_rrule that might apply must also have a config because if it applied
     # it will be identical, and if it doesn't we don't care what it is.
-    no_rrule_m = meta(Tuple{typeof(ChainRulesCore.no_rrule), config_T, arg_Ts...})
+    no_rrule_m = meta(Tuple{typeof(ChainRulesCore.no_rrule), config_T, arg_Ts...}; world)
   end
 
   is_ambig |= rrule_m === nothing  # this means there was an ambiguity error on unconfigured rrule
