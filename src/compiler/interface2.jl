@@ -27,7 +27,7 @@ function _generate_pullback(ctx, world, f, args...)
   g = try
     _generate_pullback_via_decomposition(T, world)
   catch e
-    rethrow(CompileError(T,e))
+    return :(throw($(CompileError(T,e))))
   end
   g === nothing && return :(f(args...), Pullback{$T}((f,)))
   meta, forw, _ = g
@@ -45,7 +45,7 @@ function _generate_callable_pullback(j::Type{<:Pullback{T}}, world, Δ) where T
   g = try
     _generate_pullback_via_decomposition(T, world)
   catch e
-    rethrow(CompileError(T,e))
+    return :(throw($(CompileError(T,e))))
   end
   if g === nothing
     Δ == Nothing && return :nothing
