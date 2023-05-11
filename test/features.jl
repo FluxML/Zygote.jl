@@ -401,7 +401,11 @@ global_param = 3
   y, back = Zygote._pullback(cx, x -> x*global_param, 2)
   @test y == 6
   @test back(1) == (nothing, 3)
-  Zygote.cache(cx)[GlobalRef(Main, :global_param)] == 2
+  ref = first(keys(Zygote.cache(cx)))
+  @test ref isa GlobalRef
+  @test ref.mod == Main
+  @test ref.name == :global_param
+  @test Zygote.cache(cx)[ref] == 2
 end
 
 function pow_try(x)
