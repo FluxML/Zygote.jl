@@ -1,6 +1,6 @@
 # Mostly copied over from Cassette in `src/overdub.jl`
 # Return `Reflection` for signature `sigtypes` and `world`, if possible. Otherwise, return `nothing`.
-function reflect(@nospecialize(sigtypes::Tuple), world::UInt = typemax(UInt))
+function reflect(@nospecialize(sigtypes::Tuple), world::UInt)
     if length(sigtypes) > 2 && sigtypes[1] === typeof(invoke)
         @assert sigtypes[3] <: Type{<:Tuple}
         sigtypes = (sigtypes[2], sigtypes[3].parameters[1].parameters...)
@@ -41,23 +41,32 @@ end
 
 
 # ugly hack to make differentiating `getproperty` infer a lot better
-@generated function _pullback(cx::AContext, ::typeof(literal_getproperty), x, ::Val{f}) where f
+function _generate_literal_getproperty(ctx, world, x, ::Type{Val{f}}) where f
+    world = something(world, typemax(UInt))
+
     sig(x) = Tuple{x, typeof(f)}
     rrule_sig(x) = Tuple{typeof(getproperty), x, typeof(f)}
-    pb_sig(x) = Tuple{cx, typeof(getproperty), x, typeof(f)}
+    pb_sig(x) = Tuple{ctx, typeof(getproperty), x, typeof(f)}
+    @static if VERSION >= v"1.10.0-DEV.65"
+        which(f, t) = Base._which(Base.signature_type(f, t); world).method
+    else
+        which(f, t) = Base.which(f, t)
+    end
 
-    # either `getproperty` has a custom implementation or `_pullback(cx, getproperty, x, f)`
+    # either `getproperty` has a custom implementation or `_pullback(ctx, getproperty, x, f)`
     # / `rrule(getproperty, x, f) is overloaded directly
     is_getfield_fallback = which(getproperty, sig(x)) == which(getproperty, sig(Any)) &&
         which(_pullback, pb_sig(x)) == which(_pullback, pb_sig(Any)) &&
         which(rrule, rrule_sig(x)) == which(rrule, rrule_sig(Any))
 
-    #ccall(:jl_safe_printf, Cvoid, (Cstring,), "$is_getfield_fallback: $x\n")
-
     if is_getfield_fallback
         # just copy pullback of `literal_getfield`
-        mi, _sig, sparams = reflect((typeof(_pullback), cx, typeof(literal_getfield), x, Val{f}))
-        ci = copy(Core.Compiler.retrieve_code_info(mi))
+        mi, _sig, sparams = reflect((typeof(_pullback), ctx, typeof(literal_getfield), x, Val{f}), world)
+        ci = if VERSION >= v"1.10.0-DEV.873"
+            copy(Core.Compiler.retrieve_code_info(mi, world))
+        else
+            copy(Core.Compiler.retrieve_code_info(mi))
+        end
 
         # we need to change the second arg to `_pullback` from `literal_getproperty` to
         # `literal_getfield`
@@ -69,18 +78,44 @@ end
 
         # backedge for `_pullback`, see https://docs.julialang.org/en/v1/devdocs/ast/#MethodInstance
         # this will cause a backedge to this particular MethodInstance to be attached to
-        # `_pullback(cx, getproperty, x, f)`
-        mi_pb_getproperty, _, _ = reflect((typeof(_pullback), pb_sig(x).parameters...))
-        mi_getproperty, _, _ = reflect((typeof(getproperty), sig(x).parameters...))
-        mi_rrule, _, _ = reflect((typeof(rrule), rrule_sig(x).parameters...))
+        # `_pullback(ctx, getproperty, x, f)`
+        mi_pb_getproperty, _, _ = reflect((typeof(_pullback), pb_sig(x).parameters...), world)
+        mi_getproperty, _, _ = reflect((typeof(getproperty), sig(x).parameters...), world)
+        mi_rrule, _, _ = reflect((typeof(rrule), rrule_sig(x).parameters...), world)
         ci.edges = Core.MethodInstance[mi, mi_pb_getproperty, mi_getproperty, mi_rrule]
+        # XXX: on 1.10, we should also set metadata like min-world and max-world
 
         return ci
     else
         # nothing to optimize here, need to recurse into `getproperty`
         return quote
             Base.@_inline_meta
-            _pullback(cx, getproperty, x, $(QuoteNode(f)))
+            _pullback(ctx, getproperty, x, $(QuoteNode(f)))
         end
     end
+end
+
+if VERSION >= v"1.10.0-DEV.873"
+
+# on Julia 1.10, generated functions need to keep track of the world age
+
+function _literal_getproperty_pullback_generator(world::UInt, source, self, ctx, literal_getproperty, x, f)
+  ret = _generate_literal_getproperty(ctx, world, x, f)
+  ret isa Core.CodeInfo && return ret
+
+  stub = Core.GeneratedFunctionStub(identity, Core.svec(:methodinstance, :ctx, :literal_getproperty, :x, :f), Core.svec())
+  stub(world, source, ret)
+end
+
+@eval function _pullback(ctx::AContext, ::typeof(literal_getproperty), x, f)
+  $(Expr(:meta, :generated, _literal_getproperty_pullback_generator))
+  $(Expr(:meta, :generated_only))
+end
+
+else
+
+@generated function _pullback(ctx::AContext, ::typeof(literal_getproperty), x, f)
+    _generate_literal_getproperty(ctx, nothing, x, f)
+end
+
 end

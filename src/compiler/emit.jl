@@ -95,8 +95,8 @@ end
 
 varargs(m::Method, n) = m.isva ? n - m.nargs + 1 : nothing
 
-function _generate_pullback_via_decomposition(T)
-  (m = meta(T)) === nothing && return
+function _generate_pullback_via_decomposition(T, world)
+  (m = meta(T; world)) === nothing && return
   va = varargs(m.method, length(T.parameters))
   forw, back = stacks!(Adjoint(IR(m), varargs = va, normalise = false), T)
   m, forw, back
