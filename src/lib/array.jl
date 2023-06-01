@@ -376,8 +376,6 @@ function _pullback(cx::AContext, ::typeof(kron), a::AbstractMatrix, b::AbstractM
   return res, back ∘ unthunk_tangent
 end
 
-@adjoint logabsdet(xs::AbstractMatrix) = logabsdet(xs), Δ -> (Δ[1] * inv(xs)',)
-
 @adjoint function inv(A::Union{Number, AbstractMatrix})
   Ainv = inv(A)
   return Ainv, function (Δ)
