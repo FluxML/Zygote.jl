@@ -172,6 +172,8 @@ julia> (l::Linear)(x) = l.W * x .+ l.b
 julia> model = Linear(rand(2, 5), rand(2))
 Linear([0.267663 … 0.334385], [0.0386873, 0.0203294])
 
+julia> x = rand(5);
+
 julia> dmodel = gradient(model -> sum(model(x)), model)[1]
 (W = [0.652543 … 0.683588], b = [1.0, 1.0])
 ```
