@@ -41,24 +41,6 @@ end
 @adjoint (::Type{T})(sz) where {T<:Zeros} = T(sz), Δ->(nothing,)
 @adjoint (::Type{T})(sz) where {T<:Ones} = T(sz), Δ->(nothing,)
 
-@adjoint getindex(x::AbstractArray, inds...) = x[inds...], ∇getindex(x, inds)
-
-@adjoint view(x::AbstractArray, inds...) = view(x, inds...), ∇getindex(x, inds)
-
-∇getindex(x::AbstractArray{T,N}, inds) where {T,N} = dy -> begin
-  if inds isa NTuple{N,Int} && T <: Number
-    dx = OneElement(dy, inds, axes(x))
-  elseif inds isa NTuple{<:Any, Integer}
-    dx = _zero(x, typeof(dy))
-    dx[inds...] = dy
-  else
-    dx = _zero(x, eltype(dy))
-    dxv = view(dx, inds...)
-    dxv .= accum.(dxv, _droplike(dy, dxv))
-  end
-  return (_project(x, dx), map(_->nothing, inds)...)
-end
-
 """
     OneElement(val, ind, axes) <: AbstractArray
 
@@ -260,10 +242,10 @@ reconstruct_if_dict(x̄, _keys::Nothing) = x̄
 
 function reconstruct_if_dict(x̄, _keys)
   # This reverses `collect_if_dict`, which returns `_keys::Nothing` if x is not a Dict
-  @assert x̄ isa AbstractVector{<:Union{Nothing, NamedTuple{(:first,:second)}}}
+  @assert x̄ isa AbstractVector # {<:Union{Nothing, AbstractZero, NamedTuple{(:first,:second)}}}
   # we don't compute gradients with respect to keys
   # @assert all(x -> x === nothing || x[1] == 0 || x[1] === nothing, x̄)
-  d̄ = Dict(k => isnothing(x) ? nothing : x[2] for (x, k) in zip(x̄, _keys))
+  d̄ = Dict(k => x === nothing || x isa AbstractZero ? x : x[2] for (x, k) in zip(x̄, _keys))
   return d̄
 end
 
@@ -309,8 +291,9 @@ _ndims(x) = Base.IteratorSize(x) isa Base.HasShape ? _ndims(Base.IteratorSize(x)
       nd = _ndims(xs[n])
       dims = ntuple(i -> i<d ? i : i+nd, ndims(dy)-nd)
       d += nd
-      first(dy)[n] === nothing && return nothing
-      init = zero.(first(dy)[n]) # allows for tuples, which accum can add:
+      dy_1n = first(dy)[n]
+      (dy_1n === nothing || dy_1n isa AbstractZero) && return dy_1n
+      init = zero.(dy_1n) # allows for tuples, which accum can add:
       red = mapreduce(StaticGetter{n}(), accum, dy; dims=dims, init=init)
       return _project(xs[n], reshape(red, axes(xs[n])))
     end
@@ -345,8 +328,16 @@ function _pullback(cx::AContext, ::typeof(prod), f, xs::AbstractArray)
   return _pullback(cx, (f, xs) -> prod(f.(xs)), f, xs)
 end
 
-@adjoint real(x::AbstractArray) = real(x), r̄ -> (real(r̄),)
-@adjoint conj(x::AbstractArray) = conj(x), r̄ -> (conj(r̄),)
+@adjoint function real(x::AbstractArray)
+  real_array_pullback(r̄::AbstractZero) = (r̄,)
+  real_array_pullback(r̄) = (real(r̄),)
+  return real(x), real_array_pullback
+end
+@adjoint function conj(x::AbstractArray)
+  conj_array_pullback(r̄::AbstractZero) = (r̄,)
+  conj_array_pullback(r̄) = (conj(r̄),)
+  return conj(x), conj_array_pullback
+end
 @adjoint imag(x::AbstractArray) = imag(x), ī -> (complex.(0, real.(ī)),)
 
 
@@ -456,6 +447,7 @@ _symmetric_back(Δ::LowerTriangular, uplo) = collect(uplo == 'U' ? transpose(Δ)
 
 @adjoint function Symmetric(A::AbstractMatrix, uplo=:U)
   S = Symmetric(A, uplo)
+  back(Δ::AbstractZero) = (Δ, nothing)
   back(Δ::AbstractMatrix) = (_symmetric_back(Δ, S.uplo), nothing)
   back(Δ::NamedTuple) = (_symmetric_back(Δ.data, S.uplo), nothing)
   return S, back
@@ -480,15 +472,23 @@ end
 
 @adjoint function LinearAlgebra.Hermitian(A::AbstractMatrix, uplo=:U)
   H = Hermitian(A, uplo)
+  back(Δ::AbstractZero) = (Δ, nothing)
   back(Δ::AbstractMatrix) = (_hermitian_back(Δ, H.uplo), nothing)
   back(Δ::NamedTuple) = (_hermitian_back(Δ.data, H.uplo), nothing)
   return H, back
 end
 
-@adjoint convert(::Type{R}, A::LinearAlgebra.HermOrSym{T,S}) where {T,S,R<:Array} = convert(R, A),
-  Δ -> (nothing, convert(S, Δ),)
-@adjoint Matrix(A::LinearAlgebra.HermOrSym{T,S}) where {T,S} = Matrix(A),
-  Δ -> (convert(S, Δ),)
+@adjoint function convert(::Type{R}, A::LinearAlgebra.HermOrSym{T,S}) where {T,S,R<:Array}
+  convert_Array_HermOrSym_callback(Δ::AbstractZero) = (nothing, Δ)
+  convert_Array_HermOrSym_callback(Δ) = (nothing, convert(S, Δ))
+  return convert(R, A), convert_Array_HermOrSym_callback
+end
+
+@adjoint function Matrix(A::LinearAlgebra.HermOrSym{T,S}) where {T,S}
+  Matrix_HermOrSym_pullback(Δ::AbstractZero) = (Δ,)
+  Matrix_HermOrSym_pullback(Δ) = (convert(S, Δ),)
+  return Matrix(A), Matrix_HermOrSym_pullback
+end
 
 @adjoint function lyap(A::AbstractMatrix, C::AbstractMatrix)
   X = lyap(A, C)

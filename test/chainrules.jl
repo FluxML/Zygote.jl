@@ -271,8 +271,8 @@ using Zygote: ZygoteRuleConfig
         @test Zygote.gradient(f_notimplemented, 0.1) === (nothing,)
         @test Zygote.gradient(x -> f_notimplemented(x[1]), 0.1) === (nothing,)
         if isdefined(Base, :only)
-            @test Zygote.gradient(x -> f_notimplemented(only(x)), (0.1,)) === (nothing,)
-            @test Zygote.gradient(x -> f_notimplemented(only(x)), [0.1]) === (nothing,)
+            @test Zygote.gradient(x -> f_notimplemented(only(x)), (0.1,)) === ((nothing,),)
+            @test_broken Zygote.gradient(x -> f_notimplemented(only(x)), [0.1]) === (nothing,)
         end
     end
 

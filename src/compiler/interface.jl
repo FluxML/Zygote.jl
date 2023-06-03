@@ -42,7 +42,8 @@ tailmemaybe(x::Tuple) = Base.tail(x)
 @inline pullback(f, args...) = pullback(f, Context(), args...)
 function pullback(f, cx::AContext, args...)
   y, back = _pullback(cx, f, args...)
-  y, Δ -> tailmemaybe(back(Δ))
+  wrapped_back(Δ) = tailmemaybe(differential2zygote(back(Δ)))
+  y, wrapped_back
 end
 function pullback(cx::Context, f, args...)
   ChainRulesCore.ignore_derivatives() do
@@ -95,7 +96,7 @@ julia> gradient([7, 11], 0, 1) do x, y, d
 function gradient(f, args...)
   y, back = pullback(f, args...)
   grad = back(sensitivity(y))
-  isnothing(grad) ? nothing : map(_project, args, grad)
+  return _project(args, grad)
 end
 
 # Base.adjoint(f::Function) = x -> gradient(f, x)[1]  # piracy!
@@ -131,8 +132,7 @@ julia> res.grad[w]
 function withgradient(f, args...)
   y, back = pullback(f, args...)
   grad = back(sensitivity(y))
-  results = isnothing(grad) ? map(_ -> nothing, args) : map(_project, args, grad)
-  (val=y, grad=results)
+  (val=y, grad=_project(args, grad))
 end
 
 # Param-style wrappers
@@ -184,7 +184,7 @@ Params(xs::Tuple) = Params(collect(xs))
 
 Base.in(x, ps::Params) = x in ps.params
 
-Base.map(::typeof(_project), args::Tuple{Params}, grad) = grad  # skip _project in gradient(f, ::Params)
+_project(::Tuple{Params}, grad) = grad  # skip _project in gradient(f, ::Params)
 
 function Base.union!(ps::Params, itrs...)
   foreach(itr -> foreach(x -> push!(ps, x), itr), itrs)

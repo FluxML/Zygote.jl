@@ -1,5 +1,5 @@
 using Zygote, Test, Random, LinearAlgebra, Statistics, SparseArrays, FillArrays,
-    AbstractFFTs, FFTW, Distances
+    AbstractFFTs, FFTW, Distances, ChainRulesCore
 using Zygote: gradient
 using Base.Broadcast: broadcast_shape
 using Distributed: pmap, CachingPool, workers
@@ -38,6 +38,7 @@ _joinreim(A) = A
 
 function _dropimaggrad(A)
   back(Δ) = real(Δ)
+  back(Δ::AbstractZero) = Δ
   back(Δ::Nothing) = nothing
   return Zygote.hook(back, A)
 end
@@ -174,11 +175,11 @@ end
 
   # Ensure that nothings work with numeric types.
   _, back = Zygote.pullback(getindex, randn(4), [1])
-  @test back([nothing]) == (zeros(4), nothing)
+  @test back([nothing]) === nothing
 
   # Ensure that nothings work with non-numeric types.
   _, back = Zygote.pullback(getindex, [randn(2) for _ in 1:3], [1])
-  @test back([nothing]) == (nothing, nothing)
+  @test back([nothing]) === nothing
 end
 
 @testset "view" begin

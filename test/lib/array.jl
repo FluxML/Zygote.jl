@@ -26,8 +26,7 @@ end
         k = 2
         i = findfirst(p -> p[1] == k, collect(d))
         g = gradient(d -> collect(d)[i][2], d)[1]
-        @test g isa Dict{Int64, <:Union{Nothing, Int64}}
-        @test g[k] == 1
+        @test g == Dict(k => 1, 1 => nothing)
 
         g = gradient(d -> sum(v^2 for (_,v) in collect(d)), d)[1]
         @test g isa Dict{Int,Int}

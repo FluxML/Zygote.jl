@@ -3,7 +3,7 @@ module Zygote
 using LinearAlgebra, Statistics
 using LinearAlgebra: copytri!, AbstractTriangular
 
-import ZygoteRules: @adjoint, @adjoint!, AContext, adjoint, _pullback, pullback,
+import ZygoteRules: ZygoteRules, @adjoint, @adjoint!, AContext, adjoint, _pullback, pullback,
   literal_getproperty, literal_getfield, unthunk_tangent
 
 using ChainRulesCore
