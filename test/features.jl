@@ -866,3 +866,48 @@ end
   end
   @test gradient(f760, 3)[1] ≈ 123.93054835019153
 end
+
+@testset "Dict constructors" begin 
+  # pair
+  g = gradient(1 => 2) do x
+    d = Dict(x)
+    d[1]
+  end[1]
+  @test g == (first = nothing, second = 1)
+
+  # pairs
+  g = gradient(1 => 2, 2 => 3, 4=>10) do x1, x2, x3
+    d = Dict(x1, x2, x3)
+    d[1] + 2*d[4]
+  end
+  @test g == ((first = nothing, second = 1), nothing, (first = nothing, second = 2.0))
+
+  # array of pairs
+  g = gradient(2) do c
+    d = Dict([i => i*c for i in 1:3])
+    d[1] + 2*d[2]
+  end[1]
+  @test g == 5
+
+  # generator of pairs
+  @test_broken gradient(2) do c
+    d = Dict(i => i*c for i in 1:3)
+    d[1] + 2*d[2]
+  end[1]
+end
+
+# pullback(Dict, 1 => 2)
+
+# Zygote.refresh()
+# y, pb = Zygote._pullback(Zygote.Context(), Dict, 1 => 2)
+# pb(Dict(1 => 5))
+
+# gradient(2) do c
+#   d = Dict(i => i*c for i in 1:3)
+#   d[1] + 2*d[2]
+# end[1]
+
+# gradient(2) do c
+#   d = collect(i => i*c for i in 1:3)
+#   d[1][2] + 2*d[2][2]
+# end[1]
