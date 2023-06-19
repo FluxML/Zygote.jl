@@ -119,13 +119,15 @@ julia> ∇ == gradient(/, 1, 2)
 true
 ```
 
-If `f` returns a Tuple or NamedTuple, then it calculates
-`gradient(first∘f, args...)` but returns the whole `f(args...)`:
+Allows you to capture auxillary outputs, in addition to the scalar
+used by `gradient`. To do this, `f` must return a Tuple or NamedTuple.
+Then it calculates `grad = gradient(first∘f, args...)
+but returns the whole `val = f(args...)`:
 
 ```jldoctest; setup=:(using Zygote)
 julia> withgradient([1,2,4]) do x
           z = 1 ./ x
-          sum(z), z
+          sum(z), z  # here z is an auxillary output
        end
 (val = (1.75, [1.0, 0.5, 0.25]), grad = ([-1.0, -0.25, -0.0625],))
 
