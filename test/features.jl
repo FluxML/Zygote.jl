@@ -805,7 +805,7 @@ end
   @test gradient(xs -> sum(f.(xs)), [0.5, 1.0, 1.5])[1] == [1.0, 2.0, 0.0]
   # Real input, complex output
   f = x -> x > 1.0 ? 1.0im : (x + 1.0im)^2
-  @test gradient(xs -> sum(f.(xs)), [0.5, 1.0, 1.5])[1] == [2.5, 8.0, 0.0]
+  @test gradient(xs -> sum(abs2, f.(xs)), [0.5, 1.0, 1.5])[1] == [2.5, 8.0, 0.0]
   # Complex input, complex output
   f = x -> imag(x) > 1.0 ? 1.0im : x^2
   @test gradient(xs -> sum(abs2, f.(xs)), [0.5im, 1.0im, 1.5im])[1] == [
