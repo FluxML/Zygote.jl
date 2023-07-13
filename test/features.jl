@@ -798,8 +798,28 @@ end
   @test gradient(xs -> sum(map((x -> x<2 ? false : x^2), xs)), [1,2,3])[1][2:3] == [4, 6]
   @test gradient(xs -> mapreduce((x -> x<2 ? false : x^2), +, xs), [1,2,3])[1][2:3] == [4, 6]
 
-  # type stable forward pass with input, but type unstable with dualized input
-  
+  # https://github.com/FluxML/Zygote.jl/issues/1439
+  # type stable forward pass with given input, but type unstable with dualized input
+  # Real input, real output
+  f = x -> x > 1.0 ? 1.0 : x^2
+  @test gradient(xs -> sum(f.(xs)), [0.5, 1.0, 1.5])[1] == [1.0, 2.0, 0.0]
+  # Real input, complex output
+  f = x -> x > 1.0 ? 1.0im : (x + 1.0im)^2
+  @test gradient(xs -> sum(f.(xs)), [0.5, 1.0, 1.5])[1] == [2.5, 8.0, 0.0]
+  # Complex input, complex output
+  f = x -> imag(x) > 1.0 ? 1.0im : x^2
+  @test gradient(xs -> sum(abs2, f.(xs)), [0.5im, 1.0im, 1.5im])[1] == [
+    0.0 + 0.5im, 0.0 + 4.0im, 0.0 + 0.0im
+  ]
+  # Complex input, real output
+  f = x -> imag(x) > 1.0 ? 1.0 : abs2(x)
+  @test gradient(xs -> sum(abs2, f.(xs)), [0.5im, 1.0im, 1.5im])[1] == [
+    0.0 + 0.5im, 0.0 + 4.0im, 0.0 + 0.0im
+  ]
+  # Slightly more complex case that used to error
+  f = x -> x > 1.0 ? 1.0 : x^2
+  g = x -> sum(repeat(x, inner=2) .* f.(repeat(x, inner=2)))
+  @test gradient(g, [0.5, 1.0, 1.5])[1] == [1.5, 6.0, 2.0]
 
   # with Ref, Val, Symbol
   @test gradient(x -> sum(x .+ Ref(x[1])), [1,2,3]) == ([4,1,1],)
