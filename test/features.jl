@@ -798,6 +798,9 @@ end
   @test gradient(xs -> sum(map((x -> x<2 ? false : x^2), xs)), [1,2,3])[1][2:3] == [4, 6]
   @test gradient(xs -> mapreduce((x -> x<2 ? false : x^2), +, xs), [1,2,3])[1][2:3] == [4, 6]
 
+  # type stable forward pass with input, but type unstable with dualized input
+  
+
   # with Ref, Val, Symbol
   @test gradient(x -> sum(x .+ Ref(x[1])), [1,2,3]) == ([4,1,1],)
   @test gradient(x -> sum(x .+ (x[1],)), [1,2,3]) == ([4,1,1],)
