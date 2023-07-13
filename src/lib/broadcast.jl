@@ -283,7 +283,7 @@ end
   T = eltype(out)
   if !isconcretetype(T) || T <: Union{Dual, Complex{<:Dual}}
     if any(eltype(a) <: Complex for a in args)
-      return _broadcast_forward_complex(out, args...)
+      return _broadcast_forward_complex(T, out, args...)
     else
       return _broadcast_forward(out, args...)
     end
@@ -297,7 +297,7 @@ end
 @inline _extract_value(x::Complex) = Complex(value(real(x)), value(imag(x)))
 @inline _broadcast_scalar_pullback(ȳ, out, i) = ȳ * partials(out, i)
 @inline function _broadcast_scalar_pullback(ȳ::Complex, out, i)
-  return Complex(real(ȳ) * partials(real(out), i), imag(ȳ) * partials(imag(out), i))
+  return real(ȳ) * partials(real(out), i) + imag(ȳ) * partials(imag(out), i)
 end
 @inline function _broadcast_forward(out, args::Vararg{Any, N}) where {N}
   valN = Val(N)
