@@ -96,3 +96,13 @@ end
         end
     end
 end
+
+@testset "parent" begin
+    @testset "$constructor" for constructor in [LowerTriangular, UpperTriangular]
+        x = randn(2, 2)
+        y, pb = Zygote.pullback(x) do x
+            sum(parent(constructor(2 .* x)))
+        end
+        @test first(pb(one(y))) ≈ constructor(2 * ones(2, 2))
+    end
+end
