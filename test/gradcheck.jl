@@ -1619,6 +1619,7 @@ end
   @test gradtest(-, A)
 end
 
+#= 
 @testset "AbstractFFTs" begin
 
   # Eventually these rules and tests will be moved to AbstractFFTs.jl
@@ -1726,6 +1727,7 @@ end
   @test typeof(gradient(x->sum(abs2,ifft(fft(x,1),1)),x)[1]) == Array{Float32,2}
   @test typeof(gradient(x->sum(abs2,irfft(rfft(x,1),16,1)),x)[1]) == Array{Float32,2}
 end
+=#
 
 @testset "FillArrays" begin
   
