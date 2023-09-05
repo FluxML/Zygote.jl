@@ -329,6 +329,7 @@ end
 end
 
 # Reductions
+#=
 @adjoint function sum(xs::AbstractArray; dims = :)
   if dims === (:)
     sum(xs), Δ -> (Fill(Δ, size(xs)),)
@@ -336,6 +337,7 @@ end
     sum(xs, dims = dims), Δ -> (similar(xs) .= Δ,)
   end
 end
+=#
 
 @adjoint function sum(xs::AbstractArray{Bool}; dims = :)
   sum(xs, dims = dims), Δ -> (nothing,)
