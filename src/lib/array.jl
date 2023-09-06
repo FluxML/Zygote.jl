@@ -329,19 +329,6 @@ end
 end
 
 # Reductions
-#=
-@adjoint function sum(xs::AbstractArray; dims = :)
-  if dims === (:)
-    sum(xs), Δ -> (Fill(Δ, size(xs)),)
-  else
-    sum(xs, dims = dims), Δ -> (similar(xs) .= Δ,)
-  end
-end
-=#
-
-@adjoint function sum(xs::AbstractArray{Bool}; dims = :)
-  sum(xs, dims = dims), Δ -> (nothing,)
-end
 
 function _pullback(cx::AContext, ::typeof(prod), f, xs::AbstractArray)
   return _pullback(cx, (f, xs) -> prod(f.(xs)), f, xs)
