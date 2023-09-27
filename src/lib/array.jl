@@ -368,12 +368,10 @@ function _kron(mat1::AbstractMatrix,mat2::AbstractMatrix)
     return reshape(mat1_rsh.*mat2_rsh, (m1*m2,n1*n2))
 end
 _kron(a::AbstractVector, b::AbstractVector) = vec(_kron(reshape(a, :, 1), reshape(b, :, 1)))
+_kron(a::AbstractVector, b::AbstractMatrix) = _kron(reshape(a, :, 1), b)
+_kron(a::AbstractMatrix, b::AbstractVector) = _kron(a, reshape(b, :, 1))
 
-function _pullback(cx::AContext, ::typeof(kron), a::AbstractVector, b::AbstractVector)
-  res, back = _pullback(cx, _kron, a, b)
-  return res, back ∘ unthunk_tangent
-end
-function _pullback(cx::AContext, ::typeof(kron), a::AbstractMatrix, b::AbstractMatrix)
+function _pullback(cx::AContext, ::typeof(kron), a::AbstractVecOrMat, b::AbstractVecOrMat)
   res, back = _pullback(cx, _kron, a, b)
   return res, back ∘ unthunk_tangent
 end
