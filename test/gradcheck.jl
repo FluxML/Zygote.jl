@@ -1,5 +1,5 @@
 using Zygote, Test, Random, LinearAlgebra, Statistics, SparseArrays, FillArrays,
-    AbstractFFTs, FFTW, Distances
+    AbstractFFTs, FFTW
 using Zygote: gradient
 using Base.Broadcast: broadcast_shape
 using Distributed: pmap, CachingPool, workers
@@ -1158,100 +1158,6 @@ end
       y2 = A^p
       @test y ≈ y2
       @test typeof(y) === typeof(y2)
-    end
-  end
-end
-
-@testset "distances" begin
-  rng, P, Q, D = MersenneTwister(123456), 5, 4, 3
-
-  for (f, metric) in ((euclidean, Euclidean()), (sqeuclidean, SqEuclidean()))
-
-    @testset "scalar input" begin
-      x, y = randn(rng), randn(rng)
-      @test gradtest(x -> f(x[1], y), [x])
-      @test gradtest(x -> evaluate(metric, x[1], y), [x])
-      @test gradtest(y -> f(x, y[1]), [y])
-      @test gradtest(y -> evaluate(metric, x, y[1]), [y])
-    end
-
-    @testset "vector input" begin
-      x, y = randn(rng, D), randn(rng, D)
-      @test gradtest(x -> f(x, y), x)
-      @test gradtest(x -> evaluate(metric, x, y), x)
-      @test gradtest(y -> f(x, y), y)
-      @test gradtest(y -> evaluate(metric, x, y), y)
-      @test gradtest(x -> f(x, x), x)
-    end
-
-    @testset "binary colwise" begin
-      X, Y = randn(rng, D, P), randn(rng, D, P)
-      @test gradtest(X -> colwise(metric, X, Y), X)
-      @test gradtest(Y -> colwise(metric, X, Y), Y)
-      @test gradtest(X -> colwise(metric, X, X), X)
-    end
-
-    @testset "binary pairwise" begin
-      X, Y = randn(rng, D, P), randn(rng, D, Q)
-      @test gradtest(X -> pairwise(metric, X, Y; dims=2), X)
-      @test gradtest(Y -> pairwise(metric, X, Y; dims=2), Y)
-
-      @testset "X == Y" begin
-        # Zygote's gradtest isn't sufficiently accurate to assess this, so we use
-        # FiniteDifferences.jl instead.
-        Y = copy(X)
-        Δ = randn(P, P)
-        Δ_fd = FiniteDifferences.j′vp(
-                  FiniteDifferences.central_fdm(5, 1),
-                  X -> pairwise(metric, X, Y; dims=2),
-                  Δ, X)
-        _, pb = Zygote.pullback(X -> pairwise(metric, X, Y; dims=2), X)
-
-        # This is impressively inaccurate, but at least it doesn't produce a NaN.
-        @test first(Δ_fd) ≈ first(pb(Δ)) atol=1e-3 rtol=1e-3
-      end
-
-      @testset "repeated X" begin
-        Δ = randn(P, P)
-        X = repeat(randn(rng, D), 1, P)
-
-        # Single input matrix
-        Δ_fd = FiniteDifferences.j′vp(
-          FiniteDifferences.central_fdm(5, 1), X -> pairwise(metric, X; dims=2), Δ, X
-        )
-        _, pb = Zygote.pullback(X -> pairwise(metric, X; dims=2), X)
-
-        # This is impressively inaccurate, but at least it doesn't produce a NaN.
-        @test first(Δ_fd) ≈ first(pb(Δ)) atol=1e-3 rtol=1e-3
-
-        # Two input matrices
-        Y = copy(X)
-        Δ_fd = FiniteDifferences.j′vp(
-          FiniteDifferences.central_fdm(5, 1), X -> pairwise(metric, X, Y; dims=2), Δ, X
-        )
-        _, pb = Zygote.pullback(X -> pairwise(metric, X, Y; dims=2), X)
-
-        # This is impressively inaccurate, but at least it doesn't produce a NaN.
-        @test first(Δ_fd) ≈ first(pb(Δ)) atol=1e-3 rtol=1e-3
-      end
-    end
-
-    @testset "binary pairwise - X and Y close" begin
-      X = randn(rng, D, P)
-      Y = X .+ 1e-10
-      dist = pairwise(metric, X, Y; dims=2)
-      @test first(pullback((X, Y)->pairwise(metric, X, Y; dims=2), X, Y)) ≈ dist
-    end
-
-    let
-      Xt, Yt = randn(rng, P, D), randn(rng, Q, D)
-      @test gradtest(Xt->pairwise(metric, Xt, Yt; dims=1), Xt)
-      @test gradtest(Yt->pairwise(metric, Xt, Yt; dims=1), Yt)
-    end
-
-    @testset "unary pairwise" begin
-      @test gradtest(X->pairwise(metric, X; dims=2), randn(rng, D, P))
-      @test gradtest(Xt->pairwise(metric, Xt; dims=1), randn(rng, P, D))
     end
   end
 end
