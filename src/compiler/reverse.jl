@@ -132,6 +132,10 @@ function instrument(ir::IR)
     elseif isexpr(ex, :(=))
       @assert ex.args[1] isa GlobalRef
       pr[v] = xcall(Zygote, :global_set, QuoteNode(ex.args[1]), ex.args[2])
+    elseif isexpr(ex, :boundscheck)
+      # Expr(:boundscheck) now appears in common Julia code paths, so we need to handle it.
+      # For correctness sake, fix to true like https://github.com/dfdx/Umlaut.jl/issues/34.
+      pr[v] = true
     else
       ex = instrument_new!(pr, v, ex)
       ex = instrument_literals!(pr, v, ex)

@@ -225,3 +225,12 @@ end
 
 # issue 897
 @test gradient(x -> sum(norm, collect(eachcol(x))), ones(3, 400))[1] ≈ fill(0.5773502691896258, 3, 400)
+
+# Tests adapted from https://github.com/dfdx/Umlaut.jl/pull/35
+@eval _boundscheck_foo(x) = ifelse($(Expr(:boundscheck)), 2x, x)
+
+@testset "Meta Expr handling" begin
+  y, (dx,) = withgradient(_boundscheck_foo, 1)
+  @test y == 2
+  @test dx == 2
+end
