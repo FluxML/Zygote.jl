@@ -225,3 +225,23 @@ end
 
 # issue 897
 @test gradient(x -> sum(norm, collect(eachcol(x))), ones(3, 400))[1] ≈ fill(0.5773502691896258, 3, 400)
+
+# issue 1118 & 1380
+function f_1380(x)
+    if rand(Bool)
+        return x
+    else
+        return 2x
+    end
+
+    # unreachable
+    return nothing
+end
+
+@testset "unreachable block" begin
+    y, back = Zygote.pullback(f_1380, 1.)
+    # There should not be a compiler error
+    local g
+    @test_nowarn g = back(1.)
+    @test only(g) ∈ (1., 2.)
+end

@@ -244,7 +244,6 @@ Variable(a::Alpha) = Variable(a.id)
 sig(b::IRTools.Block) = unique([arg for br in branches(b) for arg in br.args if arg isa Variable])
 sig(pr::Primal) = Dict(b.id => sig(b) for b in blocks(pr.ir))
 
-# TODO unreachables?
 function adjointcfg(pr::Primal)
   ir = empty(pr.ir)
   return!(ir, nothing)
@@ -257,7 +256,8 @@ function adjointcfg(pr::Primal)
         push!(rb, xcall(Base, :(!==), alpha(pr.branches[b.id]), BranchNumber(i)))
       branch!(rb, preds[i].id, unless = cond)
     end
-    if !isempty(branches(b)) && branches(b)[end] == IRTools.unreachable
+    if isempty(preds) || (!isempty(branches(b)) && branches(b)[end] == IRTools.unreachable)
+      # An unreachable block in the primal will also be unreachable in the adjoint
       branch!(rb, 0)
     end
   end
