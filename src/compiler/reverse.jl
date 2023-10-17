@@ -257,7 +257,8 @@ function adjointcfg(pr::Primal)
       branch!(rb, preds[i].id, unless = cond)
     end
     if isempty(preds) || (!isempty(branches(b)) && branches(b)[end] == IRTools.unreachable)
-      # An unreachable block in the primal will also be unreachable in the adjoint
+      # If `b` is unreachable, then no context produced by the primal should end up branching to `rb`
+      push!(rb, xcall(Core, :throw, "unreachable")) # `throw` is necessary for inference not to hit the `unreachable`
       branch!(rb, 0)
     end
   end
