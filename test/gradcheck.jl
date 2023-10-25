@@ -114,7 +114,7 @@ end
   @test gradtest(X -> sum(sum(x -> x^2, X; dims=1)), randn(10)) # issue #681
 
   # Non-differentiable sum of booleans
-  @test gradient(sum, [true, false, true]) == (nothing,)
+  @test gradient(sum, [true, false, true]) === nothing
   @test gradient(x->sum(x .== 0.0), [1.2, 0.2, 0.0, -1.1, 100.0]) == (nothing,)
 
   # https://github.com/FluxML/Zygote.jl/issues/314
@@ -178,7 +178,7 @@ end
 
   # Ensure that nothings work with non-numeric types.
   _, back = Zygote.pullback(getindex, [randn(2) for _ in 1:3], [1])
-  @test back([nothing]) == (nothing, nothing)
+  @test back([nothing]) === nothing
 end
 
 @testset "view" begin
