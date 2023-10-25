@@ -41,24 +41,6 @@ end
 @adjoint (::Type{T})(sz) where {T<:Zeros} = T(sz), Δ->(nothing,)
 @adjoint (::Type{T})(sz) where {T<:Ones} = T(sz), Δ->(nothing,)
 
-@adjoint getindex(x::AbstractArray, inds...) = x[inds...], ∇getindex(x, inds)
-
-@adjoint view(x::AbstractArray, inds...) = view(x, inds...), ∇getindex(x, inds)
-
-∇getindex(x::AbstractArray{T,N}, inds) where {T,N} = dy -> begin
-  if inds isa NTuple{N,Int} && T <: Number
-    dx = OneElement(dy, inds, axes(x))
-  elseif inds isa NTuple{<:Any, Integer}
-    dx = _zero(x, typeof(dy))
-    dx[inds...] = dy
-  else
-    dx = _zero(x, eltype(dy))
-    dxv = view(dx, inds...)
-    dxv .= accum.(dxv, _droplike(dy, dxv))
-  end
-  return (_project(x, dx), map(_->nothing, inds)...)
-end
-
 """
     OneElement(val, ind, axes) <: AbstractArray
 
