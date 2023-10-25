@@ -2,13 +2,19 @@ using ForwardDiff
 using Zygote: hessian_dual, hessian_reverse
 
 @testset "hessian: $hess" for hess in [hessian_dual, hessian_reverse]
+  function f1(x, bias)
+    h = hess(x -> sum(x.^3), x)
+    return h * x .+ bias
+  end
 
   if hess == hessian_dual
     @test hess(x -> x[1]*x[2], randn(2)) ≈ [0 1; 1 0]
     @test hess(((x,y),) -> x*y, randn(2)) ≈ [0 1; 1 0]  # original docstring version
+    @test gradient(b->sum(f1(rand(3),b)),rand(3))[1] ≈ [1, 1, 1]
   else
     @test_broken hess(x -> x[1]*x[2], randn(2)) ≈ [0 1; 1 0]  # can't differentiate ∇getindex
     @test_broken hess(((x,y),) -> x*y, randn(2)) ≈ [0 1; 1 0]
+    @test_broken gradient(b->sum(f1(rand(3),b)),rand(3))[1] ≈ [1, 1, 1] # jacobian is not differentiable
   end
   @test hess(x -> sum(x.^3), [1 2; 3 4]) ≈ Diagonal([6, 18, 12, 24])
   @test hess(sin, pi/2) ≈ -1
@@ -132,7 +138,7 @@ using ForwardDiff
   g3(x) = sum(abs2,ForwardDiff.jacobian(f,x))
   out,back = Zygote.pullback(g3,[2.0,3.2])
   @test back(1.0)[1] == ForwardDiff.gradient(g3,[2.0,3.2])
-  
+
   # From https://github.com/FluxML/Zygote.jl/issues/1218
   f1218(x::AbstractVector,y::AbstractVector) = sum(x)*sum(y)
   gradf1218(x,y) = ForwardDiff.gradient(x->f1218(x,y), x)[1]

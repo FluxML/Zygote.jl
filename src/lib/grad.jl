@@ -61,8 +61,7 @@ julia> hessian(sin, pi/2)
 """
 hessian(f, x) = hessian_dual(f, x)
 
-hessian_dual(f, x::AbstractArray) = forward_jacobian(x -> gradient(f, x)[1], x)[2]
-
+hessian_dual(f, x::AbstractArray) = ForwardDiff.jacobian(x -> gradient(f, x)[1], x)
 hessian_dual(f, x::Number) = ForwardDiff.derivative(x -> gradient(f, x)[1], x)
 
 """
@@ -222,11 +221,11 @@ end
     diaghessian(f, args...) -> Tuple
 
 Diagonal part of the Hessian. Returns a tuple containing, for each argument `x`,
-`h` of the same shape with `h[i] = Hᵢᵢ = ∂²y/∂x[i]∂x[i]`. 
+`h` of the same shape with `h[i] = Hᵢᵢ = ∂²y/∂x[i]∂x[i]`.
 The original evaluation `y = f(args...)` must give a real number `y`.
 
 For one vector argument `x`, this is equivalent to `(diag(hessian(f,x)),)`.
-Like [`hessian`](@ref) it uses ForwardDiff over Zygote. 
+Like [`hessian`](@ref) it uses ForwardDiff over Zygote.
 
 !!! warning
     For arguments of any type except `Number` & `AbstractArray`, the result is `nothing`.
