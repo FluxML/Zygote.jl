@@ -64,5 +64,5 @@ end
   end
 
   m, b = Zygote._pullback(Zygote.Context(), nameof, M)
-  @test b(m) === nothing
+  @test b(m) == (nothing, nothing)
 end
