@@ -46,7 +46,7 @@ Requires = "1.1"
 PrecompileTools = "1"
 SpecialFunctions = "1.6, 2"
 Tracker = "0.2"
-ZygoteRules = "0.2.1"
+ZygoteRules = "0.2.4"
 julia = "1.6"
 
 [extensions]
