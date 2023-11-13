@@ -227,10 +227,30 @@ end
 @test gradient(x -> sum(norm, collect(eachcol(x))), ones(3, 400))[1] ≈ fill(0.5773502691896258, 3, 400)
 
 # Tests adapted from https://github.com/dfdx/Umlaut.jl/pull/35
-@eval _boundscheck_foo(x) = ifelse($(Expr(:boundscheck)), 2x, x)
+@eval _has_boundscheck(x) = ifelse($(Expr(:boundscheck)), 2x, x)
 
 @testset "Meta Expr handling" begin
-  y, (dx,) = withgradient(_boundscheck_foo, 1)
+  y, (dx,) = withgradient(_has_boundscheck, 1)
   @test y == 2
   @test dx == 2
+end
+
+# issue 1118 & 1380
+function f_1380(x)
+    if rand(Bool)
+        return x
+    else
+        return 2x
+    end
+
+    # unreachable
+    return nothing
+end
+
+@testset "unreachable block" begin
+    y, back = Zygote.pullback(f_1380, 1.)
+    # There should not be a compiler error
+    local g
+    @test_nowarn g = back(1.)
+    @test only(g) ∈ (1., 2.)
 end

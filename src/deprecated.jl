@@ -65,3 +65,9 @@ macro nograd(ex)
   end
   return blk
 end
+
+# Internal function used by some downstream packages.
+# Removing this completely would require some tricky registry changes,
+# but leaving it as a vestigial function is much easier.
+# See https://github.com/FluxML/Zygote.jl/pull/1328 for more context.
+function ∇getindex end
