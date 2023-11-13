@@ -27,7 +27,7 @@ accum(x::AbstractArray, ys::AbstractArray...) = accum.(x, ys...)
 @generated function accum(x::NamedTuple, y::NamedTuple)
   # assumes that y has no keys apart from those also in x
   if fieldnames(y) ⊈ fieldnames(x)
-    return :(throw(ArgumentError("$y keys must be a subset of $x keys")))
+    return :(throw(ArgumentError("$(typeof(y)) keys must be a subset of $(typeof(x)) keys")))
   end
 
   grad(field) = field in fieldnames(y) ? :(y.$field) : :nothing
