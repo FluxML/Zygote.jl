@@ -245,3 +245,46 @@ end
     @test_nowarn g = back(1.)
     @test only(g) ∈ (1., 2.)
 end
+
+function f_try_catch(x,y)
+    z = x + y
+    try
+        if x < 0.
+            throw(DomainError("x is negative"))
+        end
+        z = 2z + x + y
+    catch err
+        @error "something went wrong" exception=(err,catch_backtrace())
+    end
+    return 3z
+end
+
+@testset "try/catch" begin
+    @testset "happy path (nothrow)" begin
+        res, (dx,dy) = withgradient(f_try_catch, 1., 2.)
+        @test res == 3 * (2 * (1. + 2.) + 1. + 2.)
+        @test dx == 3. * (2. + 1.)
+        @test dy == 3. * (2. + 1.)
+    end
+
+    function foo_try(f)
+      y = 1
+      try
+        y = f()
+      catch
+        y
+      end
+      y
+    end
+
+    g, = gradient(x -> foo_try(() -> x), 1) # 1
+    @test g == 1.
+
+    vy, pull = pullback(foo_try, () -> 0//0) # bypass because of expr
+    @test vy === 1
+    @test_throws ErrorException pull(1.)
+
+    err = try pull(1.) catch ex; ex end
+    @test occursin("Can't differentiate function execution in catch block",
+                   string(err))
+end

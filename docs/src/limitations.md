@@ -82,27 +82,30 @@ julia> gradient(rand(3)) do y
 
 ## Try-catch statements
 
-Any expressions involving `try`/`catch` statements is not supported.
+Exceptions containing try-catch statements can be differentiated if the catch block is not reached (no error are thrown).
+
 ```julia
-function tryme(x)
-  try
-    2 * x
-  catch e
-    throw(e)
-  end
-end
-
-julia> gradient(rand(3)) do x
-         sum(tryme(x))
+julia> function safe_sqrt(x)
+           try
+               sqrt(x)
+           catch
+               0.
+           end
        end
-ERROR: Compiling Tuple{typeof(tryme), Vector{Float64}}: try/catch is not supported.
-Refer to the Zygote documentation for fixes.
-https://fluxml.ai/Zygote.jl/latest/limitations
+safe_sqrt (generic function with 1 method)
 
+julia> gradient(safe_sqrt, 4.)
+(0.25,)
+
+julia> val, pull = pullback(safe_sqrt, -1.)
+(0.0, Zygote.var"#76#77"{Zygote.Pullback{Tuple{typeof(safe_sqrt), Float64}, Any}}(∂(safe_sqrt)))
+
+julia> pull(1.)
+ERROR: Can't differentiate function execution in catch block at #= REPL[2]:3 =#.
 Stacktrace:
-  ...
 ```
-Here `tryme` uses a `try`/`catch` statement, and Zygote throws an error when trying to differentiate it as expected. `try`/`catch` expressions are used for error handling, but they are less common in Julia compared to some other languages.
+
+Here, the `safe_sqrt` function catches DomainError from the sqrt call when the input is out of domain and safely returns 0. Zygote is able to differentiate the function when no error is thrown by the sqrt call, but fails to differentiate when the control flow goes through the catch block.
 
 ## Foreign call expressions
 
