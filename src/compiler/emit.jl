@@ -43,15 +43,15 @@ function forward_stacks!(adj, F)
   stks, recs = [], []
   pr = adj.primal
   for b in blocks(pr), α in alphauses(block(adj.adjoint, b.id))
-    is_stack = runonce(b)
-    if is_stack
+    not_stack = runonce(b)
+    if not_stack
       push!(recs, Variable(α))
     else
       stk = pushfirst!(pr, xstack(Any))
       push!(recs, stk)
       push!(b, xcall(Zygote, :_push!, stk, Variable(α)))
     end
-    push!(stks, (b.id, alpha(α), is_stack))
+    push!(stks, (b.id, alpha(α), not_stack))
   end
   rec = push!(pr, xtuple(recs...))
   P = length(pr.blocks) == 1 ? Pullback{F} : Pullback{F,Any}
@@ -70,9 +70,9 @@ function reverse_stacks!(adj, stks)
   t = pushfirst!(blocks(ir)[end], xcall(:getfield, self, QuoteNode(:t)))
   repl = Dict()
   for b in blocks(ir)
-    for (i, (b′, α, is_stack)) in enumerate(stks)
+    for (i, (b′, α, not_stack)) in enumerate(stks)
       b.id == b′ || continue
-      if is_stack
+      if not_stack
         val = insertafter!(ir, t, xcall(:getindex, t, i))
       else
         stk = push!(entry, xcall(:getindex, t, i))
