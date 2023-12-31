@@ -685,13 +685,9 @@ end
   end == ([8 112; 36 2004],)
 end
 
-@testset "PyCall custom @adjoint" begin
-  # Trigger Python install if required. Required for Buildkite CI!
-  import Conda
-  Conda.list()
-
-  import PyCall
-  math = PyCall.pyimport("math")
+@testset "PythonCall custom @adjoint" begin
+  using PythonCall: pyimport
+  math = pyimport("math")
   pysin(x) = math.sin(x)
   Zygote.@adjoint pysin(x) = math.sin(x), (δ) -> (δ * math.cos(x), )
   @test Zygote.gradient(pysin, 1.5) == Zygote.gradient(sin, 1.5)
