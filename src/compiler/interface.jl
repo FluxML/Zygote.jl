@@ -257,7 +257,7 @@ function Base.delete!(ps::Params, x)
   return ps
 end
 
-Base.Broadcast.broadcasted(f, ps::Params) = broadcasted(f, ps.order)
+Base.Broadcast.broadcastable(ps::Params) = ps.order
 
 @adjoint function Broadcast.broadcasted(f::Function, ps::Params)
   f.(ps), _ -> throw(ArgumentError("Zygote.Params does not support broadcasting within gradients, try iteration `for p in ps`"))
