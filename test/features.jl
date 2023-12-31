@@ -686,10 +686,10 @@ end
 end
 
 @testset "PythonCall custom @adjoint" begin
-  using PythonCall: pyimport
+  using PythonCall: pyimport, pyconvert
   math = pyimport("math")
   pysin(x) = math.sin(x)
-  Zygote.@adjoint pysin(x) = math.sin(x), (δ) -> (δ * math.cos(x), )
+  Zygote.@adjoint pysin(x) = pyconvert(Float64, math.sin(x)), δ -> (δ * math.cos(x),)
   @test Zygote.gradient(pysin, 1.5) == Zygote.gradient(sin, 1.5)
 end
 
