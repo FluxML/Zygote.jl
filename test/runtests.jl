@@ -1,17 +1,17 @@
 using Zygote, Test, LinearAlgebra
 using Zygote: gradient, ZygoteRuleConfig
-using CUDA
-using CUDA: has_cuda
 
 @testset "all" begin  # Overall testset ensures it keeps running after failure
-
-  if has_cuda()
-    @testset "CUDA tests" begin
-      include("cuda.jl")
+  if !haskey(ENV, "GITHUB_ACTION")
+    using CUDA
+    if CUDA.has_cuda()
+      @testset "CUDA tests" begin
+        include("cuda.jl")
+      end
+      @info "CUDA tests have run"
+    else
+      @warn "CUDA not found - Skipping CUDA Tests"
     end
-    @info "CUDA tests have run"
-  else
-    @warn "CUDA not found - Skipping CUDA Tests"
   end
 
   @testset "deprecated.jl" begin
