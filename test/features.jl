@@ -689,7 +689,7 @@ end
   using PythonCall: pyimport, pyconvert
   math = pyimport("math")
   pysin(x) = math.sin(x)
-  Zygote.@adjoint pysin(x) = pyconvert(Float64, math.sin(x)), δ -> (δ * math.cos(x),)
+  Zygote.@adjoint pysin(x) = pyconvert(Float64, math.sin(x)), δ -> (pyconvert(Float64, δ * math.cos(x)),)
   @test Zygote.gradient(pysin, 1.5) == Zygote.gradient(sin, 1.5)
 end
 
