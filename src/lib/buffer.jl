@@ -28,12 +28,19 @@ end
   end
 end
 
-@adjoint! function copyto!(b::Buffer, xs)
+@adjoint! function copyto!(b::Buffer, xs::AbstractArray)
   copyto!(b, xs), function (_)
     grad = grad_mut(__context__, b)
     x̄s = copy(grad)
     grad .= eltype(grad) <: Number ? 0 : nothing
     return (nothing, x̄s)
+  end
+end
+
+@adjoint! function copyto!(b::Buffer, x::Number)
+  copyto!(b, x), function (_)
+    grad = grad_mut(__context__, b)
+    return (nothing, sum(grad))
   end
 end
 
@@ -44,8 +51,9 @@ end
   end
 end
 
-_pullback(cx::AContext, ::typeof(Broadcast.materialize!), b::Buffer, x) =
-  _pullback(cx, copyto!, b, x)
+function _pullback(cx::AContext, ::typeof(Broadcast.materialize!), b::Buffer, x)
+    _pullback(cx, copyto!, b, x)
+end
 
 @adjoint function copy(b::Buffer)
   res = copy(b)
