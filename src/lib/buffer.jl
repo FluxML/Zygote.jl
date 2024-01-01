@@ -44,7 +44,7 @@ end
   end
 end
 
-_pullback(cx::AContext, ::typeof(Broadcast.materialize!), b::Buffer, x::AbstractArray) =
+_pullback(cx::AContext, ::typeof(Broadcast.materialize!), b::Buffer, x) =
   _pullback(cx, copyto!, b, x)
 
 @adjoint function copy(b::Buffer)

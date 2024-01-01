@@ -523,7 +523,7 @@ end
   @test gradtest(x -> maximum(x, dims=[1, 2]), rand(2, 3, 4))
 
   @test gradient(x -> 1 / maximum(x), [1., 2, 3])[1] == [0, 0, -1/9]
-  
+
   # issue 1224, second order
   f1244(w, x) = sum(maximum((w * x).^2, dims=1))
   g1244(w, x) = sum(gradient(f1244, w, x)[2].^2)
@@ -1538,6 +1538,12 @@ using Zygote: Buffer
     return sum(copy(b))
   end == ([2,2,2],)
 
+  @test gradient([1, 2, 3]) do xs
+    b = Zygote.Buffer(xs)
+    b .= 2
+    return sum(copy(b))
+  end == (nothing,)
+
   @test gradient(2) do x
     b = Zygote.Buffer([])
     push!(b, x)
@@ -1701,7 +1707,7 @@ end
 end
 
 @testset "FillArrays" begin
-  
+
   @test gradcheck(x->sum(Fill(x[], (2, 2))), [0.1])
   @test first(Zygote.gradient(sz->sum(Ones(sz)), 6)) === nothing
   @test first(Zygote.gradient(sz->sum(Zeros(sz)), 6)) === nothing
