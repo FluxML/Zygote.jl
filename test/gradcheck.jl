@@ -1544,6 +1544,12 @@ using Zygote: Buffer
     return sum(copy(b))
   end == (nothing,)
 
+  @test gradient(1.1) do p
+    b = Zygote.Buffer(zeros(3))
+    b .= (p*i for i in eachindex(b))
+    return sum(copy(b) .* (2:4))
+  end[1] ≈ 1*2 + 2*3 + 3*4
+
   @test gradient(2) do x
     b = Zygote.Buffer([])
     push!(b, x)

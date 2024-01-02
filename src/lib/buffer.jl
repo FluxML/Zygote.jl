@@ -28,21 +28,6 @@ end
   end
 end
 
-@adjoint! function copyto!(b::Buffer, xs::AbstractArray)
-  copyto!(b, xs), function (_)
-    grad = grad_mut(__context__, b)
-    x̄s = copy(grad)
-    grad .= eltype(grad) <: Number ? 0 : nothing
-    return (nothing, x̄s)
-  end
-end
-
-@adjoint! function copyto!(b::Buffer, x::Number)
-  copyto!(b, x), function (_)
-    grad = grad_mut(__context__, b)
-    return (nothing, sum(grad))
-  end
-end
 
 @adjoint! function push!(b::Buffer, x)
   push!(b, x), function (y)
@@ -51,9 +36,6 @@ end
   end
 end
 
-function _pullback(cx::AContext, ::typeof(Broadcast.materialize!), b::Buffer, x)
-    _pullback(cx, copyto!, b, x)
-end
 
 @adjoint function copy(b::Buffer)
   res = copy(b)
@@ -69,4 +51,18 @@ end
   end
 
   return res, copy_sensitivity
+end
+
+Base.BroadcastStyle(::Type{Buffer{T,A}}) where {T,A} = Base.BroadcastStyle(A)
+
+@non_differentiable Base.Broadcast.Broadcasted(::Nothing)
+
+function _pullback(cx::AContext, ::typeof(copyto!), b::Buffer, bc::Base.Broadcast.Broadcasted)
+  xs, map_pullback = ∇map(cx, i -> bc[i], eachindex(bc))
+  copyto!(b, xs), function (_)
+    grad = grad_mut(cx, b)
+    # ys = copy(grad)
+    d, = map_pullback(reshape(first(grad, length(xs)), size(xs)))
+    return (nothing, nothing, d.bc)
+  end
 end
