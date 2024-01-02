@@ -18,6 +18,11 @@ test_rrule(ZygoteRuleConfig(), x->sum(sin, Diagonal(x)), rand(3); rrule_f=rrule_
     # This was wrong before https://github.com/FluxML/Zygote.jl/pull/1170
     @test gradient(x -> sum([y[2] * y[3] for y in Iterators.product(x, x, x, x)]), [1,2,3,4])[1] ≈ [320, 320, 320, 320]
     @test gradient(x -> sum(y[2] * y[3] for y in Iterators.product(x, x, x, x)), [1,2,3,4])[1] ≈ [320, 320, 320, 320]
+
+    for p in (1.0, fill(1.0), [1.0])
+        @test gradient(p -> sum([x*q for q in p, x in 1:3]), p) == (6p,)
+        # @test gradient(p -> sum(x*q for (q, p) in Iterators.product(p, 1:3)), p) == (6.0,)
+    end
 end
 
 @testset "collect" begin
