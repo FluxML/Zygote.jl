@@ -82,7 +82,7 @@ julia> gradient(rand(3)) do y
 
 ## Try-catch statements
 
-Exceptions containing try-catch statements can be differentiated if the catch block is not reached (no error are thrown).
+Code containting try-catch blocks can be differentiated as long as no exception is actually thrown.
 
 ```julia
 julia> function safe_sqrt(x)
