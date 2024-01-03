@@ -288,6 +288,11 @@ _ndims(x) = Base.IteratorSize(x) isa Base.HasShape ? _ndims(Base.IteratorSize(x)
   Iterators.product(xs...), back
 end
 
+function _pullback(cx::AContext, ::typeof(collect), p_::Base.Iterators.ProductIterator)
+  p, back = _pullback(cx, Iterators.product, p_.iterators...)
+  collect(p), y -> (nothing, (iterators=back(y),))
+end
+
 @adjoint function Iterators.Zip(xs)
   axs = map(_tryaxes, xs)  # same function used for map
   back(dy::NamedTuple{(:is,)}) = tuple(dy.is)
