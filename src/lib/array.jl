@@ -268,29 +268,30 @@ end
 _ndims(::Base.HasShape{d}) where {d} = d
 _ndims(x) = Base.IteratorSize(x) isa Base.HasShape ? _ndims(Base.IteratorSize(x)) : 1
 
+function prodfunc(xs, dy)
+  @assert length(first(dy)) == length(xs)
+  ndim = map(Zygote._ndims, xs)
+  cdim = cumsum((0, ndim[begin:end-1]...))
+  getters = ntuple(n -> StaticGetter{n}(), Val(length(xs)))
+  dims = Vector{Int}(undef, length(xs))
+  map(first(dy), xs, cdim, ndim, getters) do dyn, x, cd, nd, getter
+    dyn === nothing && return nothing
+    append!(empty!(dims), 1:cd, cd+nd+1:ndims(dy))
+    init = map(zero, dyn) # allows for tuples, which accum can add:
+    red = mapreduce(getter, accum, dy; dims=_ndims(x) == 0 ? (:) : dims, init=init)
+    return _project(x, _ndims(x) == 0 ? red : reshape(red, axes(x)))
+  end
+end
+
 @adjoint function Iterators.product(xs...)
   back(::AbstractArray{Nothing}) = nothing
   back(dy::NamedTuple{(:iterators,)}) = dy.iterators
-  function back(dy::AbstractArray)
-    @assert length(first(dy)) == length(xs)
-    ndim = map(Zygote._ndims, xs)
-    cdim = cumsum((0, ndim[begin:end-1]...))
-    getters = ntuple(n -> StaticGetter{n}(), Val(length(xs)))
-    dims = Vector{Int}(undef, length(xs))
-    map(first(dy), xs, cdim, ndim, getters) do dyn, x, cd, nd, getter
-      dyn === nothing && return nothing
-      append!(empty!(dims), 1:cd, cd+nd+1:ndims(dy))
-      init = map(zero, dyn) # allows for tuples, which accum can add:
-      red = mapreduce(getter, accum, dy; dims=_ndims(x) == 0 ? (:) : dims, init=init)
-      return _project(x, _ndims(x) == 0 ? red : reshape(red, axes(x)))
-    end
-  end
+  back(dy::AbstractArray) = prodfunc(xs, dy)
   Iterators.product(xs...), back
 end
 
-function _pullback(cx::AContext, ::typeof(collect), p_::Base.Iterators.ProductIterator)
-  p, back = _pullback(cx, Iterators.product, p_.iterators...)
-  collect(p), y -> (nothing, (iterators=back(y),))
+@adjoint function Base.collect(p::Base.Iterators.ProductIterator)
+  collect(p), dy -> ((iterators=prodfunc(p.iterators, dy),),)
 end
 
 @adjoint function Iterators.Zip(xs)

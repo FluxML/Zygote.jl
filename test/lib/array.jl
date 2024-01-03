@@ -23,6 +23,11 @@ test_rrule(ZygoteRuleConfig(), x->sum(sin, Diagonal(x)), rand(3); rrule_f=rrule_
         @test gradient(p -> sum([x*q for q in p, x in 1:3]), p) == (6p,)
         # @test gradient(p -> sum(x*q for (q, p) in Iterators.product(p, 1:3)), p) == (6.0,)
     end
+
+    @test gradient(x -> sum(broadcast(prod, Iterators.product(x,x))), ones(4)) == (2*4ones(4),)
+    @test gradient(x -> sum(broadcast(prod, Iterators.product(x .^ 2, x))), ones(4)) == (3*4ones(4),)
+    @test gradient(x -> sum(broadcast(prod, Iterators.product(x, x .^ 2))), ones(4)) == (3*4ones(4),)
+    @test gradient(x -> sum(broadcast(prod, Iterators.product(x .^ 2, x .^ 2))), ones(4)) == (4*4ones(4),)
 end
 
 @testset "collect" begin
