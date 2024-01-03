@@ -251,20 +251,6 @@ end
 
 @adjoint iterate(r::UnitRange, i...) = iterate(r, i...), _ -> nothing
 
-@adjoint function sort(x::AbstractArray; by=identity)
-  p = sortperm(x, by=by)
-  return x[p], x̄ -> (x̄[invperm(p)],)
-end
-
-@adjoint function filter(f, x::AbstractVector)
-    t = map(f, x)
-    x[t], Δ -> begin
-        dx = _zero(x, eltype(Δ))
-        dx[t] .= Δ
-        (nothing, dx)
-    end
-end
-
 # Iterators
 
 @adjoint function enumerate(xs)
