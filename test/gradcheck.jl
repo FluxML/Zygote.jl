@@ -425,13 +425,17 @@ end
       [2,3,1],
       [1, 2, 3],
       [1,2,3],
-      [2,1,3]
+      [2,1,3],
+      [1,3,2],
+      [3,2,1]
   ]
   for i = 1:3
     @test gradient(v->sort(v)[i], [3.,1,2])[1][correct[1][i]] == 1
     @test gradient(v->sort(v)[i], [1.,2,3])[1][correct[2][i]] == 1
     @test gradient(v->sort(v,by=x->x%10)[i], [11,2,99])[1][correct[3][i]] == 1
     @test gradient(v->sort(v,by=x->x%10)[i], [2,11,99])[1][correct[4][i]] == 1
+    @test gradient(v->sort(v,rev=true)[i], [3.,1,2])[1][correct[5][i]] == 1
+    @test gradient(v->sort(v,rev=true)[i], [1.,2,3])[1][correct[6][i]] == 1
   end
 end
 
