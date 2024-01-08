@@ -18,6 +18,9 @@ end
 end
 
 # IdSet (needed for nested AD with implicit params)
+
+grad_mut(::IdSet) = IdSet()
+
 function _pullback(cx::AContext, ::typeof(push!), s::IdSet, @nospecialize(x))
   res = push!(s, x)
   function idset_push!_pullback(_)
