@@ -67,6 +67,10 @@ sensitivity(y::Complex) = error("Output is complex, so the gradient is not defin
 sensitivity(y::AbstractArray) = error("Output is an array, so the gradient is not defined. Perhaps you wanted jacobian.")
 sensitivity(y) = error("Output should be scalar; gradients are not defined for output $(repr(y))")
 
+# Preserves output as tuple when gradients are collapsed
+_project_all(::NTuple{N}, ::Nothing) where {N} = ntuple(_ -> nothing, N)
+_project_all(x::Tuple, dx::Tuple) = map(_project, x, dx)
+
 """
     gradient(f, args...)
 
@@ -95,7 +99,7 @@ julia> gradient([7, 11], 0, 1) do x, y, d
 function gradient(f, args...)
   y, back = pullback(f, args...)
   grad = back(sensitivity(y))
-  isnothing(grad) ? nothing : map(_project, args, grad)
+  return _project_all(args, grad)
 end
 
 # Base.adjoint(f::Function) = x -> gradient(f, x)[1]  # piracy!
@@ -161,7 +165,7 @@ function withgradient(f, args...)
   else
     back(sensitivity(y))
   end
-  results = isnothing(grad) ? map(_ -> nothing, args) : map(_project, args, grad)
+  results = _project_all(args, grad)
   (val=y, grad=results)
 end
 
@@ -420,6 +424,9 @@ function pullback(f, ps::Params)
     Grads(cx.cache, ps) # TODO make a copy
   end
 end
+
+# No conversion required here
+_project_all(_, dx::Grads) = dx
 
 # Code Reflection
 
