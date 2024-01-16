@@ -295,14 +295,24 @@ end
   return collect(p), collect_product_pullback
 end
 
-@adjoint function Iterators.Zip(xs)
-  axs = map(_tryaxes, xs)  # same function used for map
-  back(dy::NamedTuple{(:is,)}) = tuple(dy.is)
-  back(dy::AbstractArray) = ntuple(length(xs)) do d
-    dx = map(StaticGetter{d}(), dy)
-    _project(xs[d], _restore(dx, axs[d]))
-  end |> tuple
-  Iterators.Zip(xs), back
+function zipfunc(xs, dy)
+  getters = ntuple(n -> StaticGetter{n}(), Val(length(xs)))
+  map(xs, getters) do x, getter
+    dx = map(getter, dy)
+    _project(x, _restore(dx, _tryaxes(x)))
+  end
+end
+
+@adjoint function Iterators.zip(xs...)
+  back(::AbstractArray{Nothing}) = nothing
+  back(dy::NamedTuple{(:is,)}) = dy.is
+  back(dy::AbstractArray) = zipfunc(xs, dy)
+  Iterators.zip(xs...), back
+end
+
+@adjoint function Base.collect(z::Base.Iterators.Zip)
+  collect_zip_pullback(dy) = ((is=zipfunc(z.is, dy),),)
+  collect(z), collect_zip_pullback
 end
 
 # Reductions
