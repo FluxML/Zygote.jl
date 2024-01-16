@@ -169,8 +169,10 @@ _reverse(x::Symmetric) = Symmetric(_reverse(x.data), x.uplo == 'U' ? :L : :U)
 # So we keep axes(x) to restore gradient dx to its full length & correct shape.
 _tryaxes(x) = axes(x)
 _tryaxes(x::Tuple) = Val(length(x))
-_restore(dx, ax::Tuple) = axes(dx) == ax ? dx : reshape(vcat(dx, falses(prod(length, ax) - length(dx))), ax)
+_tryaxes(::Number) = Val(-1)
+_restore(dx, ax::Tuple) = axes(dx) == ax ? dx : reshape(vcat(dx, falses(prod(map(length, ax)) - length(dx))), ax)
 _restore(dx, ::Val{N}) where {N} = ntuple(i -> get(dx,i,nothing), N)
+_restore(dx, ::Val{-1}) = only(dx)
 
 # Sometimes a pullback doesn't return a Tuple, but rather returns only a
 # single nothing to say "all arguments have zero cotangent". This function is needed to

@@ -30,6 +30,26 @@ test_rrule(ZygoteRuleConfig(), x->sum(sin, Diagonal(x)), rand(3); rrule_f=rrule_
     @test @inferred back(collect(y)) == (nothing, [1.0, 2.0, 3.0, 4.0, 5.0], fill(5.0))
 end
 
+@testset "adjoints of Iterators.zip" begin
+    y, back = _pullback(Iterators.zip, 1:5, 1:3, 1:2)
+    @test back(collect(y)) == (nothing, [1.0, 2.0, 0.0, 0.0, 0.0], [1.0, 2.0, 0.0], [1.0, 2.0])
+    @test back([(nothing, j, k) for (i,j,k) in zip(1:5, 1:3, 1:2)]) == (nothing, Union{Nothing, Float64}[nothing, nothing, 0.0, 0.0, 0.0], [1.0, 2.0, 0.0], [1.0, 2.0])
+    @test back([(i, nothing, k) for (i,j,k) in zip(1:5, 1:3, 1:2)]) == (nothing, [1.0, 2.0, 0.0, 0.0, 0.0], Union{Nothing, Float64}[nothing, nothing, 0.0], [1.0, 2.0])
+    @test back([(i, j, nothing) for (i,j,k) in zip(1:5, 1:3, 1:2)]) == (nothing, [1.0, 2.0, 0.0, 0.0, 0.0], [1.0, 2.0, 0.0], nothing)
+
+
+    @test gradient(x -> sum([y[2] * y[3] for y in Iterators.zip(x, x, x, x)]), [1,2,3,4])[1] ≈ [2, 4, 6, 8]
+    @test gradient(x -> sum(y[2] * y[3] for y in Iterators.zip(x, x, x, x)), [1,2,3,4])[1] ≈ [2, 4, 6, 8]
+
+    for p in (1.0, fill(1.0), [1.0])
+        @test gradient(p_ -> sum(map(prod, Iterators.zip(p_, p))), p) == (p,)
+        @test gradient(p_ -> sum(x*q for (q, x) in Iterators.zip(p_, p)), p) == (p,)
+    end
+
+    y, back = _pullback(Iterators.zip, 1:5, fill(1))
+    @test @inferred back(collect(y)) == (nothing, [1.0, 0.0, 0.0, 0.0, 0.0], fill(1.0))
+end
+
 @testset "collect" begin
     @testset "Dict" begin
         d = Dict(1 => 5, 2 => 6)
@@ -56,7 +76,7 @@ end
         @test g === (2.0, 4.0)
     end
 
-    @testset "Iterators.Product" begin
+    @testset "Iterators.ProductIterator" begin
         p = Iterators.product(1:3, 1:2)
         g = gradient(p -> sum(prod, collect(p)), p)[1]
         @test g == (iterators=(3ones(3), 6ones(2)),)
@@ -65,6 +85,17 @@ end
         @test gradient(x -> sum(broadcast(prod, Iterators.product(x .^ 2, x))), ones(4)) == (3*4ones(4),)
         @test gradient(x -> sum(broadcast(prod, Iterators.product(x, x .^ 2))), ones(4)) == (3*4ones(4),)
         @test gradient(x -> sum(broadcast(prod, Iterators.product(x .^ 2, x .^ 2))), ones(4)) == (4*4ones(4),)
+    end
+
+    @testset "Iterators.Zip" begin
+        z = Iterators.zip(1:3, 1:2)
+        g = gradient(z -> sum(prod, collect(z)), z)[1]
+        @test g == (is=([1.0, 2.0, 0.0], [1.0, 2.0]),)
+
+        @test gradient(x -> sum(broadcast(prod, Iterators.zip(x,x))), ones(4)) == (2ones(4),)
+        @test gradient(x -> sum(broadcast(prod, Iterators.zip(x.^2,x))), ones(4)) == (3ones(4),)
+        @test gradient(x -> sum(broadcast(prod, Iterators.zip(x,x.^2))), ones(4)) == (3ones(4),)
+        @test gradient(x -> sum(broadcast(prod, Iterators.zip(x.^2,x.^2))), ones(4)) == (4ones(4),)
     end
 end
 
