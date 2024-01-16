@@ -268,7 +268,7 @@ end
 _ndims(::Base.HasShape{d}) where {d} = d
 _ndims(x) = Base.IteratorSize(x) isa Base.HasShape ? _ndims(Base.IteratorSize(x)) : 1
 
-function prodfunc(xs, dy)
+function productfunc(xs, dy)
   @assert length(first(dy)) == length(xs)
   ndim = map(Zygote._ndims, xs)
   cdim = cumsum((1, ndim[begin:end-1]...))
@@ -286,7 +286,7 @@ end
 @adjoint function Iterators.product(xs...)
   back(::AbstractArray{Nothing}) = nothing
   back(dy::NamedTuple{(:iterators,)}) = dy.iterators
-  back(dy::AbstractArray) = prodfunc(xs, dy)
+  back(dy::AbstractArray) = productfunc(xs, dy)
   Iterators.product(xs...), back
 end
 
