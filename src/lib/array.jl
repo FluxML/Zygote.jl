@@ -271,15 +271,15 @@ _ndims(x) = Base.IteratorSize(x) isa Base.HasShape ? _ndims(Base.IteratorSize(x)
 function prodfunc(xs, dy)
   @assert length(first(dy)) == length(xs)
   ndim = map(Zygote._ndims, xs)
-  cdim = cumsum((0, ndim[begin:end-1]...))
+  cdim = cumsum((1, ndim[begin:end-1]...))
   getters = ntuple(n -> StaticGetter{n}(), Val(length(xs)))
-  dims = Vector{Int}(undef, length(xs))
-  map(first(dy), xs, cdim, ndim, getters) do dyn, x, cd, nd, getter
+  map(first(dy), xs, cdim, getters) do dyn, x, cd, getter
     dyn === nothing && return nothing
-    append!(empty!(dims), 1:cd, cd+nd+1:ndims(dy))
+    nd = _ndims(x)
+    dims = nd == 0 ? (:) : ntuple(i -> i<cd ? i : i+nd, Val(ndims(dy)-nd))
     init = map(zero, dyn) # allows for tuples, which accum can add:
-    red = mapreduce(getter, accum, dy; dims=_ndims(x) == 0 ? (:) : dims, init=init)
-    return _project(x, _ndims(x) == 0 ? red : reshape(red, axes(x)))
+    red = mapreduce(getter, accum, dy; dims, init)
+    return _project(x, nd == 0 ? red : reshape(red, axes(x)))
   end
 end
 
