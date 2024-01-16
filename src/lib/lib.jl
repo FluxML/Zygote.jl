@@ -22,7 +22,7 @@ accum(x, y) =
 accum(x, y, zs...) = accum(accum(x, y), zs...)
 
 accum(x::Tuple, ys::Tuple...) = map(accum, x, ys...)
-accum(x::AbstractArray, ys::AbstractArray...) = accum.(x, ys...)
+accum(x::AbstractArray, ys::AbstractArray...) = Base.broadcast_preserving_zero_d(accum, x, ys...)
 
 @generated function accum(x::NamedTuple, y::NamedTuple)
   # assumes that y has no keys apart from those also in x
