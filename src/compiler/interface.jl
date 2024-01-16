@@ -39,6 +39,52 @@ _pullback(f, args...) = _pullback(Context(), f, args...)
 tailmemaybe(::Nothing) = nothing
 tailmemaybe(x::Tuple) = Base.tail(x)
 
+"""
+    pullback(f, args...)
+    pullback(f, ::Params)
+
+Returns the value of the function `f` and a back-propagator function,
+which can be called to obtain a tuple containing `∂f/∂x` for each argument `x`,
+the derivative (for scalar `x`) or gradient.
+
+```julia
+y, back = pullback(f, args...)
+∇ = back(seed)
+```
+
+`back` must be called with a start value `seed` matching the output of `f(args...)`.
+If `f(args...)` returns a number, `seed` should be a number.
+If `f(args...)` returns an array, `seed` should be an equally-sized array.
+
+See also [`withgradient`](@ref) to obtain the value and gradients in one call,
+and [`gradient`](@ref) for obtaining just the gradients.
+
+```jldoctest; setup=:(using Zygote)
+julia> y, back = pullback(*, 2.0, 3.0, 5.0);
+
+julia> y
+30.0
+
+julia> back(1.0)
+(15.0, 10.0, 6.0)
+
+julia> back(2.0)
+(30.0, 20.0, 12.0)
+
+julia> y, back = pullback(x -> [x, x], 1.0);
+
+julia> y
+2-element Vector{Float64}:
+ 1.0
+ 1.0
+
+julia> back([1.0, 1.0])
+(2.0,)
+
+julia> back([2.0, nothing])
+(2.0,)
+```
+"""
 @inline pullback(f, args...) = pullback(f, Context(), args...)
 function pullback(f, cx::AContext, args...)
   y, back = _pullback(cx, f, args...)
@@ -76,6 +122,7 @@ _project_all(x::Tuple, dx::Tuple) = map(_project, x, dx)
 
 Returns a tuple containing `∂f/∂x` for each argument `x`,
 the derivative (for scalar `x`) or the gradient.
+If no gradient is defined, `∂f/∂x` will be `nothing`.
 
 `f(args...)` must be a real number, see [`jacobian`](@ref) for array output.
 
@@ -113,7 +160,7 @@ end
     withgradient(f, ::Params)
 
 Returns both the value of the function and the [`gradient`](@ref),
-as a named tuple. 
+as a named tuple.
 
 ```jldoctest; setup=:(using Zygote)
 julia> y, ∇ = withgradient(/, 1, 2)
@@ -308,7 +355,7 @@ end
     Grads(...)
 
 Dictionary-like container returned when taking gradients with
-respect to implicit parameters. For an array `W`, appearing 
+respect to implicit parameters. For an array `W`, appearing
 within `Params([W, A, B...])`, the gradient is `g[W]`.
 """
 struct Grads
@@ -325,7 +372,7 @@ const ADictOrGrads = Union{AbstractDict, Grads}
 
 # Dictionary interface.
 # Don't use the IdDict directly since it may contain some spurious pairs.
-Base.haskey(gs::Grads, x) = x ∈ gs.params 
+Base.haskey(gs::Grads, x) = x ∈ gs.params
 Base.keys(gs::Grads) = gs.params
 Base.values(gs::Grads) = (gs.grads[p] for p in gs.params)
 
@@ -385,7 +432,7 @@ broadcasted(f, a::Numeric, gs::Grads) = map(x -> f(a, x), gs)
 broadcasted(f, gs::Grads, a::Numeric) = map(x -> f(x, a), gs)
 
 function materialize!(gs1::Grads, gs2::Grads)
-  issetequal(gs1.params, gs2.params) || 
+  issetequal(gs1.params, gs2.params) ||
     throw(ArgumentError("Expected Grads objects with the same Params."))
   for p in gs1.params
     gs1[p] = gs2[p]
