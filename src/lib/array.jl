@@ -286,10 +286,10 @@ function productfunc(xs, dy)
 end
 
 @adjoint function Iterators.product(xs...)
-  back(::AbstractArray{Nothing}) = nothing
-  back(dy::NamedTuple{(:iterators,)}) = dy.iterators
-  back(dy::AbstractArray) = productfunc(xs, dy)
-  Iterators.product(xs...), back
+  product_pullback(::AbstractArray{Nothing}) = nothing
+  product_pullback(dy::NamedTuple{(:iterators,)}) = dy.iterators
+  product_pullback(dy::AbstractArray) = productfunc(xs, dy)
+  Iterators.product(xs...), product_pullback
 end
 
 @adjoint function Base.collect(p::Base.Iterators.ProductIterator)
@@ -306,10 +306,10 @@ function zipfunc(xs, dy)
 end
 
 @adjoint function Iterators.zip(xs...)
-  back(::AbstractArray{Nothing}) = nothing
-  back(dy::NamedTuple{(:is,)}) = dy.is
-  back(dy::AbstractArray) = zipfunc(xs, dy)
-  Iterators.zip(xs...), back
+  zip_pullback(::AbstractArray{Nothing}) = nothing
+  zip_pullback(dy::NamedTuple{(:is,)}) = dy.is
+  zip_pullback(dy::AbstractArray) = zipfunc(xs, dy)
+  Iterators.zip(xs...), zip_pullback
 end
 
 @adjoint function Base.collect(z::Base.Iterators.Zip)
