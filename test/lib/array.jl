@@ -19,15 +19,15 @@ test_rrule(ZygoteRuleConfig(), x->sum(sin, Diagonal(x)), rand(3); rrule_f=rrule_
     @test gradient(x -> sum([y[2] * y[3] for y in Iterators.product(x, x, x, x)]), [1,2,3,4])[1] ≈ [320, 320, 320, 320]
     @test gradient(x -> sum(y[2] * y[3] for y in Iterators.product(x, x, x, x)), [1,2,3,4])[1] ≈ [320, 320, 320, 320]
 
+    # Numbers failed before https://github.com/FluxML/Zygote.jl/pull/1489
     for p in (1.0, fill(1.0), [1.0])
         @test gradient(p -> sum([x*q for q in p, x in 1:3]), p) == (6p,)
         @test gradient(p -> sum(x*q for (q, x) in Iterators.product(p, 1:3)), p) == (6p,)
     end
 
-    @test gradient(x -> sum(broadcast(prod, Iterators.product(x,x))), ones(4)) == (2*4ones(4),)
-    @test gradient(x -> sum(broadcast(prod, Iterators.product(x .^ 2, x))), ones(4)) == (3*4ones(4),)
-    @test gradient(x -> sum(broadcast(prod, Iterators.product(x, x .^ 2))), ones(4)) == (3*4ones(4),)
-    @test gradient(x -> sum(broadcast(prod, Iterators.product(x .^ 2, x .^ 2))), ones(4)) == (4*4ones(4),)
+    # inference would also fail before #1489
+    y, back = _pullback(Iterators.product, 1:5, fill(1))
+    @test @inferred back(collect(y)) == (nothing, [1.0, 2.0, 3.0, 4.0, 5.0], fill(5.0))
 end
 
 @testset "collect" begin
@@ -54,6 +54,17 @@ end
         t = (1, 2)
         g = gradient(d -> sum(x^2 for x in collect(d)), t)[1]
         @test g === (2.0, 4.0)
+    end
+
+    @testset "Iterators.Product" begin
+        p = Iterators.product(1:3, 1:2)
+        g = gradient(p -> sum(prod, collect(p)), p)[1]
+        @test g == (iterators=(3ones(3), 6ones(2)),)
+
+        @test gradient(x -> sum(broadcast(prod, Iterators.product(x,x))), ones(4)) == (2*4ones(4),)
+        @test gradient(x -> sum(broadcast(prod, Iterators.product(x .^ 2, x))), ones(4)) == (3*4ones(4),)
+        @test gradient(x -> sum(broadcast(prod, Iterators.product(x, x .^ 2))), ones(4)) == (3*4ones(4),)
+        @test gradient(x -> sum(broadcast(prod, Iterators.product(x .^ 2, x .^ 2))), ones(4)) == (4*4ones(4),)
     end
 end
 
