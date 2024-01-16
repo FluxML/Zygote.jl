@@ -291,7 +291,8 @@ end
 end
 
 @adjoint function Base.collect(p::Base.Iterators.ProductIterator)
-  collect(p), dy -> ((iterators=prodfunc(p.iterators, dy),),)
+  collect_product_pullback(dy) = ((iterators=prodfunc(p.iterators, dy),),)
+  return collect(p), collect_product_pullback
 end
 
 @adjoint function Iterators.Zip(xs)
