@@ -33,8 +33,8 @@ end
 @testset "adjoints of Iterators.zip" begin
     y, back = _pullback(Iterators.zip, 1:5, 1:3, 1:2)
     @test back(collect(y)) == (nothing, [1.0, 2.0, 0.0, 0.0, 0.0], [1.0, 2.0, 0.0], [1.0, 2.0])
-    @test back([(nothing, j, k) for (i,j,k) in zip(1:5, 1:3, 1:2)]) == (nothing, Union{Nothing, Float64}[nothing, nothing, 0.0, 0.0, 0.0], [1.0, 2.0, 0.0], [1.0, 2.0])
-    @test back([(i, nothing, k) for (i,j,k) in zip(1:5, 1:3, 1:2)]) == (nothing, [1.0, 2.0, 0.0, 0.0, 0.0], Union{Nothing, Float64}[nothing, nothing, 0.0], [1.0, 2.0])
+    @test back([(nothing, j, k) for (i,j,k) in zip(1:5, 1:3, 1:2)]) == (nothing, nothing, [1.0, 2.0, 0.0], [1.0, 2.0])
+    @test back([(i, nothing, k) for (i,j,k) in zip(1:5, 1:3, 1:2)]) == (nothing, [1.0, 2.0, 0.0, 0.0, 0.0], nothing, [1.0, 2.0])
     @test back([(i, j, nothing) for (i,j,k) in zip(1:5, 1:3, 1:2)]) == (nothing, [1.0, 2.0, 0.0, 0.0, 0.0], [1.0, 2.0, 0.0], nothing)
 
 
