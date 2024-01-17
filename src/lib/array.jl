@@ -168,6 +168,7 @@ _reverse(x::Symmetric) = Symmetric(_reverse(x.data), x.uplo == 'U' ? :L : :U)
 
 # With mismatched lengths, map stops early. With mismatched shapes, it makes a vector.
 # So we keep axes(x) to restore gradient dx to its full length & correct shape.
+_tryaxes(x) = (s = Base.IteratorSize(x); s isa Base.HasShape ? axes(x) : s isa Base.HasLength ? (Base.OneTo(length(x)),) : throw(ArgumentError("iterator size must be finite")))
 _tryaxes(x::AbstractArray) = axes(x)
 _tryaxes(x::Tuple) = Val(length(x))
 _tryaxes(x::Number) = x
@@ -317,6 +318,20 @@ end
 @adjoint function Base.collect(z::Base.Iterators.Zip)
   collect_zip_pullback(dy::AbstractArray) = ((is=zipfunc(z.is, dy),),)
   collect(z), collect_zip_pullback
+end
+
+takefunc(itr, dy) = _restore(dy, _tryaxes(itr))
+
+@adjoint function Iterators.take(itr, n)
+  take_pullback(dy::NamedTuple{(:xs,:n)}) = (dy.xs, dy.n)
+  take_pullback(dy::NamedTuple{(:n,:xs)}) = (dy.xs, dy.n)
+  take_pullback(dy) = (takefunc(itr, dy), nothing)
+  Iterators.take(itr, n), take_pullback
+end
+
+@adjoint function Base.collect(t::Iterators.Take)
+    collect_take_pullback(dy) = ((xs=takefunc(t.xs, dy), n=nothing),)
+    collect(t), collect_take_pullback
 end
 
 # Reductions

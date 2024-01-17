@@ -215,8 +215,22 @@ end
 
   @test gradient(xs -> sum(inv, [x^2 for x in xs]), ones(2)) == ([-2, -2],)
 
-  # no adjoint for generic iterators
-  @test_broken gradient(x -> sum(collect(Iterators.take([x*i for i in 1:5], 5))), 1.0)
+  # adjoint of generators is available and should support generic arrays and iterators
+  # generator of array
+  @test gradient(p -> sum(collect(p*i for i in [1.0, 2.0, 3.0])), 2.0) == (6.0,)
+  # generator of iterator with HasShape
+  @test gradient(p -> sum(collect(p*i for (i,) in zip([1.0, 2.0, 3.0]))), 2.0) == (6.0,)
+  # generator of iterator with HasLength
+  @test gradient(p -> sum(collect(p*i for i in Iterators.take([1.0, 2.0, 3.0], 3))), 2.0) == (6.0,)
+  @test gradient(p -> sum(collect(p*i for i in Iterators.take(p*[1.0, 2.0, 3.0], 2))), 2.0) == (12.0,)
+  # generator 0-d behavior handled incorrectly
+  @test_broken gradient(p -> sum(collect(p*i for i in 1.0)), 2.0)
+  @test_broken gradient(p -> sum(collect(p*i for i in fill(1.0))), 2.0)
+
+  # adjoints for iterators
+  @test gradient(x -> sum(collect(Iterators.take([x*i for i in 1:5], 4))), 1.0) == (10.0,)
+  @test gradient(x -> sum(collect(Iterators.take([x*i for i in 1:5], 5))), 1.0) == (15.0,)
+  @test_broken gradient(sum∘collect, 1.0) == (1.0,) # broken since no generic adjoint
 end
 
 @test gradtest(x -> reverse(x), rand(17))
