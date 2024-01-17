@@ -214,6 +214,9 @@ end
   @test gradient(x -> sum(inv, collect(view(x', 1,:))), ones(2,2)) == ([-1 0; -1 0],)
 
   @test gradient(xs -> sum(inv, [x^2 for x in xs]), ones(2)) == ([-2, -2],)
+
+  # no adjoint for generic iterators
+  @test_broken gradient(x -> sum(collect(Iterators.take([x*i for i in 1:5], 5))), 1.0)
 end
 
 @test gradtest(x -> reverse(x), rand(17))
@@ -1547,6 +1550,18 @@ using Zygote: Buffer
   @test gradient(1.1) do p
     b = Zygote.Buffer(zeros(3))
     b .= (p*i for i in eachindex(b))
+    return sum(copy(b) .* (2:4))
+  end[1] ≈ 1*2 + 2*3 + 3*4
+
+  @test gradient(1.1) do p
+    b = Zygote.Buffer(zeros(3))
+    copyto!(b, [p*i for i in eachindex(b)])
+    return sum(copy(b) .* (2:4))
+  end[1] ≈ 1*2 + 2*3 + 3*4
+
+  @test_broken gradient(1.1) do p
+    b = Zygote.Buffer(zeros(3))
+    copyto!(b, (p*i for i in eachindex(b)))
     return sum(copy(b) .* (2:4))
   end[1] ≈ 1*2 + 2*3 + 3*4
 
