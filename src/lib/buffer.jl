@@ -30,14 +30,22 @@ end
   setindex!(b, v, i...), setindex!_buffer_pullback
 end
 
+@adjoint! function copyto!(b::Buffer, src::AbstractArray)
+  function copyto!_buffer_array_pullback(_)
+    grad = grad_mut(__context__, b)
+    return (nothing, copy(grad))
+  end
+  copyto!(b, src), copyto!_buffer_array_pullback
+end
+
 @adjoint! function copyto!(b::Buffer, bc::Base.Broadcast.Broadcasted)
   xs, map_pullback = ∇map(__context__, i -> bc[i], eachindex(bc))
-  function copyto!_buffer_pullback(_)
+  function copyto!_buffer_broadcast_pullback(_)
     grad = grad_mut(__context__, b)
     d, = map_pullback(reshape(first(grad, length(xs)), size(xs)))
-    return (nothing, nothing, d.bc)
+    return (nothing, d.bc)
   end
-  copyto!(b, xs), copyto!_buffer_pullback
+  copyto!(b, xs), copyto!_buffer_broadcast_pullback
 end
 
 @adjoint! function push!(b::Buffer, x)
