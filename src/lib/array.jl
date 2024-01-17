@@ -168,7 +168,7 @@ _reverse(x::Symmetric) = Symmetric(_reverse(x.data), x.uplo == 'U' ? :L : :U)
 
 # With mismatched lengths, map stops early. With mismatched shapes, it makes a vector.
 # So we keep axes(x) to restore gradient dx to its full length & correct shape.
-_tryaxes(x) = axes(x)
+_tryaxes(x::AbstractArray) = axes(x)
 _tryaxes(x::Tuple) = Val(length(x))
 _tryaxes(x::Number) = x
 _restore(dx::AbstractArray{Nothing}, ax::Tuple) = similar(dx, ax)
