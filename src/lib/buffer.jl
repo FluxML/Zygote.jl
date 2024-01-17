@@ -28,6 +28,14 @@ end
   end
 end
 
+@adjoint! function copyto!(b::Buffer, bc::Base.Broadcast.Broadcasted)
+  xs, map_pullback = ∇map(__context__, i -> bc[i], eachindex(bc))
+  copyto!(b, xs), function (_)
+    grad = grad_mut(__context__, b)
+    d, = map_pullback(reshape(first(grad, length(xs)), size(xs)))
+    return (nothing, nothing, d.bc)
+  end
+end
 
 @adjoint! function push!(b::Buffer, x)
   push!(b, x), function (y)
@@ -51,18 +59,4 @@ end
   end
 
   return res, copy_sensitivity
-end
-
-Base.BroadcastStyle(::Type{Buffer{T,A}}) where {T,A} = Base.BroadcastStyle(A)
-
-@non_differentiable Base.Broadcast.Broadcasted(::Nothing)
-
-function _pullback(cx::AContext, ::typeof(copyto!), b::Buffer, bc::Base.Broadcast.Broadcasted)
-  xs, map_pullback = ∇map(cx, i -> bc[i], eachindex(bc))
-  copyto!(b, xs), function (_)
-    grad = grad_mut(cx, b)
-    # ys = copy(grad)
-    d, = map_pullback(reshape(first(grad, length(xs)), size(xs)))
-    return (nothing, nothing, d.bc)
-  end
 end
