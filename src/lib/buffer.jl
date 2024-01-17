@@ -7,15 +7,16 @@ grad_mut(cx::Context, b::Buffer{T}, ::Type{S}=Union{}) where {T<:Number, S<:Numb
 @non_differentiable Buffer(::Any...)
 
 @adjoint function getindex(b::Buffer, i...)
-  b[i...], function (Δ)
+  function getindex_buffer_pullback(Δ)
     grad = grad_mut(__context__, b, eltype(Δ))
     grad[i...] = accum(grad[i...], Δ)
     return
   end
+  b[i...], getindex_buffer_pullback
 end
 
 @adjoint! function setindex!(b::Buffer, v, i...)
-  setindex!(b, v, i...), function (_)
+  function setindex!_buffer_pullback(_)
     grad = grad_mut(__context__, b)
     v̄ = grad[i...]
     zero = eltype(grad) <: Number ? 0 : nothing
@@ -26,22 +27,25 @@ end
     end
     (nothing, v̄, map(_->nothing, i)...)
   end
+  setindex!(b, v, i...), setindex!_buffer_pullback
 end
 
 @adjoint! function copyto!(b::Buffer, bc::Base.Broadcast.Broadcasted)
   xs, map_pullback = ∇map(__context__, i -> bc[i], eachindex(bc))
-  copyto!(b, xs), function (_)
+  function copyto!_buffer_pullback(_)
     grad = grad_mut(__context__, b)
     d, = map_pullback(reshape(first(grad, length(xs)), size(xs)))
     return (nothing, nothing, d.bc)
   end
+  copyto!(b, xs), copyto!_buffer_pullback
 end
 
 @adjoint! function push!(b::Buffer, x)
-  push!(b, x), function (y)
+  function push!_buffer_pullback(_)
     grad = grad_mut(__context__, b)
     return (nothing, pop!(grad))
   end
+  push!(b, x), push!_buffer_pullback
 end
 
 
