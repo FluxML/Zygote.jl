@@ -137,8 +137,9 @@ end
 struct StaticGetter{i} end
 (::StaticGetter{i})(v) where {i} = v[i]
 (::StaticGetter{i})(::Nothing) where {i} = nothing
-@generated function _unzip(tuples, ::Val{N}) where {N}
-  Expr(:tuple, (:(map($(StaticGetter{i}()), tuples)) for i ∈ 1:N)...)
+function _unzip(tuples, ::Val{N}) where {N}
+  getters = ntuple(n -> StaticGetter{n}(), Val(N))
+  map(g -> map(g, tuples), getters)
 end
 function unzip(tuples)
   N = length(first(tuples))
@@ -313,7 +314,7 @@ end
 end
 
 @adjoint function Base.collect(z::Base.Iterators.Zip)
-  collect_zip_pullback(dy) = ((is=zipfunc(z.is, dy),),)
+  collect_zip_pullback(dy::AbstractArray) = ((is=zipfunc(z.is, dy),),)
   collect(z), collect_zip_pullback
 end
 
