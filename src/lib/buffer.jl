@@ -48,6 +48,16 @@ end
   copyto!(b, xs), copyto!_buffer_broadcast_pullback
 end
 
+function _pullback(cx::AContext, ::typeof(copyto!), b::Buffer, g::Base.Generator)
+    xs, collect_pullback = _pullback(cx, collect, g)
+    function copyto!_buffer_generator_pullback(_)
+        grad = grad_mut(cx, b)
+        _, dg = collect_pullback(reshape(first(grad, length(xs)), size(xs)))
+        return (nothing, nothing, dg)
+    end
+    copyto!(b, xs), copyto!_buffer_generator_pullback
+  end
+
 @adjoint! function push!(b::Buffer, x)
   function push!_buffer_pullback(_)
     grad = grad_mut(__context__, b)
