@@ -138,7 +138,7 @@ struct StaticGetter{i} end
 (::StaticGetter{i})(v) where {i} = v[i]
 (::StaticGetter{i})(::Nothing) where {i} = nothing
 function _unzip(tuples, ::Val{N}) where {N}
-  getters = ntuple(n -> StaticGetter{n}(), Val(N))
+  getters = ntuple(n -> StaticGetter{n}(), N)
   map(g -> map(g, tuples), getters)
 end
 function unzip(tuples)
@@ -276,7 +276,7 @@ function productfunc(xs, dy)
   @assert length(first(dy)) == length(xs)
   ndim = map(Zygote._ndims, xs)
   cdim = cumsum((1, ndim[begin:end-1]...))
-  getters = ntuple(n -> StaticGetter{n}(), Val(length(xs)))
+  getters = ntuple(n -> StaticGetter{n}(), length(xs))
   map(first(dy), xs, cdim, getters) do dyn, x, cd, getter
     dyn === nothing && return nothing
     nd = _ndims(x)
@@ -300,7 +300,7 @@ end
 end
 
 function zipfunc(xs, dy)
-  getters = ntuple(n -> StaticGetter{n}(), Val(length(xs)))
+  getters = ntuple(n -> StaticGetter{n}(), length(xs))
   map(xs, getters) do x, getter
     dx = map(getter, dy)
     _project(x, _restore(dx, _tryaxes(x)))
