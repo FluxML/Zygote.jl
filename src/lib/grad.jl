@@ -61,7 +61,7 @@ julia> hessian(sin, pi/2)
 """
 hessian(f, x) = hessian_dual(f, x)
 
-hessian_dual(f, x::AbstractArray) = forward_jacobian(x -> gradient(f, x)[1], x)[2]
+hessian_dual(f, x::AbstractArray) = ForwardDiff.jacobian(x -> gradient(f, x)[1], x)
 
 hessian_dual(f, x::Number) = ForwardDiff.derivative(x -> gradient(f, x)[1], x)
 
