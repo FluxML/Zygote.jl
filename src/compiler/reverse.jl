@@ -328,9 +328,8 @@ function adjoint(pr::Primal)
     if has_leave && isempty(predecessors(b)) && b.id != 1
         _, f_stmt = first(b)
         li = pr.ir.lines[f_stmt.line]
-        li = LineNumberNode(Int(li.line), li.file)
         pushfirst!(rb, stmt(xcall(Base, :error,
-                                  "Can't differentiate function execution in catch block at $(li).")))
+                                  "Can't differentiate function execution in catch block at $(li.file):$(li.line).")))
     end
 
     if b.id > 1 # Backprop through (predecessor) branch arguments
