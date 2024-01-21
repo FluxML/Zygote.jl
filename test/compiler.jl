@@ -246,7 +246,7 @@ end
     @test only(g) ∈ (1., 2.)
 end
 
-function f_try_catch(x,y)
+function throws_and_catches_if_x_negative(x,y)
     z = x + y
     try
         if x < 0.
@@ -259,12 +259,47 @@ function f_try_catch(x,y)
     return 3z
 end
 
+function try_catch_finally(cond, x)
+
+    try
+        x = 2x
+        cond && throw(DomainError())
+    catch
+        x = 2x
+    finally
+        x = 3x
+    end
+
+    x
+end
+
+if VERSION >= v"1.8"
+    # try/catch/else is invalid syntax prior to v1.8
+    eval(Meta.parse("""
+        function try_catch_else(cond, x)
+        end
+    """))
+end
+
 @testset "try/catch" begin
     @testset "happy path (nothrow)" begin
-        res, (dx,dy) = withgradient(f_try_catch, 1., 2.)
+        res, (dx,dy) = withgradient(throws_and_catches_if_x_negative, 1., 2.)
         @test res == 3 * (2 * (1. + 2.) + 1. + 2.)
         @test dx == 3. * (2. + 1.)
         @test dy == 3. * (2. + 1.)
+    end
+
+    @testset "try/catch/finally" begin
+        res, (_, dx,) = withgradient(try_catch_finally, false, 1.)
+        @test res == 6.
+        @test dx == 6.
+
+        res, pull = pullback(try_catch_finally, true, 1.)
+        @test res == 12.
+        @test_throws ErrorException pull(1.)
+        err = try pull(1.) catch ex; ex end
+        @test occursin("Can't differentiate function execution in catch block",
+                       string(err))
     end
 
     function foo_try(f)
