@@ -416,8 +416,7 @@ function pow_try(x)
   end
 end
 
-@test_broken gradient(pow_try, 1) == (2,)
-@test_throws Zygote.CompileError gradient(pow_try, 1)
+@test gradient(pow_try, 1) == (2,)
 
 function pow_simd(x, n)
   r = 1
