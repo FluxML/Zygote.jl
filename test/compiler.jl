@@ -277,6 +277,18 @@ if VERSION >= v"1.8"
     # try/catch/else is invalid syntax prior to v1.8
     eval(Meta.parse("""
         function try_catch_else(cond, x)
+            x = 2x
+
+            try
+                x = 2x
+                cond && throw(nothing)
+            catch
+                x = 3x
+            else
+                x = 2x
+            end
+
+            x
         end
     """))
 end
@@ -300,6 +312,13 @@ end
         err = try pull(1.) catch ex; ex end
         @test occursin("Can't differentiate function execution in catch block",
                        string(err))
+    end
+
+    if VERSION >= v"1.8"
+        @testset "try/catch/else" begin
+            @test Zygote.gradient(try_catch_else, false, 1.0) == (nothing, 8.0)
+            @test_throws "Can't differentiate function execution in catch block" Zygote.gradient(try_catch_else, true, 1.0)
+        end
     end
 
     function foo_try(f)
