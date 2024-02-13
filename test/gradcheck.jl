@@ -214,6 +214,23 @@ end
   @test gradient(x -> sum(inv, collect(view(x', 1,:))), ones(2,2)) == ([-1 0; -1 0],)
 
   @test gradient(xs -> sum(inv, [x^2 for x in xs]), ones(2)) == ([-2, -2],)
+
+  # adjoint of generators is available and should support generic arrays and iterators
+  # generator of array
+  @test gradient(p -> sum(collect(p*i for i in [1.0, 2.0, 3.0])), 2.0) == (6.0,)
+  # generator of iterator with HasShape
+  @test gradient(p -> sum(collect(p*i for (i,) in zip([1.0, 2.0, 3.0]))), 2.0) == (6.0,)
+  # generator of iterator with HasLength
+  @test gradient(p -> sum(collect(p*i for i in Iterators.take([1.0, 2.0, 3.0], 3))), 2.0) == (6.0,)
+  @test gradient(p -> sum(collect(p*i for i in Iterators.take(p*[1.0, 2.0, 3.0], 2))), 2.0) == (12.0,)
+  # generator 0-d behavior handled incorrectly
+  @test_broken gradient(p -> sum(collect(p*i for i in 1.0)), 2.0)
+  @test_broken gradient(p -> sum(collect(p*i for i in fill(1.0))), 2.0)
+
+  # adjoints for iterators
+  @test gradient(x -> sum(collect(Iterators.take([x*i for i in 1:5], 4))), 1.0) == (10.0,)
+  @test gradient(x -> sum(collect(Iterators.take([x*i for i in 1:5], 5))), 1.0) == (15.0,)
+  @test_broken gradient(sum∘collect, 1.0) == (1.0,) # broken since no generic adjoint
 end
 
 @test gradtest(x -> reverse(x), rand(17))
@@ -523,7 +540,7 @@ end
   @test gradtest(x -> maximum(x, dims=[1, 2]), rand(2, 3, 4))
 
   @test gradient(x -> 1 / maximum(x), [1., 2, 3])[1] == [0, 0, -1/9]
-  
+
   # issue 1224, second order
   f1244(w, x) = sum(maximum((w * x).^2, dims=1))
   g1244(w, x) = sum(gradient(f1244, w, x)[2].^2)
@@ -1538,6 +1555,36 @@ using Zygote: Buffer
     return sum(copy(b))
   end == ([2,2,2],)
 
+  @test gradient([1, 2, 3]) do xs
+    b = Zygote.Buffer(xs)
+    b .= 2
+    return sum(copy(b))
+  end == (nothing,)
+
+  @test gradient(1.1) do p
+    b = Zygote.Buffer(zeros(3))
+    b .= (p*i for i in eachindex(b))
+    return sum(copy(b) .* (2:4))
+  end[1] ≈ 1*2 + 2*3 + 3*4
+
+  @test gradient(1.1) do p
+    b = Zygote.Buffer(zeros(3))
+    copyto!(b, [p*i for i in eachindex(b)])
+    return sum(copy(b) .* (2:4))
+  end[1] ≈ 1*2 + 2*3 + 3*4
+
+  @test gradient(1.1) do p
+    b = Zygote.Buffer(zeros(3))
+    copyto!(b, (p*i for i in eachindex(b)))
+    return sum(copy(b) .* (2:4))
+  end[1] ≈ 1*2 + 2*3 + 3*4
+
+  @test_broken gradient(1.1) do p
+    b = Zygote.Buffer(zeros(3))
+    copyto!(b, p)
+    return sum(copy(b) .* (2:4))
+  end[1] ≈ 1*2
+
   @test gradient(2) do x
     b = Zygote.Buffer([])
     push!(b, x)
@@ -1701,7 +1748,7 @@ end
 end
 
 @testset "FillArrays" begin
-  
+
   @test gradcheck(x->sum(Fill(x[], (2, 2))), [0.1])
   @test first(Zygote.gradient(sz->sum(Ones(sz)), 6)) === nothing
   @test first(Zygote.gradient(sz->sum(Zeros(sz)), 6)) === nothing
