@@ -323,9 +323,10 @@ end
 takefunc(itr, dy) = _restore(dy, _tryaxes(itr))
 
 @adjoint function Iterators.take(itr, n)
+  take_pullback(::AbstractArray{Nothing}) = nothing
   take_pullback(dy::NamedTuple{(:xs,:n)}) = (dy.xs, dy.n)
   take_pullback(dy::NamedTuple{(:n,:xs)}) = (dy.xs, dy.n)
-  take_pullback(dy) = (takefunc(itr, dy), nothing)
+  take_pullback(dy::AbstractArray) = (takefunc(itr, dy), nothing)
   Iterators.take(itr, n), take_pullback
 end
 
