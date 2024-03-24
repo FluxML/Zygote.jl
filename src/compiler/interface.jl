@@ -119,6 +119,7 @@ _project_sentinel(x::Tuple, dx::Tuple) = map(_project_sentinel, x, dx)
 _project_sentinel(::Any, ::NoTangent) = nothing
 _project_sentinel(::Any, ::ZeroTangent) = nothing
 _project_sentinel(::Any, ::Nothing) = nothing
+_project_sentinel(::Any, dx::Any) = dx
 
 """
     gradient(f, args...)
