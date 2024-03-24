@@ -2125,3 +2125,9 @@ end
   @test gradient(x -> @.(x * x * x), 2.0) == gradient(x -> x * (x * x), 2.0)
   @test gradient(x -> @.(3.0*x*2.0*x), 2.0) == gradient(x -> 6(x^2), 2.0)
 end
+
+@testset "Sparse input" begin
+  g1 = Zygote.gradient(sum, zeros(1,1))[1]
+  g2 = Zygote.gradient(sum, spzeros(1,1))[1]
+  @test g1 == g2
+end
