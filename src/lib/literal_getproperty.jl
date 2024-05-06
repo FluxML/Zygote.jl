@@ -85,6 +85,11 @@ function _generate_literal_getproperty(ctx, world, x, ::Type{Val{f}}) where f
         ci.edges = Core.MethodInstance[mi, mi_pb_getproperty, mi_getproperty, mi_rrule]
         # XXX: on 1.10, we should also set metadata like min-world and max-world
 
+        if isdefined(Base, :__has_internal_change) && Base.__has_internal_change(v"1.12-alpha", :codeinfonargs)
+            ci.nargs = 5
+            ci.isva = false
+        end
+
         return ci
     else
         # nothing to optimize here, need to recurse into `getproperty`
