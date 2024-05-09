@@ -50,6 +50,23 @@ end
     @test @inferred back(collect(y)) == (nothing, [1.0, 0.0, 0.0, 0.0, 0.0], fill(1.0))
 end
 
+@testset "adjoints of Iterators.take" begin
+    y, back = _pullback(Iterators.take, 1:5, 3)
+    @test back(collect(y)) == (nothing, [1.0, 2.0, 3.0, 0.0, 0.0], nothing)
+    @test back([nothing for i in 1:3]) === nothing
+
+    @test gradient(x -> sum([2y for y in Iterators.take(x, 4)]), [1,2,3,4])[1] ≈ [2, 2, 2, 2]
+    @test gradient(x -> sum(2y for y in Iterators.take(x, 4)), [1,2,3,4])[1] ≈ [2, 2, 2, 2]
+
+    for p in (1.0, fill(1.0), [1.0])
+        @test gradient(p_ -> sum(map(prod, Iterators.take(p_, 1))), p) == (p,)
+        @test gradient(p_ -> sum(x for x in Iterators.take(p_, 1)), p) == (p,)
+    end
+
+    y, back = _pullback(Iterators.take, ones(2, 2), 3)
+    @test @inferred back(collect(y)) == (nothing, [1.0 1.0; 1.0 0.0], nothing)
+end
+
 @testset "collect" begin
     @testset "Dict" begin
         d = Dict(1 => 5, 2 => 6)
@@ -96,6 +113,16 @@ end
         @test gradient(x -> sum(broadcast(prod, Iterators.zip(x.^2,x))), ones(4)) == (3ones(4),)
         @test gradient(x -> sum(broadcast(prod, Iterators.zip(x,x.^2))), ones(4)) == (3ones(4),)
         @test gradient(x -> sum(broadcast(prod, Iterators.zip(x.^2,x.^2))), ones(4)) == (4ones(4),)
+    end
+
+
+    @testset "Iterators.Take" begin
+        z = Iterators.take(1:3, 2)
+        g = gradient(z -> sum(collect(z)), z)[1]
+        @test g == (xs=[1.0, 1.0, 0.0], n=nothing)
+
+        @test gradient(x -> sum(broadcast(prod, Iterators.take(x,2))), ones(4)) == ([1.0,1.0,0.0,0.0],)
+        @test gradient(x -> sum(broadcast(prod, Iterators.take(x.^2,2))), ones(4)) == (2*[1.0,1.0,0.0,0.0],)
     end
 end
 
