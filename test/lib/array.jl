@@ -118,6 +118,19 @@ end
         sum(v for (_, v) in d)
     end
     @test gradient(f_comprehension, w)[1] == ones(5)
+
+    w = [randn(5); NaN]
+    function f_generator_conditional(w)
+        d = Dict{Int, Float64}(i => v for (i,v) in enumerate(w) if !isnan(v))
+        sum(v for (_, v) in d)
+    end
+    @test gradient(f_generator_conditional, w)[1] == [ones(5); nothing]
+
+    function f_comprehension_conditional(w)
+        d = Dict{Int, Float64}(i => v for (i,v) in enumerate(w) if !isnan(v))
+        sum(v for (_, v) in d)
+    end
+    @test gradient(f_comprehension_conditional, w)[1] == [ones(5); nothing]
 end
 
 @testset "_reverse" begin
