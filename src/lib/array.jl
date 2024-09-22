@@ -260,6 +260,7 @@ end
 @adjoint function enumerate(xs)
   back(::AbstractArray{Nothing}) = nothing
   back(dy::NamedTuple{(:itr,)}) = tuple(dy.itr)
+  back(diys::AbstractArray{Union{Nothing, T}}) where T = (map(x -> x === nothing ? x : last(x), diys),)
   back(diys) = (map(last, diys),)
   enumerate(xs), back
 end
