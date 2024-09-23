@@ -420,3 +420,15 @@ end
     @test z2d_compiled.c.a === z2d_fallback.c.a
     @test z2d_compiled.c.b === z2d_fallback.c.b
 end
+
+@testset "ChainRules translation" begin
+    @test Zygote.wrap_chainrules_input(nothing) == ZeroTangent()
+    @test Zygote.wrap_chainrules_input((nothing,)) == ZeroTangent()
+    @test Zygote.wrap_chainrules_input([nothing]) == ZeroTangent()
+    @test Zygote.wrap_chainrules_input(((1.0, 2.0), 3.0)) == Tangent{Any}(Tangent{Any}(1.0, 2.0), 3.0)
+    @test Zygote.wrap_chainrules_input((; a = 1.0, b = 2.0)) == Tangent{Any}(a = 1.0, b = 2.0)
+    @test Zygote.wrap_chainrules_input(Ref(1)) == 1
+    @test Zygote.wrap_chainrules_input([2.0; 4.0]) == [2.0; 4.0]
+    @test Zygote.wrap_chainrules_input([[2.0; 4.0], [1.0; 3.0]]) == [[2.0; 4.0], [1.0; 3.0]]
+    @test Zygote.wrap_chainrules_input([nothing; 4.0]) == [0.0; 4.0] # ChainRules uses the numeric zero where possible
+end
