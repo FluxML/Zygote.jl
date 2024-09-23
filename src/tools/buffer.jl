@@ -72,8 +72,8 @@ function Base.deleteat!(b::Buffer, i)
   return b
 end
 
-@forward Buffer.data  Base.eltype, Base.length, Base.ndims, Base.size, Base.axes, 
-                      Base.eachindex, Base.stride, Base.strides, Base.findfirst, 
+@forward Buffer.data  Base.eltype, Base.length, Base.ndims, Base.size, Base.axes,
+                      Base.eachindex, Base.stride, Base.strides, Base.findfirst,
                       Base.keys
 
 Base.IteratorSize(::Type{<:Buffer{<:Any, A}}) where {A} = Base.IteratorSize(A)
@@ -84,3 +84,5 @@ function Base.iterate(b::Buffer, state=(eachindex(b),))
   y === nothing && return nothing
   b[y[1]], (state[1], tail(y)...)
 end
+
+Base.BroadcastStyle(::Type{Buffer{T,A}}) where {T,A} = Base.BroadcastStyle(A)
