@@ -6,6 +6,12 @@ using LinearAlgebra: copytri!, AbstractTriangular
 import ZygoteRules: @adjoint, @adjoint!, AContext, adjoint, _pullback, pullback,
   literal_getproperty, literal_getfield, unthunk_tangent
 
+using ZygoteRules: ZygoteRules
+ZygoteRules.gradtuple0(::Tuple{Vararg{Nothing}}) = nothing
+ZygoteRules.gradtuple1(::Tuple{Vararg{Nothing}}) = nothing
+ZygoteRules.gradtuple2(::Tuple{Vararg{Nothing}}) = nothing
+ZygoteRules.gradtuple3(::Tuple{Vararg{Nothing}}) = nothing
+
 using ChainRulesCore
 using ChainRules: ChainRules, rrule, unthunk, canonicalize
 using IRTools
