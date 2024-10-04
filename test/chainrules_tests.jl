@@ -414,6 +414,9 @@ end
     @test z2d_compiled.d === z2d_fallback.d
     @test z2d_compiled.c.a === z2d_fallback.c.a
     @test z2d_compiled.c.b === z2d_fallback.c.b
+
+    # empty arrays => NoTangent()
+    @test z2d(ones(1, 0), ones(16, 0)) === NoTangent()
 end
 
 @testset "ChainRules translation" begin
