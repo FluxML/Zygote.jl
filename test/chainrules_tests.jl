@@ -416,7 +416,7 @@ end
     @test z2d_compiled.c.b === z2d_fallback.c.b
 
     # empty arrays => NoTangent()
-    @test z2d(ones(1, 0), ones(16, 0)) === NoTangent()
+    @test @inferred(Zygote.z2d(ones(1, 0), ones(16, 0))) === NoTangent()
 end
 
 @testset "ChainRules translation" begin
