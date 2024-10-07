@@ -419,6 +419,10 @@ end
     @test z2d_compiled.d === z2d_fallback.d
     @test z2d_compiled.c.a === z2d_fallback.c.a
     @test z2d_compiled.c.b === z2d_fallback.c.b
+
+    # empty dx => returns the dx
+    @test @inferred(Zygote.z2d(ones(1, 0), ones(16, 0))) === ones(1, 0)
+    @test @inferred(Zygote.z2d(Union{Nothing, Float64}[], ones(16, 0))) === Union{Nothing, Float64}[]
 end
 
 @testset "ChainRules translation" begin
