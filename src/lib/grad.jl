@@ -28,39 +28,43 @@ function Zygote._pullback(ctx::Zygote.AContext, ::typeof(checkpointed), f, xs...
 end
 
 
+
 """
 
-    eager_update(f, update, state, xs...)
-
-Allows training large models when the gradients cannot all fit in memory simultaneously.
+    eager_update!((modelf, xs...), (update!, state)) = modelf(xs...) and update!(state, modelf, grads)
+    eager_update!(f, (model, xs...), (update!, state)) = f(model, xs...) and update!(state, model, grads)
 
 A combination of gradient checkpointing and eagerly updating the model parameters, discarding the updated gradients.
-Assumes that `f` is a callable struct, `state` is the optimization state (eg. from Optimisers.jl) matching `f`, and
-`update` is the function that updates the parameters of `f` from the state and the gradients, called as `update(state, f, grads)`.
+Works when `modelf` is a callable struct that also stores the parameters to be updated, or if you have a function `f`
+that takes the `model`` as the first argument. `state` is the optimization state (eg. from Optimisers.jl) matching your model, and
+`update!` is the function that updates the parameters of `modelf`/`model` from the state and the gradients, called as `update!(state, model, grads)`.
 
-If eg. `model.layers[i]` is layer in a transformer, then:
+If eg. `model.layers[i]` is layer in a transformer, and is callable as `model.layers[i](h, other_args...)`, then:
 
 ```
-for i in 1:length(model.layers)
-  h = eager_updater(model.layers[i], Optimisers.update!, opt_state.layers[i], h, other_args)
-end
+h = eager_update!((model.layers[i], h, other_args...), (Optimisers.update!, opt_state.layers[i]))
 ```
 
-!!! warning
-    If different layers share trainable parameters, then `eager_update` will likely give wrong results.
+If eg. `f` needs to call `model.layers[i]` (which holds the parameters) as `f(model.layers[i], h, other_args...)`, then:
+
+```
+h = eager_update!(f, (model.layers[i], h, other_args...), (Optimisers.update!, opt_state.layers[i]))
+```
 """
-eager_update(f, update, state, xs...) = f(state, xs...)
-
-function Zygote._pullback(ctx::Zygote.AContext, ::typeof(eager_update), f, update, state, xs...)
-    y = f(xs...)
-    function pullback_eager_update(Δy)
-        y, pb = Zygote._pullback(ctx, f, xs...)
+eager_update!(f, (model, xs...), (update!, state)) = f(model, xs...)
+function Zygote._pullback(ctx::Zygote.AContext, ::typeof(eager_update!), f,(model, xs...), (update!, state))
+    y = f(model, xs...)
+    function pullback_eager_update!(Δy)
+        y, pb = Zygote._pullback(ctx, f, model, xs...)
         ret = pb(Δy)
-        update(state, f, ret[1])
-        return (nothing, nothing, nothing, nothing, ret[2:end]...)
+        update(state, model, ret[2])
+        return (nothing, nothing, (nothing, ret[3:end]...), nothing)
     end
-    return y, pullback_eager_update
+    return y, pullback_eager_update!
 end
+
+eager_update!((modelf, xs...), (update!, state)) = eager_update!((m, xs...) -> m(xs...), (modelf, xs...), (update!, state))
+
 
 
 """
