@@ -50,6 +50,9 @@ If eg. `f` needs to call `model.layers[i]` (which holds the parameters) as `f(mo
 ```
 h = eager_update!(f, (model.layers[i], h, other_args...), (Optimisers.update!, opt_state.layers[i]))
 ```
+
+!!! warning
+    If different layers share trainable parameters, then `eager_update` will likely give wrong results.
 """
 eager_update!(f, (model, xs...), (update!, state)) = f(model, xs...)
 function Zygote._pullback(ctx::Zygote.AContext, ::typeof(eager_update!), f,(model, xs...), (update!, state))
