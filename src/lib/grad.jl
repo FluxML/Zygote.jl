@@ -57,7 +57,7 @@ function Zygote._pullback(ctx::Zygote.AContext, ::typeof(eager_update!), f,(mode
     function pullback_eager_update!(Δy)
         y, pb = Zygote._pullback(ctx, f, model, xs...)
         ret = pb(Δy)
-        update(state, model, ret[2])
+        update!(state, model, ret[2])
         return (nothing, nothing, (nothing, ret[3:end]...), nothing)
     end
     return y, pullback_eager_update!
