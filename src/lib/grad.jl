@@ -31,44 +31,41 @@ end
 
 """
 
-    eager_update!((modelf, xs...), (update!, state)) = modelf(xs...) and update!(state, modelf, grads)
-    eager_update!(f, (model, xs...), (update!, state)) = f(model, xs...) and update!(state, model, grads)
+    eager_update!(state, model, update!)
 
-A combination of gradient checkpointing and eagerly updating the model parameters, discarding the updated gradients.
-Works when `modelf` is a callable struct that also stores the parameters to be updated, or if you have a function `f`
-that takes the `model`` as the first argument. `state` is the optimization state (eg. from Optimisers.jl) matching your model, and
-`update!` is the function that updates the parameters of `modelf`/`model` from the state and the gradients, called as `update!(state, model, grads)`.
+Eagerly updates the model parameters, discarding the updated gradients to save memory.
+`model` stores the parameters to be updated, `state` is the optimization state (eg. from Optimisers.jl) matching your model component, and
+`update!` is the function that updates the parameters (eg. from `Optimisers.jl`), usually called as `update!(state, model, grads)`.
 
-If eg. `model.layers[i]` is layer in a transformer, and is callable as `model.layers[i](h, other_args...)`, then:
+If `f` is a function that takes a single layer, called as `h = f(model.layers[i], h, other_args...)` then we can eagerly update with:
 
 ```
-h = eager_update!((model.layers[i], h, other_args...), (Optimisers.update!, opt_state.layers[i]))
+h = f(Zygote.eager_update!(state.layers[i], model.layers[i], Optimisers.update!), h, other_args...)
 ```
 
-If eg. `f` needs to call `model.layers[i]` (which holds the parameters) as `f(model.layers[i], h, other_args...)`, then:
+or combine this with gradient checkpointing (for additional memory saving at the cost of increased execution time) with:
 
 ```
-h = eager_update!(f, (model.layers[i], h, other_args...), (Optimisers.update!, opt_state.layers[i]))
+h = Zygote.checkpointed(f, eager_update!(state.layers[i], model.layers[i], Optimisers.update!), h, other_args...)
+```
+
+If `model.layers[i]` itself is callable, we can use the above by first wrapping it:
+
+```
+f(model, xs...) = model(xs...)
+h = f(Zygote.eager_update!(state.layers[i], model.layers[i], Optimisers.update!), h, other_args...)
 ```
 
 !!! warning
-    If different layers share trainable parameters, then `eager_update` will likely give wrong results.
+    If different layers share trainable parameters, then `eager_update!` will likely give wrong results.
 """
-eager_update!(f, (model, xs...), (update!, state)) = f(model, xs...)
-function Zygote._pullback(ctx::Zygote.AContext, ::typeof(eager_update!), f,(model, xs...), (update!, state))
-    y = f(model, xs...)
-    function pullback_eager_update!(Δy)
-        y, pb = Zygote._pullback(ctx, f, model, xs...)
-        ret = pb(Δy)
-        update!(state, model, ret[2])
-        return (nothing, nothing, (nothing, ret[3:end]...), nothing)
+function eager_update!(state, model, update!)
+    function update_hook(dmodel)
+        update!(state, model, dmodel)
+        return nothing
     end
-    return y, pullback_eager_update!
+    return Zygote.hook(update_hook, model)
 end
-
-eager_update!((modelf, xs...), (update!, state)) = eager_update!((m, xs...) -> m(xs...), (modelf, xs...), (update!, state))
-
-
 
 """
     hessian(f, x)
