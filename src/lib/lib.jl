@@ -37,6 +37,10 @@ function accum(x::RefValue, y::RefValue)
   return x
 end
 
+accum(x, y::AbstractThunk) = @thunk(accum(x, unthunk_tangent(y)))
+accum(x::AbstractThunk, y) = @thunk(accum(unthunk_tangent(x), y))
+accum(x::AbstractThunk, y::AbstractThunk) = @thunk(accum(unthunk_tangent(x), unthunk_tangent(y)))
+
 # Core functions
 @_adjoint_keepthunks deepcopy(x) = deepcopy(x), ȳ -> (ȳ,)
 
