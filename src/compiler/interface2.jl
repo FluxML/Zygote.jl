@@ -2,7 +2,11 @@ ignore_sig(T) = all(T -> T <: Type, T.parameters)
 
 function edge!(m::IRTools.Meta, edge::Core.MethodInstance)
   m.code.edges === nothing && (m.code.edges = Core.MethodInstance[])
-  push!(m.code.edges, edge)
+  if m.code.edges isa Core.SimpleVector
+    m.code.edges = Core.svec(m.code.edges..., edge)
+  else
+    push!(m.code.edges, edge)
+  end
   return
 end
 
