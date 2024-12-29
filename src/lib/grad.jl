@@ -39,19 +39,19 @@ Eagerly updates the model parameters, discarding the updated gradients to save m
 
 If `f` is a function that takes a single layer, called as `h = f(model.layers[i], h, other_args...)` then we can eagerly update with:
 
-```
+```julia
 h = f(Zygote.eager_update!(state.layers[i], model.layers[i], Optimisers.update!), h, other_args...)
 ```
 
 or combine this with gradient checkpointing (for additional memory saving at the cost of increased execution time) with:
 
-```
+```julia
 h = Zygote.checkpointed(f, eager_update!(state.layers[i], model.layers[i], Optimisers.update!), h, other_args...)
 ```
 
 If `model.layers[i]` itself is callable, we can use the above by first wrapping it:
 
-```
+```julia
 f(model, xs...) = model(xs...)
 h = f(Zygote.eager_update!(state.layers[i], model.layers[i], Optimisers.update!), h, other_args...)
 ```
