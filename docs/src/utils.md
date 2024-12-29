@@ -26,6 +26,7 @@ Zygote.hook
 Zygote.Buffer
 Zygote.forwarddiff
 Zygote.checkpointed
+Zygote.eager_update!
 ```
 
 `Params` and `Grads` can be copied to and from arrays using the `copy!` function.
