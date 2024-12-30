@@ -163,14 +163,10 @@ using Zygote: ZygoteRuleConfig
 
         @test (1,) == h(1)
 
-        if VERSION >= v"1.6-"
-            @test begin
-                a3, pb3 = Zygote.pullback(h, 1)
-                ((1,),) == pb3(1)
-            end
-        else
+
+        @test begin
             a3, pb3 = Zygote.pullback(h, 1)
-            @test ((1,),) == pb3(1)
+            ((1,),) == pb3(1)
         end
     end
 
