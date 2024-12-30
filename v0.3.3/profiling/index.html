@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Profiling · Zygote</title><script>(function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+(i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+})(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+ga('create', 'UA-36890222-9', 'auto');
+ga('send', 'pageview');
+</script><link href="https://cdnjs.cloudflare.com/ajax/libs/normalize/4.2.0/normalize.min.css" rel="stylesheet" type="text/css"/><link href="https://fonts.googleapis.com/css?family=Lato|Roboto+Mono" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/default.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL=".."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.2.0/require.min.js" data-main="../assets/documenter.js"></script><script src="../siteinfo.js"></script><script src="../../versions.js"></script><link href="../assets/documenter.css" rel="stylesheet" type="text/css"/></head><body><nav class="toc"><h1>Zygote</h1><select id="version-selector" onChange="window.location.href=this.value" style="visibility: hidden"></select><form class="search" id="search-form" action="../search/"><input id="search-query" name="q" type="text" placeholder="Search docs"/></form><ul><li><a class="toctext" href="../">Home</a></li><li><a class="toctext" href="../adjoints/">Custom Adjoints</a></li><li><a class="toctext" href="../utils/">Utilities</a></li><li><a class="toctext" href="../complex/">Complex Differentiation</a></li><li><a class="toctext" href="../flux/">Flux</a></li><li class="current"><a class="toctext" href>Profiling</a><ul class="internal"><li><a class="toctext" href="#Performance-Profiling-1">Performance Profiling</a></li><li><a class="toctext" href="#Memory-Profiling-1">Memory Profiling</a></li><li><a class="toctext" href="#Reflection-1">Reflection</a></li></ul></li><li><a class="toctext" href="../internals/">Internals</a></li><li><a class="toctext" href="../glossary/">Glossary</a></li></ul></nav><article id="docs"><header><nav><ul><li><a href>Profiling</a></li></ul><a class="edit-page" href="https://github.com/FluxML/Zygote.jl/blob/master/docs/src/profiling.md"><span class="fa"></span> Edit on GitHub</a></nav><hr/><div id="topbar"><span>Profiling</span><a class="fa fa-bars" href="#"></a></div></header><h1><a class="nav-anchor" id="Debugging-in-Time-and-Space-1" href="#Debugging-in-Time-and-Space-1">Debugging in Time and Space</a></h1><p>Because Zygote generates Julia code for the backwards pass, many of Julia&#39;s normal profiling and performance debugging tools work well on it out of the box.</p><h2><a class="nav-anchor" id="Performance-Profiling-1" href="#Performance-Profiling-1">Performance Profiling</a></h2><p>Julia&#39;s <a href="https://docs.julialang.org/en/v1/manual/profile/">sampling profiler</a> is useful for understanding performance. We recommend <a href="http://docs.junolab.org/latest/man/juno_frontend/#Profiler-1">running the profiler in Juno</a>, but the terminal or <a href="https://github.com/timholy/ProfileView.jl">ProfileView.jl</a> also work well.</p><p><img src="https://i.imgur.com/saYm3Uo.png" alt/></p><p>The bars indicate time taken in both the forwards and backwards passes at that line. The canopy chart on the right shows us each function call as a block, arranged so that when <code>f</code> calls <code>g</code>, <code>g</code> gets a block just below <code>f</code>, which is bigger the longer it took to run. If we dig down the call stack we&#39;ll eventually find the adjoints for things like <code>matmul</code>, which we can click on to view.</p><p><img src="https://i.imgur.com/ypLQZlu.png" alt/></p><p>The trace inside the adjoint can be used to distinguish time taken by the forwards and backwards passes.</p><h2><a class="nav-anchor" id="Memory-Profiling-1" href="#Memory-Profiling-1">Memory Profiling</a></h2><p>Reverse-mode AD typically uses memory proportional to the number of operations in the program, so long-running programs can also suffer memory usage issues. Zygote includes a space profiler to help debug these issues. Like the time profiler, it shows a canopy chart, but this time hovering over it displays the number of bytes stored by each line of the program.</p><p><img src="https://i.imgur.com/pd2P4W4.png" alt/></p><p>Note that this currently only works inside Juno.</p><h2><a class="nav-anchor" id="Reflection-1" href="#Reflection-1">Reflection</a></h2><p>Julia&#39;s code and type inference reflection tools can also be useful, though Zygote&#39;s use of closures can make the output noisy. To see the code Julia runs you should use the low-level <code>_forward</code> method and the pullback it returns. This will directly show either the derived adjoint code or the code for a custom adjoint, if there is one.</p><pre><code class="language-julia">julia&gt; using Zygote: Context, _forward
+
+julia&gt; add(a, b) = a+b
+
+julia&gt; @code_typed _forward(Context(), add, 1, 2)
+CodeInfo(
+1 ─ %1 = (Base.getfield)(args, 1)::Int64
+│   %2 = (Base.getfield)(args, 2)::Int64
+│   %3 = (Base.add_int)(%1, %2)::Int64
+│   %4 = (Base.tuple)(%3, $(QuoteNode(∂(add))))::PartialTuple(Tuple{Int64,typeof(∂(add))}, Any[Int64, Const(∂(add), false)])
+└──      return %4
+) =&gt; Tuple{Int64,typeof(∂(add))}
+
+julia&gt; y, back = _forward(Context(), add, 1, 2)
+(3, ∂(add))
+
+julia&gt; @code_typed back(1)
+CodeInfo(
+1 ─ %1 = (Base.mul_int)(Δ, 1)::Int64
+│   %2 = (Base.mul_int)(Δ, 1)::Int64
+│   %3 = (Zygote.tuple)(nothing, %1, %2)::PartialTuple(Tuple{Nothing,Int64,Int64}, Any[Const(nothing, false), Int64, Int64])
+└──      return %3
+) =&gt; Tuple{Nothing,Int64,Int64}</code></pre><footer><hr/><a class="previous" href="../flux/"><span class="direction">Previous</span><span class="title">Flux</span></a><a class="next" href="../internals/"><span class="direction">Next</span><span class="title">Internals</span></a></footer></article></body></html>
