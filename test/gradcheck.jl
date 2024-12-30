@@ -2191,4 +2191,4 @@ end
   # Check that trivial scalar broadcast hasn't gone weird:
   @test gradient(x -> @.(x * x * x), 2.0) == gradient(x -> x * (x * x), 2.0)
   @test gradient(x -> @.(3.0*x*2.0*x), 2.0) == gradient(x -> 6(x^2), 2.0)
- end
+end
