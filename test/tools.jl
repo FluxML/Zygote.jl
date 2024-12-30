@@ -45,13 +45,14 @@ end
 
   struct Tester
     cpu_offload::Float64
-  end
 
-  function Tester(p)
+    function Tester(p)
       # @show Zygote.isderiving(p)
       cpu_offload = Zygote.isderiving(p) ? 0.0 : 0.2
-      Tester(cpu_offload)
+      new(cpu_offload)
+    end
   end
+
 
   function f56(p)
     sum(Tester(p).cpu_offload .* p)

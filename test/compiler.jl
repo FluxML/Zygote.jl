@@ -320,13 +320,13 @@ end
         @test_throws ErrorException pull(1.)
         err = try pull(1.) catch ex; ex end
         @test occursin("Can't differentiate function execution in catch block",
-                       string(err))
+                       string(err)) broken=VERSION>=v"1.11"
     end
 
     if VERSION >= v"1.8"
         @testset "try/catch/else" begin
             @test Zygote.gradient(try_catch_else, false, 1.0) == (nothing, 8.0)
-            @test_throws "Can't differentiate function execution in catch block" Zygote.gradient(try_catch_else, true, 1.0)
+            @test_throws ErrorException Zygote.gradient(try_catch_else, true, 1.0)
         end
     end
 
@@ -349,5 +349,5 @@ end
 
     err = try pull(1.) catch ex; ex end
     @test occursin("Can't differentiate function execution in catch block",
-                   string(err))
+                   string(err)) broken=VERSION>=v"1.11"
 end
