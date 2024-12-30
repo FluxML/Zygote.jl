@@ -450,7 +450,11 @@ end
 end
 
 @testset "@timed" begin
-  @test gradient(x -> first(@timed x), 0) == (1,) broken=VERSION>=v"1.11"
+  if VERSION >= v"1.11"
+    @test_broken gradient(x -> first(@timed x), 0) == (1,)
+  else
+    @test gradient(x -> first(@timed x), 0) == (1,)
+  end
 end
 
 mutable struct MyMutable
@@ -622,19 +626,17 @@ end
   end == ([1, 2 * 10^1, 3 * 100^2],)
 
   # zip
-  if VERSION >= v"1.5"
-    # On Julia 1.4 and earlier, [x/y for (x,y) in zip(10:14, 1:10)] is a DimensionMismatch,
-    # while on 1.5 - 1.7 it stops early.
+  # On Julia 1.4 and earlier, [x/y for (x,y) in zip(10:14, 1:10)] is a DimensionMismatch,
+  # while on 1.5 - 1.7 it stops early.
 
-    @test gradient(10:14, 1:10) do xs, ys
-      sum([x/y for (x,y) in zip(xs, ys)])
-    end[2] ≈ vcat(.-(10:14) ./ (1:5).^2, zeros(5))
+  @test gradient(10:14, 1:10) do xs, ys
+    sum([x/y for (x,y) in zip(xs, ys)])
+  end[2] ≈ vcat(.-(10:14) ./ (1:5).^2, zeros(5))
 
-    @test_broken gradient(10:14, 1:10) do xs, ys
-      sum(x/y for (x,y) in zip(xs, ys))   # same without collect
-      # Here @adjoint function Iterators.Zip(xs) gets dy = (is = (nothing, nothing),)
-    end[2] ≈ vcat(.-(10:14) ./ (1:5).^2, zeros(5))
-  end
+  @test_broken gradient(10:14, 1:10) do xs, ys
+    sum(x/y for (x,y) in zip(xs, ys))   # same without collect
+    # Here @adjoint function Iterators.Zip(xs) gets dy = (is = (nothing, nothing),)
+  end[2] ≈ vcat(.-(10:14) ./ (1:5).^2, zeros(5))
 
   bk_z = pullback((xs,ys) -> sum([abs2(x*y) for (x,y) in zip(xs,ys)]), [1,2], [3im,4im])[2]
   @test bk_z(1.0)[1] isa AbstractVector{<:Real}  # projection

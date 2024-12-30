@@ -33,7 +33,7 @@ y, back = pullback(badly, 2)
 bt = try back(1) catch e stacktrace(catch_backtrace()) end
 
 @test trace_contains(bt, nothing, "compiler.jl", bad_def_line)
-if VERSION <= v"1.6-" || VERSION >= v"1.10-"
+if VERSION >= v"1.10-"
   @test trace_contains(bt, :badly, "compiler.jl", bad_call_line)
 else
   @test_broken trace_contains(bt, :badly, "compiler.jl", bad_call_line)
@@ -319,8 +319,11 @@ end
         @test res == 12.
         @test_throws ErrorException pull(1.)
         err = try pull(1.) catch ex; ex end
-        @test occursin("Can't differentiate function execution in catch block",
-                       string(err)) broken=VERSION>=v"1.11"
+        if VERSION >= v"1.11"
+          @test_broken occursin("Can't differentiate function execution in catch block", string(err))
+        else
+          @test occursin("Can't differentiate function execution in catch block", string(err))
+        end
     end
 
     if VERSION >= v"1.8"
@@ -348,6 +351,9 @@ end
     @test_throws ErrorException pull(1.)
 
     err = try pull(1.) catch ex; ex end
-    @test occursin("Can't differentiate function execution in catch block",
-                   string(err)) broken=VERSION>=v"1.11"
+    if VERION >= v"1.11"
+      @test_broken occursin("Can't differentiate function execution in catch block", string(err))
+    else
+      @test occursin("Can't differentiate function execution in catch block", string(err))
+    end
 end

@@ -405,10 +405,8 @@ end
 
 @testset "vararg map" begin
   # early stop
-  if VERSION >= v"1.5"
     # In Julia 1.4 and earlier, map(*,rand(5),[1,2,3]) is a DimensionMismatch
-    @test gradient(x -> sum(map(*,x,[1,2,3])), rand(5)) == ([1,2,3,0,0],)
-  end
+  @test gradient(x -> sum(map(*,x,[1,2,3])), rand(5)) == ([1,2,3,0,0],)
   @test gradient(x -> sum(map(*,x,(1,2,3))), rand(5)) == ([1,2,3,0,0],)
   @test gradient(x -> sum(map(*,x,[1,2,3])), Tuple(rand(5))) == ((1.0, 2.0, 3.0, nothing, nothing),)
 
@@ -1862,15 +1860,13 @@ end
   @test gradient(x -> sum(randexp(Random.GLOBAL_RNG, Float32, 1,1)), 1) == (nothing,)
   @test gradient(x -> sum(randexp(Random.GLOBAL_RNG, Float32, (1,1))), 1) == (nothing,)
 
-  @static if VERSION > v"1.3"
-    @test gradient(x -> sum(rand(Random.default_rng(), 4)), 1) == (nothing,)
-    @test gradient(x -> sum(rand(Random.default_rng(), Float32, 1,1)), 1) == (nothing,)
-    @test gradient(x -> sum(rand(Random.default_rng(), Float32, (1,1))), 1) == (nothing,)
-    @test gradient(x -> sum(randn(Random.default_rng(), Float32, 1,1)), 1) == (nothing,)
-    @test gradient(x -> sum(randn(Random.default_rng(), Float32, (1,1))), 1) == (nothing,)
-    @test gradient(x -> sum(randexp(Random.default_rng(), Float32, 1,1)), 1) == (nothing,)
-    @test gradient(x -> sum(randexp(Random.default_rng(), Float32, (1,1))), 1) == (nothing,)
-  end
+  @test gradient(x -> sum(rand(Random.default_rng(), 4)), 1) == (nothing,)
+  @test gradient(x -> sum(rand(Random.default_rng(), Float32, 1,1)), 1) == (nothing,)
+  @test gradient(x -> sum(rand(Random.default_rng(), Float32, (1,1))), 1) == (nothing,)
+  @test gradient(x -> sum(randn(Random.default_rng(), Float32, 1,1)), 1) == (nothing,)
+  @test gradient(x -> sum(randn(Random.default_rng(), Float32, (1,1))), 1) == (nothing,)
+  @test gradient(x -> sum(randexp(Random.default_rng(), Float32, 1,1)), 1) == (nothing,)
+  @test gradient(x -> sum(randexp(Random.default_rng(), Float32, (1,1))), 1) == (nothing,)
 end
 
 @testset "broadcasted($op, Array, Bool)" for op in (+,-,*)
