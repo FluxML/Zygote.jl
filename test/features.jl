@@ -243,21 +243,6 @@ end
 
   @test gradient(pow_rec, 2, 3) == (12, nothing)
 
-  # For nested AD, until we support errors
-  function grad(f, args...)
-    y, back = pullback(f, args...)
-    return back(1)
-  end
-
-  D(f, x) = grad(f, x)[1]
-
-  @test D(x -> D(sin, x), 0.5) == -sin(0.5)
-  @test D(x -> x*D(y -> x+y, 1), 1) == 1
-  @test D(x -> x*D(y -> x*y, 1), 4) == 8
-
-  @test sin''(1.0) ==  -sin(1.0)
-  @test sin'''(1.0) ==  -cos(1.0)
-
   f(x) = throw(DimensionMismatch("fubar"))
 
   @test_throws DimensionMismatch gradient(f, 1)
@@ -333,6 +318,23 @@ end
 
   y, back = Zygote.pullback(x->tuple(x...), [1, 2, 3])
   @test back((1, 1, 1)) == ((1,1,1),)
+end
+
+@testset "nested AD" begin
+  # For nested AD, until we support errors
+  function grad(f, args...)
+    y, back = pullback(f, args...)
+    return back(1)
+  end
+
+  D(f, x) = grad(f, x)[1]
+
+  @test D(x -> D(sin, x), 0.5) == -sin(0.5)
+  @test D(x -> x*D(y -> x+y, 1), 1) == 1
+  @test D(x -> x*D(y -> x*y, 1), 4) == 8
+
+  @test sin''(1.0) ==  -sin(1.0)
+  @test sin'''(1.0) ==  -cos(1.0)
 end
 
 @testset "compiler error" begin
