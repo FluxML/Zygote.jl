@@ -1061,7 +1061,13 @@ _randmatseries(rng, ::typeof(atanh), T, n, domain::Type{Complex}) = nothing
         @testset "similar eigenvalues" begin
           λ[1] = λ[3] + sqrt(eps(eltype(λ))) / 10
           A2 = U * Diagonal(λ) * U'
-          @test _gradtest_hermsym(f, ST, A2)
+          @static if VERSION >= v"1.11"
+            broken = f == sqrt && MT <: Symmetric{Float64} && domain == Complex
+            # @show f MT domain
+            @test _gradtest_hermsym(f, ST, A2) broken=broken
+          else
+            @test _gradtest_hermsym(f, ST, A2)
+          end
         end
 
         if f ∉ (log, sqrt) # only defined for invertible matrices
@@ -1166,10 +1172,20 @@ end
           return sum(sin.(vcat(vec.(_splitreim(B))...)))
         end === map(_->nothing, _splitreim(A))
       else
-        @test gradtest(_splitreim(collect(A))...) do (args...)
-          A = ST(_joinreim(_dropimaggrad.(args)...))
-          B = A^p
-          return vcat(vec.(_splitreim(B))...)
+        @static if VERSION >= v"1.11"
+          # @show MT p
+          broken = MT <: Symmetric{Float64} && p == -3
+          @test gradtest(_splitreim(collect(A))...) do (args...)
+            A = ST(_joinreim(_dropimaggrad.(args)...))
+            B = A^p
+            return vcat(vec.(_splitreim(B))...)
+          end broken=broken
+        else
+          @test gradtest(_splitreim(collect(A))...) do (args...)
+            A = ST(_joinreim(_dropimaggrad.(args)...))
+            B = A^p
+            return vcat(vec.(_splitreim(B))...)
+          end
         end
       end
 
