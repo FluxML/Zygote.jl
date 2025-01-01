@@ -1,7 +1,3 @@
-# TODO remove once PR is merged
-import Pkg
-Pkg.add(url="https://github.com/pxl-th/ChainRules.jl.git", rev="pxl-th/eachslice")
-
 using Zygote, Test, LinearAlgebra
 using Zygote: gradient, ZygoteRuleConfig
 

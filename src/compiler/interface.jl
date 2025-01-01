@@ -357,6 +357,9 @@ function copy!(x::AbstractVector, ps::Params)
   x
 end
 
+_maybe_unthunk(x::AbstractThunk) = unthunk(x)
+_maybe_unthunk(x) = x
+
 """
     Grads(...)
 
@@ -391,7 +394,7 @@ end
 
 function Base.getindex(gs::Grads, x)
   isbits(x) && error("Only reference types can be differentiated with `Params`.")
-  return gs.grads[x]
+  return _maybe_unthunk(gs.grads[x])
 end
 
 """
@@ -474,7 +477,7 @@ function pullback(f, ps::Params)
       cache(cx)[p] = nothing
     end
     back(Δ)
-    Grads(unthunk_tangent(cx.cache), ps) # TODO make a copy
+    Grads(_maybe_unthunk(cx.cache), ps)
   end
 end
 

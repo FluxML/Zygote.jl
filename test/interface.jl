@@ -269,5 +269,4 @@ end
     @test sgs[d.b] ≈ fill(1.f0, size(d.b))
   end
 
-
 end
