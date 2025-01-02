@@ -74,7 +74,7 @@ Tracker = "9f7883ad-71c0-57eb-9f7f-b5c9e6d3789c"
 Pkg = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
 
 [targets]
-test = ["ChainRulesTestUtils", "Conda", "CUDA", "Distances", "FFTW", "FiniteDifferences", "PythonCall", "Test", "Pkg"]
+test = ["ChainRulesTestUtils", "Conda", "CUDA", "Distances", "FFTW", "FiniteDifferences", "PythonCall", "Test"]
 
 [sources]
 ChainRulesCore = {url = "https://github.com/pxl-th/ChainRulesCore.jl.git", rev = "pxl-th/thunks"}
