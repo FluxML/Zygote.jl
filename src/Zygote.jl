@@ -45,9 +45,6 @@ include("lib/utils.jl")
 include("lib/range.jl")
 include("lib/logexpfunctions.jl")
 
-_usethunks() = true
-ChainRulesCore.rrule(::typeof(_usethunks)) = false, () -> (NoTangent(),)
-
 # we need to define this late, so that the genfuncs see lib.jl
 # Move using statements out of this file to help with sysimage building
 using IRTools: varargs!, inlineable!, pis!, slots!
@@ -86,10 +83,6 @@ using PrecompileTools
 # see https://github.com/SciML/DiffEqFlux.jl/issues/783
 @static if VERSION < v"1.8" || VERSION >= v"1.8.5"
   @compile_workload precompile()
-end
-
-function __init__()
-    ChainRulesCore.UTILIZE_THUNKS[] = _usethunks
 end
 
 end # module
