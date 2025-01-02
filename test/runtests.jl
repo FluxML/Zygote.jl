@@ -1,6 +1,3 @@
-import Pkg
-Pkg.add(url="https://github.com/pxl-th/ChainRulesCore.jl.git", rev="pxl-th/thunks")
-
 using Zygote, Test, LinearAlgebra
 using Zygote: gradient, ZygoteRuleConfig
 
