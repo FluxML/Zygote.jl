@@ -543,8 +543,7 @@ end
   f1244(w, x) = sum(maximum((w * x).^2, dims=1))
   g1244(w, x) = sum(gradient(f1244, w, x)[2].^2)
   h1244(w, x) = gradient(g1244, w, x)[2]
-  # FIXME broken since thunks utilization
-  @test_broken h1244([1 2 3; 4 5 6.0], [7,8,9.0]) ≈ [300608, 375760, 450912]
+  @test h1244([1 2 3; 4 5 6.0], [7,8,9.0]) ≈ [300608, 375760, 450912]
 end
 
 @testset "minimum" begin
