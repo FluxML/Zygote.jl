@@ -37,9 +37,12 @@ function accum(x::RefValue, y::RefValue)
   return x
 end
 
-accum(x, y::AbstractThunk) = @thunk(accum(x, unthunk_tangent(y)))
-accum(x::AbstractThunk, y) = @thunk(accum(unthunk_tangent(x), y))
-accum(x::AbstractThunk, y::AbstractThunk) = @thunk(accum(unthunk_tangent(x), unthunk_tangent(y)))
+accum(x::NamedTuple, y::ChainRulesCore.Tangent) = accum(x, wrap_chainrules_output(y))
+accum(x::ChainRulesCore.Tangent, y::NamedTuple) = accum(wrap_chainrules_output(x), y)
+
+accum(x, y::AbstractThunk) = @thunk(accum(x, unthunk(y)))
+accum(x::AbstractThunk, y) = @thunk(accum(unthunk(x), y))
+accum(x::AbstractThunk, y::AbstractThunk) = @thunk(accum(unthunk(x), unthunk(y)))
 
 # Core functions
 @_adjoint_keepthunks deepcopy(x) = deepcopy(x), ȳ -> (ȳ,)
