@@ -237,7 +237,7 @@ function _pullback(cx::AContext, ::typeof(collect), g::Base.Generator)
     x̄ = reconstruct_if_dict(x̄, _keys) # return a dictionary if needed
     (nothing, (f = f̄, iter = x̄),)
   end
-  y, collect_pullback
+  y, collect_pullback ∘ unthunk_tangent
 end
 
 collect_if_dict(x::Dict) = collect(x), collect(keys(x))

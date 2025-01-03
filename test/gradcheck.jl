@@ -20,14 +20,14 @@ function ngradient(f, xs::AbstractArray...)
   return grads
 end
 
-function gradcheck(f, xs...)
+function gradcheck(f, xs...; rtol = 1e-5, atol = 1e-5)
   grad_zygote = gradient(f, xs...)
   grad_finite_difference = ngradient(f, xs...)
-  return all(isapprox.(grad_zygote, grad_finite_difference; rtol = 1e-5, atol = 1e-5))
+  return all(isapprox.(grad_zygote, grad_finite_difference; rtol = rtol, atol = atol))
 end
 
-gradtest(f, xs::AbstractArray...) = gradcheck((xs...) -> sum(sin.(f(xs...))), xs...)
-gradtest(f, dims...) = gradtest(f, rand.(Float64, dims)...)
+gradtest(f, xs::AbstractArray...; kwargs...) = gradcheck((xs...) -> sum(sin.(f(xs...))), xs...; kwargs...)
+gradtest(f, dims...; kwargs...) = gradtest(f, rand.(Float64, dims)...; kwargs...)
 
 # utilities for using gradcheck with complex matrices
 _splitreim(A) = (real(A),)
@@ -160,8 +160,8 @@ end
   @test gradient(y, x, z) == ([1, 1, 2], nothing)
 
   # https://github.com/FluxML/Zygote.jl/issues/376
-  _, back = Zygote._pullback(x->x[1]*im, randn(2))
-  @test back(1.0)[2] == real([-im, 0]) == [0, 0]
+  _, back = Zygote.pullback(x -> x[1] * im, randn(2))
+  @test back(1.0)[1] == real([-im, 0]) == [0, 0]
 
   # _droplike
   @test gradient(x -> sum(inv, x[1, :]'), ones(2, 2)) == ([-1 -1; 0 0],)
@@ -949,8 +949,8 @@ end
 _hermsymtype(::Type{<:Symmetric}) = Symmetric
 _hermsymtype(::Type{<:Hermitian}) = Hermitian
 
-function _gradtest_hermsym(f, ST, A)
-  gradtest(_splitreim(collect(A))...) do (args...)
+function _gradtest_hermsym(f, ST, A; kwargs...)
+  gradtest(_splitreim(collect(A))...; kwargs...) do (args...)
     B = f(ST(_joinreim(_dropimaggrad.(args)...)))
     return sum(_splitreim(B))
   end
