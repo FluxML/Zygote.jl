@@ -1171,13 +1171,6 @@ end
           B = A^p
           return sum(sin.(vcat(vec.(_splitreim(B))...)))
         end === map(_->nothing, _splitreim(A))
-      elseif p == -3 && MT <: Symmetric{Float64}
-        # FIXME Fails due to accuracy issues.
-        @test_broken gradtest(_splitreim(collect(A))...) do (args...)
-          A = ST(_joinreim(_dropimaggrad.(args)...))
-          B = A^p
-          return vcat(vec.(_splitreim(B))...)
-        end
       else
         @static if VERSION >= v"1.11"
           # @show MT p
