@@ -114,7 +114,7 @@ end
   @test gradtest(X -> sum(sum(x -> x^2, X; dims=1)), randn(10)) # issue #681
 
   # Non-differentiable sum of booleans
-  @test_skip gradient(sum, [true, false, true]) == (nothing,)  # fine locally, fails on buidkite?
+  @test gradient(sum, [true, false, true]) == (nothing,)
   @test gradient(x->sum(x .== 0.0), [1.2, 0.2, 0.0, -1.1, 100.0]) == (nothing,)
 
   # https://github.com/FluxML/Zygote.jl/issues/314
