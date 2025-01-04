@@ -53,7 +53,6 @@ end
     @test g isa Dict{Int, Float64}
     @test g == Dict(1 => 10.0, 2 => 12.0)
 
-
     w = randn(5)
     function f_generator(w)
         d = Dict{Int, Float64}(i => v for (i,v) in enumerate(w))
