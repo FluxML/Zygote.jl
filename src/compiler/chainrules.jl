@@ -1,3 +1,14 @@
+# ToDo: Move some of this to ZygoteRules, or move unthunk_tangent for Tuple and NamedTuple from
+# Zygote rules here?
+function unthunk_tangent end
+@inline unthunk_tangent(x::AbstractThunk) = wrap_chainrules_output(unthunk(x))
+@inline unthunk_tangent(x::NTuple{N,<:Number}) where N = x
+@inline unthunk_tangent(x::AbstractArray{<:Number,N}) where N = x
+@inline unthunk_tangent(x::AbstractArray) = map(unthunk_tangent, x)
+unthunk_tangent(d::IdDict) = IdDict([unthunk_tangent(k) => unthunk_tangent(v) for (k, v) in d])
+@non_differentiable unthunk_tangent(::IdDict)
+
+
 struct ZygoteRuleConfig{CTX<:AContext} <: RuleConfig{Union{HasReverseMode,NoForwardsMode}}
   context::CTX
 end
@@ -107,7 +118,6 @@ is_kwfunc(k, ::Type{<:NamedTuple}, f, args...) = k===Core.kwftype(f)
 Convert `x` from the differentials types ChainRules uses to the format Zygote uses internally.
 """
 @inline wrap_chainrules_output(x) = x
-@inline wrap_chainrules_output(x::AbstractThunk) = wrap_chainrules_output(unthunk(x))  # For now we are just not going to deal with thunks
 @inline wrap_chainrules_output(x::Tuple) = map(wrap_chainrules_output, x)
 # Zygote convention: even if many AbstractZero partials (i.e. multi-input function), make just 1 nothing.
 @inline wrap_chainrules_output(x::Tuple{Vararg{ChainRules.AbstractZero}}) = nothing
@@ -162,6 +172,7 @@ end
 # For arrays, whitelist the safe ones, but always look inside Any[]:
 @inline wrap_chainrules_input(dxs::AbstractArray{<:Number}) = dxs
 @inline wrap_chainrules_input(dxs::AbstractArray{<:AbstractArray{<:Number}}) = dxs
+@inline wrap_chainrules_input(dxs::AbstractArray{<:Union{Nothing,T}}) where T <: Number = map(x -> x === nothing ? zero(T) : x, dxs)
 @inline wrap_chainrules_input(dxs::AbstractArray) = map(wrap_chainrules_input, dxs)
 
 #=
@@ -260,7 +271,9 @@ function ChainRulesCore.rrule_via_ad(config::ZygoteRuleConfig, f_args...; kwargs
         _pullback(config.context, f_args...)
     end
 
-    ad_pullback(Δ) = zygote2differential(pb(wrap_chainrules_output(Δ)), f_args)
+    ad_pullback(Δ) = zygote2differential(
+        pb(wrap_chainrules_output(unthunk_tangent(Δ))),
+        f_args)
     return y, ad_pullback
 end
 

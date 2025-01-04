@@ -33,7 +33,7 @@ y, back = pullback(badly, 2)
 bt = try back(1) catch e stacktrace(catch_backtrace()) end
 
 @test trace_contains(bt, nothing, "compiler.jl", bad_def_line)
-if VERSION <= v"1.6-" || VERSION >= v"1.10-"
+if VERSION >= v"1.10-"
   @test trace_contains(bt, :badly, "compiler.jl", bad_call_line)
 else
   @test_broken trace_contains(bt, :badly, "compiler.jl", bad_call_line)
@@ -225,3 +225,135 @@ end
 
 # issue 897
 @test gradient(x -> sum(norm, collect(eachcol(x))), ones(3, 400))[1] ≈ fill(0.5773502691896258, 3, 400)
+
+# Tests adapted from https://github.com/dfdx/Umlaut.jl/pull/35
+@eval _has_boundscheck(x) = ifelse($(Expr(:boundscheck)), 2x, x)
+
+@testset "Meta Expr handling" begin
+  y, (dx,) = withgradient(_has_boundscheck, 1)
+  @test y == 2
+  @test dx == 2
+end
+
+# issue 1118 & 1380
+function f_1380(x)
+    if rand(Bool)
+        return x
+    else
+        return 2x
+    end
+
+    # unreachable
+    return nothing
+end
+
+@testset "unreachable block" begin
+    y, back = Zygote.pullback(f_1380, 1.)
+    # There should not be a compiler error
+    local g
+    @test_nowarn g = back(1.)
+    @test only(g) ∈ (1., 2.)
+end
+
+function throws_and_catches_if_x_negative(x,y)
+    z = x + y
+    try
+        if x < 0.
+            throw(DomainError("x is negative"))
+        end
+        z = 2z + x + y
+    catch err
+        @error "something went wrong" exception=(err,catch_backtrace())
+    end
+    return 3z
+end
+
+function try_catch_finally(cond, x)
+
+    try
+        x = 2x
+        cond && throw(DomainError())
+    catch
+        x = 2x
+    finally
+        x = 3x
+    end
+
+    x
+end
+
+if VERSION >= v"1.8"
+    # try/catch/else is invalid syntax prior to v1.8
+    eval(Meta.parse("""
+        function try_catch_else(cond, x)
+            x = 2x
+
+            try
+                x = 2x
+                cond && throw(nothing)
+            catch
+                x = 3x
+            else
+                x = 2x
+            end
+
+            x
+        end
+    """))
+end
+
+@testset "try/catch" begin
+    @testset "happy path (nothrow)" begin
+        res, (dx,dy) = withgradient(throws_and_catches_if_x_negative, 1., 2.)
+        @test res == 3 * (2 * (1. + 2.) + 1. + 2.)
+        @test dx == 3. * (2. + 1.)
+        @test dy == 3. * (2. + 1.)
+    end
+
+    @testset "try/catch/finally" begin
+        res, (_, dx,) = withgradient(try_catch_finally, false, 1.)
+        @test res == 6.
+        @test dx == 6.
+
+        res, pull = pullback(try_catch_finally, true, 1.)
+        @test res == 12.
+        @test_throws ErrorException pull(1.)
+        err = try pull(1.) catch ex; ex end
+        if VERSION >= v"1.11"
+          @test_broken occursin("Can't differentiate function execution in catch block", string(err))
+        else
+          @test occursin("Can't differentiate function execution in catch block", string(err))
+        end
+    end
+
+    if VERSION >= v"1.8"
+        @testset "try/catch/else" begin
+            @test Zygote.gradient(try_catch_else, false, 1.0) == (nothing, 8.0)
+            @test_throws ErrorException Zygote.gradient(try_catch_else, true, 1.0)
+        end
+    end
+
+    function foo_try(f)
+      y = 1
+      try
+        y = f()
+      catch
+        y
+      end
+      y
+    end
+
+    g, = gradient(x -> foo_try(() -> x), 1) # 1
+    @test g == 1.
+
+    vy, pull = pullback(foo_try, () -> 0//0) # bypass because of expr
+    @test vy === 1
+    @test_throws ErrorException pull(1.)
+
+    err = try pull(1.) catch ex; ex end
+    if VERSION >= v"1.11"
+      @test_broken occursin("Can't differentiate function execution in catch block", string(err))
+    else
+      @test occursin("Can't differentiate function execution in catch block", string(err))
+    end
+end

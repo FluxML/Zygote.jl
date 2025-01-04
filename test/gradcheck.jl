@@ -20,14 +20,14 @@ function ngradient(f, xs::AbstractArray...)
   return grads
 end
 
-function gradcheck(f, xs...)
+function gradcheck(f, xs...; rtol = 1e-5, atol = 1e-5)
   grad_zygote = gradient(f, xs...)
   grad_finite_difference = ngradient(f, xs...)
-  return all(isapprox.(grad_zygote, grad_finite_difference; rtol = 1e-5, atol = 1e-5))
+  return all(isapprox.(grad_zygote, grad_finite_difference; rtol = rtol, atol = atol))
 end
 
-gradtest(f, xs::AbstractArray...) = gradcheck((xs...) -> sum(sin.(f(xs...))), xs...)
-gradtest(f, dims...) = gradtest(f, rand.(Float64, dims)...)
+gradtest(f, xs::AbstractArray...; kwargs...) = gradcheck((xs...) -> sum(sin.(f(xs...))), xs...; kwargs...)
+gradtest(f, dims...; kwargs...) = gradtest(f, rand.(Float64, dims)...; kwargs...)
 
 # utilities for using gradcheck with complex matrices
 _splitreim(A) = (real(A),)
@@ -160,8 +160,8 @@ end
   @test gradient(y, x, z) == ([1, 1, 2], nothing)
 
   # https://github.com/FluxML/Zygote.jl/issues/376
-  _, back = Zygote._pullback(x->x[1]*im, randn(2))
-  @test back(1.0)[2] == real([-im, 0]) == [0, 0]
+  _, back = Zygote.pullback(x -> x[1] * im, randn(2))
+  @test back(1.0)[1] == real([-im, 0]) == [0, 0]
 
   # _droplike
   @test gradient(x -> sum(inv, x[1, :]'), ones(2, 2)) == ([-1 -1; 0 0],)
@@ -174,7 +174,7 @@ end
 
   # Ensure that nothings work with numeric types.
   _, back = Zygote.pullback(getindex, randn(4), [1])
-  @test back([nothing]) == (zeros(4), nothing)
+  @test back([nothing]) === nothing
 
   # Ensure that nothings work with non-numeric types.
   _, back = Zygote.pullback(getindex, [randn(2) for _ in 1:3], [1])
@@ -214,6 +214,23 @@ end
   @test gradient(x -> sum(inv, collect(view(x', 1,:))), ones(2,2)) == ([-1 0; -1 0],)
 
   @test gradient(xs -> sum(inv, [x^2 for x in xs]), ones(2)) == ([-2, -2],)
+
+  # adjoint of generators is available and should support generic arrays and iterators
+  # generator of array
+  @test gradient(p -> sum(collect(p*i for i in [1.0, 2.0, 3.0])), 2.0) == (6.0,)
+  # generator of iterator with HasShape
+  @test gradient(p -> sum(collect(p*i for (i,) in zip([1.0, 2.0, 3.0]))), 2.0) == (6.0,)
+  # generator of iterator with HasLength
+  @test gradient(p -> sum(collect(p*i for i in Iterators.take([1.0, 2.0, 3.0], 3))), 2.0) == (6.0,)
+  @test gradient(p -> sum(collect(p*i for i in Iterators.take(p*[1.0, 2.0, 3.0], 2))), 2.0) == (12.0,)
+  # generator 0-d behavior handled incorrectly
+  @test_broken gradient(p -> sum(collect(p*i for i in 1.0)), 2.0)
+  @test_broken gradient(p -> sum(collect(p*i for i in fill(1.0))), 2.0)
+
+  # adjoints for iterators
+  @test gradient(x -> sum(collect(Iterators.take([x*i for i in 1:5], 4))), 1.0) == (10.0,)
+  @test gradient(x -> sum(collect(Iterators.take([x*i for i in 1:5], 5))), 1.0) == (15.0,)
+  @test_broken gradient(sum∘collect, 1.0) == (1.0,) # broken since no generic adjoint
 end
 
 @test gradtest(x -> reverse(x), rand(17))
@@ -275,6 +292,8 @@ end
 @test gradtest(kron, rand(5,1), rand(3,1))
 @test gradtest(kron, rand(5,1), rand(3,1), rand(8,1))
 @test gradtest(kron, rand(5,2), rand(3,2), rand(8,2))
+@test gradtest(kron, rand(5), rand(3, 2))
+@test gradtest(kron, rand(3, 2), rand(5))
 
 for mapfunc in [map,pmap]
   @testset "$mapfunc" begin
@@ -386,10 +405,8 @@ end
 
 @testset "vararg map" begin
   # early stop
-  if VERSION >= v"1.5"
     # In Julia 1.4 and earlier, map(*,rand(5),[1,2,3]) is a DimensionMismatch
-    @test gradient(x -> sum(map(*,x,[1,2,3])), rand(5)) == ([1,2,3,0,0],)
-  end
+  @test gradient(x -> sum(map(*,x,[1,2,3])), rand(5)) == ([1,2,3,0,0],)
   @test gradient(x -> sum(map(*,x,(1,2,3))), rand(5)) == ([1,2,3,0,0],)
   @test gradient(x -> sum(map(*,x,[1,2,3])), Tuple(rand(5))) == ((1.0, 2.0, 3.0, nothing, nothing),)
 
@@ -423,13 +440,17 @@ end
       [2,3,1],
       [1, 2, 3],
       [1,2,3],
-      [2,1,3]
+      [2,1,3],
+      [1,3,2],
+      [3,2,1]
   ]
   for i = 1:3
     @test gradient(v->sort(v)[i], [3.,1,2])[1][correct[1][i]] == 1
     @test gradient(v->sort(v)[i], [1.,2,3])[1][correct[2][i]] == 1
     @test gradient(v->sort(v,by=x->x%10)[i], [11,2,99])[1][correct[3][i]] == 1
     @test gradient(v->sort(v,by=x->x%10)[i], [2,11,99])[1][correct[4][i]] == 1
+    @test gradient(v->sort(v,rev=true)[i], [3.,1,2])[1][correct[5][i]] == 1
+    @test gradient(v->sort(v,rev=true)[i], [1.,2,3])[1][correct[6][i]] == 1
   end
 end
 
@@ -517,7 +538,7 @@ end
   @test gradtest(x -> maximum(x, dims=[1, 2]), rand(2, 3, 4))
 
   @test gradient(x -> 1 / maximum(x), [1., 2, 3])[1] == [0, 0, -1/9]
-  
+
   # issue 1224, second order
   f1244(w, x) = sum(maximum((w * x).^2, dims=1))
   g1244(w, x) = sum(gradient(f1244, w, x)[2].^2)
@@ -928,8 +949,8 @@ end
 _hermsymtype(::Type{<:Symmetric}) = Symmetric
 _hermsymtype(::Type{<:Hermitian}) = Hermitian
 
-function _gradtest_hermsym(f, ST, A)
-  gradtest(_splitreim(collect(A))...) do (args...)
+function _gradtest_hermsym(f, ST, A; kwargs...)
+  gradtest(_splitreim(collect(A))...; kwargs...) do (args...)
     B = f(ST(_joinreim(_dropimaggrad.(args)...)))
     return sum(_splitreim(B))
   end
@@ -1040,7 +1061,13 @@ _randmatseries(rng, ::typeof(atanh), T, n, domain::Type{Complex}) = nothing
         @testset "similar eigenvalues" begin
           λ[1] = λ[3] + sqrt(eps(eltype(λ))) / 10
           A2 = U * Diagonal(λ) * U'
-          @test _gradtest_hermsym(f, ST, A2)
+          @static if VERSION >= v"1.11"
+            broken = f == sqrt && MT <: Symmetric{Float64} && domain == Real
+            # @show f MT domain
+            @test _gradtest_hermsym(f, ST, A2) broken=broken
+          else
+            @test _gradtest_hermsym(f, ST, A2)
+          end
         end
 
         if f ∉ (log, sqrt) # only defined for invertible matrices
@@ -1145,10 +1172,20 @@ end
           return sum(sin.(vcat(vec.(_splitreim(B))...)))
         end === map(_->nothing, _splitreim(A))
       else
-        @test gradtest(_splitreim(collect(A))...) do (args...)
-          A = ST(_joinreim(_dropimaggrad.(args)...))
-          B = A^p
-          return vcat(vec.(_splitreim(B))...)
+        @static if VERSION >= v"1.11"
+          # @show MT p
+          broken = MT <: Symmetric{Float64} && p == -3
+          @test gradtest(_splitreim(collect(A))...) do (args...)
+            A = ST(_joinreim(_dropimaggrad.(args)...))
+            B = A^p
+            return vcat(vec.(_splitreim(B))...)
+          end broken=broken
+        else
+          @test gradtest(_splitreim(collect(A))...) do (args...)
+            A = ST(_joinreim(_dropimaggrad.(args)...))
+            B = A^p
+            return vcat(vec.(_splitreim(B))...)
+          end
         end
       end
 
@@ -1532,6 +1569,36 @@ using Zygote: Buffer
     return sum(copy(b))
   end == ([2,2,2],)
 
+  @test gradient([1, 2, 3]) do xs
+    b = Zygote.Buffer(xs)
+    b .= 2
+    return sum(copy(b))
+  end == (nothing,)
+
+  @test gradient(1.1) do p
+    b = Zygote.Buffer(zeros(3))
+    b .= (p*i for i in eachindex(b))
+    return sum(copy(b) .* (2:4))
+  end[1] ≈ 1*2 + 2*3 + 3*4
+
+  @test gradient(1.1) do p
+    b = Zygote.Buffer(zeros(3))
+    copyto!(b, [p*i for i in eachindex(b)])
+    return sum(copy(b) .* (2:4))
+  end[1] ≈ 1*2 + 2*3 + 3*4
+
+  @test gradient(1.1) do p
+    b = Zygote.Buffer(zeros(3))
+    copyto!(b, (p*i for i in eachindex(b)))
+    return sum(copy(b) .* (2:4))
+  end[1] ≈ 1*2 + 2*3 + 3*4
+
+  @test_broken gradient(1.1) do p
+    b = Zygote.Buffer(zeros(3))
+    copyto!(b, p)
+    return sum(copy(b) .* (2:4))
+  end[1] ≈ 1*2
+
   @test gradient(2) do x
     b = Zygote.Buffer([])
     push!(b, x)
@@ -1695,7 +1762,7 @@ end
 end
 
 @testset "FillArrays" begin
-  
+
   @test gradcheck(x->sum(Fill(x[], (2, 2))), [0.1])
   @test first(Zygote.gradient(sz->sum(Ones(sz)), 6)) === nothing
   @test first(Zygote.gradient(sz->sum(Zeros(sz)), 6)) === nothing
@@ -1809,15 +1876,13 @@ end
   @test gradient(x -> sum(randexp(Random.GLOBAL_RNG, Float32, 1,1)), 1) == (nothing,)
   @test gradient(x -> sum(randexp(Random.GLOBAL_RNG, Float32, (1,1))), 1) == (nothing,)
 
-  @static if VERSION > v"1.3"
-    @test gradient(x -> sum(rand(Random.default_rng(), 4)), 1) == (nothing,)
-    @test gradient(x -> sum(rand(Random.default_rng(), Float32, 1,1)), 1) == (nothing,)
-    @test gradient(x -> sum(rand(Random.default_rng(), Float32, (1,1))), 1) == (nothing,)
-    @test gradient(x -> sum(randn(Random.default_rng(), Float32, 1,1)), 1) == (nothing,)
-    @test gradient(x -> sum(randn(Random.default_rng(), Float32, (1,1))), 1) == (nothing,)
-    @test gradient(x -> sum(randexp(Random.default_rng(), Float32, 1,1)), 1) == (nothing,)
-    @test gradient(x -> sum(randexp(Random.default_rng(), Float32, (1,1))), 1) == (nothing,)
-  end
+  @test gradient(x -> sum(rand(Random.default_rng(), 4)), 1) == (nothing,)
+  @test gradient(x -> sum(rand(Random.default_rng(), Float32, 1,1)), 1) == (nothing,)
+  @test gradient(x -> sum(rand(Random.default_rng(), Float32, (1,1))), 1) == (nothing,)
+  @test gradient(x -> sum(randn(Random.default_rng(), Float32, 1,1)), 1) == (nothing,)
+  @test gradient(x -> sum(randn(Random.default_rng(), Float32, (1,1))), 1) == (nothing,)
+  @test gradient(x -> sum(randexp(Random.default_rng(), Float32, 1,1)), 1) == (nothing,)
+  @test gradient(x -> sum(randexp(Random.default_rng(), Float32, (1,1))), 1) == (nothing,)
 end
 
 @testset "broadcasted($op, Array, Bool)" for op in (+,-,*)

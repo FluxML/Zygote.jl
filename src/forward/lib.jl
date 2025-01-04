@@ -60,10 +60,8 @@ function _pushforward(dargs, ::typeof(Core._apply), f, args...)
   Core._apply(_pushforward, ((df, dargs...), f), args...)
 end
 
-if VERSION >= v"1.4.0-DEV.304"
-  _pushforward(dargs, ::typeof(Core._apply_iterate), ::typeof(iterate), f, args...) =
-    _pushforward((first(args), tail(tail(dargs))...), Core._apply, f, args...)
-end
+_pushforward(dargs, ::typeof(Core._apply_iterate), ::typeof(iterate), f, args...) =
+  _pushforward((first(args), tail(tail(dargs))...), Core._apply, f, args...)
 
 using ..Zygote: literal_getproperty, literal_getfield, literal_getindex
 

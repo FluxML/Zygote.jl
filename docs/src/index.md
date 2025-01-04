@@ -1,6 +1,6 @@
 # Zygote
 
-Welcome! Zygote extends the Julia language to support [differentiable programming](https://fluxml.ai/blog/2019/02/07/what-is-differentiable-programming.html). With Zygote you can write down any Julia code you feel like – including using existing Julia packages – then get gradients and optimise your program. Deep learning, ML and probabilistic programming are all different kinds of differentiable programming that you can do with Zygote.
+Welcome! Zygote extends the Julia language to support [differentiable programming](https://fluxml.ai/blogposts/2019-02-07-what-is-differentiable-programming/). With Zygote you can write down any Julia code you feel like – including using existing Julia packages – then get gradients and optimise your program. Deep learning, ML and probabilistic programming are all different kinds of differentiable programming that you can do with Zygote.
 
 At least, that's the idea. We're still in beta so expect some adventures.
 

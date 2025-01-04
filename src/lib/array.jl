@@ -41,24 +41,6 @@ end
 @adjoint (::Type{T})(sz) where {T<:Zeros} = T(sz), Δ->(nothing,)
 @adjoint (::Type{T})(sz) where {T<:Ones} = T(sz), Δ->(nothing,)
 
-@adjoint getindex(x::AbstractArray, inds...) = x[inds...], ∇getindex(x, inds)
-
-@adjoint view(x::AbstractArray, inds...) = view(x, inds...), ∇getindex(x, inds)
-
-∇getindex(x::AbstractArray{T,N}, inds) where {T,N} = dy -> begin
-  if inds isa NTuple{N,Int} && T <: Number
-    dx = OneElement(dy, inds, axes(x))
-  elseif inds isa NTuple{<:Any, Integer}
-    dx = _zero(x, typeof(dy))
-    dx[inds...] = dy
-  else
-    dx = _zero(x, eltype(dy))
-    dxv = view(dx, inds...)
-    dxv .= accum.(dxv, _droplike(dy, dxv))
-  end
-  return (_project(x, dx), map(_->nothing, inds)...)
-end
-
 """
     OneElement(val, ind, axes) <: AbstractArray
 
@@ -155,8 +137,9 @@ end
 struct StaticGetter{i} end
 (::StaticGetter{i})(v) where {i} = v[i]
 (::StaticGetter{i})(::Nothing) where {i} = nothing
-@generated function _unzip(tuples, ::Val{N}) where {N}
-  Expr(:tuple, (:(map($(StaticGetter{i}()), tuples)) for i ∈ 1:N)...)
+function _unzip(tuples, ::Val{N}) where {N}
+  getters = ntuple(n -> StaticGetter{n}(), N)
+  map(g -> map(g, tuples), getters)
 end
 function unzip(tuples)
   N = length(first(tuples))
@@ -185,10 +168,14 @@ _reverse(x::Symmetric) = Symmetric(_reverse(x.data), x.uplo == 'U' ? :L : :U)
 
 # With mismatched lengths, map stops early. With mismatched shapes, it makes a vector.
 # So we keep axes(x) to restore gradient dx to its full length & correct shape.
-_tryaxes(x) = axes(x)
+_tryaxes(x) = (s = Base.IteratorSize(x); s isa Base.HasShape ? axes(x) : s isa Base.HasLength ? (Base.OneTo(length(x)),) : throw(ArgumentError("iterator size must be finite")))
+_tryaxes(x::AbstractArray) = axes(x)
 _tryaxes(x::Tuple) = Val(length(x))
-_restore(dx, ax::Tuple) = axes(dx) == ax ? dx : reshape(vcat(dx, falses(prod(length, ax) - length(dx))), ax)
+_tryaxes(x::Number) = x
+_restore(dx::AbstractArray{Nothing}, ax::Tuple) = similar(dx, ax)
+_restore(dx, ax::Tuple) = axes(dx) == ax ? dx : reshape(vcat(dx, falses(prod(map(length, ax)) - length(dx))), ax)
 _restore(dx, ::Val{N}) where {N} = ntuple(i -> get(dx,i,nothing), N)
+_restore(dx, ::Number) = only(dx)
 
 # Sometimes a pullback doesn't return a Tuple, but rather returns only a
 # single nothing to say "all arguments have zero cotangent". This function is needed to
@@ -250,7 +237,7 @@ function _pullback(cx::AContext, ::typeof(collect), g::Base.Generator)
     x̄ = reconstruct_if_dict(x̄, _keys) # return a dictionary if needed
     (nothing, (f = f̄, iter = x̄),)
   end
-  y, collect_pullback
+  y, collect_pullback ∘ unthunk_tangent
 end
 
 collect_if_dict(x::Dict) = collect(x), collect(keys(x))
@@ -269,25 +256,12 @@ end
 
 @adjoint iterate(r::UnitRange, i...) = iterate(r, i...), _ -> nothing
 
-@adjoint function sort(x::AbstractArray; by=identity)
-  p = sortperm(x, by=by)
-  return x[p], x̄ -> (x̄[invperm(p)],)
-end
-
-@adjoint function filter(f, x::AbstractVector)
-    t = map(f, x)
-    x[t], Δ -> begin
-        dx = _zero(x, eltype(Δ))
-        dx[t] .= Δ
-        (nothing, dx)
-    end
-end
-
 # Iterators
 
 @adjoint function enumerate(xs)
   back(::AbstractArray{Nothing}) = nothing
   back(dy::NamedTuple{(:itr,)}) = tuple(dy.itr)
+  back(diys::AbstractArray{Union{Nothing, T}}) where T = (map(x -> x === nothing ? x : last(x), diys),)
   back(diys) = (map(last, diys),)
   enumerate(xs), back
 end
@@ -300,32 +274,66 @@ end
 _ndims(::Base.HasShape{d}) where {d} = d
 _ndims(x) = Base.IteratorSize(x) isa Base.HasShape ? _ndims(Base.IteratorSize(x)) : 1
 
-@adjoint function Iterators.product(xs...)
-  back(::AbstractArray{Nothing}) = nothing
-  back(dy::NamedTuple{(:iterators,)}) = dy.iterators
-  function back(dy::AbstractArray)
-    d = 1
-    ntuple(length(xs)) do n
-      nd = _ndims(xs[n])
-      dims = ntuple(i -> i<d ? i : i+nd, ndims(dy)-nd)
-      d += nd
-      first(dy)[n] === nothing && return nothing
-      init = zero.(first(dy)[n]) # allows for tuples, which accum can add:
-      red = mapreduce(StaticGetter{n}(), accum, dy; dims=dims, init=init)
-      return _project(xs[n], reshape(red, axes(xs[n])))
-    end
+function productfunc(xs, dy)
+  @assert length(first(dy)) == length(xs)
+  ndim = map(Zygote._ndims, xs)
+  cdim = cumsum((1, ndim[begin:end-1]...))
+  getters = ntuple(n -> StaticGetter{n}(), length(xs))
+  map(first(dy), xs, cdim, getters) do dyn, x, cd, getter
+    dyn === nothing && return nothing
+    nd = _ndims(x)
+    dims = nd == 0 ? (:) : ntuple(i -> i<cd ? i : i+nd, Val(ndims(dy)-nd))
+    init = map(zero, dyn) # allows for tuples, which accum can add:
+    red = mapreduce(getter, accum, dy; dims, init)
+    return _project(x, nd == 0 ? red : reshape(red, axes(x)))
   end
-  Iterators.product(xs...), back
 end
 
-@adjoint function Iterators.Zip(xs)
-  axs = map(_tryaxes, xs)  # same function used for map
-  back(dy::NamedTuple{(:is,)}) = tuple(dy.is)
-  back(dy::AbstractArray) = ntuple(length(xs)) do d
-    dx = map(StaticGetter{d}(), dy)
-    _project(xs[d], _restore(dx, axs[d]))
-  end |> tuple
-  Iterators.Zip(xs), back
+@adjoint function Iterators.product(xs...)
+  product_pullback(::AbstractArray{Nothing}) = nothing
+  product_pullback(dy::NamedTuple{(:iterators,)}) = dy.iterators
+  product_pullback(dy::AbstractArray) = productfunc(xs, dy)
+  Iterators.product(xs...), product_pullback
+end
+
+@adjoint function Base.collect(p::Base.Iterators.ProductIterator)
+  collect_product_pullback(dy) = ((iterators=productfunc(p.iterators, dy),),)
+  return collect(p), collect_product_pullback
+end
+
+function zipfunc(xs, dy)
+  getters = ntuple(n -> StaticGetter{n}(), length(xs))
+  map(xs, getters) do x, getter
+    dx = map(getter, dy)
+    _project(x, _restore(dx, _tryaxes(x)))
+  end
+end
+
+@adjoint function Iterators.zip(xs...)
+  zip_pullback(::AbstractArray{Nothing}) = nothing
+  zip_pullback(dy::NamedTuple{(:is,)}) = dy.is
+  zip_pullback(dy::AbstractArray) = zipfunc(xs, dy)
+  Iterators.zip(xs...), zip_pullback
+end
+
+@adjoint function Base.collect(z::Base.Iterators.Zip)
+  collect_zip_pullback(dy::AbstractArray) = ((is=zipfunc(z.is, dy),),)
+  collect(z), collect_zip_pullback
+end
+
+takefunc(itr, dy) = _restore(dy, _tryaxes(itr))
+
+@adjoint function Iterators.take(itr, n)
+  take_pullback(::AbstractArray{Nothing}) = nothing
+  take_pullback(dy::NamedTuple{(:xs,:n)}) = (dy.xs, dy.n)
+  take_pullback(dy::NamedTuple{(:n,:xs)}) = (dy.xs, dy.n)
+  take_pullback(dy::AbstractArray) = (takefunc(itr, dy), nothing)
+  Iterators.take(itr, n), take_pullback
+end
+
+@adjoint function Base.collect(t::Iterators.Take)
+    collect_take_pullback(dy) = ((xs=takefunc(t.xs, dy), n=nothing),)
+    collect(t), collect_take_pullback
 end
 
 # Reductions
@@ -357,12 +365,10 @@ function _kron(mat1::AbstractMatrix,mat2::AbstractMatrix)
     return reshape(mat1_rsh.*mat2_rsh, (m1*m2,n1*n2))
 end
 _kron(a::AbstractVector, b::AbstractVector) = vec(_kron(reshape(a, :, 1), reshape(b, :, 1)))
+_kron(a::AbstractVector, b::AbstractMatrix) = _kron(reshape(a, :, 1), b)
+_kron(a::AbstractMatrix, b::AbstractVector) = _kron(a, reshape(b, :, 1))
 
-function _pullback(cx::AContext, ::typeof(kron), a::AbstractVector, b::AbstractVector)
-  res, back = _pullback(cx, _kron, a, b)
-  return res, back ∘ unthunk_tangent
-end
-function _pullback(cx::AContext, ::typeof(kron), a::AbstractMatrix, b::AbstractMatrix)
+function _pullback(cx::AContext, ::typeof(kron), a::AbstractVecOrMat, b::AbstractVecOrMat)
   res, back = _pullback(cx, _kron, a, b)
   return res, back ∘ unthunk_tangent
 end

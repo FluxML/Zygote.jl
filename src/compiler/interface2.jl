@@ -2,7 +2,11 @@ ignore_sig(T) = all(T -> T <: Type, T.parameters)
 
 function edge!(m::IRTools.Meta, edge::Core.MethodInstance)
   m.code.edges === nothing && (m.code.edges = Core.MethodInstance[])
-  push!(m.code.edges, edge)
+  if m.code.edges isa Core.SimpleVector
+    m.code.edges = Core.svec(m.code.edges..., edge)
+  else
+    push!(m.code.edges, edge)
+  end
   return
 end
 
@@ -72,7 +76,13 @@ if VERSION >= v"1.10.0-DEV.873"
 
 function _pullback_generator(world::UInt, source, self, ctx, f, args)
   ret = _generate_pullback(ctx, world, f, args...)
-  ret isa Core.CodeInfo && return ret
+  if ret isa Core.CodeInfo
+    if isdefined(Base, :__has_internal_change) && Base.__has_internal_change(v"1.12-alpha", :codeinfonargs)
+      ret.nargs = 4
+      ret.isva = true
+    end
+    return ret
+  end
 
   stub = Core.GeneratedFunctionStub(identity, Core.svec(:methodinstance, :ctx, :f, :args), Core.svec())
   stub(world, source, ret)
@@ -85,7 +95,13 @@ end
 
 function _callable_pullback_generator(world::UInt, source, self, Δ)
   ret = _generate_callable_pullback(self, world, Δ)
-  ret isa Core.CodeInfo && return ret
+  if ret isa Core.CodeInfo
+    if isdefined(Base, :__has_internal_change) && Base.__has_internal_change(v"1.12-alpha", :codeinfonargs)
+      ret.nargs = 2
+      ret.isva = false
+    end
+    return ret
+  end
 
   stub = Core.GeneratedFunctionStub(identity, Core.svec(:methodinstance, :Δ), Core.svec())
   stub(world, source, ret)

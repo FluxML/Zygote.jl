@@ -2,14 +2,8 @@ using ForwardDiff
 using Zygote: hessian_dual, hessian_reverse
 
 @testset "hessian: $hess" for hess in [hessian_dual, hessian_reverse]
-
-  if hess == hessian_dual
-    @test hess(x -> x[1]*x[2], randn(2)) ≈ [0 1; 1 0]
-    @test hess(((x,y),) -> x*y, randn(2)) ≈ [0 1; 1 0]  # original docstring version
-  else
-    @test_broken hess(x -> x[1]*x[2], randn(2)) ≈ [0 1; 1 0]  # can't differentiate ∇getindex
-    @test_broken hess(((x,y),) -> x*y, randn(2)) ≈ [0 1; 1 0]
-  end
+  @test hess(x -> x[1]*x[2], randn(2)) ≈ [0 1; 1 0]
+  @test hess(((x,y),) -> x*y, randn(2)) ≈ [0 1; 1 0]  # original docstring version
   @test hess(x -> sum(x.^3), [1 2; 3 4]) ≈ Diagonal([6, 18, 12, 24])
   @test hess(sin, pi/2) ≈ -1
 
@@ -18,22 +12,20 @@ using Zygote: hessian_dual, hessian_reverse
   @test_throws Exception hess(identity, randn(2))
 end
 
-VERSION > v"1.6-" && @testset "diagonal hessian" begin
+@testset "diagonal hessian" begin
   @test diaghessian(x -> x[1]*x[2]^2, [1, pi]) == ([0, 2],)
 
-  if VERSION > v"1.6-"
-    # Gradient of ^ may contain log(complex(...)), which interacts badly with Dual below Julia 1.6:
-    # julia> log(ForwardDiff.Dual(1,0) + 0im) # ERROR: StackOverflowError:
-    # https://github.com/JuliaDiff/ChainRules.jl/issues/525
-    # Fixed in 1.6 by: https://github.com/JuliaLang/julia/pull/36030
-    xs, y = randn(2,3), rand()
-    f34(xs, y) = xs[1] * (sum(xs .^ (1:3)') + y^4)  # non-diagonal Hessian, two arguments
+  # Gradient of ^ may contain log(complex(...)), which interacts badly with Dual below Julia 1.6:
+  # julia> log(ForwardDiff.Dual(1,0) + 0im) # ERROR: StackOverflowError:
+  # https://github.com/JuliaDiff/ChainRules.jl/issues/525
+  # Fixed in 1.6 by: https://github.com/JuliaLang/julia/pull/36030
+  xs, y = randn(2,3), rand()
+  f34(xs, y) = xs[1] * (sum(xs .^ (1:3)') + y^4)  # non-diagonal Hessian, two arguments
 
-    dx, dy = diaghessian(f34, xs, y)
-    @test size(dx) == size(xs)
-    @test vec(dx) ≈ diag(hessian(x -> f34(x,y), xs))
-    @test dy ≈ hessian(y -> f34(xs,y), y)
-  end
+  dx, dy = diaghessian(f34, xs, y)
+  @test size(dx) == size(xs)
+  @test vec(dx) ≈ diag(hessian(x -> f34(x,y), xs))
+  @test dy ≈ hessian(y -> f34(xs,y), y)
 
   zs = randn(7,13)  # test chunk mode
   @test length(zs) > ForwardDiff.DEFAULT_CHUNK_THRESHOLD

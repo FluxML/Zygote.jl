@@ -3,6 +3,18 @@ using IRTools: IR, Variable, Pipe, xcall, var, prewalk, postwalk,
   insertafter!, finish, expand!, prune!, substitute!, substitute,
   block, block!, branch!, return!, stmt, meta
 
+
+# TODO: Temporary, to be removed when ChainRulesCore rrules are required to
+# support thunks as an input and all instances of _adjoint_keepthunks in
+# Zygote have been replaces by rrules:
+macro _adjoint_keepthunks(ex)
+  ZygoteRules.gradm(ex, false, true)
+end
+macro _adjoint_keepthunks!(ex)
+  ZygoteRules.gradm(ex, true, true)
+end
+
+
 @inline tuple_va(N, xs) = xs
 @inline tuple_va(N, x, xs...) = (x, tuple_va(N, xs...)...)
 @inline tuple_va(::Val{N}, ::Nothing) where N = ntuple(_ -> nothing, Val(N))
@@ -124,14 +136,13 @@ function instrument(ir::IR)
     ex = st.expr
     if isexpr(ex, :foreigncall, :isdefined)
       continue
-    elseif isexpr(ex, :enter, :leave)
-      error("""try/catch is not supported.
-            Refer to the Zygote documentation for fixes.
-            https://fluxml.ai/Zygote.jl/latest/limitations
-            """)
     elseif isexpr(ex, :(=))
       @assert ex.args[1] isa GlobalRef
       pr[v] = xcall(Zygote, :global_set, QuoteNode(ex.args[1]), ex.args[2])
+    elseif isexpr(ex, :boundscheck)
+      # Expr(:boundscheck) now appears in common Julia code paths, so we need to handle it.
+      # For correctness sake, fix to true like https://github.com/dfdx/Umlaut.jl/issues/34.
+      pr[v] = true
     else
       ex = instrument_new!(pr, v, ex)
       ex = instrument_literals!(pr, v, ex)
@@ -244,7 +255,6 @@ Variable(a::Alpha) = Variable(a.id)
 sig(b::IRTools.Block) = unique([arg for br in branches(b) for arg in br.args if arg isa Variable])
 sig(pr::Primal) = Dict(b.id => sig(b) for b in blocks(pr.ir))
 
-# TODO unreachables?
 function adjointcfg(pr::Primal)
   ir = empty(pr.ir)
   return!(ir, nothing)
@@ -257,7 +267,9 @@ function adjointcfg(pr::Primal)
         push!(rb, xcall(Base, :(!==), alpha(pr.branches[b.id]), BranchNumber(i)))
       branch!(rb, preds[i].id, unless = cond)
     end
-    if !isempty(branches(b)) && branches(b)[end] == IRTools.unreachable
+    if isempty(preds) || (!isempty(branches(b)) && branches(b)[end] == IRTools.unreachable)
+      # If `b` is unreachable, then no context produced by the primal should end up branching to `rb`
+      push!(rb, xcall(Base, :error, "unreachable")) # `throw` is necessary for inference not to hit the `unreachable`
       branch!(rb, 0)
     end
   end
@@ -278,7 +290,7 @@ xaccum(ir, xs...) = push!(ir, xcall(Zygote, :accum, xs...))
 
 function passthrough_expr(ex::Expr)
     # Metadata we want to preserve
-    isexpr(ex, GlobalRef, :call, :isdefined, :inbounds, :meta, :loopinfo) && return true
+    isexpr(ex, GlobalRef, :call, :isdefined, :inbounds, :meta, :loopinfo, :enter, :leave, :catch) && return true
     # ccalls and more that are safe to preserve/required for proper operation:
     # - jl_set_task_threadpoolid: added in 1.9 for @spawn
     isexpr(ex, :foreigncall) && unwrapquote(ex.args[1]) in (:jl_set_task_threadpoolid,) && return true
@@ -296,9 +308,14 @@ function adjoint(pr::Primal)
     for i = 1:length(sigs[b.id])
       grad(sigs[b.id][i], arguments(rb)[i])
     end
+
+    has_leave = false
+
     # Backprop through statements
     for v in reverse(keys(b))
       ex = b[v].expr
+      has_leave |= isexpr(ex, :leave)
+
       if haskey(pr.pullbacks, v)
         g = push!(rb, stmt(Expr(:call, alpha(pr.pullbacks[v]), grad(v)),
                            line = b[v].line))
@@ -320,6 +337,17 @@ function adjoint(pr::Primal)
         continue
       end
     end
+
+    # This is corresponds to a catch blocks which technically
+    # has predecessors but they are not modelled in the IRTools CFG.
+    # We put an error message at the beginning of said block.
+    if has_leave && isempty(predecessors(b)) && b.id != 1
+        _, f_stmt = first(b)
+        li = pr.ir.lines[f_stmt.line]
+        pushfirst!(rb, stmt(xcall(Base, :error,
+                                  "Can't differentiate function execution in catch block at $(li.file):$(li.line).")))
+    end
+
     if b.id > 1 # Backprop through (predecessor) branch arguments
       gs = grad.(arguments(b))
       for br in branches(rb)
