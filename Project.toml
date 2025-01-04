@@ -58,7 +58,7 @@ SpecialFunctions = "1.6, 2"
 Statistics = "1"
 Tracker = "0.2"
 ZygoteRules = "0.2.5"
-julia = "1.6"
+julia = "1.10"
 
 [extras]
 CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
