@@ -37,7 +37,13 @@ end
 _pullback(f, args...) = _pullback(Context(), f, args...)
 
 tailmemaybe(::Nothing) = nothing
-tailmemaybe(x::Tuple) = Base.tail(x)
+tailmemaybe(x::Tuple) = unthunk_tangent(Base.tail(x))
+
+# unthunking is essentially an identity operation on a lazy value, but
+# `@adjoint unthunk_tangent(x) = unthunk_tangent(x), ȳ -> (ȳ,)` is not enough to make
+# nested AD work, so define
+@adjoint tailmemaybe(xs::Tuple) = tailmemaybe(xs), x̄s -> ((nothing, x̄s...),)
+
 
 """
     pullback(f, args...)
@@ -351,6 +357,9 @@ function copy!(x::AbstractVector, ps::Params)
   x
 end
 
+_maybe_unthunk(x::AbstractThunk) = unthunk(x)
+_maybe_unthunk(x) = x
+
 """
     Grads(...)
 
@@ -385,7 +394,7 @@ end
 
 function Base.getindex(gs::Grads, x)
   isbits(x) && error("Only reference types can be differentiated with `Params`.")
-  return gs.grads[x]
+  return _maybe_unthunk(gs.grads[x])
 end
 
 """
@@ -468,7 +477,7 @@ function pullback(f, ps::Params)
       cache(cx)[p] = nothing
     end
     back(Δ)
-    Grads(cx.cache, ps) # TODO make a copy
+    Grads(_maybe_unthunk(cx.cache), ps)
   end
 end
 

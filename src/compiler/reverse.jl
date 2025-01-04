@@ -3,6 +3,18 @@ using IRTools: IR, Variable, Pipe, xcall, var, prewalk, postwalk,
   insertafter!, finish, expand!, prune!, substitute!, substitute,
   block, block!, branch!, return!, stmt, meta
 
+
+# TODO: Temporary, to be removed when ChainRulesCore rrules are required to
+# support thunks as an input and all instances of _adjoint_keepthunks in
+# Zygote have been replaces by rrules:
+macro _adjoint_keepthunks(ex)
+  ZygoteRules.gradm(ex, false, true)
+end
+macro _adjoint_keepthunks!(ex)
+  ZygoteRules.gradm(ex, true, true)
+end
+
+
 @inline tuple_va(N, xs) = xs
 @inline tuple_va(N, x, xs...) = (x, tuple_va(N, xs...)...)
 @inline tuple_va(::Val{N}, ::Nothing) where N = ntuple(_ -> nothing, Val(N))
