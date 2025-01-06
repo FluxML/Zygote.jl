@@ -1,13 +1,5 @@
 using Base: RefValue
-
-if VERSION > v"1.7.0-DEV.204"
-  using Base: ismutabletype
-else
-  function ismutabletype(@nospecialize(t::Type))
-    t = Base.unwrap_unionall(t)
-    return isa(t, DataType) && t.mutable
-  end
-end
+using Base: ismutabletype
 
 # Interfaces
 
@@ -87,12 +79,7 @@ unwrap(ref, x) = x
 end
 
 function global_set(ref, val)
-  @static if VERSION < v"1.9.0-DEV.265"
-    ccall(:jl_set_global, Cvoid, (Any, Any, Any),
-          ref.mod, ref.name, val)
-  else
     setglobal!(ref.mod, ref.name, val)
-  end
 end
 
 @_adjoint_keepthunks! function global_set(ref, x)
