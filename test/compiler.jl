@@ -319,11 +319,7 @@ end
         @test res == 12.
         @test_throws ErrorException pull(1.)
         err = try pull(1.) catch ex; ex end
-        if VERSION >= v"1.11"
-          @test_broken occursin("Can't differentiate function execution in catch block", string(err))
-        else
-          @test occursin("Can't differentiate function execution in catch block", string(err))
-        end
+        @test occursin("Can't differentiate function execution in catch block", string(err))
     end
 
     if VERSION >= v"1.8"
@@ -351,9 +347,5 @@ end
     @test_throws ErrorException pull(1.)
 
     err = try pull(1.) catch ex; ex end
-    if VERSION >= v"1.11"
-      @test_broken occursin("Can't differentiate function execution in catch block", string(err))
-    else
-      @test occursin("Can't differentiate function execution in catch block", string(err))
-    end
+    @test occursin("Can't differentiate function execution in catch block", string(err))
 end
