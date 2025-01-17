@@ -151,7 +151,7 @@ julia> gradient([7, 11], 0, 1) do x, y, d
 """
 function gradient(f, args...)
   y, back = pullback(f, args...)
-  grad = back(sensitivity(y))
+  grad = unthunk_tangent(back(sensitivity(y)))
   return _project_all(args, grad)
 end
 

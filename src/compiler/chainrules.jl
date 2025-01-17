@@ -1,6 +1,6 @@
 # ToDo: Move some of this to ZygoteRules, or move unthunk_tangent for Tuple and NamedTuple from
 # Zygote rules here?
-function unthunk_tangent end
+# function unthunk_tangent end
 @inline unthunk_tangent(x::AbstractThunk) = wrap_chainrules_output(unthunk(x))
 @inline unthunk_tangent(x::NTuple{N,<:Number}) where N = x
 @inline unthunk_tangent(x::AbstractArray{<:Number,N}) where N = x

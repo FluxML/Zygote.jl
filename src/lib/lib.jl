@@ -40,8 +40,11 @@ end
 accum(x::NamedTuple, y::ChainRulesCore.Tangent) = accum(x, wrap_chainrules_output(y))
 accum(x::ChainRulesCore.Tangent, y::NamedTuple) = accum(wrap_chainrules_output(x), y)
 
-accum(x, y::AbstractThunk) = accum(x, unthunk(y))
-accum(x::AbstractThunk, y) = accum(unthunk(x), y)
+accum(x::Nothing, y::AbstractThunk) = y
+accum(x::AbstractThunk, y::Nothing) = x
+
+accum(x, y::AbstractThunk) = @thunk(accum(x, unthunk(y)))
+accum(x::AbstractThunk, y) = @thunk(accum(unthunk(x), y))
 accum(x::AbstractThunk, y::AbstractThunk) = @thunk(accum(unthunk(x), unthunk(y)))
 
 # Core functions
