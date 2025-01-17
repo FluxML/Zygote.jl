@@ -428,3 +428,31 @@ end
     @test Zygote.wrap_chainrules_input([[2.0; 4.0], [1.0; 3.0]]) == [[2.0; 4.0], [1.0; 3.0]]
     @test Zygote.wrap_chainrules_input([nothing; 4.0]) == [0.0; 4.0] # ChainRules uses the numeric zero where possible
 end
+
+@testset "Lazy" begin
+    custom_add(x, y) = x + y
+    function ChainRulesCore.rrule(::typeof(custom_add), x, y)
+        function pullback(Δ)
+            return NoTangent(), unthunk(Δ), @thunk(error("Should not compute."))
+        end
+        custom_add(x, y), pullback
+    end
+
+    x, y = 1f0, 1f0
+    Zygote.gradient(x) do x
+        sum(custom_add(x, y))
+    end
+end
+
+@testset "No thunks in the gradient" begin
+    struct Dense
+        w::Matrix{Float32}
+    end
+    (d::Dense)(x) = d.w * x
+
+    layers = [Dense(rand(Float32, 3, 3))]
+    x = ones(Float32, 3)
+    g = gradient(layers -> sum(layers[1](x)), layers)[1]
+    @test g[1] isa NamedTuple
+    @test g[1].w isa Array
+end
