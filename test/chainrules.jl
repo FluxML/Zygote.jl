@@ -445,12 +445,12 @@ end
 end
 
 @testset "No thunks in the gradient" begin
-    struct Dense
+    struct CustomDense
         w::Matrix{Float32}
     end
-    (d::Dense)(x) = d.w * x
+    (d::CustomDense)(x) = d.w * x
 
-    layers = [Dense(rand(Float32, 3, 3))]
+    layers = [CustomDense(rand(Float32, 3, 3))]
     x = ones(Float32, 3)
     g = gradient(layers -> sum(layers[1](x)), layers)[1]
     @test g[1] isa NamedTuple
