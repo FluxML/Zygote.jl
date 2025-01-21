@@ -152,7 +152,7 @@ julia> gradient([7, 11], 0, 1) do x, y, d
 function gradient(f, args...)
   y, back = pullback(f, args...)
   grad = back(sensitivity(y))
-  return _project_all(args, grad)
+  return _project_all(args, unthunk_tangent(grad))
 end
 
 # Base.adjoint(f::Function) = x -> gradient(f, x)[1]  # piracy!
@@ -218,7 +218,7 @@ function withgradient(f, args...)
   else
     back(sensitivity(y))
   end
-  results = _project_all(args, grad)
+  results = _project_all(args, unthunk_tangent(grad))
   (val=y, grad=results)
 end
 
