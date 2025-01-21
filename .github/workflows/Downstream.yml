@@ -25,7 +25,6 @@ jobs:
           - {user: SciML, repo: DiffEqFlux.jl, group: Layers}
           - {user: SciML, repo: DiffEqFlux.jl, group: BasicNeuralDE}
           - {user: SciML, repo: NeuralPDE.jl, group: NNPDE}
-          - {user: JuliaMolSim, repo: Molly.jl, group: Zygote}
     steps:
       - uses: actions/checkout@v3
       - uses: julia-actions/setup-julia@v1
