@@ -299,6 +299,7 @@ end
 
 function adjoint(pr::Primal)
   ir, sigs = adjointcfg(pr)
+  catch_blocks = falses(length(blocks(pr.ir)))
   for b in reverse(blocks(pr.ir))
     rb = block(ir, b.id)
     grads = Dict()
@@ -309,12 +310,13 @@ function adjoint(pr::Primal)
       grad(sigs[b.id][i], arguments(rb)[i])
     end
 
-    has_leave = false
-
     # Backprop through statements
     for v in reverse(keys(b))
       ex = b[v].expr
-      has_leave |= isexpr(ex, :leave)
+
+      if isexpr(ex, :catch)
+        catch_blocks[first(ex.args)] = true
+      end
 
       if haskey(pr.pullbacks, v)
         g = push!(rb, stmt(Expr(:call, alpha(pr.pullbacks[v]), grad(v)),
@@ -338,16 +340,6 @@ function adjoint(pr::Primal)
       end
     end
 
-    # This is corresponds to a catch blocks which technically
-    # has predecessors but they are not modelled in the IRTools CFG.
-    # We put an error message at the beginning of said block.
-    if has_leave && isempty(predecessors(b)) && b.id != 1
-        _, f_stmt = first(b)
-        li = pr.ir.lines[f_stmt.line]
-        pushfirst!(rb, stmt(xcall(Base, :error,
-                                  "Can't differentiate function execution in catch block at $(li.file):$(li.line).")))
-    end
-
     if b.id > 1 # Backprop through (predecessor) branch arguments
       gs = grad.(arguments(b))
       for br in branches(rb)
@@ -368,6 +360,22 @@ function adjoint(pr::Primal)
       branches(rb)[1].args[1] = Δ
     end
   end
+
+  for (id, is_catch) in enumerate(catch_blocks)
+    is_catch || continue
+
+    b = block(pr.ir, id)
+    rb = block(ir, id)
+    err_message = if isempty(b)
+      "Can't differentiate function execution in catch block"
+    else
+      _, f_stmt = first(b)
+      li = pr.ir.lines[f_stmt.line]
+      "Can't differentiate function execution in catch block at $(li.file):$(li.line)."
+    end
+    pushfirst!(rb, stmt(xcall(Base, :error, err_message)))
+  end
+
   return ir
 end
 

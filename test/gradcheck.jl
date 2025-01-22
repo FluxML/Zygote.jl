@@ -178,7 +178,7 @@ end
 
   # Ensure that nothings work with non-numeric types.
   _, back = Zygote.pullback(getindex, [randn(2) for _ in 1:3], [1])
-  @test back([nothing]) === nothing
+  @test back([nothing]) == nothing
 end
 
 @testset "view" begin

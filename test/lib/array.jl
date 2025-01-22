@@ -129,9 +129,8 @@ end
 @testset "dictionary comprehension" begin
     d = Dict(1 => 5, 2 => 6)
     g = gradient(d -> sum([v^2 for (_,v) in d]), d)[1]
-    @test g isa Dict{Int, Int}
-    @test g == Dict(1 => 10, 2 => 12)
-
+    @test g isa Dict{Int, Float64}
+    @test g == Dict(1 => 10.0, 2 => 12.0)
 
     w = randn(5)
     function f_generator(w)

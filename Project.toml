@@ -1,6 +1,6 @@
 name = "Zygote"
 uuid = "e88e6eb3-aa80-5325-afca-941959d7151f"
-version = "0.7.0"
+version = "0.7.3"
 
 [deps]
 AbstractFFTs = "621f4979-c628-5d54-868e-fcf4e3e8185c"
@@ -57,7 +57,7 @@ Requires = "1.1"
 SpecialFunctions = "1.6, 2"
 Statistics = "1"
 Tracker = "0.2"
-ZygoteRules = "0.2.5"
+ZygoteRules = "0.2.7"
 julia = "1.10"
 
 [extras]
