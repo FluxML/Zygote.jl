@@ -44,7 +44,7 @@ accum(x::Nothing, y::AbstractThunk) = y
 accum(x::AbstractThunk, y::Nothing) = x
 
 accum(x, y::AbstractThunk) = accum(x, unthunk(y))
-accum(x::AbstractThunk, y) = accum(unthunk(x), y))
+accum(x::AbstractThunk, y) = accum(unthunk(x), y)
 accum(x::AbstractThunk, y::AbstractThunk) = accum(unthunk(x), unthunk(y))
 
 # Core functions
