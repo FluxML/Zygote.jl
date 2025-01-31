@@ -33,11 +33,7 @@ y, back = pullback(badly, 2)
 bt = try back(1) catch e stacktrace(catch_backtrace()) end
 
 @test trace_contains(bt, nothing, "compiler.jl", bad_def_line)
-if VERSION >= v"1.10-"
-  @test trace_contains(bt, :badly, "compiler.jl", bad_call_line)
-else
-  @test_broken trace_contains(bt, :badly, "compiler.jl", bad_call_line)
-end
+@test trace_contains(bt, :badly, "compiler.jl", bad_call_line)
 
 # Type inference checks
 
@@ -178,12 +174,11 @@ end
     @test y_explicit == y_implicit == getfield(g, :m)
 
     ∇args = ((m = [1.0, 0.0, 0.0], P = nothing),)
-    if VERSION > v"1.7-"
       # This type instability is due to the handling of non-bitstypes in `accum_param`
       @test Base.return_types(back_implicit, Tuple{Vector{Float64}}) == Any[Union{Tuple{Nothing}, typeof(∇args)}]
       # But the same should infer if implicit parameters are disabled
       @test Base.return_types(back_explicit, Tuple{Vector{Float64}}) == Any[typeof(∇args)]
-    end
+
     @test back_explicit([1., 0, 0]) == back_implicit([1., 0, 0]) == ∇args
 
     Base.getproperty(g::Gaussian, s::Symbol) = 2getfield(g, s)
@@ -282,9 +277,6 @@ function try_catch_finally(cond, x)
     x
 end
 
-if VERSION >= v"1.8"
-    # try/catch/else is invalid syntax prior to v1.8
-    eval(Meta.parse("""
         function try_catch_else(cond, x)
             x = 2x
 
@@ -299,8 +291,6 @@ if VERSION >= v"1.8"
 
             x
         end
-    """))
-end
 
 @testset "try/catch" begin
     @testset "happy path (nothrow)" begin
@@ -322,12 +312,10 @@ end
         @test occursin("Can't differentiate function execution in catch block", string(err))
     end
 
-    if VERSION >= v"1.8"
         @testset "try/catch/else" begin
             @test Zygote.gradient(try_catch_else, false, 1.0) == (nothing, 8.0)
             @test_throws ErrorException Zygote.gradient(try_catch_else, true, 1.0)
         end
-    end
 
     function foo_try(f)
       y = 1
