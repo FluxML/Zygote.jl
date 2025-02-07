@@ -169,6 +169,7 @@ module MyMod
 end
 
 @eval usesmod(x) = Base.getproperty($MyMod, :func)(x, Base.getproperty($MyMod, :C))
+usesmod2(x) = Base.getproperty(MyMod, :func)(x, Base.getproperty(MyMod, :C))
 
 @testset "inference for `getproperty`" begin
     Gaussian = _Gaussian(:getproperty)
@@ -221,6 +222,7 @@ end
 
     # Const properties on modules should be lowered as-is (not differentiated)
     @test @inferred gradient(usesmod, 1)[1] == 1.0
+    @test @inferred gradient(usesmod2, 1)[1] == 1.0
 end
 
 # issue 897
