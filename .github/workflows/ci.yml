@@ -13,6 +13,7 @@ jobs:
   test:
     name: Julia ${{ matrix.version }} - ${{ matrix.os }} - ${{ matrix.arch }} - ${{ github.event_name }}
     runs-on: ${{ matrix.os }}
+    continue-on-error: ${{ matrix.version == 'nightly' }} # allow nightly to fail
     strategy:
       fail-fast: false
       matrix:
@@ -41,12 +42,9 @@ jobs:
       - uses: julia-actions/julia-buildpkg@v1
         env:
            JULIA_PKG_SERVER: ""
-        # `allow-failure` not available yet https://github.com/actions/toolkit/issues/399
-        #continue-on-error: ${{ matrix.version == 'nightly' }} # comment out to report nightly failures
       - uses: julia-actions/julia-runtest@v1
         env:
            JULIA_PKG_SERVER: ""
-        #continue-on-error: ${{ matrix.version == 'nightly' }} # comment out to report nightly failures
       - uses: julia-actions/julia-processcoverage@v1
         if: matrix.version == '1' && matrix.os == 'ubuntu-latest'
       - uses: codecov/codecov-action@v3

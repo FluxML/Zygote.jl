@@ -1,5 +1,9 @@
-using ChainRulesCore, ChainRulesTestUtils, Zygote
+@testitem "chainrules" begin
+
+using ChainRulesCore
+using ChainRulesTestUtils
 using Zygote: ZygoteRuleConfig
+using LinearAlgebra
 
 @testset "ChainRules integration" begin
     @testset "ChainRules basics" begin
@@ -64,7 +68,7 @@ using Zygote: ZygoteRuleConfig
             end
             return simo(x), simo_pullback
         end
-        
+
         simo_outer(x) = sum(simo(x))
 
         simo_rrule_hitcount[] = 0
@@ -86,7 +90,7 @@ using Zygote: ZygoteRuleConfig
             end
             return miso(a, b), miso_pullback
         end
-        
+
 
         miso_outer(x) = miso(100x, 10x)
 
@@ -182,7 +186,7 @@ using Zygote: ZygoteRuleConfig
             end
             return kwfoo(x; k=k), kwfoo_pullback
         end
-        
+
 
         kwfoo_outer_unused(x) = kwfoo(x)
         kwfoo_outer_used(x) = kwfoo(x; k=-15)
@@ -207,7 +211,7 @@ using Zygote: ZygoteRuleConfig
             end
             return not_diff_kw_eg(x, i; kwargs...), not_diff_kw_eg_pullback
         end
-        
+
 
         @test (nothing,) == Zygote.gradient(x->not_diff_kw_eg(x, 2), 10.4)
         @test (nothing,) == Zygote.gradient(x->not_diff_kw_eg(x, 2; kw=2.0), 10.4)
@@ -218,7 +222,7 @@ using Zygote: ZygoteRuleConfig
             x::T
         end
         StructForTestingTypeOnlyRRules() = StructForTestingTypeOnlyRRules(1.0)
-        
+
         function ChainRulesCore.rrule(P::Type{<:StructForTestingTypeOnlyRRules})
             # notice here we mess with the primal doing 2.0 rather than 1.0, this is for testing purposes
             # and also because apparently people actually want to do this. Weird, but 🤷
@@ -253,7 +257,7 @@ using Zygote: ZygoteRuleConfig
         @test ([1.0],) == Zygote.gradient(oout_id_outer, [π])
         @test oout_id_rrule_hitcount[] == 0
 
-        # Now try opting out After we have already used it 
+        # Now try opting out After we have already used it
         @opt_out ChainRulesCore.rrule(::typeof(oout_id), x::Real)
         oout_id_rrule_hitcount[] = 0
         @test (1.0,) == Zygote.gradient(oout_id_outer, π)
@@ -399,7 +403,7 @@ end
     @test @inferred(Zygote.z2d((nothing,), (1,))) === NoTangent()
     @test @inferred(Zygote.z2d((nothing, nothing), (1,2))) === NoTangent()
 
-    # To test the generic case, we need a struct within a struct. 
+    # To test the generic case, we need a struct within a struct.
     nested = Tangent{Base.RefValue{ComplexF64}}(; x=Tangent{ComplexF64}(; re=1, im=NoTangent()),)
     if VERSION > v"1.7-"
         @test @inferred(Zygote.z2d((; x=(; re=1)), Ref(3.0+im))) == nested
@@ -455,4 +459,6 @@ end
     g = gradient(layers -> sum(layers[1](x)), layers)[1]
     @test g[1] isa NamedTuple
     @test g[1].w isa Array
+end
+
 end

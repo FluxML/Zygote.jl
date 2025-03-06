@@ -1,7 +1,11 @@
+@testitem "cuda" begin
+
+using LinearAlgebra
 using CUDA
 using Zygote: Grads
 using Random: randn!
 import FiniteDifferences
+
 CUDA.allowscalar(false)
 
 function gradcheck_gpu(f, xs...)
@@ -10,7 +14,6 @@ function gradcheck_gpu(f, xs...)
     grad_finite_difference = FiniteDifferences.grad(m, f, collect.(xs)...)
     return all(isapprox.(collect.(grad_zygote), grad_finite_difference))
 end
-
 
 # Test GPU movement inside the call to `gradient`
 @testset "GPU movement" begin
@@ -193,5 +196,7 @@ end
     # These check _broadcast_forward_complex(::Type{<:Dual}, ...)
     @test gradcheck_gpu(x->sum(imag, x.^2 .+ abs.(sinh.(conj.(x)))), ygpu)
 
+
+end
 
 end
