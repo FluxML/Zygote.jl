@@ -1,5 +1,6 @@
 @testitem "cuda" begin
 
+using LinearAlgebra
 using CUDA
 using Zygote: Grads
 using Random: randn!
