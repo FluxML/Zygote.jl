@@ -11,7 +11,7 @@ run_cuda || @warn "CUDA not found - Skipping CUDA Tests"
 
 runtests(Zygote; nworkers, nworker_threads, testitem_timeout) do ti
     if run_cuda
-        return true
+        return ti.name == "cuda"
     else
         return ti.name != "cuda"
     end
