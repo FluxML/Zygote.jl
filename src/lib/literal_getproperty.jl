@@ -29,11 +29,7 @@ function reflect(@nospecialize(sigtypes::Tuple), world::UInt)
     end
     method_index === 0 && return nothing
     type_signature, raw_static_params, method = _methods[method_index]
-    if VERSION < v"1.8-"
-        method_instance = Core.Compiler.specialize_method(method, type_signature, raw_static_params, false)
-    else
-        method_instance = Core.Compiler.specialize_method(method, type_signature, raw_static_params; preexisting=false)
-    end
+    method_instance = Core.Compiler.specialize_method(method, type_signature, raw_static_params; preexisting=false)
     method_signature = method.sig
     static_params = Any[raw_static_params...]
     return method_instance, method_signature, static_params
@@ -47,11 +43,7 @@ function _generate_literal_getproperty(ctx, world, x, ::Type{Val{f}}) where f
     sig(x) = Tuple{x, typeof(f)}
     rrule_sig(x) = Tuple{typeof(getproperty), x, typeof(f)}
     pb_sig(x) = Tuple{ctx, typeof(getproperty), x, typeof(f)}
-    @static if VERSION >= v"1.10.0-DEV.65"
-        which(f, t) = Base._which(Base.signature_type(f, t); world).method
-    else
-        which(f, t) = Base.which(f, t)
-    end
+    which(f, t) = Base._which(Base.signature_type(f, t); world).method
 
     # either `getproperty` has a custom implementation or `_pullback(ctx, getproperty, x, f)`
     # / `rrule(getproperty, x, f) is overloaded directly
@@ -62,11 +54,7 @@ function _generate_literal_getproperty(ctx, world, x, ::Type{Val{f}}) where f
     if is_getfield_fallback
         # just copy pullback of `literal_getfield`
         mi, _sig, sparams = reflect((typeof(_pullback), ctx, typeof(literal_getfield), x, Val{f}), world)
-        ci = if VERSION >= v"1.10.0-DEV.873"
-            copy(Core.Compiler.retrieve_code_info(mi, world))
-        else
-            copy(Core.Compiler.retrieve_code_info(mi))
-        end
+        ci = copy(Core.Compiler.retrieve_code_info(mi, world))
 
         # we need to change the second arg to `_pullback` from `literal_getproperty` to
         # `literal_getfield`
@@ -100,7 +88,6 @@ function _generate_literal_getproperty(ctx, world, x, ::Type{Val{f}}) where f
     end
 end
 
-if VERSION >= v"1.10.0-DEV.873"
 
 # on Julia 1.10, generated functions need to keep track of the world age
 
@@ -115,12 +102,4 @@ end
 @eval function _pullback(ctx::AContext, ::typeof(literal_getproperty), x, f)
   $(Expr(:meta, :generated, _literal_getproperty_pullback_generator))
   $(Expr(:meta, :generated_only))
-end
-
-else
-
-@generated function _pullback(ctx::AContext, ::typeof(literal_getproperty), x, f)
-    _generate_literal_getproperty(ctx, nothing, x, f)
-end
-
 end
