@@ -1,12 +1,7 @@
 module ZygoteTrackerExt
 
-if isdefined(Base, :get_extension)
-    using Zygote
-    using Tracker: Tracker, TrackedArray, TrackedReal
-else
-    using ..Zygote
-    using ..Tracker: Tracker, TrackedArray, TrackedReal
-end
+using Zygote
+using Tracker: Tracker, TrackedArray, TrackedReal
 
 Zygote.unwrap(x::Union{TrackedArray,TrackedReal}) = Tracker.data(x)
 

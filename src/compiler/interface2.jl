@@ -62,8 +62,6 @@ function _generate_callable_pullback(j::Type{<:Pullback{T}}, world, Δ) where T
   return update!(meta.code, back)
 end
 
-if VERSION >= v"1.10.0-DEV.873"
-
 # on Julia 1.10, generated functions need to keep track of the world age
 
 function _pullback_generator(world::UInt, source, self, ctx, f, args)
@@ -102,16 +100,4 @@ end
 @eval function (j::Pullback)(Δ)
   $(Expr(:meta, :generated, _callable_pullback_generator))
   $(Expr(:meta, :generated_only))
-end
-
-else
-
-@generated function _pullback(ctx::AContext, f, args...)
-  _generate_pullback(ctx, nothing, f, args...)
-end
-
-@generated function (j::Pullback)(Δ)
-  _generate_callable_pullback(j, nothing, Δ)
-end
-
 end
