@@ -40,8 +40,6 @@ bt = try back(1) catch e stacktrace(catch_backtrace()) end
 
 # Type inference checks
 
-Zygote.refresh()
-
 y, back = @test_inferred pullback(*, 2, 3)
 @test_inferred(back(1))
 

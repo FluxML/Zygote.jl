@@ -1,14 +1,8 @@
 module ZygoteDistancesExt
 
-if isdefined(Base, :get_extension)
-    using Zygote
-    using Distances
-    using LinearAlgebra
-else
-    using ..Zygote
-    using ..Distances
-    using ..LinearAlgebra
-end
+using Zygote
+using Distances
+using LinearAlgebra
 
 using Zygote: @adjoint, AContext, _pullback
 

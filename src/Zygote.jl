@@ -10,7 +10,7 @@ import ZygoteRules: @adjoint, @adjoint!, AContext, adjoint, _pullback, pullback,
 using ChainRulesCore
 using ChainRules: ChainRules, AbstractThunk, rrule, unthunk, canonicalize
 using IRTools
-using MacroTools, Requires
+using MacroTools
 using MacroTools: @forward
 
 import Distributed: pmap, CachingPool, workers
@@ -53,22 +53,7 @@ include("compiler/interface2.jl")
 
 include("profiler/Profile.jl")
 
-
-if !isdefined(Base, :get_extension)
-  @init @require Distances="b4f34e82-e78d-54a5-968a-f98e89d6e8f7" include("../ext/ZygoteDistancesExt.jl")
-  @init @require Tracker="9f7883ad-71c0-57eb-9f7f-b5c9e6d3789c" include("../ext/ZygoteTrackerExt.jl")
-  @init @require Colors="5ae59095-9a9b-59fe-a467-6f913c188581" include("../ext/ZygoteColorsExt.jl")
-end
-
 using InteractiveUtils
-precompile() = Requires.@include("precompile.jl")
-
-# helps to work around 265-y issues
-function refresh()
-  Requires.@include("compiler/interface2.jl")
-  precompile()
-  return
-end
 
 macro profile(ex)
   @capture(ex, f_(x__)) || error("@profile f(args...)")
@@ -79,6 +64,8 @@ macro profile(ex)
 end
 
 using PrecompileTools
-  @compile_workload precompile()
+@compile_workload begin
+    include("precompile.jl")
+end
 
-end # module
+end
