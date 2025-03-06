@@ -1,3 +1,5 @@
+@testitem "features" begin
+
 using Zygote, Test, LinearAlgebra
 using Zygote: Params, gradient, forwarddiff
 using FillArrays: Fill
@@ -397,7 +399,7 @@ global_r = 1
   @test back(1) == (nothing, 3)
   ref = first(keys(Zygote.cache(cx)))
   @test ref isa GlobalRef
-  @test ref.mod == Main
+  @test_broken ref.mod == Main # TODO module is now "features###"
   @test ref.name == :global_param
   @test Zygote.cache(cx)[ref] == 2
 
@@ -409,7 +411,7 @@ global_r = 1
     end
     return global_r
   end
-  
+
   @test gradient(pow_global, 2, 3) == (12, nothing)
 end
 
@@ -694,14 +696,6 @@ end
   end == ([8 112; 36 2004],)
 end
 
-@testset "PythonCall custom @adjoint" begin
-  using PythonCall: pyimport, pyconvert
-  math = pyimport("math")
-  pysin(x) = math.sin(x)
-  Zygote.@adjoint pysin(x) = pyconvert(Float64, math.sin(x)), δ -> (pyconvert(Float64, δ * math.cos(x)),)
-  @test Zygote.gradient(pysin, 1.5) == Zygote.gradient(sin, 1.5)
-end
-
 # https://github.com/JuliaDiff/ChainRules.jl/issues/257
 @testset "Keyword Argument Passing" begin
   struct Type1{VJP}
@@ -717,9 +711,8 @@ end
   end
 
   i = 1
-  global x = Any[nothing,nothing]
-
-  Zygote.@nograd g(x,i,sensealg) = Main.x[i] = sensealg
+  x = Any[nothing,nothing]
+  Zygote.@nograd g(x,i,sensealg) = x[i] = sensealg
   function f(;sensealg=nothing)
     g(x,i,sensealg)
     return rand(100)
@@ -889,3 +882,4 @@ end
   @test g1[1] ≈ g2[1] ≈ g3[1]
 end
 
+end

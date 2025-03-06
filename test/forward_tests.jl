@@ -1,4 +1,6 @@
-using Zygote, Test
+@testitem "forward" begin
+
+using LinearAlgebra
 
 D(f, x) = pushforward(f, x)(1)
 
@@ -46,3 +48,5 @@ end == 0
   mul!(B, A, A)
   sum(B)
 end == 6
+
+end

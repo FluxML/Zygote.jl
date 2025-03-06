@@ -1,4 +1,6 @@
-using Zygote, Test
+@testitem "compiler" begin
+
+using LinearAlgebra
 using Zygote: pullback, @adjoint, Context
 
 macro test_inferred(ex)
@@ -11,9 +13,10 @@ macro test_inferred(ex)
   end) |> esc
 end
 
-trace_contains(st, func, file, line) = any(st) do fr
-  func in (nothing, fr.func) && endswith(String(fr.file), file) &&
-    fr.line == line
+function trace_contains(st, func, file, line)
+  any(st) do fr
+    func in (nothing, fr.func) && endswith(String(fr.file), file) && fr.line == line
+  end
 end
 
 bad(x) = x
@@ -32,8 +35,8 @@ y, back = pullback(badly, 2)
 @test_throws Exception back(1)
 bt = try back(1) catch e stacktrace(catch_backtrace()) end
 
-@test trace_contains(bt, nothing, "compiler.jl", bad_def_line)
-@test trace_contains(bt, :badly, "compiler.jl", bad_call_line)
+@test trace_contains(bt, nothing, "compiler_tests.jl", bad_def_line)
+@test trace_contains(bt, :badly, "compiler_tests.jl", bad_call_line)
 
 # Type inference checks
 
@@ -277,20 +280,20 @@ function try_catch_finally(cond, x)
     x
 end
 
-        function try_catch_else(cond, x)
-            x = 2x
+function try_catch_else(cond, x)
+    x = 2x
 
-            try
-                x = 2x
-                cond && throw(nothing)
-            catch
-                x = 3x
-            else
-                x = 2x
-            end
+    try
+        x = 2x
+        cond && throw(nothing)
+    catch
+        x = 3x
+    else
+        x = 2x
+    end
 
-            x
-        end
+    x
+end
 
 @testset "try/catch" begin
     @testset "happy path (nothrow)" begin
@@ -336,4 +339,6 @@ end
 
     err = try pull(1.) catch ex; ex end
     @test occursin("Can't differentiate function execution in catch block", string(err))
+end
+
 end

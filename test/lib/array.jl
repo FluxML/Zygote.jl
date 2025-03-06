@@ -1,8 +1,3 @@
-using ChainRulesTestUtils
-using LinearAlgebra: Diagonal, Hermitian, LowerTriangular, UpperTriangular
-using LinearAlgebra: UnitLowerTriangular, UnitUpperTriangular
-using Zygote: ZygoteRuleConfig, _pullback, _reverse
-
 # issue 897
 
 test_rrule(ZygoteRuleConfig(), x->sum(sin, Diagonal(x)), ones(2); rrule_f=rrule_via_ad, check_inferred=false)

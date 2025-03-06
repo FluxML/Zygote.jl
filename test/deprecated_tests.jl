@@ -1,3 +1,5 @@
+@testitem "deprecated" begin
+
 @test_deprecated dropgrad(1)
 @test_deprecated ignore(1)
 @test_deprecated Zygote.@ignore x=1
@@ -8,3 +10,5 @@
   y = Zygote.@ignore x
   x * y
 end == (1,)
+
+end
