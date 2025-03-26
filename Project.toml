@@ -1,6 +1,6 @@
 name = "Zygote"
 uuid = "e88e6eb3-aa80-5325-afca-941959d7151f"
-version = "0.7.4"
+version = "0.7.5"
 
 [deps]
 AbstractFFTs = "621f4979-c628-5d54-868e-fcf4e3e8185c"
@@ -37,15 +37,15 @@ ZygoteDistancesExt = "Distances"
 ZygoteTrackerExt = "Tracker"
 
 [compat]
-Atom = "0.12"
 AbstractFFTs = "1.3.1"
+Atom = "0.12"
 ChainRules = "1.72.2"
 ChainRulesCore = "1.25.1"
 Colors = "0.12, 0.13"
 DiffRules = "1.4"
 Distances = "0.10"
 FillArrays = "0.8, 0.9, 0.10, 0.11, 0.12, 0.13, 1"
-ForwardDiff = "0.10"
+ForwardDiff = "0.10, 1"
 GPUArraysCore = "0.1.1, 0.2"
 IRTools = "0.4.12"
 LogExpFunctions = "0.3.1"
