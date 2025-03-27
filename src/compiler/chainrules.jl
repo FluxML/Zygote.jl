@@ -4,6 +4,7 @@
 @inline ZygoteRules.unthunk_tangent(x::NTuple{N,<:Number}) where N = x
 @inline ZygoteRules.unthunk_tangent(x::AbstractArray{<:Number,N}) where N = x
 @inline ZygoteRules.unthunk_tangent(x::AbstractArray) = map(unthunk_tangent, x)
+@inline ZygoteRules.unthunk_tangent(r::Base.RefValue) = r[] = unthunk_tangent(r[])
 ZygoteRules.unthunk_tangent(d::IdDict) = IdDict([unthunk_tangent(k) => unthunk_tangent(v) for (k, v) in d])
 @non_differentiable unthunk_tangent(::IdDict)
 
