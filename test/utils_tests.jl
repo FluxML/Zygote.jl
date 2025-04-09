@@ -77,6 +77,11 @@ end
   j6 = jacobian((x,y) -> abs2.(x .* y), [1+im, 2], 3+4im)
   @test j6[1][1,:] ≈ g6[1]
   @test j6[2][1] ≈ g6[2]
+
+  # https://github.com/FluxML/Zygote.jl/issues/1506
+  y7, g7 = Zygote.withjacobian(identity, rand(2, 3));
+  @test size(y7) == (2,3)
+  @test only(g7) == I
 end
 
 @testset "jacobian(loss, ::Params)" begin
