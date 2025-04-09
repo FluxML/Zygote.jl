@@ -188,7 +188,7 @@ function withjacobian(f, args...)
       nothing
   end
   delta = _eyelike(yvec)
-  for k in LinearIndices(y)
+  for k in LinearIndices(yvec)
     grads = back(delta[:,k])
     for (dx, grad) in zip(out, grads)
       dx isa AbstractArray || continue
