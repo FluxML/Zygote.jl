@@ -882,4 +882,16 @@ end
   @test g1[1] ≈ g2[1] ≈ g3[1]
 end
 
+# https://github.com/FluxML/Flux.jl/issues/2585
+@testset "Nested thunks" begin
+    W = ones(Float32, 10, 10)
+    x = [ones(Float32, 10) for i in 1:512]
+    gs = gradient(W) do W
+        sum((W * xi)[1] for xi in x)
+    end
+    dW = gs[1]
+    @test all(dW[1, :] .== 512)
+    @test all(dW[2:end, :] .== 0)
+end
+
 end
