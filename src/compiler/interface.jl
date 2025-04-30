@@ -1,5 +1,5 @@
 using InteractiveUtils
-using InteractiveUtils: typesof
+using Base: typesof
 using Core: Typeof
 import Base: copy!, IdSet
 import Base.Broadcast: broadcasted, materialize!
