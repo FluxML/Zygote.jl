@@ -1,4 +1,4 @@
-using IRTools: IR, Variable, Pipe, xcall, var, prewalk, postwalk,
+using IRTools: IRTools, IR, Variable, Pipe, xcall, var, prewalk, postwalk,
   blocks, predecessors, successors, argument!, arguments, branches,
   insertafter!, finish, expand!, prune!, substitute!, substitute,
   block, block!, branch!, return!, stmt, meta
@@ -238,7 +238,7 @@ Base.show(io::IO, x::Alpha) = print(io, "@", x.id)
 
 alpha(x) = x
 alpha(x::Variable) = Alpha(x.id)
-Variable(a::Alpha) = Variable(a.id)
+IRTools.Variable(a::Alpha) = Variable(a.id)
 
 sig(b::IRTools.Block) = unique([arg for br in branches(b) for arg in br.args if arg isa Variable])
 sig(pr::Primal) = Dict(b.id => sig(b) for b in blocks(pr.ir))
