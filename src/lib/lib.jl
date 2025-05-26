@@ -28,8 +28,8 @@ function accum(x::RefValue, y::RefValue)
   @assert x === y
   return x
 end
-accum(x, ref::RefValue) = accum(x, ref[])
-accum(ref::RefValue, x) = accum(ref[], x)
+accum(x::NamedTuple, ref::RefValue) = accum(x, ref[])
+accum(ref::RefValue, x::NamedTuple) = accum(ref[], x)
 
 accum(x::NamedTuple, y::ChainRulesCore.Tangent) = accum(x, wrap_chainrules_output(y))
 accum(x::ChainRulesCore.Tangent, y::NamedTuple) = accum(wrap_chainrules_output(x), y)
