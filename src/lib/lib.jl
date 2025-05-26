@@ -15,7 +15,6 @@ accum(x, y, zs...) = accum(accum(x, y), zs...)
 
 accum(x::Tuple, ys::Tuple...) = map(accum, x, ys...)
 accum(x::AbstractArray, ys::AbstractArray...) = Base.broadcast_preserving_zero_d(accum, x, ys...)
-accum(::Tuple{}, ::NamedTuple{}) = ()
 
 @generated function accum(x::NamedTuple, y::NamedTuple)
   # assumes that y has no keys apart from those also in x
@@ -29,6 +28,8 @@ function accum(x::RefValue, y::RefValue)
   @assert x === y
   return x
 end
+accum(x, ref::RefValue) = accum(x, ref[])
+accum(ref::RefValue, x) = accum(ref[], x)
 
 accum(x::NamedTuple, y::ChainRulesCore.Tangent) = accum(x, wrap_chainrules_output(y))
 accum(x::ChainRulesCore.Tangent, y::NamedTuple) = accum(wrap_chainrules_output(x), y)
@@ -231,7 +232,7 @@ end
     else
       dx = grad_mut(__context__, x)
       dx[] = (; dx[]..., pair(Val(f), accum(getfield(dx[], f), Δ))...)
-      return (dx[],nothing)
+      return (dx,nothing)
     end
   end
   unwrap(val), back
