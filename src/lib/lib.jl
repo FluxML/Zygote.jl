@@ -28,8 +28,14 @@ function accum(x::RefValue, y::RefValue)
   @assert x === y
   return x
 end
-accum(x::NamedTuple, ref::RefValue) = ref
-accum(ref::RefValue, x::NamedTuple) = ref
+function accum(x::NamedTuple, ref::RefValue)
+  fieldnames(ref[]) ⊆ fieldnames(x) || throw(ArgumentError("$(ref[]) keys from Ref must be a subset of $x keys"))
+  ref
+end
+function accum(ref::RefValue, x::NamedTuple)
+  fieldnames(x) ⊆ fieldnames(ref[]) || throw(ArgumentError("$x keys from Ref must be a subset of $(ref[]) keys"))
+  ref
+end
 
 accum(x::NamedTuple, y::ChainRulesCore.Tangent) = accum(x, wrap_chainrules_output(y))
 accum(x::ChainRulesCore.Tangent, y::NamedTuple) = accum(wrap_chainrules_output(x), y)
