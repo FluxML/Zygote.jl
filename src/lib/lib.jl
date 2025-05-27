@@ -29,11 +29,11 @@ function accum(x::RefValue, y::RefValue)
   return x
 end
 function accum(x::NamedTuple, ref::RefValue)
-  fieldnames(ref[]) ⊆ fieldnames(x) || throw(ArgumentError("$(ref[]) keys from Ref must be a subset of $x keys"))
+  fieldnames(typeof(ref[])) ⊆ fieldnames(typeof(x)) || throw(ArgumentError("$(ref[]) keys from Ref must be a subset of $x keys"))
   ref
 end
 function accum(ref::RefValue, x::NamedTuple)
-  fieldnames(x) ⊆ fieldnames(ref[]) || throw(ArgumentError("$x keys from Ref must be a subset of $(ref[]) keys"))
+  fieldnames(typeof(x)) ⊆ fieldnames(typeof(ref[])) || throw(ArgumentError("$x keys must be a subset of $(ref[]) keys from Ref"))
   ref
 end
 
