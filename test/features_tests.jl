@@ -480,6 +480,19 @@ let
   @test back(1.) == ((1.0,),)
 end
 
+mutable struct MWEGetter{G, U}
+  idxs::G
+  u::U
+end
+
+u = ones(3)
+idxs = [1, 2]
+mwe1574 = MWEGetter(idxs, u)
+
+function fn1574(mwe)
+  map(i -> mwe.u[i], mwe.idxs)
+end
+
 @testset "mutable struct, including Ref" begin
   # Zygote's representation is Base.RefValue{Any}((value = 7.0,)), but the
   # map to ChainRules types and back normalises to (value = 7.0,) same as struct:
@@ -506,6 +519,9 @@ end
   # Broadcasting over Ref is handled specially. Tested elsewhere too.
   @test gradient(x -> sum(sum, x .* [1,2,3]), Ref([4,5])) == ((x = [6.0, 6.0],),)
   @test gradient(x -> sum(sum, Ref(x) .* [1,2,3]), [4,5]) == ([6.0, 6.0],)
+
+  # Broadcasting/ Mapping over Mutables with differring graphs for fields
+  @test gradient(x -> sum(fn1574(x)), mwe1574)[1] == (; idxs = [nothing, nothing], u = [1.0, 1.0, 0.0])
 end
 
 @testset "mutable accum_param bugs" begin
