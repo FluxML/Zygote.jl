@@ -28,6 +28,16 @@ function accum(x::RefValue, y::RefValue)
   @assert x === y
   return x
 end
+function accum(x::NamedTuple, ref::RefValue)
+    # We do not actually do any accumulation here, because the ref will already have been mutated.
+  fieldnames(typeof(ref[])) ⊆ fieldnames(typeof(x)) || throw(ArgumentError("$(ref[]) keys from Ref must be a subset of $x keys"))
+  ref
+end
+function accum(ref::RefValue, x::NamedTuple)
+    # We do not actually do any accumulation here, because the ref will already have been mutated.
+  fieldnames(typeof(x)) ⊆ fieldnames(typeof(ref[])) || throw(ArgumentError("$x keys must be a subset of $(ref[]) keys from Ref"))
+  ref
+end
 
 accum(x::NamedTuple, y::ChainRulesCore.Tangent) = accum(x, wrap_chainrules_output(y))
 accum(x::ChainRulesCore.Tangent, y::NamedTuple) = accum(wrap_chainrules_output(x), y)
