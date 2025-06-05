@@ -33,6 +33,7 @@ function accum(x::NamedTuple, ref::RefValue)
   ref
 end
 function accum(ref::RefValue, x::NamedTuple)
+    # We do not actually do any accumulation here, because the ref will already have been mutated.
   fieldnames(typeof(x)) ⊆ fieldnames(typeof(ref[])) || throw(ArgumentError("$x keys must be a subset of $(ref[]) keys from Ref"))
   ref
 end
