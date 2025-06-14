@@ -79,7 +79,7 @@ julia&gt; gradient([7, 11], 0, 1) do x, y, d
          p = size(x, d)
          sum(x.^p .+ y)
        end
-([14.0, 22.0], 2.0, nothing)</code></pre></div><a class="docs-sourcelink" target="_blank" href="https://github.com/FluxML/Zygote.jl/blob/92dab93758cd423b710f54cccdedb0172ec35df4/src/compiler/interface.jl#L126-L151">source</a></section></article><pre><code class="language-julia">julia&gt; linear(θ, x) = θ[:W] * x .+ θ[:b]
+([14.0, 22.0], 2.0, nothing)</code></pre></div><a class="docs-sourcelink" target="_blank" href="https://github.com/FluxML/Zygote.jl/blob/6295734229ee2152915c1dad93dd0345525c62b2/src/compiler/interface.jl#L126-L151">source</a></section></article><pre><code class="language-julia">julia&gt; linear(θ, x) = θ[:W] * x .+ θ[:b]
 linear (generic function with 1 method)
 
 julia&gt; x = rand(5);
@@ -121,7 +121,7 @@ julia&gt; g[x]
  8.0  80.0  800.0
 
 julia&gt; haskey(g, z)  # only x and y are parameters
-false</code></pre></div><a class="docs-sourcelink" target="_blank" href="https://github.com/FluxML/Zygote.jl/blob/92dab93758cd423b710f54cccdedb0172ec35df4/src/compiler/interface.jl#L227-L251">source</a></section></article><pre><code class="language-julia">julia&gt; W = rand(2, 5); b = rand(2);
+false</code></pre></div><a class="docs-sourcelink" target="_blank" href="https://github.com/FluxML/Zygote.jl/blob/6295734229ee2152915c1dad93dd0345525c62b2/src/compiler/interface.jl#L227-L251">source</a></section></article><pre><code class="language-julia">julia&gt; W = rand(2, 5); b = rand(2);
 
 julia&gt; linear(x) = W * x .+ b
 linear (generic function with 2 methods)
