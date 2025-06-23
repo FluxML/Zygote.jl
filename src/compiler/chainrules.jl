@@ -294,7 +294,8 @@ z2d(::Tuple{Vararg{Nothing}}, ::Tuple) = NoTangent()  # collapse all-zero case
 z2d(dx, ::Any) = dx
 z2d(dx::AbstractArray{<:Number}, primal::AbstractArray) = dx
 z2d(dx::AbstractArray{<:AbstractArray{<:Number}}, primal::AbstractArray) = dx
-z2d(dx::AbstractArray, primal::AbstractArray) = map(z2d, dx, primal)
+z2d(dx::AbstractArray, primal::AbstractArray) = isempty(dx) ? dx : map(Zygote.z2d, dx, primal)
+
 #=
 # As an optimisation, we can convert by `reinterpret` for bitstypes, e.g. arrays of tuples of numbers
 function z2d(dx::AbstractArray{S}, primal::AbstractArray{P}) where {S,P}
