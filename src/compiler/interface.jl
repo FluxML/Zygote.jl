@@ -133,7 +133,7 @@ If no gradient is defined, `∂f/∂x` will be `nothing`.
 `f(args...)` must be a real number, see [`jacobian`](@ref) for array output.
 
 See also [`withgradient`](@ref) to keep the value `f(args...)`,
-and [`pullback`](@ref) for value and back-propagator.
+and [`pullback`](@ref "Pullbacks") for value and back-propagator.
 
 ```jldoctest; setup=:(using Zygote)
 julia> gradient(*, 2.0, 3.0, 5.0)
