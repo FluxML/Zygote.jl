@@ -696,3 +696,19 @@ end
   back(Δ::AbstractArray) = (nothing, last.(_back.(Δ)))
   return Fill(y, size(r)), back
 end
+
+
+# StaticArrays
+using StaticArrays
+
+# I'm not quite sure how to test this, but
+# f(x) = SArray{Tuple{2, 2}, Float64, 2}(x, x, x, x)
+# _, back = forward(f, 0.1)
+# back(@SArray(rand(2, 2)))
+# seems correct
+
+@adjoint function StaticArrays.SArray{S, T, N, L}(x::NTuple{L, T}) where {S, T, N, L}
+  return SArray{S, T, N, L}(x), function (Δ)
+    return (Tuple(Δ), )
+  end
+end
