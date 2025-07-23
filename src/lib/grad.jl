@@ -152,7 +152,7 @@ julia> jacobian((a,d) -> prod(a, dims=d), [1 2; 3 4; 5 6], 2)
 ```
 
 !!! warning
-    For arguments of any type except `Number` & `AbstractArray`, the result is `nothing`.
+    For arguments of any type except `Number` & `AbstractArray{<:Number}`, the result is `nothing`.
 
 ```
 julia> jacobian((a,s) -> a.^length(s), [1,2,3], "str")
@@ -181,7 +181,7 @@ function withjacobian(f, args...)
   y, back = pullback(_jvec∘f, args...)
   out = map(args) do x
     T = promote_type(eltype(x), eltype(y))
-    dx = x isa AbstractArray ? similar(x, T, length(y), length(x)) :
+    dx = x isa AbstractArray{<:Number} ? similar(x, T, length(y), length(x)) :
       x isa Number ? similar(y, T, length(y)) :
       nothing
   end
@@ -196,7 +196,7 @@ function withjacobian(f, args...)
   (val=y, grad=out)
 end
 
-_jvec(x::AbstractArray) = vec(x)
+_jvec(x::AbstractArray{<:Number}) = vec(x)
 _jvec(x::Number) = _jvec(vcat(x))
 _jvec(x) = throw(ArgumentError("jacobian expected a function which returns an array, or a scalar, got $(typeof(x))"))
 _jvec(x::AbstractArray{<:Complex}) = throw(ArgumentError("jacobian does not accept complex output"))
