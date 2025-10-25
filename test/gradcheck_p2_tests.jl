@@ -514,7 +514,8 @@ end
           y = Zygote.pullback(^, A, p)[1]
           y2 = A^p
           @test y ≈ y2
-          @test typeof(y) == typeof(y2)
+          broken = VERSION >= v"1.12" &&  MT <: Hermitian{Float64} && domain == Complex
+          @test typeof(y) == typeof(y2) broken=broken
 
           @testset "similar eigenvalues" begin
             λ[1] = λ[3] + sqrt(eps(eltype(λ))) / 10
