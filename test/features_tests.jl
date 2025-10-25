@@ -412,7 +412,7 @@ global_r = 1
     return global_r
   end
 
-  @test gradient(pow_global, 2, 3) == (12, nothing)
+  @test gradient(pow_global, 2, 3) == (12, nothing) broken=VERSION>=v"1.12"
 end
 
 

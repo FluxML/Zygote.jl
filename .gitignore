@@ -6,3 +6,5 @@ docs/Manifest.toml
 Manifest.toml
 dev/
 .vscode/
+/test.jl
+.CondaPkg
