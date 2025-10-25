@@ -425,7 +425,8 @@ end
         y, back = Zygote.pullback(f, A)
         y2 = f(A)
         @test y ≈ y2
-        @test typeof(y) == typeof(y2)
+        broken = VERSION >= v"1.12" &&  MT <: Hermitian{Float64} && domain == Real
+        @test typeof(y) == typeof(y2) broken=broken
         ȳ = randn(eltype(y), size(y))
         if y isa Union{Symmetric,Hermitian}
             ȳ = typeof(y)(ȳ, y.uplo)
@@ -437,7 +438,7 @@ end
         @testset "similar eigenvalues" begin
           λ[1] = λ[3] + sqrt(eps(eltype(λ))) / 10
           A2 = U * Diagonal(λ) * U'
-          @static if VERSION >= v"1.11"
+          @static if VERSION >= v"1.11" && VERSION < v"1.12"
             broken = f == sqrt && MT <: Symmetric{Float64} && domain == Real
             # @show f MT domain
             @test _gradtest_hermsym(f, ST, A2) broken=broken
@@ -471,10 +472,11 @@ end
       y = Zygote.pullback(sincos, A)[1]
       y2 = sincos(A)
       @test y[1] ≈ y2[1]
-      @test typeof(y[1]) == typeof(y2[1])
+      broken = VERSION >= v"1.12" &&  MT <: Hermitian{Float64}
+      @test typeof(y[1]) == typeof(y2[1]) broken=broken
       @test y[2] ≈ y2[2]
-      @test typeof(y[2]) == typeof(y2[2])
-
+      @test typeof(y[2]) == typeof(y2[2]) broken=broken
+     
       @testset "similar eigenvalues" begin
         λ[1] = λ[3] + sqrt(eps(eltype(λ))) / 10
         A2 = U * Diagonal(λ) * U'
@@ -513,7 +515,8 @@ end
           y = Zygote.pullback(^, A, p)[1]
           y2 = A^p
           @test y ≈ y2
-          @test typeof(y) == typeof(y2)
+          broken = VERSION >= v"1.12" &&  MT <: Hermitian{Float64} && domain == Complex
+          @test typeof(y) == typeof(y2) broken=broken
 
           @testset "similar eigenvalues" begin
             λ[1] = λ[3] + sqrt(eps(eltype(λ))) / 10
