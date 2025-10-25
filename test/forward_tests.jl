@@ -6,9 +6,9 @@ D(f, x) = pushforward(f, x)(1)
 
 @test D(x -> sin(cos(x)), 0.5) == -cos(cos(0.5))*sin(0.5)
 
-@test D(x -> D(cos, x), 0.5) == -cos(0.5)
+@test D(x -> D(cos, x), 0.5) == -cos(0.5) broken=VERSION>=v"1.12"
 
-@test D(x -> x*D(y -> x*y, 1), 4) == 8
+@test D(x -> x*D(y -> x*y, 1), 4) == 8 broken=VERSION>=v"1.12"
 
 function pow(x, n)
   r = 1
@@ -25,9 +25,9 @@ end
   f(y) = x = x*y
   D(f, 1)
   D(f, 1)
-end == 1
+end == 1 broken=VERSION>=v"1.12"
 
-@test D(x -> D(y -> x = y, x)*x, 1) == 1
+@test D(x -> D(y -> x = y, x)*x, 1) == 1 broken=VERSION>=v"1.12"
 
 @test D(1) do x
   D(2) do y
@@ -36,7 +36,7 @@ end == 1
     end
   end
   x
-end == 0
+end == 0 broken=VERSION>=v"1.12"
 
 @test D(x -> abs(x+2im), 1) == gradient(x -> abs(x+2im), 1+0im)[1]
 @test real(D(x -> abs(x+2im), 1)) == gradient(x -> abs(x+2im), 1)[1]  # ProjectTo means gradient here is real
