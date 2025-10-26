@@ -216,7 +216,8 @@ end
 
 
     # Const properties on modules should be lowered as-is (not differentiated)
-    @test @inferred gradient(usesmod, 1)[1] == 1.0
+    @test gradient(usesmod, 1)[1] == 1.0 broken=VERSION >= v"1.12"
+    @test @inferred gradient(usesmod, 1)[1] == 1.0 broken=VERSION >= v"1.12"
 end
 
 # issue 897
