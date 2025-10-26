@@ -1,4 +1,4 @@
-@testitem "pythoncall" skip=(VERSION < v"1.11") begin
+@testitem "pythoncall" skip=true begin
 
   using PythonCall: pyimport, pyconvert
 
