@@ -439,7 +439,7 @@ end
           λ[1] = λ[3] + sqrt(eps(eltype(λ))) / 10
           A2 = U * Diagonal(λ) * U'
           broken = f == sqrt && MT <: Symmetric{Float64} && domain == Real
-          broken = broken && (VERSION >= v"1.12") && !Sys.isapple()
+          broken = broken && (VERSION >= v"1.12")
           # @show f MT domain
           @test _gradtest_hermsym(f, ST, A2) broken=broken
         end
