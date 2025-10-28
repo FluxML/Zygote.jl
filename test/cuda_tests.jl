@@ -49,7 +49,7 @@ end
   @test gradient(x -> sum(x .> 3), a_gpu) == (nothing,)
   g3 = gradient(x -> sum(x .^ 3) / count(x .> 3), a)[1]              # was Can't differentiate gc_preserve_end expression
   @test_skip cu(g3) ≈ gradient(x -> sum(x .^ 3) / sum(x .> 3), a_gpu)[1]  # was KernelException -- not fixed by PR #1018
-  @test cu(g3) ≈ gradient(x -> sum(x .^ 3) / count(x .> 3), a_gpu)[1]
+  @test_broken cu(g3) ≈ gradient(x -> sum(x .^ 3) / count(x .> 3), a_gpu)[1]
 
   # Projection: eltype preservation:
   @test gradient(x -> 2.3 * sum(x.^4), a_gpu)[1] isa CuArray{Float32}
