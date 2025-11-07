@@ -1,5 +1,13 @@
-using Base: RefValue
-using Base: ismutabletype
+using Base: RefValue, ismutabletype, tail
+
+struct AccThunk{T} <: AbstractThunk
+    thunks::Vector{T}
+end
+
+_maybe_thunks(x) = x
+_maybe_thunks(x::AccThunk) = x.thunks
+
+ChainRules.unthunk(acc::AccThunk) = reduce(accum, unthunk.(acc.thunks))
 
 # Interfaces
 
@@ -7,9 +15,8 @@ accum() = nothing
 accum(x) = x
 
 accum(x, y) =
-  x === nothing ? y :
-  y === nothing ? x :
-  x + y
+  x === nothing ?
+    y : (y === nothing ? x : x + y)
 
 accum(x, y, zs...) = accum(accum(x, y), zs...)
 
@@ -47,9 +54,9 @@ accum(x::ChainRulesCore.Tangent, y::NamedTuple) = accum(wrap_chainrules_output(x
 accum(x::Nothing, y::AbstractThunk) = y
 accum(x::AbstractThunk, y::Nothing) = x
 
-accum(x, y::AbstractThunk) = accum(x, unthunk(y))
-accum(x::AbstractThunk, y) = accum(unthunk(x), y)
-accum(x::AbstractThunk, y::AbstractThunk) = accum(unthunk(x), unthunk(y))
+accum(x::AbstractThunk, y::AbstractThunk) = AccThunk(vcat(_maybe_thunks(x), _maybe_thunks(y)))
+accum(x::AbstractThunk, y) = AccThunk(vcat(_maybe_thunks(x), [y]))
+accum(x, y::AbstractThunk) = AccThunk(vcat([x], _maybe_thunks(y)))
 
 # Core functions
 @_adjoint_keepthunks deepcopy(x) = deepcopy(x), ȳ -> (ȳ,)
@@ -67,7 +74,7 @@ accum_param(::Context{false}, _, Δ) = Δ
   isbitstype(x) && return :(Δ)
   quote
     if haskey(cache(cx), x)
-      cache(cx)[x] = accum(cache(cx)[x],Δ)
+      cache(cx)[x] = accum(cache(cx)[x], Δ)
       return
     else
       return Δ
@@ -107,8 +114,6 @@ end
 end
 
 # Tuples
-
-using Base: tail
 
 @_adjoint_keepthunks tuple(xs...) = xs, identity
 
