@@ -27,17 +27,21 @@ julia> y
 0.479425538604203
 ```
 
-`pullback` gives two outputs: the result of the original function, `sin(0.5)`, and a *pullback*, here called `back`. `back` implements the gradient computation for `sin`, accepting a derivative and producing a new one. In mathematical terms, it implements a vector-Jacobian product. Where ``y = f(x)`` and the gradient ``\frac{\partial l}{\partial x}`` is written ``\bar{x}``, the pullback ``\mathcal{B}_y`` computes:
+`pullback` gives two outputs: the result of the original function, `sin(0.5)`, and a *pullback*, here called `back`. `back` implements the gradient computation for `sin`, accepting a derivative and producing a new one. In mathematical terms, it implements a vector-Jacobian product. Where ``y = f(x)`` and the gradient ``\frac{\partial l}{\partial x}`` is written ``\bar{x}``, the pullback ``\mathcal{B}_f^x`` computes:
 
 ```math
-\bar{x} = \frac{\partial l}{\partial x} = \frac{\partial l}{\partial y} \frac{\partial y}{\partial x} = \mathcal{B}_y(\bar{y})
+\bar{x} = \frac{\partial l}{\partial x} = \frac{\partial l}{\partial y} \frac{\partial y}{\partial x} = \mathcal{B}_f^x(\bar{y})
 ```
+
+at the point `x`.
 
 To make this concrete, take the function ``y = \sin(x)``. ``\frac{\partial y}{\partial x} = \cos(x)``, so the pullback is ``\bar{y} \cos(x)``. In other words `pullback(sin, x)` behaves the same as
 
 ```julia
 dsin(x) = (sin(x), ȳ -> (ȳ * cos(x),))
 ```
+
+where the pullback function `ȳ -> (ȳ * cos(x),)` is a reverse of the chain rule with embedded information from the forward pass.
 
 `gradient` takes a function ``l = f(x)`` and assumes ``l̄ = \frac{\partial l}{\partial l} = 1`` and feeds this in to the pullback. In the case of `sin`,
 
