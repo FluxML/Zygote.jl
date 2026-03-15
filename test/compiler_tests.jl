@@ -252,6 +252,28 @@ end
     @test only(g) ∈ (1., 2.)
 end
 
+function kwlog_repro(x; customgrad = true, show_warnings = false)
+    if !customgrad
+        if show_warnings
+            @warn "Forcing customgrad to false"
+        end
+        customgrad = false
+    end
+    return customgrad ? x^2 : x^3
+end
+
+@testset "keyword wrapper logging" begin
+    @test gradient(x -> kwlog_repro(x; customgrad = true, show_warnings = false), 2.0) == (4.0,)
+
+    # Exercise the synthesized default-argument wrapper directly.
+    wrapper_name = only(filter(names(@__MODULE__; all = true)) do sym
+        name = String(sym)
+        startswith(name, "#kwlog_repro#")
+    end)
+    wrapper = getfield(@__MODULE__, wrapper_name)
+    @test gradient(x -> wrapper(true, false, kwlog_repro, x), 2.0) == (4.0,)
+end
+
 function throws_and_catches_if_x_negative(x,y)
     z = x + y
     try

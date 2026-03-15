@@ -1,5 +1,25 @@
 ignore_sig(T) = all(T -> T <: Type, T.parameters)
 
+_valid_isdefined_arg(x) = x isa Union{Core.SlotNumber, Core.Argument}
+
+function _sanitize_invalid_isdefined(x)
+  if x isa Expr
+    if x.head === :isdefined && !_valid_isdefined_arg(only(x.args))
+      # Lowered `isdefined` is only valid on slots/arguments. After decomposition we can
+      # end up with the original slot reference substituted by a literal/SSA value, which
+      # produces malformed IR on Julia 1.12 codegen. Those cases are necessarily known-true.
+      return true
+    end
+    return Expr(x.head, map(_sanitize_invalid_isdefined, x.args)...)
+  end
+  return x
+end
+
+function sanitize_invalid_isdefined!(ci::Core.CodeInfo)
+  ci.code = map(_sanitize_invalid_isdefined, ci.code)
+  return ci
+end
+
 function edge!(m::IRTools.Meta, edge::Core.MethodInstance)
   m.code.edges === nothing && (m.code.edges = Core.MethodInstance[])
   if m.code.edges isa Core.SimpleVector
@@ -41,7 +61,7 @@ function _generate_pullback(ctx, world, f, args...)
   forw = slots!(pis!(inlineable!(forw)))
   # be ready to swap to using chainrule if one is declared
   cr_edge != nothing && edge!(meta, cr_edge)
-  return update!(meta.code, forw)
+  return sanitize_invalid_isdefined!(update!(meta.code, forw))
 end
 
 function _generate_callable_pullback(j::Type{<:Pullback{T}}, world, Δ) where T
@@ -60,7 +80,7 @@ function _generate_callable_pullback(j::Type{<:Pullback{T}}, world, Δ) where T
   argnames!(meta, Symbol("#self#"), :Δ)
   # IRTools.verify(back)
   back = slots!(inlineable!(back))
-  return update!(meta.code, back)
+  return sanitize_invalid_isdefined!(update!(meta.code, back))
 end
 
 # on Julia 1.10, generated functions need to keep track of the world age

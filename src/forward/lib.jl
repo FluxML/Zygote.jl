@@ -28,8 +28,12 @@ zerolike(x::GlobalRef) = nothing
 @tangent fieldnames(T) = fieldnames(T), _ -> zerolike(fieldnames(T))
 @tangent eltype(x) = eltype(x), ẋ -> zerolike(eltype(ẋ))
 @tangent getglobal(m::Module, s::Symbol) = getglobal(m, s), (_, _) -> nothing
-@tangent Core.has_free_typevars(T) = Core.has_free_typevars(T), _ -> nothing
-@tangent Core._typeof_captured_variable(T) = Core._typeof_captured_variable(T), _ -> nothing
+if isdefined(Core, :has_free_typevars)
+  @eval @tangent Core.has_free_typevars(T) = Core.has_free_typevars(T), _ -> nothing
+end
+if isdefined(Core, :_typeof_captured_variable)
+  @eval @tangent Core._typeof_captured_variable(T) = Core._typeof_captured_variable(T), _ -> nothing
+end
 
 @tangent fieldcount(T) = fieldcount(T), _ -> zerolike(fieldcount(T))
 
