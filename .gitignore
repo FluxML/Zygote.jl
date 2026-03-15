@@ -8,3 +8,4 @@ dev/
 .vscode/
 /test.jl
 .CondaPkg
+sandbox/

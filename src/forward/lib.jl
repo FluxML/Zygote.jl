@@ -27,6 +27,9 @@ zerolike(x::GlobalRef) = nothing
 @tangent typeassert(x, T) = typeassert(x, T), (ẋ, _) -> ẋ
 @tangent fieldnames(T) = fieldnames(T), _ -> zerolike(fieldnames(T))
 @tangent eltype(x) = eltype(x), ẋ -> zerolike(eltype(ẋ))
+@tangent getglobal(m::Module, s::Symbol) = getglobal(m, s), (_, _) -> nothing
+@tangent Core.has_free_typevars(T) = Core.has_free_typevars(T), _ -> nothing
+@tangent Core._typeof_captured_variable(T) = Core._typeof_captured_variable(T), _ -> nothing
 
 @tangent fieldcount(T) = fieldcount(T), _ -> zerolike(fieldcount(T))
 

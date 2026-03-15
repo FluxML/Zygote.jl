@@ -93,6 +93,17 @@ unwrap(ref, x) = x
   (accum_param(__context__, x, x̄),)
 end
 
+@_adjoint_keepthunks function getglobal(m::Module, s::Symbol)
+  x = getglobal(m, s)
+  isconst(m, s) && return x, _ -> (nothing, nothing)
+  x, function (x̄)
+    ref = GlobalRef(m, s)
+    accum_global(__context__, ref, x̄)
+    accum_param(__context__, x, x̄)
+    return (nothing, nothing)
+  end
+end
+
 function global_set(ref, val)
     setglobal!(ref.mod, ref.name, val)
 end
