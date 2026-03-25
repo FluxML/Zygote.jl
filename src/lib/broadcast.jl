@@ -264,11 +264,30 @@ using ForwardDiff: Dual, Partials, value, partials
     return Complex(re_dual, im_dual)
 end
 
+_iscomplex(::Complex) = true
+_iscomplex(_) = false
+
+# When any argument is complex, all duals need 2N partials for consistency.
+# Real args in a mixed real/complex broadcast must also use 2N partials,
+# matching the partials count of complex args (which tag real and imaginary
+# parts separately). See https://github.com/FluxML/Zygote.jl/issues/1601
+@inline function _dual_real_in_complex(x::Real, i, ::Val{N}) where {N}
+    Dual(x, ntuple(==(i), 2N))
+end
+
 function dualize(args::Vararg{Any, N}) where {N}
-    ds = map(args, ntuple(identity,N)) do x, i
-        return dual(x, i, Val(N))
-      end
-      return ds
+    if any(_iscomplex, args)
+        ds = map(args, ntuple(identity, N)) do x, i
+            x isa Complex ? dual(x, i, Val(N)) :
+            x isa Real    ? _dual_real_in_complex(x, i, Val(N)) :
+                            dual(x, i, Val(N))
+        end
+    else
+        ds = map(args, ntuple(identity, N)) do x, i
+            return dual(x, i, Val(N))
+        end
+    end
+    return ds
 end
 
 @inline function dual_function(f::F) where F

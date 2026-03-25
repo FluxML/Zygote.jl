@@ -121,4 +121,15 @@ end
     @test Zygote.hessian(fun, collect(1:9)) ≈ [14 0 0 0 0 0 2 0 0; 0 16 0 0 0 0 0 4 0; 0 0 18 0 0 0 0 0 6; 0 0 0 14 0 0 8 0 0; 0 0 0 0 16 0 0 10 0; 0 0 0 0 0 18 0 0 12; 2 0 0 8 0 0 0 0 0; 0 4 0 0 10 0 0 0 0; 0 0 6 0 0 12 0 0 0]
 end
 
+@testset "issue #1601 mixed complex/real broadcast" begin
+    cpx(l, x) = real(l) + x
+    f(x) = sum(@. real(cpx(im + x, x)))
+    @test gradient(f, ones(10))[1] ≈ 2 .* ones(10)
+
+    # Mixed complex/real with complex output
+    h(l, x) = l + x
+    g(x) = sum(real.(@. h(im + x, x)))
+    @test gradient(g, ones(5))[1] ≈ 2 .* ones(5)
+end
+
 end
