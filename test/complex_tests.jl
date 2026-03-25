@@ -121,4 +121,27 @@ end
     @test Zygote.hessian(fun, collect(1:9)) ≈ [14 0 0 0 0 0 2 0 0; 0 16 0 0 0 0 0 4 0; 0 0 18 0 0 0 0 0 6; 0 0 0 14 0 0 8 0 0; 0 0 0 0 16 0 0 10 0; 0 0 0 0 0 18 0 0 12; 2 0 0 8 0 0 0 0 0; 0 4 0 0 10 0 0 0 0; 0 0 6 0 0 12 0 0 0]
 end
 
+@testset "issue #1601 mixed complex/real broadcast" begin
+    cpx(l, x) = real(l) + x
+    f(x) = sum(@. real(cpx(im + x, x)))
+    @test gradient(f, ones(10))[1] ≈ 2 .* ones(10)
+
+    # Mixed complex/real with complex output
+    h(l, x) = l + x
+    g(x) = sum(real.(@. h(im + x, x)))
+    @test gradient(g, ones(5))[1] ≈ 2 .* ones(5)
+end
+
+# https://github.com/FluxML/Zygote.jl/issues/1461
+@testset "issue #1461 muladd with complex broadcast" begin
+    f_muladd(x, a, b) = sum(@. real(a * exp(muladd(b, im, x))))
+    f_no_muladd(x, a, b) = sum(@. real(a * exp(x + b * im)))
+    x = ones(Float64, 10); a = 1.0; b = 2.0
+    g1 = gradient(f_no_muladd, x, a, b)
+    g2 = gradient(f_muladd, x, a, b)
+    @test g1[1] ≈ g2[1]
+    @test g1[2] ≈ g2[2]
+    @test g1[3] ≈ g2[3]
+end
+
 end
