@@ -8,3 +8,6 @@ dev/
 .vscode/
 /test.jl
 .CondaPkg
+
+CLAUDE.md
+.claude/
