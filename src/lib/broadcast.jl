@@ -253,12 +253,18 @@ using ForwardDiff: Dual, Partials, value, partials
 
 # We do this because it ensures type stability so it compiles nicely on the gpu
 # The val is needed for some type stability
-@inline dual(x, i, ::Val{N}) where {N} = x
-@inline dual(x::Bool, i, ::Val{N}) where {N} = x
-@inline dual(x::Real, i, ::Val{N}) where {N} = Dual(x, ntuple(==(i), N))
+# The Val{C} flag indicates whether any sibling argument is complex, so that
+# all duals in a mixed real/complex broadcast get 2N partials.
+# See https://github.com/FluxML/Zygote.jl/issues/1601
+#     https://github.com/FluxML/Zygote.jl/issues/1461
+@inline dual(x, i, ::Val{N}, ::Val{C}) where {N,C} = x
+@inline dual(x::Bool, i, ::Val{N}, ::Val{false}) where {N} = x
+@inline dual(x::Bool, i, ::Val{N}, ::Val{true}) where {N} = x
+@inline dual(x::Real, i, ::Val{N}, ::Val{false}) where {N} = Dual(x, ntuple(==(i), N))
+@inline dual(x::Real, i, ::Val{N}, ::Val{true}) where {N} = Dual(x, ntuple(==(i), 2N))
 # For complex since ForwardDiff.jl doesn't play nicely with complex numbers we
 # construct a Complex dual number and tag the real and imaginary parts separately
-@inline function dual(x::Complex{T}, i, ::Val{N}) where {T,N}
+@inline function dual(x::Complex{T}, i, ::Val{N}, ::Val{C}) where {T,N,C}
     re_dual = Dual(real(x), ntuple(==(i), 2N))
     im_dual = Dual(imag(x), ntuple(==(N+i), 2N))
     return Complex(re_dual, im_dual)
@@ -267,25 +273,10 @@ end
 _iscomplex(::Complex) = true
 _iscomplex(_) = false
 
-# When any argument is complex, all duals need 2N partials for consistency.
-# Real args in a mixed real/complex broadcast must also use 2N partials,
-# matching the partials count of complex args (which tag real and imaginary
-# parts separately). See https://github.com/FluxML/Zygote.jl/issues/1601
-@inline function _dual_real_in_complex(x::Real, i, ::Val{N}) where {N}
-    Dual(x, ntuple(==(i), 2N))
-end
-
 function dualize(args::Vararg{Any, N}) where {N}
-    if any(_iscomplex, args)
-        ds = map(args, ntuple(identity, N)) do x, i
-            x isa Complex ? dual(x, i, Val(N)) :
-            x isa Real    ? _dual_real_in_complex(x, i, Val(N)) :
-                            dual(x, i, Val(N))
-        end
-    else
-        ds = map(args, ntuple(identity, N)) do x, i
-            return dual(x, i, Val(N))
-        end
+    has_complex = Val(any(_iscomplex, args))
+    ds = map(args, ntuple(identity, N)) do x, i
+        return dual(x, i, Val(N), has_complex)
     end
     return ds
 end
