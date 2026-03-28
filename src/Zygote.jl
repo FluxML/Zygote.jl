@@ -13,6 +13,7 @@ using IRTools
 using MacroTools
 using MacroTools: @forward
 
+import ChainRules
 import Distributed: pmap, CachingPool, workers
 export Params, withgradient, gradient, withjacobian, jacobian, hessian, diaghessian, pullback, pushforward, @code_adjoint
 export rrule_via_ad
