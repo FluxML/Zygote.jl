@@ -671,22 +671,6 @@ AbstractFFTs.rfft(x::Fill, dims...) = AbstractFFTs.rfft(collect(x), dims...)
 AbstractFFTs.irfft(x::Fill, d, dims...) = AbstractFFTs.irfft(collect(x), d, dims...)
 AbstractFFTs.brfft(x::Fill, d, dims...) = AbstractFFTs.brfft(collect(x), d, dims...)
 
-# the adjoint jacobian of an FFT with respect to its input is the reverse FFT of the
-# gradient of its inputs, but with different normalization factor
-@adjoint function *(P::AbstractFFTs.Plan, xs)
-  return P * xs, function(Δ)
-    N = prod(size(xs)[[P.region...]])
-    return (nothing, N * (P \ Δ))
-  end
-end
-
-@adjoint function \(P::AbstractFFTs.Plan, xs)
-  return P \ xs, function(Δ)
-    N = prod(size(Δ)[[P.region...]])
-    return (nothing, (P * Δ)/N)
-  end
-end
-
 # FillArray functionality
 # =======================
 
