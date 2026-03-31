@@ -178,15 +178,17 @@ julia> withjacobian(cumsum, [1,2,3])
 ```
 """
 function withjacobian(f, args...)
-  y, back = pullback(_jvec∘f, args...)
+  y, back1 = pullback(f, args...)
+  yvec, back2 = pullback(_jvec, y)
+  back = dy -> back1(back2(dy)[1])
   out = map(args) do x
     T = promote_type(eltype(x), eltype(y))
     dx = x isa AbstractArray ? similar(x, T, length(y), length(x)) :
       x isa Number ? similar(y, T, length(y)) :
       nothing
   end
-  delta = _eyelike(y)
-  for k in LinearIndices(y)
+  delta = _eyelike(yvec)
+  for k in LinearIndices(yvec)
     grads = back(delta[:,k])
     for (dx, grad) in zip(out, grads)
       dx isa AbstractArray || continue
