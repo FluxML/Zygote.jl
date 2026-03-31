@@ -1,5 +1,7 @@
 using Base: RefValue
 using Base: ismutabletype
+using LinearAlgebra: Hermitian, Symmetric
+using SparseArrays: SparseMatrixCSC
 
 # Interfaces
 
@@ -15,6 +17,11 @@ accum(x, y, zs...) = accum(accum(x, y), zs...)
 
 accum(x::Tuple, ys::Tuple...) = map(accum, x, ys...)
 accum(x::AbstractArray, ys::AbstractArray...) = Base.broadcast_preserving_zero_d(accum, x, ys...)
+
+const HermOrSymSparse{T, I} = Union{Hermitian{T, SparseMatrixCSC{T, I}}, Symmetric{T, SparseMatrixCSC{T, I}}}
+
+accum(x::HermOrSymSparse, y::HermOrSymSparse) = x + y
+
 accum(::Tuple{}, ::NamedTuple{}) = ()
 accum(::NamedTuple{}, ::Tuple{}) = ()
 
