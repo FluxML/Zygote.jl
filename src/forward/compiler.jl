@@ -50,6 +50,12 @@ function dual(ir)
     st = instrument!(pr, v, st)
     if isexpr(st.expr, :meta, :inbounds, :loopinfo)
       Δs[v] = nothing
+    elseif isexpr(st.expr, :foreigncall, :isdefined)
+      Δs[v] = push!(pr, xcall(Forward, :zerolike, v))
+    elseif isexpr(st.expr, :call) && st.expr.args[1] == GlobalRef(Core, :_typeof_captured_variable)
+      Δs[v] = nothing
+    elseif isexpr(st.expr, :call) && st.expr.args[1] == GlobalRef(Core, :has_free_typevars)
+      Δs[v] = false
     elseif isexpr(st.expr, :boundscheck) ||
            (isexpr(st.expr, :call) && st.expr.args[1] == GlobalRef(Base, :not_int)) ||
            (isexpr(st.expr, :call) && st.expr.args[1] == GlobalRef(Core, :(===))) ||
