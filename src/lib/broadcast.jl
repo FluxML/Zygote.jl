@@ -369,8 +369,18 @@ using GPUArraysCore  # replaces @require CUDA block, weird indenting to preserve
        # Ordinary broadcasting calls broadcast_forward anyway when certain its' safe,
        # so perhaps this can be deleted? Possible edge case here:
        # https://github.com/FluxML/Zygote.jl/pull/1018#issuecomment-873629415
-  @adjoint broadcasted(::AbstractGPUArrayStyle, f, args...) =
+  @adjoint function broadcasted(::AbstractGPUArrayStyle, f, args...)
+    # Bool-valued broadcasts (e.g. `x .> 3`) are non-differentiable and must be
+    # evaluated on the plain values: running predicates like `>` through ForwardDiff
+    # `Dual`s gives wrong results, because ForwardDiff (>= v1) compares Duals with a
+    # total order that breaks value-ties using the partials. See
+    # https://github.com/FluxML/Zygote.jl/issues/1597
+    # This mirrors the `T == Bool` short-circuit in `_broadcast_generic` above.
+    if Broadcast.combine_eltypes(f, args) == Bool
+      return (f.(args...), _ -> nothing)
+    end
     broadcast_forward(f, args...)
+  end
 
   @adjoint (::Type{T})(xs::Array) where {T <: AbstractGPUArray} =
     T(xs), Δ -> (convert(Array, Δ), )
