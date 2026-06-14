@@ -104,9 +104,15 @@ end
 @adjoint broadcasted(::typeof(/), x::AbstractArray{<:Number}, y::Number) =
   _pullback(__context__, /, x, y)
 
+# `_pow_grad` guards against spurious `NaN`s from `0 * Inf`: when the local
+# derivative `df` is exactly zero (e.g. `x^2` at `x == 0`), the contribution is
+# zero even if the incoming sensitivity `ȳ` is infinite or `NaN`, as happens for
+# `sqrt.(x.^2)` at the cusp `x == 0` (see FluxML/Zygote.jl#1598).
+_pow_grad(ȳ, df) = iszero(df) ? zero(ȳ * df) : ȳ * df
+
 @adjoint function broadcasted(::typeof(Base.literal_pow), ::typeof(^), x::Numeric, exp::Val{p}) where p
   y = Base.literal_pow.(^, x, exp)
-  y, ȳ -> (nothing, nothing, ȳ .* p .* conj.(x .^ (p - 1)), nothing)
+  y, ȳ -> (nothing, nothing, _pow_grad.(ȳ, p .* conj.(x .^ (p - 1))), nothing)
 end
 
 @adjoint broadcasted(::typeof(identity), x::Numeric) = x, Δ -> (nothing, Δ)

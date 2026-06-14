@@ -9,7 +9,12 @@ function ChainRulesCore.rrule(
     ::ZygoteRuleConfig, ::typeof(Base.literal_pow), ::typeof(^), x::Number, ::Val{p}
 ) where {p}
     function literal_pow_pullback(Δ)
-        dx = Δ * conj(p * Base.literal_pow(^,x,Val(p-1)))
+        df = conj(p * Base.literal_pow(^,x,Val(p-1)))
+        # When the local derivative `df` is exactly zero (e.g. `x^2` at `x == 0`),
+        # the gradient contribution is zero even if `Δ` is infinite or `NaN`. This
+        # avoids spurious `NaN`s from `0 * Inf` for functions like `sqrt(x^2)`
+        # at the cusp `x == 0` (see FluxML/Zygote.jl#1598).
+        dx = iszero(df) ? zero(Δ * df) : Δ * df
         return (NoTangent(), NoTangent(), dx, NoTangent())
     end
     return Base.literal_pow(^,x,Val(p)), literal_pow_pullback

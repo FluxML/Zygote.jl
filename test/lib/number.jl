@@ -26,6 +26,21 @@
     @test gradient(//, 3, 2) == (1//2, -3//4)
   end
 
+  @testset "literal_pow at zero (#1598)" begin
+    # `sqrt(x^2)` has a cusp at `x == 0`: the inner `x^2` derivative is `0` while
+    # the outer `sqrt` derivative is `Inf`, which used to multiply to `NaN`.
+    @test gradient(x -> sqrt(x^2), 0.0) == (0.0,)
+    @test gradient(x -> sqrt(x^2), 2.0) == (1.0,)
+    @test gradient(x -> sqrt(x^2), -2.0) == (-1.0,)
+    # ordinary `^` gradients must be unaffected
+    @test gradient(x -> x^2, 0.0) == (0.0,)
+    @test gradient(x -> x^3, 0.0) == (0.0,)
+    @test gradient(x -> x^2, 3.0) == (6.0,)
+    # broadcasted path
+    @test gradient(x -> sum(sqrt.(x.^2)), [0.0, 1.0, -2.0]) == ([0.0, 1.0, -1.0],)
+    @test gradient(x -> sum(x.^2), [0.0, 1.0]) == ([0.0, 2.0],)
+  end
+
   @testset "Complex numbers" begin
     @test gradient(imag, 3.0) == (0.0,)
     @test gradient(imag, 3.0 + 3.0im) == (0.0 + 1.0im,)
