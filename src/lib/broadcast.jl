@@ -264,8 +264,12 @@ using ForwardDiff: Dual, Partials, value, partials
 # See https://github.com/FluxML/Zygote.jl/issues/1601
 #     https://github.com/FluxML/Zygote.jl/issues/1461
 @inline dual(x, i, ::Val{N}, ::Val{C}) where {N,C} = x
-@inline dual(x::Bool, i, ::Val{N}, ::Val{false}) where {N} = x
-@inline dual(x::Bool, i, ::Val{N}, ::Val{true}) where {N} = x
+# Integers (incl. Bool) are not differentiable, so leave them untouched rather than
+# seeding partials. This also avoids silently wrong results from ForwardDiff v1, where
+# `Dual(1,1) != 1` breaks integer comparisons inside the broadcasted function.
+# See https://github.com/FluxML/Zygote.jl/issues/1602
+@inline dual(x::Integer, i, ::Val{N}, ::Val{false}) where {N} = x
+@inline dual(x::Integer, i, ::Val{N}, ::Val{true}) where {N} = x
 @inline dual(x::Real, i, ::Val{N}, ::Val{false}) where {N} = Dual(x, ntuple(==(i), N))
 @inline dual(x::Real, i, ::Val{N}, ::Val{true}) where {N} = Dual(x, ntuple(==(i), 2N))
 # For complex since ForwardDiff.jl doesn't play nicely with complex numbers we

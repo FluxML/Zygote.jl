@@ -301,6 +301,25 @@ end
   end
 end
 
+@testset "issue #1602 integer args in broadcast are not dualized" begin
+  # Integers (e.g. a `1:N` index range) broadcast through a function must stay integers,
+  # otherwise ForwardDiff v1's `Dual(1,1) != 1` silently breaks integer comparisons.
+  generate_i(i, a, d) = ifelse(i == 1, a, d)
+  function f_std(a, d)
+    N = 3
+    x = ones(N)
+    v = @. generate_i(1:N, a, d)
+    return sum(v .* x)
+  end
+  @test gradient(f_std, 0.2, 0.5) == (1.0, 2.0)
+
+  # gradient w.r.t. the integer range itself is dropped (not differentiable)
+  @test gradient((a, d) -> sum(@. ifelse((0:4) >= 2, a^2, d)), 1.3, 0.7) == (3 * 2 * 1.3, 2.0)
+
+  # genuine differentiable args alongside an integer array still get correct gradients
+  @test gradient(x -> sum(x .* [2, 3, 4]), [1.0, 2.0, 3.0])[1] == [2.0, 3.0, 4.0]
+end
+
 @testset "norm" begin
     # rrule for norm is defined in ChainRules. These tests just check various norm-related
     # issues are resolved
