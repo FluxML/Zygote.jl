@@ -696,3 +696,16 @@ end
   back(Δ::AbstractArray) = (nothing, last.(_back.(Δ)))
   return Fill(y, size(r)), back
 end
+
+# Sorted search
+# =============
+
+# `searchsorted*` return integer indices (or an index range) locating a value in a
+# sorted array — piecewise-constant, integer-valued outputs whose derivative is zero.
+# Their binary search computes a midpoint with the `>>>` (`lshr_int`) intrinsic, so
+# without these the source transform recurses into a non-differentiable intrinsic and
+# errors whenever the searched array is itself differentiable (e.g.
+# `searchsortedlast.(eachcol(s), x)`). See #1156.
+ChainRulesCore.@non_differentiable searchsortedfirst(::Any, ::Any)
+ChainRulesCore.@non_differentiable searchsortedlast(::Any, ::Any)
+ChainRulesCore.@non_differentiable searchsorted(::Any, ::Any)

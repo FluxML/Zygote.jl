@@ -42,6 +42,21 @@ function ChainRulesCore.rrule(::ZygoteRuleConfig, ::typeof(//), a, b)
     return a // b, divide_pullback
 end
 
+# `flipsign`/`copysign` are implemented with bit-twiddling intrinsics (`bitcast`,
+# `xor_int`, ...) that are not differentiable on their own, so the source transform
+# bottoms out at an intrinsic and errors. The functions themselves are differentiable:
+# they only copy `y`'s sign bit onto the magnitude, so d/dx is ±1 (`flipsign(1, y)`)
+# and d/dy is 0 a.e. Needed for e.g. `Colors.colordiff` (issues #467, #619).
+function ChainRulesCore.rrule(::ZygoteRuleConfig, ::typeof(flipsign), x::Real, y::Real)
+    flipsign_pullback(Δ) = (NoTangent(), flipsign(Δ, y), ZeroTangent())
+    return flipsign(x, y), flipsign_pullback
+end
+
+function ChainRulesCore.rrule(::ZygoteRuleConfig, ::typeof(copysign), x::Real, y::Real)
+    copysign_pullback(Δ) = (NoTangent(), flipsign(flipsign(Δ, x), y), ZeroTangent())
+    return copysign(x, y), copysign_pullback
+end
+
 # Complex Numbers
 
 function ChainRulesCore.rrule(::ZygoteRuleConfig, T::Type{<:Complex}, r, i)
