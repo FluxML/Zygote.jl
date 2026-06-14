@@ -8,6 +8,6 @@ jobs:
     steps:
       - name: Create PR comment
         if: github.event_name == 'pull_request' && github.repository == github.event.pull_request.head.repo.full_name && github.event.label.name == 'documentation'
-        uses: thollander/actions-comment-pull-request@71efef56b184328c7ef1f213577c3a90edaa4aff
+        uses: thollander/actions-comment-pull-request@24bffb9b452ba05a4f3f77933840a6a841d1b32b
         with:
           message: 'Once the build has completed, you can preview any updated documentation at this URL: https://fluxml.ai/Zygote.jl/previews/PR${{ github.event.number }}/'
