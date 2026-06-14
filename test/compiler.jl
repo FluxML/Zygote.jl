@@ -1,5 +1,3 @@
-@testitem "compiler" begin
-
 using LinearAlgebra
 using Zygote: pullback, @adjoint, Context
 
@@ -340,14 +338,10 @@ end
     @test occursin("Can't differentiate function execution in catch block", string(err))
 end
 
-end
-
-@testitem "refresh" begin
+@testset "refresh" begin
   # https://github.com/FluxML/Zygote.jl/issues/1599
   # `Zygote.refresh()` must pick up an `rrule` defined *after* a gradient has
   # already been computed (and cached) for the same signature.
-  using ChainRulesCore
-
   function refresh1599(x::AbstractArray)
     y = similar(x)
     for i in eachindex(x)

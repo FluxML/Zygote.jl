@@ -1,4 +1,5 @@
-@testitem "gradcheck pt. 1" setup=[GradCheckSetup] begin
+include("gradcheck_testsetup.jl")
+using .GradCheckSetup
 
 using Random
 using LinearAlgebra
@@ -572,6 +573,4 @@ end
       @test first(back(randn(rng, M, P))) isa Vector
     end
   end
-end
-
 end

@@ -1,4 +1,5 @@
-@testitem "gradcheck pt. 2" setup=[GradCheckSetup] begin
+include("gradcheck_testsetup.jl")
+using .GradCheckSetup
 
 using Random
 using LinearAlgebra
@@ -571,6 +572,4 @@ end
       @test typeof(y) === typeof(y2)
     end
   end
-end
-
 end

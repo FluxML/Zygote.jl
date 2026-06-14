@@ -1,5 +1,3 @@
-@testitem "features" begin
-
 using Zygote, Test, LinearAlgebra
 using Zygote: Params, gradient, forwarddiff
 using FillArrays: Fill
@@ -896,6 +894,4 @@ end
   y2, g2 = withgradient(first∘f3, [1,2,3.0])
   y3, g3 = withgradient(f3, [1,2,3.0])
   @test g1[1] ≈ g2[1] ≈ g3[1]
-end
-
 end

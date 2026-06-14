@@ -1,5 +1,3 @@
-@testitem "complex" begin
-
 using LinearAlgebra
 
 @testset "basic" begin
@@ -142,6 +140,4 @@ end
     @test g1[1] ≈ g2[1]
     @test g1[2] ≈ g2[2]
     @test g1[3] ≈ g2[3]
-end
-
 end

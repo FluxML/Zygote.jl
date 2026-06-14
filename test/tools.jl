@@ -1,5 +1,3 @@
-@testitem "tools" begin
-
 @testset "Buffer" begin
   w = rand(2,3)
   b = rand(2)
@@ -62,7 +60,5 @@ end
 
   gs56 = gradient(f56, [1.0])
   @test gs56[1] == [0.]
-
-end
 
 end

@@ -1,5 +1,3 @@
-@testitem "interface" begin
-
 using Zygote: Grads
 
 @testset "Params" begin
@@ -270,7 +268,5 @@ end
     @test sgs[d.W] ≈ fill(1.f0, size(d.W))
     @test sgs[d.b] ≈ fill(1.f0, size(d.b))
   end
-
-end
 
 end
