@@ -55,6 +55,16 @@ include("profiler/Profile.jl")
 
 using InteractiveUtils
 
+# Clear Zygote's internal caches and force the pullback-generating `@generated`
+# functions to be re-run. This is needed to pick up `ChainRulesCore.rrule`s (or
+# `@adjoint`s) defined *after* a gradient has already been taken for the relevant
+# signature, since the cached generated code does not always get invalidated
+# (see https://github.com/FluxML/Zygote.jl/issues/1599).
+function refresh()
+  include(joinpath(@__DIR__, "compiler", "interface2.jl"))
+  return
+end
+
 macro profile(ex)
   @capture(ex, f_(x__)) || error("@profile f(args...)")
   quote

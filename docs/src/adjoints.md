@@ -130,7 +130,7 @@ julia> @adjoint width(p::Point) = p.x, x̄ -> (Point(x̄, 0),)
 
 julia> @adjoint height(p::Point) = p.y, ȳ -> (Point(0, ȳ),)
 
-julia> Zygote.refresh() # currently needed when defining new adjoints
+julia> Zygote.refresh() # needed when defining new adjoints or rrules for already-differentiated signatures
 
 julia> gradient(a -> height(a), Point(1, 2))
 (Point(0.0, 1.0),)
