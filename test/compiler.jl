@@ -218,6 +218,18 @@ end
     @test @inferred(gradient(usesmod, 1))[1] == 1.0 broken=VERSION >= v"1.12"
 end
 
+@testset "non-differentiable primitives error clearly" begin
+    # Regression: the callable pullback's non-differentiable branch referenced a
+    # stale argument name `j` (the generator stub names it `methodinstance`), so it
+    # leaked `UndefVarError: j` instead of a clear message. Introduced with the
+    # world-age generated-function rework; surfaced by #194, #252, #467, #619, #1156.
+    _, pb = Zygote._pullback(getglobal, Base.MathConstants, :eulergamma)
+    err = try; pb(1.0); nothing; catch e; e; end
+    @test err isa ErrorException
+    @test occursin("Non-differentiable function", err.msg)
+    @test !occursin("UndefVarError", err.msg)
+end
+
 # issue 897
 @test gradient(x -> sum(norm, collect(eachcol(x))), ones(3, 400))[1] ≈ fill(0.5773502691896258, 3, 400)
 

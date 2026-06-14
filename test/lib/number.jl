@@ -41,6 +41,19 @@
     @test gradient(x -> sum(x.^2), [0.0, 1.0]) == ([0.0, 2.0],)
   end
 
+  @testset "flipsign / copysign" begin
+    # Differentiable despite their bit-twiddling implementations: d/dx = ±1 (the
+    # sign copied from `y`), d/dy = 0. Without rules these hit a non-diff intrinsic.
+    for x in (0.8, -1.4), y in (2.3, -0.7)
+      @test gradient(flipsign, x, y)[1] == flipsign(1.0, y)
+      @test gradient(copysign, x, y)[1] == flipsign(1.0, x * y)
+      @test gradient(flipsign, x, y)[2] === nothing  # sign argument is non-differentiable
+      @test gradient(copysign, x, y)[2] === nothing
+    end
+    @test gradient(x -> flipsign(x, -3.0), 2.0) == (-1.0,)
+    @test gradient(x -> copysign(x, -3.0), 2.0) == (-1.0,)
+  end
+
   @testset "Complex numbers" begin
     @test gradient(imag, 3.0) == (0.0,)
     @test gradient(imag, 3.0 + 3.0im) == (0.0 + 1.0im,)
