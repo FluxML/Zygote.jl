@@ -18,11 +18,12 @@ julia --project=test -e 'using Pkg; Pkg.instantiate()'
 # Run the full test suite (CUDA tests auto-skip unless a GPU is present)
 julia --project=test test/runtests.jl
 
-# Run a single test item by name (regex match on @testitem name)
-julia --project=test -e 'using ReTestItems, Zygote; runtests(Zygote; name="compiler")'
+# Run specific test files by name (matched with `startswith`)
+julia --project=test test/runtests.jl compiler gradcheck
 
-# Run a single test file
-julia --project=test -e 'using ReTestItems; runtests("test/compiler_tests.jl")'
+# List all available tests, or limit parallelism
+julia --project=test test/runtests.jl --list
+julia --project=test test/runtests.jl --jobs=4
 
 # Build docs / run doctests
 julia --project=docs -e 'using Pkg; Pkg.develop(PackageSpec(path=pwd())); Pkg.instantiate()'
@@ -30,7 +31,7 @@ julia --project=docs docs/make.jl
 julia --project=docs -e 'using Documenter, Zygote; doctest(Zygote)'
 ```
 
-Tests use **ReTestItems**: each `test/*_tests.jl` is one `@testitem "<name>" begin ... end`. Item names (use these with `name=`): `compiler`, `chainrules`, `complex`, `features`, `interface`, `lib`, `structures`, `tools`, `utils`, `forward`, `deprecated`, `gradcheck pt. 1`–`4`, `cuda` (GPU-only), `pythoncall` (skipped). The `gradcheck pt. N` items depend on the shared `@testsetup module GradCheckSetup` in `test/gradcheck_testsetup.jl` (finite-difference gradient checking helpers: `gradcheck`, `gradtest`, `ngradient`).
+Tests use **ParallelTestRunner**: `test/runtests.jl` autodiscovers each `test/*.jl` file with `find_tests` and runs it as a plain script in an isolated subprocess. Test names are the file stems (use these as positional args, matched with `startswith`): `compiler`, `chainrules`, `complex`, `features`, `interface`, `lib`, `structures`, `tools`, `utils`, `forward`, `deprecated`, `gradcheck_p1`–`p4`, `cuda` (GPU-only), `python` (disabled by default). The `gradcheck_p*` files `include("gradcheck_testsetup.jl"); using .GradCheckSetup` for the shared finite-difference gradient checking helpers (`gradcheck`, `gradtest`, `ngradient`). Files that are not standalone tests — `gradcheck_testsetup.jl` and the `lib/` helpers included by `lib.jl` — are removed from the discovered testsuite in `runtests.jl`.
 
 Supported Julia: **1.10+** (`Project.toml` `compat`; the README's "1.6 onwards" is stale).
 
