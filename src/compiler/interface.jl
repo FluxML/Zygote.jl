@@ -49,6 +49,9 @@ tailmemaybe(x::Tuple) = unthunk_tangent(Base.tail(x))
     pullback(f, args...)
     pullback(f, ::Params)
 
+The `pullback(f, ::Params)` (implicit-parameter) form is **deprecated** and will be
+removed in a future release; use `pullback(f, args...)` with explicit arguments instead.
+
 Returns the value of the function `f` and a back-propagator function,
 which can be called to obtain a tuple containing `∂f/∂x` for each argument `x`,
 the derivative (for scalar `x`) or gradient.
@@ -194,7 +197,7 @@ julia> withgradient(3.0, 4.0) do x, y
 (val = (div = 0.75, mul = 12.0), grad = (0.25, -0.1875))
 ```
 
-Also supports implicit mode:
+Also supports implicit mode, which is **deprecated** (use the explicit form above):
 
 ```jldoctest; setup=:(using Zygote)
 julia> w = [3.0];
@@ -230,6 +233,10 @@ end
 Gradient with implicit parameters. Takes a zero-argument function,
 and returns a dictionary-like container, whose keys are arrays `x in ps`.
 
+!!! warning "Deprecated"
+    Implicit parameters are deprecated and will be removed in a future release.
+    Use the explicit-parameter API instead, e.g. `gradient(m -> loss(m), model)`.
+
 See also [`withgradient`](@ref) to keep the value `loss()`.
 
 ```jldoctest; setup=:(using Zygote)
@@ -256,6 +263,10 @@ gradient
 
 Container for implicit parameters, used when differentiating
 a zero-argument function `() -> loss(A, B)` with respect to `A, B`.
+
+!!! warning "Deprecated"
+    Implicit parameters are deprecated and will be removed in a future release.
+    Prefer the explicit-parameter API, e.g. `gradient(m -> loss(m), model)`.
 """
 struct Params{B <: Buffer}
   order::B
@@ -366,6 +377,10 @@ _maybe_unthunk(x) = x
 Dictionary-like container returned when taking gradients with
 respect to implicit parameters. For an array `W`, appearing
 within `Params([W, A, B...])`, the gradient is `g[W]`.
+
+!!! warning "Deprecated"
+    Implicit parameters (and the `Grads` object) are deprecated and will be
+    removed in a future release. Prefer the explicit-parameter API.
 """
 struct Grads
   grads::IdDict{Any,Any}
@@ -470,6 +485,16 @@ function _getformap(gs, p)
 end
 
 function pullback(f, ps::Params)
+  Base.depwarn("""
+    Implicit parameters are deprecated and will be removed in a future release.
+    This includes calling `gradient`, `withgradient`, `jacobian`, `withjacobian` or `pullback`
+    with a `Zygote.Params` argument (which returns a `Grads` object).
+    Switch to the explicit-parameter API instead, e.g. replace
+        gradient(() -> loss(model, x), Params(model))
+    with
+        gradient(m -> loss(m, x), model)
+    See https://fluxml.ai/Zygote.jl/ for details.
+    """, :pullback)
   cx = Context{true}(nothing)
   y, back = _pullback(cx, f)
   y, function (Δ)

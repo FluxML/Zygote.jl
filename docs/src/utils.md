@@ -38,6 +38,13 @@ Zygote.eager_update!
 
 ## Working with Grads
 
+!!! warning "Deprecated"
+    `Params` and `Grads` are part of the implicit-parameter interface, which is deprecated
+    and will be removed in a future release. Prefer differentiating with explicit arguments;
+    the gradient of a nested model is then an ordinary (named) tuple, which supports the same
+    map/broadcast/accumulate operations shown below via
+    [Functors.jl](https://github.com/FluxML/Functors.jl)/[Optimisers.jl](https://github.com/FluxML/Optimisers.jl).
+
 Map, broadcast, and iteration are supported for the dictionary-like `Grads` objects.
 These operations are value based and preserve the keys.
 

@@ -219,6 +219,10 @@ _gradcopy!(dst::AbstractArray, src::AbstractArray) = copyto!(dst, g isa Number ?
 Like [`gradient`](@ref) with implicit parameters, this method takes a zero-argument function
 and returns an `IdDict`-like object, now containing the Jacobian for each parameter.
 
+!!! warning "Deprecated"
+    Implicit parameters are deprecated and will be removed in a future release.
+    Use the explicit form `jacobian(f, args...)` instead.
+
 # Examples
 ```jldoctest; setup=:(using Zygote)
 julia> xs = [1 2; 3 4]; ys = [5,7,9];

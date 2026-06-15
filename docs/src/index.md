@@ -129,9 +129,9 @@ julia> gradient(colordiff, RGB(1, 0, 0), RGB(0, 1, 0))
 ((r = 0.4590887719632896, g = -9.598786801605689, b = 14.181383399012862), (r = -1.7697549557037275, g = 28.88472330558805, b = -0.044793892637761346))
 ```
 
-## Explicit and Implicit Parameters
+## Differentiating Models
 
-It's easy to work with even very large and complex models, and there are few ways to do this. Autograd-style models pass around a collection of weights. Depending on how you write your model, there are multiple ways to *explicitly* take gradients with respect to parameters. For example, the function `linear` accepts the parameters as an argument to the model. So, we directly pass in the parameters, `θ`, as an argument to the function being differentiated.
+It's easy to work with even very large and complex models, and there are few ways to do this. Autograd-style models pass around a collection of weights. Depending on how you write your model, there are multiple ways to take gradients with respect to parameters. For example, the function `linear` accepts the parameters as an argument to the model. So, we directly pass in the parameters, `θ`, as an argument to the function being differentiated.
 
 ```@docs
 gradient(f, args...)
@@ -178,11 +178,17 @@ julia> dmodel = gradient(model -> sum(model(x)), model)[1]
 (W = [0.652543 … 0.683588], b = [1.0, 1.0])
 ```
 
-Zygote also supports another way to take gradients, via *implicit parameters*. Here the loss function takes zero arguments, but the variables of interest are indicated by a special `Params` object. The function `linear` which depends on `W` and `b` is executed when the loss function `() -> sum(linear(x))` is called, and hence this dependence is visible to Zygote:
+## [Deprecated] Implicit Parameters
 
-```@docs
-gradient
-```
+Zygote also supports another way to take gradients, via *implicit parameters*.
+
+!!! warning "Deprecated"
+    The implicit-parameter interface (`Params`/`Grads`) is deprecated and will be removed
+    in a future release. Prefer the explicit style shown above. Calling `gradient`,
+    `withgradient`, `jacobian` or `pullback` with a `Params` argument now emits a
+    deprecation warning (visible when running Julia with `--depwarn=yes`).
+
+Here the loss function takes zero arguments, but the variables of interest are indicated by a special `Params` object. The function `linear` which depends on `W` and `b` is executed when the loss function `() -> sum(linear(x))` is called, and hence this dependence is visible to Zygote:
 
 ```julia
 julia> W = rand(2, 5); b = rand(2);
@@ -199,4 +205,4 @@ julia> grads[W], grads[b] # access gradients using arrays as keys
 
 Here `grads` is a dictionary-like object, whose keys are the same parameters we indicated in `Params`. (In fact it wraps a dictionary using `objectid(W)` as keys, which does not change if the values in `W` are mutated).
 
-This implicit style is the one presently used by [Flux.jl](https://github.com/FluxML/Flux.jl), a closely related machine learning library. It uses structs like `Linear` above to define layers, and the function `Flux.params(model)` returns a `Params` object containing all the parameters of all layers. See [its documentation](https://fluxml.ai/Flux.jl/stable/models/basics/) for more details. When using Zygote for most other purposes, however, the explicit style is usually preferred.
+This implicit style was historically used by [Flux.jl](https://github.com/FluxML/Flux.jl), a closely related machine learning library, where `Flux.params(model)` returned a `Params` object containing all the parameters of all layers. Flux has since moved to the explicit style (differentiating a model passed as an argument), which is recommended for all new code; the implicit interface shown here is deprecated.

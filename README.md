@@ -56,18 +56,23 @@ julia> function ChainRulesCore.rrule(::typeof(add), a, b)
        end
 ```
 
-To support large machine learning models with many parameters, Zygote can differentiate implicitly-used parameters, as opposed to just function arguments.
+To support large machine learning models with many parameters, Zygote can differentiate
+whole models with respect to their (possibly nested) structure of parameters, by passing
+them explicitly as arguments.
 
 ```julia
-julia> W, b = rand(2, 3), rand(2);
+julia> using Zygote
 
-julia> predict(x) = W*x .+ b;
+julia> model = (W = rand(2, 3), b = rand(2));
 
-julia> g = gradient(Params([W, b])) do
-         sum(predict([1,2,3]))
-       end
-Grads(...)
+julia> predict(model, x) = model.W * x .+ model.b;
 
-julia> g[W], g[b]
-([1.0 2.0 3.0; 1.0 2.0 3.0], [1.0, 1.0])
+julia> g = gradient(m -> sum(predict(m, [1, 2, 3])), model)[1]
+(W = [1.0 2.0 3.0; 1.0 2.0 3.0], b = [1.0, 1.0])
 ```
+
+> [!WARNING]
+> Zygote also has a legacy *implicit-parameters* interface, in which the parameters of
+> interest are collected in a `Zygote.Params` object and the gradients returned in a
+> dictionary-like `Grads` object. This interface is **deprecated** and will be removed in a
+> future release; use the explicit style shown above instead.
