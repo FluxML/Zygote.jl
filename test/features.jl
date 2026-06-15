@@ -755,6 +755,19 @@ end
   end[1] == Dict(1 => Fill(5, 1), 2 => Fill(1, 1))
 end
 
+@testset "range adjoints (#954)" begin
+  # ChainRules marks `(:)` non-differentiable, which silently dropped the gradient
+  # w.r.t. the endpoints of a real range. The endpoints carry a genuine gradient.
+  @test gradient(x -> (x:3)[1], 1.2) == (1.0,)
+  @test gradient(x -> (x:3)[end], 1.2) == (1.0,)
+  @test gradient(x -> sum(x:0.5:3), 1.0) == (5.0,)
+  # start:step:stop  ->  r[i] = start + (i-1)*step
+  @test gradient((a, s) -> (a:s:10)[3], 1.0, 2.0) == (1.0, 2.0)
+  @test gradient(x -> sum(abs2, x:0.7:5.0), 1.0)[1] ≈ 33.0
+  # integer ranges used for indexing/iteration still behave
+  @test gradient(x -> sum(x[1:2]), [1.0, 2.0, 3.0]) == ([1.0, 1.0, 0.0],)
+end
+
 @testset "tricky broadcasting" begin
   @test gradient(x -> sum(x .+ ones(2,2)), (1,2)) == ((2,2),)
   @test gradient(x -> sum(x .+ ones(2,2)), (1,)) == ((4,),)
