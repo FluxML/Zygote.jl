@@ -113,6 +113,16 @@ end
   @test collect(gradient(f, cu(ComplexF32[0.0 + 0.0im]))[1]) == ComplexF32[0.0 + 0.0im]
   ca = ComplexF32[3.0 + 4.0im, 0.0 + 0.0im, -1.0 + 0.0im]
   @test collect(gradient(f, cu(ca))[1]) ≈ gradient(f, ca)[1]
+
+  # https://github.com/FluxML/Zygote.jl/issues/1498 : `sum(f, x)` over a GPU
+  # array *wrapper* (here a logical `view`) used to scalar-index, because the
+  # fast forward-mode rule only matched bare `AbstractGPUArray`s.
+  let X = randn(Float32, 16, 16), iso = rand(Bool, 16, 16)
+    h(x, m) = sum(z -> abs2(1 - z), view(x, m))
+    g_gpu = gradient(x -> h(x, cu(iso)), cu(X))[1]
+    @test g_gpu isa CuArray
+    @test collect(g_gpu) ≈ gradient(x -> h(x, iso), X)[1]
+  end
 end
 
 @testset "jacobian" begin
