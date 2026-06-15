@@ -741,7 +741,7 @@ end
 @adjoint function sort(x::AbstractArray; kws...)
   p = sortperm(x; kws...)
   function sort_pullback(ȳ)
-    x̄ = zero(x)
+    x̄ = zero(ȳ)
     x̄[p] = ȳ
     return (x̄,)
   end
