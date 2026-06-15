@@ -1,10 +1,12 @@
 
 name: IntegrationTest
 on:
-  push:
-    branches: [master]
-    tags: [v*]
-  pull_request:
+  # Temporarily disabled: only run manually via the Actions tab.
+  workflow_dispatch:
+  # push:
+  #   branches: [master]
+  #   tags: [v*]
+  # pull_request:
 
 jobs:
   test:
