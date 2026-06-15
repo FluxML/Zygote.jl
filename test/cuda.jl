@@ -1,5 +1,7 @@
 using LinearAlgebra
+using SparseArrays
 using CUDA
+using CUDA.CUSPARSE: CuSparseMatrixCSC
 using Zygote: Grads
 using Random: randn!
 import FiniteDifferences
@@ -222,4 +224,26 @@ end
     @test gradcheck_gpu(x->sum(imag, x.^2 .+ abs.(sinh.(conj.(x)))), ygpu)
 
 
+end
+
+@testset "sparse projection" begin
+  # https://github.com/FluxML/Zygote.jl/issues/1313 : the gradient w.r.t. a
+  # `CuSparseMatrixCSC` must stay sparse (with the primal's pattern) and match
+  # the CPU sparse path, instead of coming back dense.
+  M = sprand(10, 10, 0.3)
+  x = randn(10)
+  g_cpu = gradient(M -> sum((M*x).^2), M)[1]
+  @test g_cpu isa SparseMatrixCSC
+
+  Mg = CuSparseMatrixCSC(Float32.(M))
+  xg = cu(Float32.(x))
+  g_gpu = gradient(M -> sum((M*xg).^2), Mg)[1]
+  @test g_gpu isa CuSparseMatrixCSC{Float32}
+  @test collect(g_gpu.colPtr) == M.colptr
+  @test collect(g_gpu.rowVal) == M.rowval
+  @test collect(g_gpu.nzVal) ≈ Float32.(g_cpu.nzval)
+
+  # the result must support sparsity-preserving updates (the original bug was an
+  # exception in `update!` because the gradient was dense)
+  @test Mg - 0.1f0 * g_gpu isa CuSparseMatrixCSC
 end
