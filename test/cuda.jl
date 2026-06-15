@@ -83,6 +83,14 @@ end
   g3_gpu = gradient(f3, a_gpu')[1]
   @test g3_gpu isa Adjoint{Float32, <:CuArray{Float32, 1}}  # preserves structure
   @test g3_gpu |> collect ≈ g3
+
+  # https://github.com/FluxML/Zygote.jl/issues/1529 : `sum(abs, x)` on the GPU
+  # goes through the forward-mode broadcast; at a zero input ForwardDiff used to
+  # give 1 (real) / NaN (complex via `hypot`) instead of the CPU's 0.
+  @test collect(gradient(f, cu(Float32[0.0]))[1]) == Float32[0.0]
+  @test collect(gradient(f, cu(ComplexF32[0.0 + 0.0im]))[1]) == ComplexF32[0.0 + 0.0im]
+  ca = ComplexF32[3.0 + 4.0im, 0.0 + 0.0im, -1.0 + 0.0im]
+  @test collect(gradient(f, cu(ca))[1]) ≈ gradient(f, ca)[1]
 end
 
 @testset "jacobian" begin
