@@ -1,15 +1,17 @@
 name: Downgrade
 on:
-  pull_request:
-    branches:
-      - master
-    paths-ignore:
-      - 'docs/**'
-  push:
-    branches:
-      - master
-    paths-ignore:
-      - 'docs/**'
+  # Temporarily disabled: only run manually via the Actions tab.
+  workflow_dispatch:
+  # pull_request:
+  #   branches:
+  #     - master
+  #   paths-ignore:
+  #     - 'docs/**'
+  # push:
+  #   branches:
+  #     - master
+  #   paths-ignore:
+  #     - 'docs/**'
 jobs:
   test:
     runs-on: ubuntu-latest
