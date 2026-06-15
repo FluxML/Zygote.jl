@@ -316,15 +316,55 @@ end
 end
 
 
+# Does this (possibly nested) type contain a `ForwardDiff.Dual` anywhere?
+_has_dual(::Type{<:Dual}) = true
+_has_dual(::Type{<:Complex{<:Dual}}) = true
+_has_dual(::Type{T}) where {T<:Tuple} = any(_has_dual, fieldtypes(T))
+_has_dual(::Type) = false
+
+# Recursively strip `ForwardDiff.Dual` values from a broadcast output element,
+# descending into `Tuple`s (e.g. the result of `broadcast(tuple, x, y)`).
+@inline _strip_dual(x::Dual) = value(x)
+@inline _strip_dual(x::Complex{<:Dual}) = Complex(value(real(x)), value(imag(x)))
+@inline _strip_dual(x::Tuple) = map(_strip_dual, x)
+
+# Contract an incoming cotangent element `ȳ1` with the partials of the output
+# element `o1` w.r.t. the i-th broadcast argument, descending into `Tuple`s.
+@inline _dual_partial(ȳ1, o1::Dual, i) = ȳ1 * partials(o1, i)
+@inline _dual_partial(ȳ1::Tuple, o1::Tuple, i) = mapreduce((y1, p1) -> _dual_partial(y1, p1, i), +, ȳ1, o1)
+@inline _dual_partial(::Nothing, o1, i) = false  # missing cotangent component → zero contribution
+
 @inline function broadcast_forward(f, args::Vararg{Any,N}) where N
   out = dual_function(f).(args...)
   T = eltype(out)
-  T <: Union{Dual, Complex{<:Dual}} || return (out, _ -> nothing)
-  if any(eltype(a) <: Complex for a in args)
-    _broadcast_forward_complex(T, out, args...)
+  if T <: Union{Dual, Complex{<:Dual}}
+    if any(eltype(a) <: Complex for a in args)
+      return _broadcast_forward_complex(T, out, args...)
+    else
+      return _broadcast_forward(T, out, args...)
+    end
+  elseif _has_dual(T)
+    # The output element is a `Tuple` (possibly nested) of `Dual`s, as produced by
+    # e.g. `broadcast(tuple, x, y)`. Strip the `Dual`s from the returned value and
+    # contract the partials in the pullback, rather than leaking `Dual`s to the
+    # caller and returning a `nothing` gradient. See FluxML/Zygote.jl#1424.
+    return _broadcast_forward_tuple(out, args...)
   else
-    _broadcast_forward(T, out, args...)
+    return (out, _ -> nothing)
   end
+end
+
+# Real input, `Tuple`-of-`Dual` output (e.g. `broadcast(tuple, x, y)`).
+@inline function _broadcast_forward_tuple(out, args::Vararg{Any, N}) where {N}
+  valN = Val(N)
+  y = broadcast(_strip_dual, out)
+  function bc_fwd_back(ȳ)
+    dargs = ntuple(valN) do i
+      unbroadcast(args[i], broadcast((ȳ1, o1) -> _dual_partial(ȳ1, o1, i), ȳ, out))
+    end
+    (nothing, nothing, dargs...) # nothings for broadcasted & f
+  end
+  return y, bc_fwd_back
 end
 
 # Real input and real output pullback

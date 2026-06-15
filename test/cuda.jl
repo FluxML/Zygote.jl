@@ -60,6 +60,22 @@ end
   @test gradient(x -> sum(exp.(x)), Diagonal(a_gpu))[1] isa Diagonal
   # non-differentiables
   @test gradient((x,y) -> sum(x.^2 .+ y'), a_gpu, a_gpu .> 0)[2] === nothing
+
+  # https://github.com/FluxML/Zygote.jl/issues/1424 : a broadcast whose output
+  # element is a Tuple (here `tuple.(x, y)`) must not leak ForwardDiff `Dual`s
+  # into the primal, and its pullback must not be `nothing`.
+  let x = cu(Float32[1, 2, 3]), y = cu(Float32[4, 5, 6])
+    f(x, y) = broadcast(tuple, x, y)
+    o, back = pullback(f, x, y)
+    @test eltype(o) == Tuple{Float32,Float32}
+    @test collect(o) == collect(broadcast(tuple, x, y))
+    gx, gy = back(o)
+    oc, backc = pullback(f, collect(x), collect(y))
+    gxc, gyc = backc(oc)
+    @test gx isa CuArray && gy isa CuArray
+    @test collect(gx) ≈ gxc
+    @test collect(gy) ≈ gyc
+  end
 end
 
 @testset "sum(f, x)" begin
