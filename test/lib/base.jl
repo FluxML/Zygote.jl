@@ -19,6 +19,28 @@
         @test first(g_hard) isa Diagonal
     end
 
+    @testset "Dict get" begin
+        # https://github.com/FluxML/Zygote.jl/issues/1610
+        d = Dict(:a => 2.0, :b => 3.0)
+
+        # get(d, k, default)
+        @test gradient(d -> get(d, :a, 0.0), d)[1] == Dict(:a => 1.0)
+        g = gradient((d, def) -> get(d, :missing, def), d, 10.0)
+        @test g[1] === nothing
+        @test g[2] == 1.0
+
+        # get(default, d, k) -- the do-block form
+        hit = Ref(false)
+        @test gradient(d -> get(() -> (hit[] = true; 0.0), d, :a), d)[1] == Dict(:a => 1.0)
+        @test hit[] == false  # default is not evaluated when the key is present
+        @test gradient(y -> get(() -> 2y, d, :missing), 5.0)[1] == 2.0
+
+        # value-typed (array) gradients route through the dict
+        da = Dict(:x => ones(3))
+        @test gradient(d -> sum(get(d, :x, zeros(3))), da)[1] == Dict(:x => ones(3))
+        @test gradient(d -> sum(get(() -> zeros(3), d, :x)), da)[1] == Dict(:x => ones(3))
+    end
+
     @testset "Dict iteration" begin
         # https://github.com/FluxML/Zygote.jl/issues/1065
         function sumkv(d)

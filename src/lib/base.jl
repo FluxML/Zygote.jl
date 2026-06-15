@@ -52,6 +52,41 @@ end
   val, dict_getindex_pullback
 end
 
+# `get(d, k, default)`: routes the gradient back into the dict when the key is
+# present, and into `default` otherwise. Without this rule Zygote would try to
+# differentiate `Base.get`'s implementation, which reaches into `Dict` internals.
+@adjoint function get(d::AbstractDict, k, default)
+  if haskey(d, k)
+    val = d[k]
+    return val, function (Δ)
+      accum_param(__context__, val, Δ) === nothing && return
+      grad = grad_mut(__context__, d)
+      grad[k] = accum(get(grad, k, nothing), Δ)
+      return (grad, nothing, nothing)
+    end
+  else
+    return default, Δ -> (nothing, nothing, Δ)
+  end
+end
+
+# `get(default, d, k)` (the do-block form): like above, but `default` is a
+# callable that is only evaluated -- and only differentiated through -- when the
+# key is missing. See https://github.com/FluxML/Zygote.jl/issues/1610
+@adjoint function get(default::Base.Callable, d::AbstractDict, k)
+  if haskey(d, k)
+    val = d[k]
+    return val, function (Δ)
+      accum_param(__context__, val, Δ) === nothing && return
+      grad = grad_mut(__context__, d)
+      grad[k] = accum(get(grad, k, nothing), Δ)
+      return (nothing, grad, nothing)
+    end
+  else
+    y, back = _pullback(__context__, default)
+    return y, Δ -> (back(Δ)[1], nothing, nothing)
+  end
+end
+
 @adjoint! function setindex!(d::AbstractDict, v, k)
   setindex!(d, v, k), function (_)
     Δ = get(grad_mut(__context__, d), k, nothing)
