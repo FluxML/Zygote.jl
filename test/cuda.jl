@@ -23,9 +23,13 @@ end
   @test gradient((x,cy) -> sum(cu(x) * cy) + sum(cy'), r, cu(r))[2] isa CUDA.CuArray
   @test_skip gradient((x,cy) -> sum(cu(x[:,1])' * cy), r, cu(r))[2] isa CUDA.CuArray # generic_matmatmul!
 
-  # Other direction:
-  @test_skip gradient(x -> sum(Array(x)), cu(r))[1] isa CUDA.CuArray
-  @test_skip gradient((x,cy) -> sum(x * Array(cy)) + sum(cy'), r, cu(r))[2] isa CUDA.CuArray
+  # Other direction: https://github.com/FluxML/Zygote.jl/issues/1305 — `Array`/
+  # `collect` move a GPU array to the host, so their pullback must move the
+  # cotangent back to the device instead of leaving it a CPU array.
+  @test gradient(x -> sum(Array(x)), cu(r))[1] isa CUDA.CuArray
+  @test gradient(x -> sum(collect(x)), cu(r))[1] isa CUDA.CuArray
+  @test gradient((x,cy) -> sum(x * Array(cy)) + sum(cy'), r, cu(r))[2] isa CUDA.CuArray
+  @test collect(gradient(x -> sum(abs2, Array(x)), cu(r))[1]) ≈ gradient(x -> sum(abs2, Array(x)), r)[1]
 end
 
 @testset "broadcasting" begin
