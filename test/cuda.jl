@@ -226,6 +226,23 @@ end
 
 end
 
+@testset "sort" begin
+  # https://github.com/FluxML/Zygote.jl/issues/1499 : `sort` with the `dims`
+  # keyword on a CuArray used to error (`llvmcall` requires the compiler) because
+  # Zygote differentiated through the GPU sort kernel. The pullback now scatters
+  # through the sorting permutation instead.
+  x = cu(rand(Float32, 4))
+  @test gradient(x -> sum(sort(x)), x)[1] isa CuArray
+  @test collect(gradient(x -> sum(abs2, sort(x)), x)[1]) ≈ gradient(x -> sum(abs2, sort(x)), collect(x))[1]
+
+  X = rand(Float32, 3, 4)
+  @test gradient(x -> sum(sort(x, dims=1)), cu(X))[1] isa CuArray
+  for dims in (1, 2)
+    @test collect(gradient(x -> sum(abs2, sort(x; dims)), cu(X))[1]) ≈
+          gradient(x -> sum(abs2, sort(x; dims)), X)[1]
+  end
+end
+
 @testset "sparse projection" begin
   # https://github.com/FluxML/Zygote.jl/issues/1313 : the gradient w.r.t. a
   # `CuSparseMatrixCSC` must stay sparse (with the primal's pattern) and match

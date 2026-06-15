@@ -733,6 +733,21 @@ end
   return Fill(y, size(r)), back
 end
 
+# `sort` is a pure permutation of its input, so its pullback scatters the
+# cotangent back through the sorting permutation. Computing it via `sortperm`
+# (rather than differentiating the sort algorithm) keeps this GPU-friendly and
+# adds support for the `dims` keyword, which ChainRules' 1-D `sort` rrule lacks.
+# See #1499 (`sum(sort(x; dims=1))` on a CuArray previously errored).
+@adjoint function sort(x::AbstractArray; kws...)
+  p = sortperm(x; kws...)
+  function sort_pullback(ȳ)
+    x̄ = zero(x)
+    x̄[p] = ȳ
+    return (x̄,)
+  end
+  return x[p], sort_pullback
+end
+
 # Sorted search
 # =============
 
