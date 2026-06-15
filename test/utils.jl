@@ -1,5 +1,3 @@
-@testitem "utils" begin
-
 using ForwardDiff
 using LinearAlgebra
 using Zygote: hessian_dual, hessian_reverse
@@ -136,6 +134,4 @@ using ForwardDiff
   @test ForwardDiff.gradient(y->gradf1218(x,y), y) == ones(5)
   # this returns (nothing,) -- now prints a warning
   @test_broken Zygote.gradient(y->gradf1218(x,y), y) == ones(5)
-end
-
 end

@@ -1,5 +1,3 @@
-@testitem "chainrules" begin
-
 using ChainRulesCore
 using ChainRulesTestUtils
 using Zygote: ZygoteRuleConfig
@@ -454,6 +452,4 @@ end
     g = gradient(layers -> sum(layers[1](x)), layers)[1]
     @test g[1] isa NamedTuple
     @test g[1].w isa Array
-end
-
 end

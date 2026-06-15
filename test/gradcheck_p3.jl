@@ -1,4 +1,5 @@
-@testitem "gradcheck pt. 3" setup=[GradCheckSetup] begin
+include("gradcheck_testsetup.jl")
+using .GradCheckSetup
 
 using Random
 using LinearAlgebra
@@ -440,7 +441,5 @@ end
       buf[:] = x
       sum(copy(buf[1:2]))
   end == ([1,1],)
-
-end
 
 end

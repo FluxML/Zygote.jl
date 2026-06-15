@@ -1,4 +1,4 @@
-@testsetup module GradCheckSetup
+module GradCheckSetup
 
 export ngradient, gradcheck, gradtest, _splitreim, _joinreim, _dropimaggrad
 export _randmatunitary, _randmatseries, realdomainrange, cat_test, test_log1pexp

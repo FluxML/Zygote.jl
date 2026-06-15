@@ -1,5 +1,3 @@
-@testitem "structures" begin
-
 using Zygote: bufferfrom
 using Base.Threads: @spawn
 
@@ -98,6 +96,4 @@ end
     end
 
     @test gradient(threads2, [1, 2, 3, 4]) == ([1, 1, 1, 1],)
-end
-
 end

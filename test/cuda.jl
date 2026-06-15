@@ -1,5 +1,3 @@
-@testitem "cuda" begin
-
 using LinearAlgebra
 using CUDA
 using Zygote: Grads
@@ -199,7 +197,5 @@ end
     # These check _broadcast_forward_complex(::Type{<:Dual}, ...)
     @test gradcheck_gpu(x->sum(imag, x.^2 .+ abs.(sinh.(conj.(x)))), ygpu)
 
-
-end
 
 end
