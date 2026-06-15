@@ -1,6 +1,6 @@
 name = "Zygote"
 uuid = "e88e6eb3-aa80-5325-afca-941959d7151f"
-version = "0.7.11"
+version = "0.7.12"
 
 [workspace]
 projects = ["test", "docs"]
@@ -50,7 +50,7 @@ Distances = "0.10"
 FillArrays = "1"
 ForwardDiff = "0.10.36, 1"
 GPUArraysCore = "0.2"
-IRTools = "0.4.12"
+IRTools = "0.4.16"
 LogExpFunctions = "0.3.29, 1"
 MacroTools = "0.5.10"
 NaNMath = "1"

@@ -723,6 +723,28 @@ end
   # https://github.com/FluxML/Zygote.jl/issues/731
   f731(x) = sum([x' * x, x...])
   @test_broken gradient(f731, ones(3)) # MethodError: no method matching +(::Tuple{Float64, Float64, Float64}, ::Vector{Float64})
+
+  # https://github.com/FluxML/Zygote.jl/issues/1198
+  # Loop-carried variables that permute every iteration (a swap or rotation)
+  # used to drop the gradient (silent `nothing`): the adjoint loop swaps two
+  # block arguments per iteration, which was mis-lowered as a non-parallel copy.
+  function swap1198(x)
+    a, b = x, 2x
+    for _ in 1:3
+      a, b = b, a
+    end
+    return a
+  end
+  @test gradient(swap1198, 1.0) == (2.0,)  # 3 swaps of (x, 2x) -> returns 2x
+
+  function rotate1198(x)
+    v0, v1, v2 = x, 2x, 3x
+    for _ in 1:4
+      v0, v1, v2 = v1, v2, v0
+    end
+    return v0
+  end
+  @test gradient(rotate1198, 1.0) == (2.0,)  # 4 rotations -> v0 holds 2x
 end
 
 @testset "accumulation" begin
