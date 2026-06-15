@@ -192,7 +192,7 @@ end
   @test gradient(p -> sum(collect(p*i for i in Iterators.take(p*[1.0, 2.0, 3.0], 2))), 2.0) == (12.0,)
   # generator 0-d behavior handled incorrectly
   @test_broken gradient(p -> sum(collect(p*i for i in 1.0)), 2.0)
-  @test gradient(p -> sum(collect(p*i for i in fill(1.0))), 2.0)[1] == 1.0  broken=VERSION<v"1.12"
+  @test gradient(p -> sum(collect(p*i for i in fill(1.0))), 2.0)[1] == 1.0
   
   # adjoints for iterators
   @test gradient(x -> sum(collect(Iterators.take([x*i for i in 1:5], 4))), 1.0) == (10.0,)
