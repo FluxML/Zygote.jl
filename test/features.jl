@@ -747,6 +747,17 @@ end
   @test gradient(rotate1198, 1.0) == (2.0,)  # 4 rotations -> v0 holds 2x
 end
 
+@testset "range (#550, #1120)" begin
+  # `range(start, stop; length)` builds a StepRangeLen with no constructor adjoint.
+  @test gradient(x -> sum(range(1.0, x, length=3)), 2.0)[1] ≈ 1.5
+  @test gradient(x -> sum(range(1, x, length=3)), 2.0)[1] ≈ 1.5          # integer start
+  @test gradient(s -> sum(range(s, 5.0, length=4)), 1.0)[1] ≈ 2.0        # wrt start
+  @test gradient(x -> sum(range(1.0, x, 3)), 2.0)[1] ≈ 1.5               # 3-arg positional
+  @test gradient((a, b) -> sum(range(a, b, length=5)), 0.0, 1.0)[1] ≈ 2.5
+  # weighted, checked numerically: sum(abs2, range(0,x,len=5)) = 1.875 x², d/dx = 3.75x
+  @test gradient(x -> sum(abs2, range(0.0, x, length=5)), 2.0)[1] ≈ 7.5
+end
+
 @testset "accumulation" begin
   # from https://github.com/FluxML/Zygote.jl/issues/905
   function net(x1)
