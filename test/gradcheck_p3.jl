@@ -176,6 +176,21 @@ end
   @test gradient(x -> hvcat((2,2),1,2,3,x)[4], 4.0) == (1.0,)
 end
 
+@testset "typed_hcat / typed_vcat / typed_hvcat / hvncat (#1413, #1572)" begin
+  # Typed array literals: Float32[...] -> typed_hcat / typed_hvcat / typed_vcat
+  @test gradient(x -> sum(Float32[1 0 0 x[1]]), [2.0f0])[1] == Float32[1]      # typed_hcat
+  @test gradient(x -> sum(Float32[1 0; 0 x[1]]), [2.0f0])[1] == Float32[1]     # typed_hvcat
+  @test gradient(x -> sum(Float64[x[1]; x[2]; 5]), [1.0, 2.0])[1] == [1, 1]    # typed_vcat
+  @test gradient(x -> sum(Float32[x[1] x[2] x[1]]), [3f0, 4f0])[1] == Float32[2, 1]  # x[1] used twice
+  # `;;` / `;;;` n-dimensional concatenation -> hvncat
+  @test gradient(x -> sum([x ;; 1.0]), 2.0) == (1.0,)
+  @test gradient(x -> sum([x ;;; 5.0]), 2.0) == (1.0,)
+  @test gradient(x -> sum([1.0, 2.0] .* [x ;; 2x]), 3.0) == (9.0,)
+  let b = rand(2)
+    @test gradtest(x -> [x ;; b], rand(2))
+  end
+end
+
 @testset "cat(..., dims = $dim)" for dim in 1:5
   catdim = (x...) -> cat(x..., dims = dim)
   @test gradtest(catdim, rand(5), rand(5))
