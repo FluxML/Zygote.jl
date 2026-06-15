@@ -471,3 +471,21 @@ using GPUArraysCore  # replaces @require CUDA block, weird indenting to preserve
   end
 
   pull_block_vert(sz, Δ::AbstractGPUArray, A::Number) = @allowscalar Δ[sz]
+
+  # `forward_jacobian` (used by `hessian`/`diaghessian`) seeds ForwardDiff `Dual`s
+  # with `map(x, reshape(1:length(x), ...))` and extracts their partials with a
+  # scalar `getindex` loop. Both scalar-index a GPU array (`hessian` on a CuArray
+  # errored, #1348, #1312). Reimplement them with device broadcasts/maps.
+  _seed_dual(x, i, offset, ::Val{N}) where {N} =
+    ForwardDiff.Dual(x, ntuple(j -> j + offset == i, Val(N)))
+  seed(x::AbstractGPUArray, ::Val{N}, offset = 0) where {N} =
+    _seed_dual.(x, LinearIndices(x), offset, Val(N))
+
+  function extract(xs::AbstractGPUArray{ForwardDiff.Dual{T,V,N}}) where {T,V,N}
+    values = map(ForwardDiff.value, xs)
+    J = similar(xs, V, N, length(xs))
+    for j in 1:N
+      J[j, :] = vec(map(d -> ForwardDiff.partials(d, j), xs))
+    end
+    return values, J
+  end
