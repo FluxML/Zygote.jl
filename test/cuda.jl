@@ -226,6 +226,18 @@ end
 
 end
 
+@testset "accum structured + GPU" begin
+  # https://github.com/FluxML/Zygote.jl/issues/1512 : the `tr` adjoint returns a
+  # host-backed `Diagonal{<:Fill}` cotangent; accumulating it against the dense
+  # GPU cotangent from `sum(abs2, x)` used to broadcast on the host and
+  # scalar-index the GPU array.
+  for x0 in (CUDA.zeros(Float32, 2, 2), cu(rand(Float32, 3, 3)))
+    g = gradient(x -> sum(abs2, x) - tr(x), x0)[1]
+    @test g isa CuArray
+    @test collect(g) ≈ gradient(x -> sum(abs2, x) - tr(x), collect(x0))[1]
+  end
+end
+
 @testset "sparse projection" begin
   # https://github.com/FluxML/Zygote.jl/issues/1313 : the gradient w.r.t. a
   # `CuSparseMatrixCSC` must stay sparse (with the primal's pattern) and match
