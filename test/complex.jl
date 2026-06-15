@@ -119,6 +119,18 @@ end
     @test Zygote.hessian(fun, collect(1:9)) ≈ [14 0 0 0 0 0 2 0 0; 0 16 0 0 0 0 0 4 0; 0 0 18 0 0 0 0 0 6; 0 0 0 14 0 0 8 0 0; 0 0 0 0 16 0 0 10 0; 0 0 0 0 0 18 0 0 12; 2 0 0 8 0 0 0 0 0; 0 4 0 0 10 0 0 0 0; 0 0 6 0 0 12 0 0 0]
 end
 
+# https://github.com/FluxML/Zygote.jl/issues/1529
+@testset "issue #1529 broadcasted abs at the origin" begin
+    # `abs` is non-differentiable at 0; the forward-mode broadcast path must use
+    # the ChainRules subgradient (0) rather than ForwardDiff's 1 (real) / NaN
+    # (complex via `hypot`). This keeps `abs.(x)` consistent with `sum(abs, x)`.
+    @test gradient(x -> sum(abs.(x)), Float32[0.0])[1] == Float32[0.0]
+    @test gradient(x -> sum(abs.(x)), ComplexF32[0.0 + 0.0im])[1] == ComplexF32[0.0 + 0.0im]
+    # away from the origin the gradient is unchanged
+    @test gradient(x -> sum(abs.(x)), Float32[3.0, -2.0])[1] == Float32[1.0, -1.0]
+    @test gradient(x -> sum(abs.(x)), ComplexF32[3.0 + 4.0im])[1] ≈ ComplexF32[0.6 + 0.8im]
+end
+
 @testset "issue #1601 mixed complex/real broadcast" begin
     cpx(l, x) = real(l) + x
     f(x) = sum(@. real(cpx(im + x, x)))

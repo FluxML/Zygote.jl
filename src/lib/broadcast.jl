@@ -294,6 +294,27 @@ end
     end
   end
 
+# `abs` is non-differentiable at the origin. ForwardDiff/DiffRules pick the
+# subgradient `1` there for real inputs, and produce `NaN` for complex inputs
+# (`abs(z) == hypot(re, im)`, whose derivative is `0/0` at the origin). Both
+# disagree with the ChainRules convention used everywhere else in Zygote, which
+# is `0`. Route the forward-mode broadcast of `abs` (the GPU `sum(abs, x)` path,
+# and `abs.(x)` on the CPU fast path) through a NaN-safe definition that matches.
+# See https://github.com/FluxML/Zygote.jl/issues/1529
+@inline dual_function(::typeof(abs)) = _abs_dualsafe ∘ only ∘ dualize
+
+@inline function _abs_dualsafe(d::Dual{T}) where {T}
+    v = value(d)
+    return Dual{T}(abs(v), sign(v) * partials(d))
+end
+@inline function _abs_dualsafe(z::Complex{<:Dual{T}}) where {T}
+    dr, di = reim(z)
+    vr, vi = value(dr), value(di)
+    a = hypot(vr, vi)
+    s = iszero(a) ? zero(a) : inv(a)  # subgradient 0 at the origin
+    return Dual{T}(a, (vr * s) * partials(dr) + (vi * s) * partials(di))
+end
+
 
 @inline function broadcast_forward(f, args::Vararg{Any,N}) where N
   out = dual_function(f).(args...)
