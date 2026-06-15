@@ -203,6 +203,12 @@ end
 # Restore splatted arrays
 _project(x::AbstractArray, dx::Tuple) = _project(x, reshape(collect(dx), axes(x)))
 
+# Splatting an array (`vcat(x...)`) makes its cotangent a `Tuple`, which can then be
+# handed to an array `rrule`'s own `ProjectTo` (bypassing the `_project` method just
+# above) and error, e.g. `vcat(vcat([x], 1)...)` (#1417, #599). Reshape it back to
+# the expected array shape before projecting.
+(project::ProjectTo{AbstractArray})(dx::Tuple) = project(reshape(collect(dx), project.axes))
+
 # Piracy:
 # CRC likes Tangent{AbstractArray}, but Zygote makes Tangent{Any}
 # in particular this would hit https://github.com/JuliaDiff/ChainRulesCore.jl/blob/2ec2549b73b22bc08f554dae864fb650cfb9c3d7/src/projection.jl#L139
