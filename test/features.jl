@@ -247,39 +247,7 @@ end
 
   @test_throws DimensionMismatch gradient(f, 1)
 
-  struct Layer{T}
-    W::T
-  end
-
-  (f::Layer)(x) = f.W * x
-
-  W = [1 0; 0 1]
-  x = [1, 2]
-
-  y, back = pullback(() -> W * x, Params([W]))
-  @test y == [1, 2]
-  @test back([1, 1])[W] == [1 2; 1 2]
-
-  layer = Layer(W)
-
-  y, back = pullback(() -> layer(x), Params([W]))
-  @test y == [1, 2]
-  @test back([1, 1])[W] == [1 2; 1 2]
-
-  @test gradient(() -> sum(W * x), Params([W]))[W] == [1 2; 1 2]
-  y, gr = withgradient(() -> sum(W * x), Params([W]))
-  @test y == 3
-  @test gr[W] == [1 2; 1 2]
-
-  let
-    p = [1]
-    θ = Zygote.Params([p])
-    θ̄ = gradient(θ) do
-      p′ = (p,)[1]
-      p′[1]
-    end
-    @test θ̄[p][1] == 1
-  end
+  # NOTE: implicit-params tests (structs/closures with `Params`) live in test/deprecated.jl
 
   @test gradient(2) do x
     H = [1 x; 3 4]
