@@ -671,20 +671,16 @@ AbstractFFTs.rfft(x::Fill, dims...) = AbstractFFTs.rfft(collect(x), dims...)
 AbstractFFTs.irfft(x::Fill, d, dims...) = AbstractFFTs.irfft(collect(x), d, dims...)
 AbstractFFTs.brfft(x::Fill, d, dims...) = AbstractFFTs.brfft(collect(x), d, dims...)
 
-# the adjoint jacobian of an FFT with respect to its input is the reverse FFT of the
-# gradient of its inputs, but with different normalization factor
-@adjoint function *(P::AbstractFFTs.Plan, xs)
-  return P * xs, function(Δ)
-    N = prod(size(xs)[[P.region...]])
-    return (nothing, N * (P \ Δ))
-  end
-end
-
+# The adjoint Jacobian of applying a plan to its input is the *adjoint* plan applied
+# to the cotangent. The old `N * (P \ Δ)` formula assumed `P' == N * inv(P)`, which only
+# holds for plans that are unitary up to the scaling `N`; it gave a gradient off by a
+# constant factor for e.g. the orthonormal DCT or `rfft` (see #899).
+#
+# For `*`, AbstractFFTs already ships a correct (and `ProjectTo`-aware, hence type
+# stable) `rrule`, so we let ChainRules handle it rather than defining an adjoint here.
+# AbstractFFTs has no rule for `\`, so we provide one using the adjoint plan `P'`.
 @adjoint function \(P::AbstractFFTs.Plan, xs)
-  return P \ xs, function(Δ)
-    N = prod(size(Δ)[[P.region...]])
-    return (nothing, (P * Δ)/N)
-  end
+  return P \ xs, Δ -> (nothing, ProjectTo(xs)(P' \ Δ))
 end
 
 # FillArray functionality
