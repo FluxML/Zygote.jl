@@ -106,6 +106,16 @@ import LogExpFunctions
     @test Zygote.pullback(g, X)[2]((factors=LowerTriangular(X),))[1] ≈
       Zygote.pullback(g, X)[2]((factors=Matrix(LowerTriangular(X)),))[1]
 
+    # https://github.com/FluxML/Zygote.jl/issues/1148
+    # `getproperty(C, :factors)` used to silently drop the gradient. Only the stored
+    # (uplo) triangle is meaningful, so the gradient must match the `.U`/`.L` adjoint
+    # there (the other triangle is LAPACK scratch and treated as non-differentiable).
+    @test gradient(X -> sum(triu(cholesky(X * X' + I).factors)), X)[1] ≈
+      gradient(X -> sum(cholesky(X * X' + I).U), X)[1]
+    let h(x) = sum(cholesky([4.0 1.0; 1.0 x]).factors)
+      @test gradient(h, 3.0)[1] ≈ FiniteDifferences.central_fdm(5, 1)(h, 3.0)
+    end
+
     # https://github.com/FluxML/Zygote.jl/issues/932
     @test gradcheck(rand(5, 5), rand(5)) do A, x
         C = cholesky(Symmetric(A' * A + I))

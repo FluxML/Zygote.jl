@@ -622,6 +622,11 @@ end
     return ((uplo=nothing, info=nothing, factors=nothing),)
   end
 end
+@adjoint function literal_getproperty(C::Cholesky, ::Val{:factors})
+  return literal_getproperty(C, Val(:factors)), function(Δ)
+    return ((uplo=nothing, info=nothing, factors=Δ),)
+  end
+end
 @adjoint function literal_getproperty(C::Cholesky, ::Val{:U})
   return literal_getproperty(C, Val(:U)), function(Δ)
     Δ_factors = C.uplo == 'U' ? UpperTriangular(Δ) : LowerTriangular(copy(Δ'))
