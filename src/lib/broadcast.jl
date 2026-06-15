@@ -483,3 +483,14 @@ using GPUArraysCore  # replaces @require CUDA block, weird indenting to preserve
   end
 
   pull_block_vert(sz, Δ::AbstractGPUArray, A::Number) = @allowscalar Δ[sz]
+
+  # Accumulating cotangents `accum`ulates by broadcasting `+`. When one cotangent
+  # is a host-backed structured array (e.g. the `Diagonal{<:Fill}` returned by
+  # the `tr` adjoint) and the other is a GPU array, that broadcast runs on the
+  # host and scalar-indexes the GPU array (`gradient(x -> sum(abs2,x) - tr(x), cu)`
+  # in #1512). Move the host operand onto the device first, then accumulate there.
+  _gpu_like(ref::AbstractGPUArray, y::AbstractGPUArray) = y
+  _gpu_like(ref::AbstractGPUArray, y::AbstractArray) = copyto!(similar(ref, eltype(y), size(y)), collect(y))
+  accum(x::AbstractGPUArray, y::AbstractGPUArray) = Base.broadcast_preserving_zero_d(accum, x, y)
+  accum(x::AbstractGPUArray, y::AbstractArray) = accum(x, _gpu_like(x, y))
+  accum(x::AbstractArray, y::AbstractGPUArray) = accum(_gpu_like(y, x), y)
