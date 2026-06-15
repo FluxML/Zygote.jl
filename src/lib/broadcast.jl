@@ -452,6 +452,18 @@ using GPUArraysCore  # replaces @require CUDA block, weird indenting to preserve
   @adjoint (::Type{T})(xs::Array) where {T <: AbstractGPUArray} =
     T(xs), Δ -> (convert(Array, Δ), )
 
+  # `Array`/`collect` move a GPU array to the host; their pullback must move the
+  # cotangent back to the device. Otherwise it stays a CPU array and a later
+  # operation that broadcasts it against the GPU primal (e.g. `A*x` in the
+  # original report) hits scalar indexing or fails to compile. See #1305.
+  # `copyto!(similar(xs, ...), Δ)` relocates without naming a specific GPU
+  # backend and without scalar indexing.
+  _gpu_cotangent(xs, Δ::AbstractGPUArray) = Δ
+  _gpu_cotangent(xs, Δ::AbstractArray) = copyto!(similar(xs, eltype(Δ), size(Δ)), Δ)
+
+  @adjoint Array(xs::AbstractGPUArray) = Array(xs), Δ -> (_gpu_cotangent(xs, Δ),)
+  @adjoint collect(xs::AbstractGPUArray) = collect(xs), Δ -> (_gpu_cotangent(xs, Δ),)
+
   # Make sure sum(f, ::CuArray) uses broadcast through forward-mode defined above
   # Not the ChainRules.rrule which will use the Zygote.Context and thus not be GPU compatible
   function _pullback(cx::AContext, ::typeof(sum), f, xs::AbstractGPUArray)
