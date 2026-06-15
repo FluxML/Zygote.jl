@@ -753,6 +753,12 @@ end
     nd = defensiveupdate(d, 5)
     return sum(nd[1]) + sum(nd[2])
   end[1] == Dict(1 => Fill(5, 1), 2 => Fill(1, 1))
+
+  # https://github.com/FluxML/Zygote.jl/issues/1113
+  # deepcopy of a dict constructed *inside* the differentiated function used to
+  # silently drop the gradient (the dict gradient is keyed by object identity).
+  @test gradient(x -> deepcopy(Dict(:a => x))[:a], 2.0) == (1.0,)
+  @test gradient(x -> (dc = deepcopy(Dict(:a => x, :b => 2x)); dc[:a] + 3 * dc[:b]), 2.0) == (7.0,)
 end
 
 @testset "tricky broadcasting" begin

@@ -41,6 +41,21 @@ function accum(a::AbstractDict, b::AbstractDict)
   return merge(a, b)
 end
 
+# A dict's gradient is tracked in the context cache keyed by the dict's *identity*
+# (see `grad_mut`). The generic `deepcopy` adjoint (`ȳ -> (ȳ,)`) doesn't bridge that
+# cache, so the gradient accumulated against the copy never reaches the original and
+# is silently dropped (issue #1113). Route it back into the original's cache slot.
+@adjoint function deepcopy(d::AbstractDict)
+  deepcopy(d), function (ȳ)
+    ȳ === nothing && return (nothing,)
+    grad = grad_mut(__context__, d)
+    for (k, v) in ȳ
+      grad[k] = accum(get(grad, k, nothing), v)
+    end
+    return (grad,)
+  end
+end
+
 @adjoint function getindex(d::AbstractDict, k)
   val = d[k]
   function dict_getindex_pullback(Δ)
