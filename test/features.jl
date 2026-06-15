@@ -720,6 +720,11 @@ end
   f866(x) = reshape(x, fill(2, 2)...)
   @test gradient(x->sum(f866(x)), rand(4))[1] == [1,1,1,1]
 
+  # https://github.com/FluxML/Zygote.jl/issues/1567
+  # reshape of a non-differentiable array gets a `nothing`/`AbstractZero` cotangent
+  @test gradient(w -> sum(w * reshape(rand(Bool, 12), 3, 4)), rand(2, 3))[1] |> size == (2, 3)
+  @test gradient(w -> sum(w * reshape(trues(6), 2, 3)), rand(4, 2))[1] |> size == (4, 2)
+
   # https://github.com/FluxML/Zygote.jl/issues/731
   f731(x) = sum([x' * x, x...])
   @test_broken gradient(f731, ones(3)) # MethodError: no method matching +(::Tuple{Float64, Float64, Float64}, ::Vector{Float64})
