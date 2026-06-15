@@ -114,6 +114,33 @@ _reshape_pullback(Δ::AbstractZero, sz) = Δ
 @adjoint reshape(xs, dims...) = reshape(xs, dims...),
   Δ -> (_reshape_pullback(Δ, size(xs)), map(_->nothing,dims)...)
 
+# Typed array literals (`Float32[1 0 0 x]`, `Float32[1 0; 0 x]`) and the `;;`/`;;;`
+# n-dimensional concatenation (`[x ;; 1]`) lower to `typed_hcat`/`typed_vcat`/
+# `typed_hvcat`/`hvncat`, none of which have a ChainRules rule, so Zygote tried to
+# differentiate their mutating `setindex!` fallback (#1413, #1572). Reuse the rules
+# for the untyped `hcat`/`vcat`/`hvcat`/`cat`, which produce numerically identical
+# values and identical cotangents (the element type only affects projection).
+for (typed, untyped) in ((:typed_hcat, :hcat), (:typed_vcat, :vcat))
+  @eval function _pullback(cx::AContext, ::typeof(Base.$typed), ::Type{T}, xs...) where {T}
+    y, back = _pullback(cx, $untyped, xs...)
+    $(Symbol(typed, :_pullback))(Δ) = (nothing, nothing, Base.tail(back(Δ))...)
+    return Base.$typed(T, xs...), $(Symbol(typed, :_pullback))
+  end
+end
+
+function _pullback(cx::AContext, ::typeof(Base.typed_hvcat), ::Type{T}, rows::Tuple{Vararg{Int}}, xs...) where {T}
+  y, back = _pullback(cx, hvcat, rows, xs...)
+  typed_hvcat_pullback(Δ) = (nothing, nothing, nothing, Base.tail(Base.tail(back(Δ)))...)
+  return Base.typed_hvcat(T, rows, xs...), typed_hvcat_pullback
+end
+
+function _pullback(cx::AContext, ::typeof(Base.hvncat), dim::Int, xs...)
+  catdims(args...) = cat(args...; dims = dim)
+  y, back = _pullback(cx, catdims, xs...)
+  hvncat_pullback(Δ) = (nothing, nothing, Base.tail(back(Δ))...)
+  return y, hvncat_pullback
+end
+
 @adjoint function repeat(xs; inner=ntuple(_->1, ndims(xs)), outer=ntuple(_->1, ndims(xs)))
   repeat(xs, inner = inner, outer = outer), function (Δ)
     Δ′ = zero(xs)
