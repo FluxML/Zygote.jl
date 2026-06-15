@@ -33,8 +33,8 @@ y, back = pullback(badly, 2)
 @test_throws Exception back(1)
 bt = try back(1) catch e stacktrace(catch_backtrace()) end
 
-@test trace_contains(bt, nothing, "compiler_tests.jl", bad_def_line)
-@test trace_contains(bt, :badly, "compiler_tests.jl", bad_call_line)
+@test trace_contains(bt, nothing, "compiler.jl", bad_def_line)
+@test trace_contains(bt, :badly, "compiler.jl", bad_call_line)
 
 # Type inference checks
 
