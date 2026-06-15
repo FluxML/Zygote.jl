@@ -103,8 +103,16 @@ end
 @adjoint PermutedDimsArray(xs, dims) = PermutedDimsArray(xs, dims),
   Δ -> (PermutedDimsArray(Δ, invperm(dims)), nothing)
 
+# `Δ` is normally an array (or an `AbstractThunk`, which `reshape` handles), but it
+# can be a sentinel `nothing`/`AbstractZero` when `xs` is non-differentiable, e.g.
+# `reshape(::Array{Bool}, ...)` (#1567). `reshape` has no method for those, so pass
+# them straight through.
+_reshape_pullback(Δ, sz) = reshape(Δ, sz)
+_reshape_pullback(::Nothing, sz) = nothing
+_reshape_pullback(Δ::AbstractZero, sz) = Δ
+
 @adjoint reshape(xs, dims...) = reshape(xs, dims...),
-  Δ -> (reshape(Δ, size(xs)),map(_->nothing,dims)...)
+  Δ -> (_reshape_pullback(Δ, size(xs)), map(_->nothing,dims)...)
 
 @adjoint function repeat(xs; inner=ntuple(_->1, ndims(xs)), outer=ntuple(_->1, ndims(xs)))
   repeat(xs, inner = inner, outer = outer), function (Δ)
