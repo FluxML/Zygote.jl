@@ -341,3 +341,32 @@ end
 end
 
 end
+
+@testitem "refresh" begin
+  # https://github.com/FluxML/Zygote.jl/issues/1599
+  # `Zygote.refresh()` must pick up an `rrule` defined *after* a gradient has
+  # already been computed (and cached) for the same signature.
+  using ChainRulesCore
+
+  function refresh1599(x::AbstractArray)
+    y = similar(x)
+    for i in eachindex(x)
+      y[i] = x[i] > 0 ? x[i]^2 : zero(eltype(x))
+    end
+    sum(y)
+  end
+
+  x = [1.7, 2.1, -1.5, -0.1, 3.1]
+  # Mutation is not differentiable, so this fails and caches the failing pullback.
+  @test_throws Exception Zygote.gradient(refresh1599, x)
+
+  function ChainRulesCore.rrule(::typeof(refresh1599), x)
+    J = [xᵢ > 0 ? 2xᵢ : zero(xᵢ) for xᵢ in x]
+    refresh1599_pullback(v) = NoTangent(), J * unthunk(v)
+    refresh1599(x), refresh1599_pullback
+  end
+
+  Zygote.refresh()
+
+  @test Zygote.gradient(refresh1599, x)[1] == [3.4, 4.2, 0.0, 0.0, 6.2]
+end
