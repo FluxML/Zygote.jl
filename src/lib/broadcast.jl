@@ -454,12 +454,15 @@ using GPUArraysCore  # replaces @require CUDA block, weird indenting to preserve
 
   # Make sure sum(f, ::CuArray) uses broadcast through forward-mode defined above
   # Not the ChainRules.rrule which will use the Zygote.Context and thus not be GPU compatible
-  function _pullback(cx::AContext, ::typeof(sum), f, xs::AbstractGPUArray)
+  # `AnyGPUArray` (rather than `AbstractGPUArray`) also covers GPU array wrappers
+  # such as `view`/`SubArray`, `Adjoint` and `Transpose`, whose generic
+  # `sum(f, x)` rrule otherwise scalar-indexes on the GPU. See #1498.
+  function _pullback(cx::AContext, ::typeof(sum), f, xs::AnyGPUArray)
     res, back = _pullback(cx, (f, xs) -> sum(f.(xs)), f, xs)
     return res, back ∘ unthunk_tangent
   end
   function _pullback(cx::AContext, ::Core.kwftype(typeof(sum)), kws, ::typeof(sum), f,
-                     xs::AbstractGPUArray)
+                     xs::AnyGPUArray)
     @assert !haskey(kws, :init) # TODO add init support (julia 1.6)
     res, back = _pullback(cx, (f, xs) -> sum(f.(xs); kws...), f, xs)
     sum_gpuarray_kw_pullback(Δ) = (nothing, nothing, back(unthunk_tangent(Δ))...)
