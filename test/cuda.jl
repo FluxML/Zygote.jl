@@ -23,9 +23,13 @@ end
   @test gradient((x,cy) -> sum(cu(x) * cy) + sum(cy'), r, cu(r))[2] isa CUDA.CuArray
   @test_skip gradient((x,cy) -> sum(cu(x[:,1])' * cy), r, cu(r))[2] isa CUDA.CuArray # generic_matmatmul!
 
-  # Other direction:
-  @test_skip gradient(x -> sum(Array(x)), cu(r))[1] isa CUDA.CuArray
-  @test_skip gradient((x,cy) -> sum(x * Array(cy)) + sum(cy'), r, cu(r))[2] isa CUDA.CuArray
+  # Other direction: https://github.com/FluxML/Zygote.jl/issues/1305 — `Array`/
+  # `collect` move a GPU array to the host, so their pullback must move the
+  # cotangent back to the device instead of leaving it a CPU array.
+  @test gradient(x -> sum(Array(x)), cu(r))[1] isa CUDA.CuArray
+  @test gradient(x -> sum(collect(x)), cu(r))[1] isa CUDA.CuArray
+  @test gradient((x,cy) -> sum(x * Array(cy)) + sum(cy'), r, cu(r))[2] isa CUDA.CuArray
+  @test collect(gradient(x -> sum(abs2, Array(x)), cu(r))[1]) ≈ gradient(x -> sum(abs2, Array(x)), r)[1]
 end
 
 @testset "broadcasting" begin
@@ -244,6 +248,18 @@ end
     @test gradcheck_gpu(x->sum(imag, x.^2 .+ abs.(sinh.(conj.(x)))), ygpu)
 
 
+end
+
+@testset "accum structured + GPU" begin
+  # https://github.com/FluxML/Zygote.jl/issues/1512 : the `tr` adjoint returns a
+  # host-backed `Diagonal{<:Fill}` cotangent; accumulating it against the dense
+  # GPU cotangent from `sum(abs2, x)` used to broadcast on the host and
+  # scalar-index the GPU array.
+  for x0 in (CUDA.zeros(Float32, 2, 2), cu(rand(Float32, 3, 3)))
+    g = gradient(x -> sum(abs2, x) - tr(x), x0)[1]
+    @test g isa CuArray
+    @test collect(g) ≈ gradient(x -> sum(abs2, x) - tr(x), collect(x0))[1]
+  end
 end
 
 @testset "sparse projection" begin
