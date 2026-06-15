@@ -61,6 +61,18 @@ end
   @test b(m) === nothing
 end
 
+# https://github.com/FluxML/Zygote.jl/issues/1517
+struct FewerArgs1517
+  x::Float64
+  y::Float64
+  FewerArgs1517(x) = new(x)  # inner constructor leaves `y` undefined
+end
+
+@testset "new with fewer arguments than fields (#1517)" begin
+  @test gradient(x -> FewerArgs1517(x).x * 2, 2.0) == (2.0,)
+  @test gradient(x -> 3 * FewerArgs1517(x).x, 5.0) == (3.0,)
+end
+
 @testset "threads" begin
     function threads1(x)
       ch = Channel(0)
