@@ -130,6 +130,21 @@ end
   x = randn(Float32,16,16)
   @test typeof(gradient(x->sum(abs2,ifft(fft(x,1),1)),x)[1]) == Array{Float32,2}
   @test typeof(gradient(x->sum(abs2,irfft(rfft(x,1),16,1)),x)[1]) == Array{Float32,2}
+
+  # #899: the plan adjoint must use the adjoint plan, not `N * inv(P)`. The latter is
+  # wrong for non-unitary plans such as the (orthonormal) DCT and `rfft`, giving a
+  # gradient off by a constant factor. Check the whole gradient against finite diffs.
+  fdgrad(f, x) = map(eachindex(x)) do i
+    h = 1e-6; xp = copy(x); xp[i] += h; xm = copy(x); xm[i] -= h
+    (f(xp) - f(xm)) / 2h
+  end
+  let x = randn(10)
+    for p in (plan_dct(x), plan_rfft(x))
+      @test gradient(v -> sum(abs2, p * v), x)[1] ≈ fdgrad(v -> sum(abs2, p * v), x) rtol=1e-4
+    end
+    p = plan_dct(x)
+    @test gradient(v -> sum(abs2, p \ v), x)[1] ≈ fdgrad(v -> sum(abs2, p \ v), x) rtol=1e-4
+  end
 end
 
 @testset "FillArrays" begin
