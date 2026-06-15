@@ -19,8 +19,12 @@ zerolike(x::GlobalRef) = nothing
 @tangent one(T::Type) = one(T), _ -> zero(T)
 @tangent Core.Typeof(x) = Core.Typeof(x), _ -> nothing
 @tangent typeof(x) = typeof(x), _ -> nothing
-@tangent Core._typeof_captured_variable(x) = Core._typeof_captured_variable(x), _ -> nothing
-@tangent Core.has_free_typevars(x) = Core.has_free_typevars(x), _ -> false
+@static if isdefined(Core, :_typeof_captured_variable)  # Core._typeof_captured_variable exists on Julia 1.11+
+  @tangent Core._typeof_captured_variable(x) = Core._typeof_captured_variable(x), _ -> nothing
+end
+@static if isdefined(Core, :has_free_typevars)  # Core.has_free_typevars exists on Julia 1.11+
+  @tangent Core.has_free_typevars(x) = Core.has_free_typevars(x), _ -> false
+end
 @tangent Core.apply_type(args...) = Core.apply_type(args...), (_...) -> nothing
 @tangent fieldtype(args...) = fieldtype(args...), (_...) -> nothing
 @tangent isa(a, b) = isa(a, b), (_, _) -> false
