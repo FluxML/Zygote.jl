@@ -192,3 +192,16 @@ end
         @test first(pb(one(y))) ≈ constructor(2 * ones(2, 2))
     end
 end
+
+@testset "searchsorted is non-differentiable (#1156)" begin
+    v = [1.0, 2.0, 3.0, 4.0, 5.0]
+    @test gradient(x -> float(searchsortedfirst(x, 3.5)), v)[1] === nothing
+    @test gradient(x -> float(searchsortedlast(x, 3.5)), v)[1] === nothing
+    @test gradient(x -> sum(float, searchsorted(x, 3.0)), v)[1] === nothing  # 3.0 ∈ v ⇒ nonempty range
+    # the #1156 reproducer: the searched arrays are differentiable views into `s`,
+    # so the binary search's `>>>` (`lshr_int`) midpoint used to be differentiated
+    s = sort(rand(10, 3) .* 10; dims=1); x = rand(3, 5)
+    g = gradient((s, x) -> sum(searchsortedlast.(eachcol(s), x)), s, x)
+    @test g[1] === nothing || all(iszero, g[1])
+    @test g[2] === nothing || all(iszero, g[2])
+end

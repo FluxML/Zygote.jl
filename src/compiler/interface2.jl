@@ -53,7 +53,13 @@ function _generate_callable_pullback(j::Type{<:Pullback{T}}, world, Δ) where T
   end
   if g === nothing
     Δ == Nothing && return :nothing
-    return :(error("Non-differentiable function $(repr(j.t[1]))"))
+    # In this expression-return path the generated `(j::Pullback)(Δ)` body is built
+    # from `_callable_pullback_generator`'s stub, whose arguments are named
+    # `(:methodinstance, :Δ)` — so the pullback object is `methodinstance` here, not
+    # `j`. Referencing `j` (the *generator's* argument name) leaks an undefined global
+    # and dies with `UndefVarError: j` instead of this message. Use `methodinstance`,
+    # matching how the sibling `_generate_pullback` refers to its stub's `f`/`args`.
+    return :(error("Non-differentiable function $(repr(methodinstance.t[1]))"))
   end
   meta, _, back = g
   argnames!(meta, Symbol("#self#"), :Δ)

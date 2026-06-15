@@ -251,6 +251,15 @@ end
 _pullback(cx::AContext, ::typeof(getfield), x, field_name::Symbol) =
   _pullback(cx, literal_getfield, x, Val(field_name))
 
+# Field access by a non-literal integer index (e.g. `ColorTypes._comp(Val{N}, c)`
+# lowers to `getfield(c, N)` with `N` a runtime `Int`). Convert the index to the
+# field *name* and reuse the `Symbol` path, so the tangent is built with a valid
+# field name rather than the bare integer. For a `Tuple`, `fieldname` returns the
+# integer itself, which routes on to `literal_getindex` as usual. (Literal-integer
+# `getfield` is already handled at IR level by `instrument_getfield!`.)
+_pullback(cx::AContext, ::typeof(getfield), x, i::Int) =
+  _pullback(cx, literal_getfield, x, Val(fieldname(typeof(x), i)))
+
 function _pullback(cx::AContext, ::typeof(literal_getproperty), x::NamedTuple,
                    ::Val{property_name}) where {property_name}
   return _pullback(cx, literal_getfield, x, Val(property_name))
@@ -267,6 +276,26 @@ end
 function _pullback(cx::AContext, ::typeof(literal_getfield), x::Tuple,
                    ::Val{index}) where {index}
   return _pullback(cx, literal_getindex, x, Val(index))
+end
+
+# Reading a binding out of a `Module` is not differentiable: a module global is a
+# constant from AD's point of view, never a differentiable input. Without these
+# methods the source transform recurses through `getproperty(::Module, ::Symbol)`
+# into the `getglobal` builtin, which has no IR and no adjoint — historically
+# surfacing as a cryptic `UndefVarError: j` (issues #194, #252, #467, #619). The
+# `accum_param` call keeps the legacy implicit-`Params` mode working when the
+# binding's *value* (e.g. a qualified global array) is a tracked parameter.
+function _pullback(cx::AContext, ::typeof(literal_getproperty), m::Module,
+                   ::Val{property_name}) where {property_name}
+  val = getproperty(m, property_name)
+  module_getproperty_pullback(Δ) = (accum_param(cx, val, Δ); nothing)
+  return val, module_getproperty_pullback
+end
+function _pullback(cx::AContext, ::typeof(literal_getfield), m::Module,
+                   ::Val{field_name}) where {field_name}
+  val = getfield(m, field_name)
+  module_getfield_pullback(Δ) = (accum_param(cx, val, Δ); nothing)
+  return val, module_getfield_pullback
 end
 
 grad_mut(x) = Ref{Any}(nt_nothing(x))
