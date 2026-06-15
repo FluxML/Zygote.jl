@@ -139,6 +139,26 @@ end
   @test j2[v1] ≈ cu(res2)
 end
 
+@testset "hessian" begin
+  # https://github.com/FluxML/Zygote.jl/issues/1348 , #1312 : `hessian`
+  # (forward-over-reverse) seeded ForwardDiff `Dual`s and extracted their
+  # partials by scalar-indexing, which is disallowed on the GPU.
+  x = cu(rand(Float32, 3))
+  H = Zygote.hessian(z -> sum(sin.(z)), x)
+  @test collect(H) ≈ Zygote.hessian(z -> sum(sin.(z)), collect(x))
+
+  @test collect(Zygote.hessian(z -> norm(sin.(z)), x)) ≈
+        Zygote.hessian(z -> norm(sin.(z)), collect(x)) rtol=1e-3
+
+  # masked-mean loss through a dense `A*v` (#1312); the sparse `A*v` variant
+  # still hits a cuSPARSE limitation (sparse matrix × ForwardDiff `Dual` vector).
+  A = cu(rand(Float32, 10, 4)); mask = cu(round.(rand(Float32, 10)))
+  v0 = cu(rand(Float32, 4))
+  gpuloss(v) = (sum((A*v) .* mask) / sum(mask) - 1f0)^2
+  cpuloss(v) = (sum((collect(A)*v) .* collect(mask)) / sum(collect(mask)) - 1f0)^2
+  @test collect(Zygote.hessian(gpuloss, v0)) ≈ Zygote.hessian(cpuloss, collect(v0)) rtol=1e-2
+end
+
 @testset "gradient algebra" begin
   w, b = rand(2) |> cu, rand(2) |> cu
   x1, x2 = rand(2) |> cu, rand(2) |> cu
