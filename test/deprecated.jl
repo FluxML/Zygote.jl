@@ -373,3 +373,66 @@ end
   gs = gradient(()->sum(t[1]), ps)
   @test gs[t[1]] == ones(2, 2)
 end
+
+@testset "implicit params: mutable accum_param" begin
+  mutable struct MutAccum{T}; x::T; end
+  struct ImmAccum{T}; x::T; end
+
+  y1 = [3.0]
+  y2 = (MutAccum(y1),)
+  y3 = (ImmAccum(y1),)
+  @test gradient(() -> sum(y2[1].x)^2, Params([y1]))[y1] == [6.0]
+  @test gradient(() -> sum(y3[1].x)^2, Params([y1]))[y1] == [6.0]
+
+  @test gradient(() -> sum(y2[1].x .+ y2[1].x)^3, Params([y1]))[y1] == [216.0]
+  @test gradient(() -> sum(y3[1].x .+ y3[1].x)^3, Params([y1]))[y1] == [216.0]
+
+  i1 = 1
+  @test gradient(() -> sum(y2[i1].x .+ y2[1].x)^3, Params([y1]))[y1] == [216.0]
+  @test gradient(() -> sum(y3[i1].x .+ y3[1].x)^3, Params([y1]))[y1] == [216.0]
+end
+
+@testset "implicit params: broadcasted($op, Array, Bool)" for op in (+,-,*)
+  @testset "with $bool and sizes $s" for s in ((4,), (2,3)), bool in (true,false)
+    r = rand(Int8, s) .+ 0.0
+    z = fill(bool, s) .+ 0.0
+    gfun(args...) = gradient(() -> sum(op.(args...)), Params(filter(a->a isa Array, collect(args))))
+
+    g = gfun(r, z)
+    gres = gfun(r, bool)
+    @test gres[r] == g[r]
+
+    g = gfun(z, r)
+    gres = gfun(bool, r)
+    @test gres[r] == g[r]
+  end
+end
+
+@testset "implicit params: Dict iteration" begin
+  # https://github.com/FluxML/Zygote.jl/issues/1065
+  function sumkv(d)
+    s = zero(d["c"])
+    for (k, v) in d
+      s += v
+      k == :b && (s += v)
+    end
+    return sum(s)
+  end
+
+  function sumvals(d)
+    s = zero(d["c"])
+    for v in values(d)
+      s += v
+    end
+    return sum(s)
+  end
+
+  d_arr = Dict(:a => [3], :b => [4], "c" => [5])
+  ps = d_arr |> values |> collect |> Params
+
+  grads = gradient(() -> sumkv(d_arr), ps)
+  @test (grads[d_arr[:a]], grads[d_arr[:b]], grads[d_arr["c"]]) == ([1], [2], [1])
+
+  grads = gradient(() -> sumvals(d_arr), ps)
+  @test (grads[d_arr[:a]], grads[d_arr[:b]], grads[d_arr["c"]]) == ([1], [1], [1])
+end

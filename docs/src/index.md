@@ -177,32 +177,3 @@ julia> x = rand(5);
 julia> dmodel = gradient(model -> sum(model(x)), model)[1]
 (W = [0.652543 … 0.683588], b = [1.0, 1.0])
 ```
-
-## [Deprecated] Implicit Parameters
-
-Zygote also supports another way to take gradients, via *implicit parameters*.
-
-!!! warning "Deprecated"
-    The implicit-parameter interface (`Params`/`Grads`) is deprecated and will be removed
-    in a future release. Prefer the explicit style shown above. Calling `gradient`,
-    `withgradient`, `jacobian` or `pullback` with a `Params` argument now emits a
-    deprecation warning (visible when running Julia with `--depwarn=yes`).
-
-Here the loss function takes zero arguments, but the variables of interest are indicated by a special `Params` object. The function `linear` which depends on `W` and `b` is executed when the loss function `() -> sum(linear(x))` is called, and hence this dependence is visible to Zygote:
-
-```julia
-julia> W = rand(2, 5); b = rand(2);
-
-julia> linear(x) = W * x .+ b
-linear (generic function with 2 methods)
-
-julia> grads = gradient(() -> sum(linear(x)), Params([W, b]))
-Grads(...)
-
-julia> grads[W], grads[b] # access gradients using arrays as keys
-([0.652543 … 0.683588], [1.0, 1.0])
-```
-
-Here `grads` is a dictionary-like object, whose keys are the same parameters we indicated in `Params`. (In fact it wraps a dictionary using `objectid(W)` as keys, which does not change if the values in `W` are mutated).
-
-This implicit style was historically used by [Flux.jl](https://github.com/FluxML/Flux.jl), a closely related machine learning library, where `Flux.params(model)` returned a `Params` object containing all the parameters of all layers. Flux has since moved to the explicit style (differentiating a model passed as an argument), which is recommended for all new code; the implicit interface shown here is deprecated.

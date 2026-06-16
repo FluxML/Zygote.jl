@@ -51,15 +51,9 @@
         end
 
         d_num = Dict(:a => 3, :b => 4, "c" => 5)
-        d_arr = Dict(:a => [3], :b => [4], "c" => [5])
-        ps = d_arr |> values |> collect |> Params
 
         @test gradient(sumkv, d_num)[1] == Dict(:a => 1, :b => 2, "c" => 1)
-        grads = gradient(() -> sumkv(d_arr), ps)
-        @test (grads[d_arr[:a]], grads[d_arr[:b]], grads[d_arr["c"]]) == ([1], [2], [1])
 
         @test gradient(sumvals, d_num)[1] == Dict(:a => 1, :b => 1, "c" => 1)
-        grads = gradient(() -> sumvals(d_arr), ps)
-        @test (grads[d_arr[:a]], grads[d_arr[:b]], grads[d_arr["c"]]) == ([1], [1], [1])
     end
 end

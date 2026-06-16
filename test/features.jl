@@ -527,20 +527,14 @@ end
   y2 = (Mut(y1),)
   y3 = (Imm(y1),)
   @test_skip gradient(x -> sum(x[1].x)^2, y2)[1] == ((x = [6.0],),)  # fails on v0.6.0 v0.6.41... and with https://github.com/FluxML/Zygote.jl/pull/1453
-  @test gradient(() -> sum(y2[1].x)^2, Params([y1]))[y1] == [6.0]
   @test gradient(x -> sum(x[1].x)^2, y3)[1] == ((x = [6.0],),)
-  @test gradient(() -> sum(y3[1].x)^2, Params([y1]))[y1] == [6.0]
 
   @test gradient(x -> sum(x[1].x .+ x[1].x)^3, y2)[1] == ((x = [216.0],),)  # fails on v0.6.0 v0.6.41
-  @test gradient(() -> sum(y2[1].x .+ y2[1].x)^3, Params([y1]))[y1] == [216.0]
   @test gradient(x -> sum(x[1].x .+ x[1].x)^3, y3)[1] == ((x = [216.0],),)
-  @test gradient(() -> sum(y3[1].x .+ y3[1].x)^3, Params([y1]))[y1] == [216.0]
 
   i1 = 1
   @test gradient(x -> sum(x[i1].x .+ x[1].x)^3, y2)[1] == ((x = [216.0],),)  # fails on v0.6.0 v0.6.41
-  @test gradient(() -> sum(y2[i1].x .+ y2[1].x)^3, Params([y1]))[y1] == [216.0]
   @test gradient(x -> sum(x[i1].x .+ x[1].x)^3, y3)[1] == ((x = [216.0],),)
-  @test gradient(() -> sum(y3[i1].x .+ y3[1].x)^3, Params([y1]))[y1] == [216.0]
 end
 
 @testset "NamedTuples" begin

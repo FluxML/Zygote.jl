@@ -286,18 +286,6 @@ end
       @test fun(z, r) == fun(bool, r)
       @test gfun(bool, r) == (nothing, gfun(z, r)[2])
     end
-
-    @testset "Implicit" begin
-      gfun(args...) = gradient(() -> sum(op.(args...)), Params(filter(a->a isa Array, collect(args))  ))
-
-      g = gfun(r, z)
-      gres = gfun(r, bool)
-      @test gres[r] == g[r]
-
-      g = gfun(z, r)
-      gres = gfun(bool, r)
-      @test gres[r] == g[r]
-    end
   end
 end
 

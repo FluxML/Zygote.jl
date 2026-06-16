@@ -3,7 +3,7 @@
 Zygote aims to support differentiating any Julia code, but it still has a few limitations.
 Notably, you might encounter errors when trying to differentiate:
 - array mutation,
-- `try`/`catch` statements,
+- `try`/`catch` statements when an exception is actually thrown,
 - "foreign call" expressions.
 
 This section gives examples where each of these errors occurs, as well as possible work-arounds.
@@ -74,7 +74,7 @@ Finally, there is also [`Zygote.Buffer`](@ref) which aims to handle the pattern 
 
 ## Try-catch statements
 
-Code containting try-catch blocks can be differentiated as long as no exception is actually thrown.
+Code containing try-catch blocks can be differentiated as long as no exception is actually thrown.
 
 ```julia
 julia> function safe_sqrt(x)
