@@ -141,6 +141,30 @@ function _pullback(cx::AContext, ::typeof(Base.hvncat), dim::Int, xs...)
   return y, hvncat_pullback
 end
 
+# Length-parameterised ranges build a `StepRangeLen` internally, which has no
+# constructor adjoint (#550, #1120). Differentiate the closed form instead:
+# `range(start, stop; length=n)[i] == start + tᵢ*(stop - start)` with
+# `tᵢ = (i-1)/(n-1)`, so `∂start = Σᵢ Δᵢ(1-tᵢ)` and `∂stop = Σᵢ Δᵢ tᵢ`.
+function _range_length_pullback(Δ::AbstractVector, start, stop, len::Integer)
+  len == 1 && return (sum(Δ), nothing)
+  t = range(zero(eltype(Δ)) / 1, one(eltype(Δ)) / 1; length = len)  # 0 .. 1
+  ∂start = sum(i -> Δ[i] * (1 - t[i]), eachindex(Δ, t))
+  ∂stop = sum(i -> Δ[i] * t[i], eachindex(Δ, t))
+  return (∂start, ∂stop)
+end
+_range_length_pullback(Δ, start, stop, len) = (nothing, nothing)  # e.g. AbstractZero/nothing
+
+@adjoint function Base.range(start, stop; length = nothing, step = nothing)
+  range_pullback(Δ) = length === nothing ? (nothing, nothing) :
+                      _range_length_pullback(Δ, start, stop, length)
+  return Base.range(start, stop; length = length, step = step), range_pullback
+end
+
+@adjoint function Base.range(start, stop, length::Integer)
+  range3_pullback(Δ) = (_range_length_pullback(Δ, start, stop, length)..., nothing)
+  return Base.range(start, stop, length), range3_pullback
+end
+
 @adjoint function repeat(xs; inner=ntuple(_->1, ndims(xs)), outer=ntuple(_->1, ndims(xs)))
   repeat(xs, inner = inner, outer = outer), function (Δ)
     Δ′ = zero(xs)
