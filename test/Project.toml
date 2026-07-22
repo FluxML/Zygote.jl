@@ -28,4 +28,5 @@ Zygote = {path = ".."}
 [compat]
 ChainRulesTestUtils = "1.13.1"
 FillArrays = "1.17.0"
+FFTW = "1.10.0"
 PythonCall = "0.9.35"
