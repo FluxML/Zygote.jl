@@ -901,3 +901,35 @@ end
   y3, g3 = withgradient(f3, [1,2,3.0])
   @test g1[1] ≈ g2[1] ≈ g3[1]
 end
+
+@testset "isdefined" begin
+  # `@isdefined` on a conditionally-defined local (a slot in the lowered IR) used to
+  # be mishandled: IRTools' SSA conversion substitutes the slot's value into the
+  # `isdefined` node, which both segfaults Julia 1.12 codegen (FluxML/Zygote.jl#1662)
+  # and reports "defined" even on the undefined path. Both branches must work.
+  function maybe(x)
+    local y
+    x > 0 && (y = 3x)
+    @isdefined(y) ? y * 2 : 42 * x
+  end
+  @test gradient(maybe, 2.0)[1] == 6.0    # y defined  -> d(6x)/dx
+  @test gradient(maybe, -1.0)[1] == 42.0  # y undefined -> d(42x)/dx
+end
+
+@testset "logging macros" begin
+  # A logging macro expands to branch-heavy, side-effecting code with `isdefined`
+  # assertions. Differentiating a function containing one used to segfault on Julia
+  # 1.12 (FluxML/Zygote.jl#1662). Logging should be transparent to AD.
+  Base.CoreLogging.with_logger(Base.CoreLogging.NullLogger()) do
+    warn_branch(x) = x > 0 ? x * 2 : (@warn "neg"; x)
+    @test gradient(warn_branch, 1.0f0)[1] == 2.0f0   # branch not taken (issue MWE)
+    @test gradient(warn_branch, -1.0f0)[1] == 1.0f0  # branch taken: warn executed
+
+    info_branch(x) = x > 0 ? x * 2 : (@info "neg"; x)
+    @test gradient(info_branch, -1.0f0)[1] == 1.0f0
+
+    @test gradient(x -> (@warn "always"; x^2), 3.0f0)[1] == 6.0f0
+    # a logging keyword argument that depends on the differentiated variable
+    @test gradient(x -> (@info "msg" foo=x; x^2), 2.0f0)[1] == 4.0f0
+  end
+end
