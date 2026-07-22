@@ -293,3 +293,19 @@ end
     fallback_Fix2(y) = f(y, x)
     return _pullback(__context__, fallback_Fix2, y)
 end
+
+# Logging (`@warn`/`@info`/...): a logging macro expands to a chunk of purely
+# side-effecting code with no meaningful gradient. Differentiating through its
+# internals is at best wasted work and at worst broken -- e.g. on Julia 1.12 the
+# atomic level load compiles to an `llvmcall` that errors inside a generated
+# pullback. ChainRules already marks most of the machinery non-differentiable
+# (`current_logger_for_env`, `shouldlog`, `handle_message`, ...); here we cover
+# the pieces it misses so the whole logging statement is transparent to AD (the
+# message still prints; the gradient just flows past it). The branch-heavy
+# expansion also used to segfault Julia 1.12's codegen via a malformed `isdefined`
+# node; that is fixed upstream in IRTools 0.4.19 (the compat bound above).
+# See https://github.com/FluxML/Zygote.jl/issues/1662.
+@non_differentiable Base.getindex(::Base.Threads.Atomic)
+if isdefined(Base.CoreLogging, :handle_message_nothrow)
+    @non_differentiable Base.CoreLogging.handle_message_nothrow(::Any...)
+end
