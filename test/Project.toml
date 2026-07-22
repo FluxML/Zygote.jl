@@ -27,3 +27,4 @@ Zygote = {path = ".."}
 
 [compat]
 FillArrays = "1.17.0"
+PythonCall = "0.9.35"
