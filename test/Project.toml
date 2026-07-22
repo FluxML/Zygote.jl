@@ -26,4 +26,5 @@ Zygote = "e88e6eb3-aa80-5325-afca-941959d7151f"
 Zygote = {path = ".."}
 
 [compat]
+FillArrays = "1.17.0"
 PythonCall = "0.9.35"
