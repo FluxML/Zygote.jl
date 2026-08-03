@@ -38,6 +38,16 @@ end
 unwrapquote(x) = x
 unwrapquote(x::QuoteNode) = x.value
 
+# Name of the function a `:foreigncall`/`ccall` targets. Up to Julia 1.12 the target is a
+# bare `QuoteNode(:name)`; from Julia 1.13 it is a 1- or 2-tuple expression `(:name,)` /
+# `(:name, :lib)`, i.e. `Expr(:tuple, QuoteNode(:name)[, lib])`.
+function foreigncall_name(x)
+  x isa QuoteNode && (x = x.value)
+  isexpr(x, :tuple) && !isempty(x.args) && (x = x.args[1])
+  x isa QuoteNode && (x = x.value)
+  return x
+end
+
 is_getproperty(ex) = iscall(ex, Base, :getproperty)
 
 # The initial premise of literal_getproperty was in some ways inherently flawed, because for
@@ -293,7 +303,7 @@ function passthrough_expr(ex::Expr)
     isexpr(ex, GlobalRef, :call, :isdefined, :inbounds, :meta, :loopinfo, :enter, :leave, :catch) && return true
     # ccalls and more that are safe to preserve/required for proper operation:
     # - jl_set_task_threadpoolid: added in 1.9 for @spawn
-    isexpr(ex, :foreigncall) && unwrapquote(ex.args[1]) in (:jl_set_task_threadpoolid,) && return true
+    isexpr(ex, :foreigncall) && foreigncall_name(ex.args[1]) === :jl_set_task_threadpoolid && return true
     return false
 end
 
