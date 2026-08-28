@@ -70,7 +70,7 @@ function _generate_literal_getproperty(ctx, world, x, ::Type{Val{f}}) where f
         mi_pb_getproperty, _, _ = reflect((typeof(_pullback), pb_sig(x).parameters...), world)
         mi_getproperty, _, _ = reflect((typeof(getproperty), sig(x).parameters...), world)
         mi_rrule, _, _ = reflect((typeof(rrule), rrule_sig(x).parameters...), world)
-        ci.edges = Core.MethodInstance[mi, mi_pb_getproperty, mi_getproperty, mi_rrule]
+        ci.edges = Any[mi, mi_pb_getproperty, mi_getproperty, mi_rrule]
         # XXX: on 1.10, we should also set metadata like min-world and max-world
 
         if isdefined(Base, :__has_internal_change) && Base.__has_internal_change(v"1.12-alpha", :codeinfonargs)
