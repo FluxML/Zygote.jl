@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Custom Adjoints · Zygote</title><script>(function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+(i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+})(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+ga('create', 'UA-36890222-9', 'auto');
+ga('send', 'pageview', {'page': location.pathname + location.search + location.hash});
+</script><link href="https://fonts.googleapis.com/css?family=Lato|Roboto+Mono" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.11.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.11.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.11.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.11.1/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL=".."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../assets/documenter.js"></script><script src="../siteinfo.js"></script><script src="../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-dark.css" data-theme-name="documenter-dark"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit">Zygote</span></div><form class="docs-search" action="../search/"><input class="docs-search-query" id="documenter-search-query" name="q" type="text" placeholder="Search docs"/></form><ul class="docs-menu"><li><a class="tocitem" href="../">Home</a></li><li class="is-active"><a class="tocitem" href>Custom Adjoints</a><ul class="internal"><li><a class="tocitem" href="#Pullbacks-1"><span>Pullbacks</span></a></li><li><a class="tocitem" href="#Custom-Adjoints-2"><span>Custom Adjoints</span></a></li><li><a class="tocitem" href="#Custom-Types-1"><span>Custom Types</span></a></li><li><a class="tocitem" href="#Advanced-Adjoints-1"><span>Advanced Adjoints</span></a></li></ul></li><li><a class="tocitem" href="../utils/">Utilities</a></li><li><a class="tocitem" href="../complex/">Complex Differentiation</a></li><li><a class="tocitem" href="../profiling/">Profiling</a></li><li><a class="tocitem" href="../internals/">Internals</a></li><li><a class="tocitem" href="../glossary/">Glossary</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><nav class="breadcrumb"><ul class="is-hidden-mobile"><li class="is-active"><a href>Custom Adjoints</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Custom Adjoints</a></li></ul></nav><div class="docs-right"><a class="docs-edit-link" href="https://github.com/FluxML/Zygote.jl/blob/master/docs/src/adjoints.md" title="Edit on GitHub"><span class="docs-icon fab"></span><span class="docs-label is-hidden-touch">Edit on GitHub</span></a><a class="docs-settings-button fas fa-cog" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-sidebar-button fa fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a></div></header><article class="content" id="documenter-page"><h1 id="Custom-Adjoints-1"><a class="docs-heading-anchor" href="#Custom-Adjoints-1">Custom Adjoints</a><a class="docs-heading-anchor-permalink" href="#Custom-Adjoints-1" title="Permalink"></a></h1><div class="admonition is-info"><header class="admonition-header">Prefer to use ChainRulesCore to define custom adjoints</header><div class="admonition-body"><p>Zygote supports the use of <a href="http://www.juliadiff.org/ChainRulesCore.jl/stable/">ChainRulesCore</a> to define custom sensitivities. It is prefered to define the custom sensitivities using <code>ChainRulesCore.rrule</code> as they will work for many AD systems, not just Zygote. These sensitivities can be added in your own package, or for Base/StdLib functions they can be added to <a href="https://github.com/JuliaDiff/ChainRules.jl/">ChainRules.jl</a>. To define custom sensitivities using ChainRulesCore, define a <code>ChainRulesCore.rrule(f, args...; kwargs...)</code>. Head to <a href="https://www.juliadiff.org/ChainRulesCore.jl/stable/">ChainRules project&#39;s documentation</a> for more information. <strong>If you are defining your custom adjoints using ChainRulesCore then you do not need to read this page</strong>, and can consider it as documenting a legacy feature.</p><p>This page exists to descibe how Zygote works, and how adjoints can be directly defined for Zygote. Defining adjoints this way does not make them accessible to other AD systems, but does let you do things that directly depend on how Zygote works. It allows for specific definitions of adjoints that are only defined for Zgyote (which might work differently to more generic definitions defined for all AD).</p></div></div><p>The <code>@adjoint</code> macro is an important part of Zygote&#39;s interface; customising your backwards pass is not only possible but widely used and encouraged. While there are specific utilities available for common things like gradient clipping, understanding adjoints will give you the most flexibility. We first give a bit more background on what these pullback things are.</p><h2 id="Pullbacks-1"><a class="docs-heading-anchor" href="#Pullbacks-1">Pullbacks</a><a class="docs-heading-anchor-permalink" href="#Pullbacks-1" title="Permalink"></a></h2><p><code>gradient</code> is really just syntactic sugar around the more fundamental function <code>pullback</code>.</p><pre><code class="language-julia">julia&gt; y, back = Zygote.pullback(sin, 0.5);
+
+julia&gt; y
+0.479425538604203</code></pre><p><code>pullback</code> gives two outputs: the result of the original function, <code>sin(0.5)</code>, and a <em>pullback</em>, here called <code>back</code>. <code>back</code> implements the gradient computation for <code>sin</code>, accepting a derivative and producing a new one. In mathematical terms, it implements a vector-Jacobian product. Where <span>$y = f(x)$</span> and the gradient <span>$\frac{\partial l}{\partial x}$</span> is written <span>$\bar{x}$</span>, the pullback <span>$\mathcal{B}_y$</span> computes:</p><div>\[\bar{x} = \frac{\partial l}{\partial x} = \frac{\partial l}{\partial y} \frac{\partial y}{\partial x} = \mathcal{B}_y(\bar{y})\]</div><p>To make this concrete, take the function <span>$y = \sin(x)$</span>. <span>$\frac{\partial y}{\partial x} = \cos(x)$</span>, so the pullback is <span>$\bar{y} \cos(x)$</span>. In other words <code>pullback(sin, x)</code> behaves the same as</p><pre><code class="language-julia">dsin(x) = (sin(x), ȳ -&gt; (ȳ * cos(x),))</code></pre><p><code>gradient</code> takes a function <span>$l = f(x)$</span> and assumes <span>$l̄ = \frac{\partial l}{\partial l} = 1$</span> and feeds this in to the pullback. In the case of <code>sin</code>,</p><pre><code class="language-julia">julia&gt; function gradsin(x)
+         _, back = dsin(x)
+         back(1)
+       end
+gradsin (generic function with 1 method)
+
+julia&gt; gradsin(0.5)
+(0.8775825618903728,)
+
+julia&gt; cos(0.5)
+0.8775825618903728</code></pre><p>More generally</p><pre><code class="language-julia">julia&gt; function mygradient(f, x...)
+         _, back = Zygote.pullback(f, x...)
+         back(1)
+       end
+mygradient (generic function with 1 method)
+
+julia&gt; mygradient(sin, 0.5)
+(0.8775825618903728,)</code></pre><p>The rest of this section contains more technical detail. It can be skipped if you only need an intuition for pullbacks; you generally won&#39;t need to worry about it as a user.</p><p>If <span>$x$</span> and <span>$y$</span> are vectors, <span>$\frac{\partial y}{\partial x}$</span> becomes a Jacobian. Importantly, because we are implementing reverse mode we actually left-multiply the Jacobian, i.e. <code>v&#39;J</code>, rather than the more usual <code>J*v</code>. Transposing <code>v</code> to a row vector and back <code>(v&#39;J)&#39;</code> is equivalent to <code>J&#39;v</code> so our gradient rules actually implement the <em>adjoint</em> of the Jacobian. This is relevant even for scalar code: the adjoint for <code>y = sin(x)</code> is <code>x̄ = sin(x)&#39;*ȳ</code>; the conjugation is usually moot but gives the correct behaviour for complex code. &quot;Pullbacks&quot; are therefore sometimes called &quot;vector-Jacobian products&quot; (VJPs), and we refer to the reverse mode rules themselves as &quot;adjoints&quot;.</p><p>Zygote has many adjoints for non-mathematical operations such as for indexing and data structures. Though these can still be seen as linear functions of vectors, it&#39;s not particularly enlightening to implement them with an actual matrix multiply. In these cases it&#39;s easiest to think of the adjoint as a kind of inverse. For example, the gradient of a function that takes a tuple to a struct (e.g. <code>y = Complex(a, b)</code>) will generally take a struct to a tuple (<code>(ȳ.re, ȳ.im)</code>). The gradient of a <code>getindex</code> <code>y = x[i...]</code> is a <code>setindex!</code> <code>x̄[i...] = ȳ</code>, etc.</p><h2 id="Custom-Adjoints-2"><a class="docs-heading-anchor" href="#Custom-Adjoints-2">Custom Adjoints</a><a class="docs-heading-anchor-permalink" href="#Custom-Adjoints-2" title="Permalink"></a></h2><p>We can extend Zygote to a new function with the <code>@adjoint</code> function.</p><pre><code class="language-julia">julia&gt; mul(a, b) = a*b
+
+julia&gt; using Zygote: @adjoint
+
+julia&gt; @adjoint mul(a, b) = mul(a, b), c̄ -&gt; (c̄*b, c̄*a)
+
+julia&gt; gradient(mul, 2, 3)
+(3, 2)</code></pre><p>It might look strange that we write <code>mul(a, b)</code> twice here. In this case we want to call the normal <code>mul</code> function for the pullback pass, but you may also want to modify the pullback pass (for example, to capture intermediate results in the pullback).</p><h2 id="Custom-Types-1"><a class="docs-heading-anchor" href="#Custom-Types-1">Custom Types</a><a class="docs-heading-anchor-permalink" href="#Custom-Types-1" title="Permalink"></a></h2><p>One good use for custom adjoints is to customise how your own types behave during differentiation. For example, in our <code>Point</code> example we noticed that the adjoint is a named tuple, rather than another point.</p><pre><code class="language-julia">import Base: +, -
+
+struct Point
+  x::Float64
+  y::Float64
+end
+
+width(p::Point) = p.x
+height(p::Point) = p.y
+
+a::Point + b::Point = Point(width(a) + width(b), height(a) + height(b))
+a::Point - b::Point = Point(width(a) - width(b), height(a) - height(b))
+dist(p::Point) = sqrt(width(p)^2 + height(p)^2)</code></pre><pre><code class="language-julia">julia&gt; gradient(a -&gt; dist(a), Point(1, 2))[1]
+(x = 0.4472135954999579, y = 0.8944271909999159)</code></pre><p>Fundamentally, this happens because of Zygote&#39;s default adjoint for <code>getfield</code>.</p><pre><code class="language-julia">julia&gt; gradient(a -&gt; a.x, Point(1, 2))
+((x = 1, y = nothing),)</code></pre><p>We can overload this by modifying the getters <code>height</code> and <code>width</code>.</p><pre><code class="language-julia">julia&gt; @adjoint width(p::Point) = p.x, x̄ -&gt; (Point(x̄, 0),)
+
+julia&gt; @adjoint height(p::Point) = p.y, ȳ -&gt; (Point(0, ȳ),)
+
+julia&gt; Zygote.refresh() # currently needed when defining new adjoints
+
+julia&gt; gradient(a -&gt; height(a), Point(1, 2))
+(Point(0.0, 1.0),)
+
+julia&gt; gradient(a -&gt; dist(a), Point(1, 2))[1]
+Point(0.4472135954999579, 0.8944271909999159)</code></pre><p>If you do this you should also overload the <code>Point</code> constructor, so that it can handle a <code>Point</code> gradient (otherwise this function will error).</p><pre><code class="language-julia">julia&gt; @adjoint Point(a, b) = Point(a, b), p̄ -&gt; (p̄.x, p̄.y)
+
+julia&gt; gradient(x -&gt; dist(Point(x, 1)), 1)
+(0.7071067811865475,)</code></pre><h2 id="Advanced-Adjoints-1"><a class="docs-heading-anchor" href="#Advanced-Adjoints-1">Advanced Adjoints</a><a class="docs-heading-anchor-permalink" href="#Advanced-Adjoints-1" title="Permalink"></a></h2><p>We usually use custom adjoints to add gradients that Zygote can&#39;t derive itself (for example, because they <code>ccall</code> to BLAS). But there are some more advanced and fun things we can to with <code>@adjoint</code>.</p><h3 id="Gradient-Hooks-1"><a class="docs-heading-anchor" href="#Gradient-Hooks-1">Gradient Hooks</a><a class="docs-heading-anchor-permalink" href="#Gradient-Hooks-1" title="Permalink"></a></h3><pre><code class="language-julia">julia&gt; hook(f, x) = x
+hook (generic function with 1 method)
+
+julia&gt; @adjoint hook(f, x) = x, x̄ -&gt; (nothing, f(x̄))</code></pre><p><code>hook</code> doesn&#39;t seem that interesting, as it doesn&#39;t do anything. But the fun part is in the adjoint; it&#39;s allowing us to apply a function <code>f</code> to the gradient of <code>x</code>.</p><pre><code class="language-julia">julia&gt; gradient((a, b) -&gt; hook(-, a)*b, 2, 3)
+(-3, 2)</code></pre><p>We could use this for debugging or modifying gradients (e.g. gradient clipping).</p><pre><code class="language-julia">julia&gt; gradient((a, b) -&gt; hook(ā -&gt; @show(ā), a)*b, 2, 3)
+ā = 3
+(3, 2)</code></pre><p>Zygote provides both <code>hook</code> and <code>@showgrad</code> so you don&#39;t have to write these yourself.</p><h3 id="Checkpointing-1"><a class="docs-heading-anchor" href="#Checkpointing-1">Checkpointing</a><a class="docs-heading-anchor-permalink" href="#Checkpointing-1" title="Permalink"></a></h3><p>A more advanced example is checkpointing, in which we save memory by re-computing the pullback pass of a function during the backwards pass. To wit:</p><pre><code class="language-julia">julia&gt; checkpoint(f, x) = f(x)
+checkpoint (generic function with 1 method)
+
+julia&gt; @adjoint checkpoint(f, x) = f(x), ȳ -&gt; Zygote._pullback(f, x)[2](ȳ)
+
+julia&gt; gradient(x -&gt; checkpoint(sin, x), 1)
+(0.5403023058681398,)</code></pre><p>If a function has side effects we&#39;ll see that the pullback pass happens twice, as expected.</p><pre><code class="language-julia">julia&gt; foo(x) = (println(x); sin(x))
+foo (generic function with 1 method)
+
+julia&gt; gradient(x -&gt; checkpoint(foo, x), 1)
+1
+1
+(0.5403023058681398,)</code></pre><h3 id="Gradient-Reflection-1"><a class="docs-heading-anchor" href="#Gradient-Reflection-1">Gradient Reflection</a><a class="docs-heading-anchor-permalink" href="#Gradient-Reflection-1" title="Permalink"></a></h3><p>It&#39;s easy to check whether the code we&#39;re running is currently being differentiated.</p><pre><code class="language-julia">isderiving() = false
+
+@adjoint isderiving() = true, _ -&gt; nothing</code></pre><p>A more interesting example is to actually detect how many levels of nesting are going on.</p><pre><code class="language-julia">nestlevel() = 0
+
+@adjoint nestlevel() = nestlevel()+1, _ -&gt; nothing</code></pre><p>Demo:</p><pre><code class="language-julia">julia&gt; function f(x)
+         println(nestlevel(), &quot; levels of nesting&quot;)
+         return x
+       end
+f (generic function with 1 method)
+
+julia&gt; grad(f, x) = gradient(f, x)[1]
+grad (generic function with 1 method)
+
+julia&gt; f(1);
+0 levels of nesting
+
+julia&gt; grad(f, 1);
+1 levels of nesting
+
+julia&gt; grad(x -&gt; x*grad(f, x), 1);
+2 levels of nesting</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../">« Home</a><a class="docs-footer-nextpage" href="../utils/">Utilities »</a></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> on <span class="colophon-date" title="Thursday 25 November 2021 19:38">Thursday 25 November 2021</span>. Using Julia version 1.6.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
