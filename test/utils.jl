@@ -94,7 +94,17 @@ using ForwardDiff
   x3 = rand(3)
   @test Zygote.gradient(f3, x3)[1] ≈ ForwardDiff.gradient(f3, x3)
 
-  @test gradient(x -> ForwardDiff.derivative(x -> x^4, x), 7) == (4 * 3 * 7^2,)
+  # Nested forward-over-forward AD over an *integer* seed miscompiles to an illegal
+  # instruction (SIGILL) on Julia ≥1.13 — a compiler regression, not a Zygote bug:
+  # `ForwardDiff.derivative(x -> ForwardDiff.derivative(y->y^4, x), 7)` crashes on its own,
+  # while the `Float64` seed works. A SIGILL is uncatchable and would take down the test
+  # worker, so `@test_skip` (which does not evaluate the expression) on affected versions.
+  if VERSION >= v"1.13-"  # `-` so 1.13 prereleases (rc/DEV) are included too
+    @test_skip gradient(x -> ForwardDiff.derivative(x -> x^4, x), 7) == (4 * 3 * 7^2,)
+  else
+    @test gradient(x -> ForwardDiff.derivative(x -> x^4, x), 7) == (4 * 3 * 7^2,)
+  end
+  @test gradient(x -> ForwardDiff.derivative(x -> x^4, x), 7.0) == (4 * 3 * 7.0^2,)
 
   f4(x) = ForwardDiff.derivative(x -> [x,x^2,x^3], x)
   @test Zygote.jacobian(f4, pi)[1] ≈ ForwardDiff.derivative(f4, pi)

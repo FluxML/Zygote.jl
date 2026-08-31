@@ -449,11 +449,12 @@ end
         @testset "similar eigenvalues" begin
           λ[1] = λ[3] + sqrt(eps(eltype(λ))) / 10
           A2 = U * Diagonal(λ) * U'
-          # This gradient test is only broken on x86_64 + Julia >= 1.12; on
-          # aarch64 the near-degenerate `sqrt(::Symmetric)` gradient passes,
-          # so gating on the architecture avoids an "Unexpected Pass" there.
+          # The near-degenerate `sqrt(::Symmetric)` gradient is numerically ill-conditioned:
+          # the finite-difference check fails on x86_64 from Julia 1.12, and on every arch
+          # (aarch64 included) from Julia 1.13. It still passes elsewhere, so gate precisely
+          # to avoid an "Unexpected Pass".
           broken = f == sqrt && MT <: Symmetric{Float64} && domain == Real
-          broken = broken && (VERSION >= v"1.12") && Sys.ARCH === :x86_64
+          broken = broken && ((VERSION >= v"1.12" && Sys.ARCH === :x86_64) || VERSION >= v"1.13-")
           # @show f MT domain
           @test _gradtest_hermsym(f, ST, A2) broken=broken
         end
