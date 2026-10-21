@@ -289,6 +289,28 @@ end
   end
 end
 
+@testset "accum wrapped GPU arrays" begin
+  # https://github.com/FluxML/Zygote.jl/issues/1676 : a `Transpose`/`Adjoint` of a
+  # GPU array was copied to the host and back before accumulating.
+  x = cu(rand(Float32, 3, 3))
+  for y in (transpose(x), x', PermutedDimsArray(x, (2, 1)))
+    @test Zygote._gpu_like(x, y) === y
+    @test Zygote.accum(x, y) isa CuArray
+    @test collect(Zygote.accum(x, y)) ≈ collect(Zygote.accum(y, x)) ≈ collect(x) + collect(y)
+  end
+
+  W, a, b = cu(rand(Float32, 3, 4)), cu(rand(Float32, 4, 2)), cu(rand(Float32, 3, 2))
+  f(W, a, b) = sum(abs2, W * a) + sum(abs2, transpose(W) * b)
+  g = gradient(W -> f(W, a, b), W)[1]
+  @test g isa CuArray
+  @test collect(g) ≈ gradient(W -> f(W, collect(a), collect(b)), collect(W))[1]
+
+  # wrapped GPU cotangent accumulated with the host `Diagonal{<:Fill}` from `tr`
+  g = gradient(x -> sum(abs2, x') - tr(x), x)[1]
+  @test g isa CuArray
+  @test collect(g) ≈ gradient(x -> sum(abs2, x') - tr(x), collect(x))[1]
+end
+
 @testset "sparse projection" begin
   # https://github.com/FluxML/Zygote.jl/issues/1313 : the gradient w.r.t. a
   # `CuSparseMatrixCSC` must stay sparse (with the primal's pattern) and match
