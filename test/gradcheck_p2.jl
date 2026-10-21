@@ -367,11 +367,13 @@ end
 _hermsymtype(::Type{<:Symmetric}) = Symmetric
 _hermsymtype(::Type{<:Hermitian}) = Hermitian
 
-function _gradtest_hermsym(f, ST, A; kwargs...)
-  gradtest(_splitreim(collect(A))...; kwargs...) do (args...)
-    B = f(ST(_joinreim(_dropimaggrad.(args)...)))
-    return sum(_splitreim(B))
-  end
+function _gradtest_hermsym(f, ST, A; rtol = 1e-6)
+  g(args...) = sum(sin.(sum(_splitreim(f(ST(_joinreim(_dropimaggrad.(args)...)))))))
+  xs = _splitreim(collect(A))
+  # `ngradient` is too inaccurate for nearly degenerate eigenvalues;
+  # `max_range` keeps evaluations inside the domain (e.g. of `atanh`)
+  fdm = FiniteDifferences.central_fdm(5, 1; max_range = 1e-4)
+  return all(isapprox.(gradient(g, xs...), FiniteDifferences.grad(fdm, g, xs...); rtol = rtol))
 end
 
 @testset "eigen(::RealHermSymComplexHerm)" begin
@@ -436,8 +438,7 @@ end
         y, back = Zygote.pullback(f, A)
         y2 = f(A)
         @test y ≈ y2
-        broken = VERSION >= v"1.12" &&  MT <: Hermitian{Float64} && domain == Real
-        @test typeof(y) == typeof(y2) broken=broken
+        @test typeof(y) == typeof(y2)
         ȳ = randn(eltype(y), size(y))
         if y isa Union{Symmetric,Hermitian}
             ȳ = typeof(y)(ȳ, y.uplo)
@@ -449,13 +450,7 @@ end
         @testset "similar eigenvalues" begin
           λ[1] = λ[3] + sqrt(eps(eltype(λ))) / 10
           A2 = U * Diagonal(λ) * U'
-          # This gradient test is only broken on x86_64 + Julia >= 1.12; on
-          # aarch64 the near-degenerate `sqrt(::Symmetric)` gradient passes,
-          # so gating on the architecture avoids an "Unexpected Pass" there.
-          broken = f == sqrt && MT <: Symmetric{Float64} && domain == Real
-          broken = broken && (VERSION >= v"1.12") && Sys.ARCH === :x86_64
-          # @show f MT domain
-          @test _gradtest_hermsym(f, ST, A2) broken=broken
+          @test _gradtest_hermsym(f, ST, A2)
         end
 
         if f ∉ (log, sqrt) # only defined for invertible matrices
@@ -483,10 +478,9 @@ end
       y = Zygote.pullback(sincos, A)[1]
       y2 = sincos(A)
       @test y[1] ≈ y2[1]
-      broken = VERSION >= v"1.12" &&  MT <: Hermitian{Float64}
-      @test typeof(y[1]) == typeof(y2[1]) broken=broken
+      @test typeof(y[1]) == typeof(y2[1])
       @test y[2] ≈ y2[2]
-      @test typeof(y[2]) == typeof(y2[2]) broken=broken
+      @test typeof(y[2]) == typeof(y2[2])
      
       @testset "similar eigenvalues" begin
         λ[1] = λ[3] + sqrt(eps(eltype(λ))) / 10
