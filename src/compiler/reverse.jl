@@ -366,11 +366,11 @@ function adjoint(pr::Primal)
 
     b = block(pr.ir, id)
     rb = block(ir, id)
-    err_message = if isempty(b)
+    lines = [st.line for (_, st) in b if st.line > 0]
+    err_message = if isempty(lines)
       "Can't differentiate function execution in catch block"
     else
-      _, f_stmt = first(b)
-      li = pr.ir.lines[f_stmt.line]
+      li = pr.ir.lines[first(lines)]
       "Can't differentiate function execution in catch block at $(li.file):$(li.line)."
     end
     pushfirst!(rb, stmt(xcall(Base, :error, err_message)))
