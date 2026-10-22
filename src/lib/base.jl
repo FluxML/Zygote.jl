@@ -168,21 +168,23 @@ end
   end
 end
 
+# Build each `Task` around its final closure: since Julia 1.14 a task caches a
+# specialization of its code at construction, so `t.code` must not be replaced.
 @adjoint! function Task(f)
-  t = Task(f)
-  t.code = function ()
+  local t
+  t = Task() do
     y, back = _pullback(__context__, f)
-    cache(__context__)[t] = Task(back)
+    cache(__context__)[t] = back
     return y
   end
   t, _ -> fetch(cache(__context__)[t])
 end
 
 function runadjoint(cx, t, ȳ = nothing)
-  t̄ = cache(cx)[t]
-  f = t̄.code
-  t̄.code = () -> f(ȳ)
+  back = cache(cx)[t]
+  t̄ = Task(() -> back(ȳ))
   t̄.sticky = t.sticky
+  cache(cx)[t] = t̄
   schedule(t̄)
 end
 
@@ -199,7 +201,7 @@ end
 end
 
 # Need to hold onto the references here
-@adjoint! function Base.sync_end(ch::Channel)
+@adjoint! function Base.sync_end(ch::Channel, args...)
   ch_copy = grad_mut(__context__, ch)
   dch = grad_mut(ch_copy)
   while !isempty(ch)
@@ -207,7 +209,7 @@ end
     put!(ch_copy, i)
     put!(dch, i)
   end
-  Base.sync_end(ch_copy), _ -> begin
+  Base.sync_end(ch_copy, args...), _ -> begin
     while !isempty(dch)
       t = take!(dch)
       runadjoint(__context__, t)
@@ -308,4 +310,15 @@ end
 @non_differentiable Base.getindex(::Base.Threads.Atomic)
 if isdefined(Base.CoreLogging, :handle_message_nothrow)
     @non_differentiable Base.CoreLogging.handle_message_nothrow(::Any...)
+end
+
+# Dynamic scopes, entered by `@with` and (since Julia 1.14) by `@sync`.
+if isdefined(Core, :current_scope)
+    @non_differentiable Core.current_scope()
+    @non_differentiable Base.ScopedValues.Scope(::Any...)
+end
+if isdefined(Base, :default_cancel_token)
+    @non_differentiable Base.default_cancel_token()
+    @non_differentiable Base.CancellationTokenSource(::Any...)
+    @non_differentiable Base.CancellationToken(::Any...)
 end

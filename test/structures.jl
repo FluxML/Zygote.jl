@@ -34,6 +34,15 @@ tasks4(x) = fetch(@async x^2)
 tasks5(x) = fetch(schedule(Task(() -> x^2)))
 @test gradient(tasks5, 5) == (10,)
 
+@static if isdefined(Base, :ScopedValues)
+  const scoped = Base.ScopedValues.ScopedValue(1.0)
+  function with_scope(x)
+    y = sin(x)
+    Base.ScopedValues.@with(scoped => 2.0, x * scoped[]) + 0 * y
+  end
+  @test gradient(with_scope, 3.0) == (2.0,)
+end
+
 @test Zygote.pullback(Array, [1f0])[1] == [1f0]
 
 # NOTE: implicit-params test "#300" lives in test/deprecated.jl

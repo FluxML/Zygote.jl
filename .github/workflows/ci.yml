@@ -18,6 +18,7 @@ jobs:
   test:
     name: Julia ${{ matrix.version }} - ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
     continue-on-error: ${{ matrix.version == 'nightly' }} # allow nightly to fail
     strategy:
       fail-fast: false
