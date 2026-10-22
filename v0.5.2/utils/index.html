@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Utilities · Zygote</title><script>(function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+(i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+})(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+ga('create', 'UA-36890222-9', 'auto');
+ga('send', 'pageview', {'page': location.pathname + location.search + location.hash});
+</script><link href="https://fonts.googleapis.com/css?family=Lato|Roboto+Mono" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.11.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.11.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.11.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.11.1/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL=".."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../assets/documenter.js"></script><script src="../siteinfo.js"></script><script src="../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-dark.css" data-theme-name="documenter-dark"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit">Zygote</span></div><form class="docs-search" action="../search/"><input class="docs-search-query" id="documenter-search-query" name="q" type="text" placeholder="Search docs"/></form><ul class="docs-menu"><li><a class="tocitem" href="../">Home</a></li><li><a class="tocitem" href="../adjoints/">Custom Adjoints</a></li><li class="is-active"><a class="tocitem" href>Utilities</a></li><li><a class="tocitem" href="../complex/">Complex Differentiation</a></li><li><a class="tocitem" href="../profiling/">Profiling</a></li><li><a class="tocitem" href="../internals/">Internals</a></li><li><a class="tocitem" href="../glossary/">Glossary</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><nav class="breadcrumb"><ul class="is-hidden-mobile"><li class="is-active"><a href>Utilities</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Utilities</a></li></ul></nav><div class="docs-right"><a class="docs-edit-link" href="https://github.com/FluxML/Zygote.jl/blob/master/docs/src/utils.md" title="Edit on GitHub"><span class="docs-icon fab"></span><span class="docs-label is-hidden-touch">Edit on GitHub</span></a><a class="docs-settings-button fas fa-cog" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-sidebar-button fa fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a></div></header><article class="content" id="documenter-page"><h1 id="Utilities-1"><a class="docs-heading-anchor" href="#Utilities-1">Utilities</a><a class="docs-heading-anchor-permalink" href="#Utilities-1" title="Permalink"></a></h1><p>Zygote provides a set of helpful utilities. These are all &quot;user-level&quot; tools – in other words you could have written them easily yourself, but they live in Zygote for convenience.</p><article class="docstring"><header><a class="docstring-binding" id="Zygote.@showgrad" href="#Zygote.@showgrad"><code>Zygote.@showgrad</code></a> — <span class="docstring-category">Macro</span></header><section><div><pre><code class="language-julia">@showgrad(x) -&gt; x</code></pre><p>Much like <code>@show</code>, but shows the gradient about to accumulate to <code>x</code>. Useful for debugging gradients.</p><pre><code class="language-none">julia&gt; gradient(2, 3) do a, b
+         @showgrad(a)*b
+       end
+∂(a) = 3
+(3, 2)</code></pre><p>Note that the gradient depends on how the output of <code>@showgrad</code> is <em>used</em>, and is not the <em>overall</em> gradient of the variable <code>a</code>. For example:</p><pre><code class="language-none">julia&gt; gradient(2) do a
+     @showgrad(a)*a
+   end
+∂(a) = 2
+(4,)
+
+julia&gt; gradient(2, 3) do a, b
+         @showgrad(a) # not used, so no gradient
+         a*b
+       end
+∂(a) = nothing
+(3, 2)</code></pre></div><a class="docs-sourcelink" target="_blank" href="https://github.com/FluxML/Zygote.jl/blob/469e34b5e6c9fbbdbe290ca0a0db3a8aaaf5e124/src/lib/utils.jl#L67-L94">source</a></section></article><article class="docstring"><header><a class="docstring-binding" id="Zygote.hook" href="#Zygote.hook"><code>Zygote.hook</code></a> — <span class="docstring-category">Function</span></header><section><div><pre><code class="language-julia">hook(x̄ -&gt; ..., x) -&gt; x</code></pre><p>Gradient hooks. Allows you to apply an arbitrary function to the gradient for <code>x</code>.</p><pre><code class="language-none">julia&gt; gradient(2, 3) do a, b
+         hook(ā -&gt; @show(ā), a)*b
+       end
+ā = 3
+(3, 2)
+
+julia&gt; gradient(2, 3) do a, b
+         hook(-, a)*b
+       end
+(-3, 2)</code></pre></div><a class="docs-sourcelink" target="_blank" href="https://github.com/FluxML/Zygote.jl/blob/469e34b5e6c9fbbdbe290ca0a0db3a8aaaf5e124/src/lib/utils.jl#L46-L62">source</a></section></article><article class="docstring"><header><a class="docstring-binding" id="Zygote.dropgrad" href="#Zygote.dropgrad"><code>Zygote.dropgrad</code></a> — <span class="docstring-category">Function</span></header><section><div><pre><code class="language-julia">dropgrad(x) -&gt; x</code></pre><p>Drop the gradient of <code>x</code>.</p><pre><code class="language-none">julia&gt; gradient(2, 3) do a, b
+     dropgrad(a)*b
+   end
+(nothing, 2)</code></pre></div><a class="docs-sourcelink" target="_blank" href="https://github.com/FluxML/Zygote.jl/blob/469e34b5e6c9fbbdbe290ca0a0db3a8aaaf5e124/src/lib/utils.jl#L1-L10">source</a></section></article><article class="docstring"><header><a class="docstring-binding" id="Zygote.hessian" href="#Zygote.hessian"><code>Zygote.hessian</code></a> — <span class="docstring-category">Function</span></header><section><div><pre><code class="language-julia">hessian(f, x)</code></pre><p>Construct the Hessian of <code>f</code>, where <code>x</code> is a real or real array and <code>f(x)</code> is a real.</p><pre><code class="language-none">julia&gt; hessian(((a, b),) -&gt; a*b, [2, 3])
+2×2 Array{Int64,2}:
+ 0  1
+ 1  0</code></pre></div><a class="docs-sourcelink" target="_blank" href="https://github.com/FluxML/Zygote.jl/blob/469e34b5e6c9fbbdbe290ca0a0db3a8aaaf5e124/src/lib/utils.jl#L102-L112">source</a></section></article><article class="docstring"><header><a class="docstring-binding" id="Zygote.Buffer" href="#Zygote.Buffer"><code>Zygote.Buffer</code></a> — <span class="docstring-category">Type</span></header><section><div><pre><code class="language-julia">Buffer(xs, ...)</code></pre><p><code>Buffer</code> is an array-like type which is mutable when taking gradients. You can construct a <code>Buffer</code> with the same syntax as <code>similar</code> (e.g. <code>Buffer(xs, 5)</code>) and then use normal indexing. Finally, use <code>copy</code> to get back a normal array.</p><p>For example:</p><pre><code class="language-julia">julia&gt; function vstack(xs)
+           buf = Buffer(xs, length(xs), 5)
+           for i = 1:5
+             buf[:, i] = xs
+           end
+           return copy(buf)
+         end
+vstack (generic function with 1 method)
+
+julia&gt; vstack([1, 2, 3])
+3×5 Array{Int64,2}:
+ 1  1  1  1  1
+ 2  2  2  2  2
+ 3  3  3  3  3
+
+julia&gt; gradient(x -&gt; sum(vstack(x)), [1, 2, 3])
+([5.0, 5.0, 5.0],)</code></pre><p><code>Buffer</code> is not an <code>AbstractArray</code> and can&#39;t be used for linear algebra operations like matrix multiplication. This prevents it from being captured by pullbacks.</p><p><code>copy</code> is a semantic copy, but does not allocate memory. Instead the <code>Buffer</code> is made immutable after copying.</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/FluxML/Zygote.jl/blob/469e34b5e6c9fbbdbe290ca0a0db3a8aaaf5e124/src/tools/buffer.jl#L1-L36">source</a></section></article><article class="docstring"><header><a class="docstring-binding" id="Zygote.forwarddiff" href="#Zygote.forwarddiff"><code>Zygote.forwarddiff</code></a> — <span class="docstring-category">Function</span></header><section><div><pre><code class="language-julia">forwarddiff(f, x) -&gt; f(x)</code></pre><p>Runs <code>f(x)</code> as usual, but instructs Zygote to differentiate <code>f</code> using forward mode, rather than the usual reverse mode.</p><p>Forward mode takes time linear in <code>length(x)</code> but only has constant memory overhead, and is very efficient for scalars, so in some cases this can be a useful optimisation.</p><pre><code class="language-julia">julia&gt; function pow(x, n)
+         r = one(x)
+         for i = 1:n
+           r *= x
+         end
+         return r
+       end
+pow (generic function with 1 method)
+
+julia&gt; gradient(5) do x
+         forwarddiff(x) do x
+           pow(x, 2)
+         end
+       end
+(10,)</code></pre><p>Note that the function <code>f</code> will <em>drop gradients</em> for any closed-over values.</p><pre><code class="language-julia">julia&gt; gradient(2, 3) do a, b
+         forwarddiff(a) do a
+           a*b
+         end
+       end
+(3, nothing)</code></pre><p>This can be rewritten by explicitly passing through <code>b</code>, i.e.</p><pre><code class="language-julia">gradient(2, 3) do a, b
+  forwarddiff([a, b]) do (a, b)
+    a*b
+  end
+end</code></pre></div><a class="docs-sourcelink" target="_blank" href="https://github.com/FluxML/Zygote.jl/blob/469e34b5e6c9fbbdbe290ca0a0db3a8aaaf5e124/src/lib/forward.jl#L49-L97">source</a></section></article><article class="docstring"><header><a class="docstring-binding" id="Zygote.ignore" href="#Zygote.ignore"><code>Zygote.ignore</code></a> — <span class="docstring-category">Function</span></header><section><div><pre><code class="language-julia">ignore() do
+  ...
+end</code></pre><p>Tell Zygote to ignore a block of code. Everything inside the <code>do</code> block will run on the forward pass as normal, but Zygote won&#39;t try to differentiate it at all. This can be useful for e.g. code that does logging of the forward pass.</p><p>Obviously, you run the risk of incorrect gradients if you use this incorrectly.</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/FluxML/Zygote.jl/blob/469e34b5e6c9fbbdbe290ca0a0db3a8aaaf5e124/src/lib/utils.jl#L14-L24">source</a></section></article><p><code>Params</code> and <code>Grads</code> can be copied to and from arrays using the <code>copy!</code> function.</p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../adjoints/">« Custom Adjoints</a><a class="docs-footer-nextpage" href="../complex/">Complex Differentiation »</a></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> on <span class="colophon-date" title="Thursday 2 July 2020 12:36">Thursday 2 July 2020</span>. Using Julia version 1.4.2.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>

@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Utilities · Zygote</title><script>(function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+(i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+})(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+ga('create', 'UA-36890222-9', 'auto');
+ga('send', 'pageview');
+</script><link href="https://cdnjs.cloudflare.com/ajax/libs/normalize/4.2.0/normalize.min.css" rel="stylesheet" type="text/css"/><link href="https://fonts.googleapis.com/css?family=Lato|Roboto+Mono" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/default.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL=".."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.2.0/require.min.js" data-main="../assets/documenter.js"></script><script src="../siteinfo.js"></script><script src="../../versions.js"></script><link href="../assets/documenter.css" rel="stylesheet" type="text/css"/></head><body><nav class="toc"><h1>Zygote</h1><select id="version-selector" onChange="window.location.href=this.value" style="visibility: hidden"></select><form class="search" id="search-form" action="../search/"><input id="search-query" name="q" type="text" placeholder="Search docs"/></form><ul><li><a class="toctext" href="../">Home</a></li><li><a class="toctext" href="../adjoints/">Custom Adjoints</a></li><li class="current"><a class="toctext" href>Utilities</a><ul class="internal"></ul></li><li><a class="toctext" href="../complex/">Complex Differentiation</a></li><li><a class="toctext" href="../flux/">Flux</a></li><li><a class="toctext" href="../profiling/">Profiling</a></li><li><a class="toctext" href="../internals/">Internals</a></li><li><a class="toctext" href="../glossary/">Glossary</a></li></ul></nav><article id="docs"><header><nav><ul><li><a href>Utilities</a></li></ul><a class="edit-page" href="https://github.com/FluxML/Zygote.jl/blob/master/docs/src/utils.md"><span class="fa"></span> Edit on GitHub</a></nav><hr/><div id="topbar"><span>Utilities</span><a class="fa fa-bars" href="#"></a></div></header><h1><a class="nav-anchor" id="Utilities-1" href="#Utilities-1">Utilities</a></h1><p>Zygote provides a set of helpful utilities. These are all &quot;user-level&quot; tools – in other words you could have written them easily yourself, but they live in Zygote for convenience.</p><section class="docstring"><div class="docstring-header"><a class="docstring-binding" id="Zygote.@showgrad" href="#Zygote.@showgrad"><code>Zygote.@showgrad</code></a> — <span class="docstring-category">Macro</span>.</div><div><div><pre><code class="language-none">@showgrad(x) -&gt; x</code></pre><p>Much like <code>@show</code>, but shows the gradient about to accumulate to <code>x</code>. Useful for debugging gradients.</p><pre><code class="language-none">julia&gt; gradient(2, 3) do a, b
+         @showgrad(a)*b
+       end
+∂(a) = 3
+(3, 2)</code></pre><p>Note that the gradient depends on how the output of <code>@showgrad</code> is <em>used</em>, and is not the <em>overall</em> gradient of the variable <code>a</code>. For example:</p><pre><code class="language-none">julia&gt; gradient(2) do a
+     @showgrad(a)*a
+   end
+∂(a) = 2
+(4,)
+
+julia&gt; gradient(2, 3) do a, b
+         @showgrad(a) # not used, so no gradient
+         a*b
+       end
+∂(a) = nothing
+(3, 2)</code></pre></div></div><a class="source-link" target="_blank" href="https://github.com/FluxML/Zygote.jl/blob/89c7b1c6bfc71db38312c504cd06f32e8efff5f7/src/lib/utils.jl#L35-L62">source</a></section><section class="docstring"><div class="docstring-header"><a class="docstring-binding" id="Zygote.hook" href="#Zygote.hook"><code>Zygote.hook</code></a> — <span class="docstring-category">Function</span>.</div><div><div><pre><code class="language-none">hook(x̄ -&gt; ..., x) -&gt; x</code></pre><p>Gradient hooks. Allows you to apply an arbitrary function to the gradient for <code>x</code>.</p><pre><code class="language-none">julia&gt; gradient(2, 3) do a, b
+         hook(ā -&gt; @show(ā), a)*b
+       end
+ā = 3
+(3, 2)
+
+julia&gt; gradient(2, 3) do a, b
+         hook(-, a)*b
+       end
+(-3, 2)</code></pre></div></div><a class="source-link" target="_blank" href="https://github.com/FluxML/Zygote.jl/blob/89c7b1c6bfc71db38312c504cd06f32e8efff5f7/src/lib/utils.jl#L14-L30">source</a></section><section class="docstring"><div class="docstring-header"><a class="docstring-binding" id="Zygote.dropgrad" href="#Zygote.dropgrad"><code>Zygote.dropgrad</code></a> — <span class="docstring-category">Function</span>.</div><div><div><pre><code class="language-none">dropgrad(x) -&gt; x</code></pre><p>Drop the gradient of <code>x</code>.</p><pre><code class="language-none">julia&gt; gradient(2, 3) do a, b
+     dropgrad(a)*b
+   end
+(nothing, 2)</code></pre></div></div><a class="source-link" target="_blank" href="https://github.com/FluxML/Zygote.jl/blob/89c7b1c6bfc71db38312c504cd06f32e8efff5f7/src/lib/utils.jl#L1-L10">source</a></section><section class="docstring"><div class="docstring-header"><a class="docstring-binding" id="Zygote.hessian" href="#Zygote.hessian"><code>Zygote.hessian</code></a> — <span class="docstring-category">Function</span>.</div><div><div><pre><code class="language-none">hessian(f, x)</code></pre><p>Construct the Hessian of <code>f</code>, where <code>x</code> is a real or real array and <code>f(x)</code> is a real.</p><pre><code class="language-none">julia&gt; hessian(((a, b),) -&gt; a*b, [2, 3])
+2×2 Array{Int64,2}:
+ 0  1
+ 1  0</code></pre></div></div><a class="source-link" target="_blank" href="https://github.com/FluxML/Zygote.jl/blob/89c7b1c6bfc71db38312c504cd06f32e8efff5f7/src/lib/utils.jl#L70-L80">source</a></section><section class="docstring"><div class="docstring-header"><a class="docstring-binding" id="Zygote.Buffer" href="#Zygote.Buffer"><code>Zygote.Buffer</code></a> — <span class="docstring-category">Type</span>.</div><div><div><pre><code class="language-none">Buffer(xs, ...)</code></pre><p><code>Buffer</code> is an array-like type which is mutable when taking gradients. You can construct a <code>Buffer</code> with the same syntax as <code>similar</code> (e.g. <code>Buffer(xs, 5)</code>) and then use normal indexing. Finally, use <code>copy</code> to get back a normal array.</p><p>For example:</p><pre><code class="language-julia">julia&gt; function vstack(xs)
+           buf = Buffer(xs, length(xs), 5)
+           for i = 1:5
+             buf[:, i] = xs
+           end
+           return copy(buf)
+         end
+vstack (generic function with 1 method)
+
+julia&gt; vstack([1, 2, 3])
+3×5 Array{Int64,2}:
+ 1  1  1  1  1
+ 2  2  2  2  2
+ 3  3  3  3  3
+
+julia&gt; gradient(x -&gt; sum(vstack(x)), [1, 2, 3])
+([5.0, 5.0, 5.0],)</code></pre><p><code>Buffer</code> is not an <code>AbstractArray</code> and can&#39;t be used for linear algebra operations like matrix multiplication. This prevents it from being captured by pullbacks.</p><p><code>copy</code> is a semantic copy, but does not allocate memory. Instead the <code>Buffer</code> is made immutable after copying.</p></div></div><a class="source-link" target="_blank" href="https://github.com/FluxML/Zygote.jl/blob/89c7b1c6bfc71db38312c504cd06f32e8efff5f7/src/lib/buffer.jl#L1-L36">source</a></section><section class="docstring"><div class="docstring-header"><a class="docstring-binding" id="Zygote.forwarddiff" href="#Zygote.forwarddiff"><code>Zygote.forwarddiff</code></a> — <span class="docstring-category">Function</span>.</div><div><div><pre><code class="language-none">forwarddiff(f, x) -&gt; f(x)</code></pre><p>Runs <code>f(x)</code> as usual, but instructs Zygote to differentiate <code>f</code> using forward mode, rather than the usual reverse mode.</p><p>Forward mode takes time linear in <code>length(x)</code> but only has constant memory overhead, and is very efficient for scalars, so in some cases this can be a useful optimisation.</p><pre><code class="language-julia">julia&gt; function pow(x, n)
+         r = one(x)
+         for i = 1:n
+           r *= x
+         end
+         return r
+       end
+pow (generic function with 1 method)
+
+julia&gt; gradient(5) do x
+         forwarddiff(x) do x
+           pow(x, 2)
+         end
+       end
+(10,)</code></pre><p>Note that the function <code>f</code> will <em>drop gradients</em> for any closed-over values.</p><pre><code class="language-julia">julia&gt; gradient(2, 3) do a, b
+         forwarddiff(a) do a
+           a*b
+         end
+       end
+(3, nothing)</code></pre><p>This can be rewritten by explicitly passing through <code>b</code>, i.e.</p><pre><code class="language-julia">gradient(2, 3) do a, b
+  forwarddiff([a, b]) do (a, b)
+    a*b
+  end
+end</code></pre></div></div><a class="source-link" target="_blank" href="https://github.com/FluxML/Zygote.jl/blob/89c7b1c6bfc71db38312c504cd06f32e8efff5f7/src/lib/forward.jl#L49-L97">source</a></section><footer><hr/><a class="previous" href="../adjoints/"><span class="direction">Previous</span><span class="title">Custom Adjoints</span></a><a class="next" href="../complex/"><span class="direction">Next</span><span class="title">Complex Differentiation</span></a></footer></article></body></html>
