@@ -37,7 +37,9 @@ end
 
 
 # ugly hack to make differentiating `getproperty` infer a lot better
-function _generate_literal_getproperty(ctx, world, x, ::Type{Val{f}}) where f
+# `F` is `Val{f}`; taking `f` as a static parameter would compile this once per field name
+function _generate_literal_getproperty(ctx, world, x, F)
+    f = F.parameters[1]
     world = something(world, typemax(UInt))
 
     sig(x) = Tuple{x, typeof(f)}
@@ -53,7 +55,7 @@ function _generate_literal_getproperty(ctx, world, x, ::Type{Val{f}}) where f
 
     if is_getfield_fallback
         # just copy pullback of `literal_getfield`
-        mi, _sig, sparams = reflect((typeof(_pullback), ctx, typeof(literal_getfield), x, Val{f}), world)
+        mi, _sig, sparams = reflect((typeof(_pullback), ctx, typeof(literal_getfield), x, F), world)
         ci = copy(Core.Compiler.retrieve_code_info(mi, world))
 
         # we need to change the second arg to `_pullback` from `literal_getproperty` to
