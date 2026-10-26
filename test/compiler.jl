@@ -34,13 +34,10 @@ y, back = pullback(badly, 2)
 bt = try back(1) catch e stacktrace(catch_backtrace()) end
 
 @test trace_contains(bt, nothing, "compiler.jl", bad_def_line)
-# On Julia 1.12+, IRTools < 0.4.23 indexes the line table of the generated `DebugInfo` by
-# statement instead of by line entry, so the pullback frames report the wrong lines.
-irtools_bad_lines = VERSION >= v"1.12" && pkgversion(Zygote.IRTools) < v"0.4.23"
-@test trace_contains(bt, nothing, "compiler.jl", bad_call_line) broken=irtools_bad_lines
+@test trace_contains(bt, nothing, "compiler.jl", bad_call_line)
 # Julia 1.14 builds frames from the `DebugInfo` tree, which names this frame after the
 # `Pullback` method rather than the primal.
-@test trace_contains(bt, :badly, "compiler.jl", bad_call_line) broken=irtools_bad_lines || VERSION >= v"1.14-"
+@test trace_contains(bt, :badly, "compiler.jl", bad_call_line) broken=VERSION >= v"1.14-"
 
 # Type inference checks
 
