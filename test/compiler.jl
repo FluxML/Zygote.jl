@@ -34,10 +34,13 @@ y, back = pullback(badly, 2)
 bt = try back(1) catch e stacktrace(catch_backtrace()) end
 
 @test trace_contains(bt, nothing, "compiler.jl", bad_def_line)
-@test trace_contains(bt, nothing, "compiler.jl", bad_call_line)
+# On Julia 1.12+, IRTools < 0.4.23 indexes the line table of the generated `DebugInfo` by
+# statement instead of by line entry, so the pullback frames report the wrong lines.
+irtools_bad_lines = VERSION >= v"1.12" && pkgversion(Zygote.IRTools) < v"0.4.23"
+@test trace_contains(bt, nothing, "compiler.jl", bad_call_line) broken=irtools_bad_lines
 # Julia 1.14 builds frames from the `DebugInfo` tree, which names this frame after the
 # `Pullback` method rather than the primal.
-@test trace_contains(bt, :badly, "compiler.jl", bad_call_line) broken=VERSION >= v"1.14-"
+@test trace_contains(bt, :badly, "compiler.jl", bad_call_line) broken=irtools_bad_lines || VERSION >= v"1.14-"
 
 # Type inference checks
 
@@ -378,4 +381,36 @@ end
   Zygote.refresh()
 
   @test Zygote.gradient(refresh1599, x)[1] == [3.4, 4.2, 0.0, 0.0, 6.2]
+end
+
+# https://github.com/FluxML/Zygote.jl/issues/1680
+# On Julia 1.12+ the generators' own world doesn't see bindings defined after Zygote.
+later_helper_1680(x) = 2x
+calls_later_helper_1680(x) = later_helper_1680(x)
+
+@testset "constant globals are not tracked" begin
+  _, back = Zygote._pullback(Context(), calls_later_helper_1680, 1.0)
+  @test back.t isa Tuple{Zygote.Pullback{Tuple{typeof(later_helper_1680), Float64}}}
+end
+
+@testset "gradients through code compiled during precompilation" begin
+  mktempdir() do dir
+    mkpath(joinpath(dir, "ZygotePrecompile1680", "src"))
+    write(joinpath(dir, "ZygotePrecompile1680", "src", "ZygotePrecompile1680.jl"), """
+      module ZygotePrecompile1680
+      using Zygote
+      helper(x) = x
+      f(x) = 2 .* helper(x)
+      Zygote.gradient(x -> sum(f(x)), [1.0, 2.0])
+      end
+      """)
+    script = """
+      pushfirst!(DEPOT_PATH, $(repr(joinpath(dir, "depot"))))
+      push!(LOAD_PATH, $(repr(dir)))
+      using ZygotePrecompile1680, Zygote
+      print(Zygote.gradient(x -> sum(abs2, ZygotePrecompile1680.f(x)), [1.0, 2.0]))
+      """
+    cmd = `$(Base.julia_cmd()) --project=$(Base.active_project()) -e $script`
+    @test readchomp(cmd) == "([8.0, 16.0],)"
+  end
 end
