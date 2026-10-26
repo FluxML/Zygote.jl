@@ -76,9 +76,6 @@ macro profile(ex)
   end
 end
 
-using PrecompileTools
-@compile_workload begin
-    include("precompile.jl")
-end
+include("precompile.jl")
 
 end

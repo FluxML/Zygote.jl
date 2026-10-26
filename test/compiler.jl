@@ -221,6 +221,15 @@ end
     @test @inferred(gradient(usesmod, 1))[1] == 1.0 broken=VERSION >= v"1.12"
 end
 
+@testset "`getproperty` generator is not compiled per field name" begin
+    Gaussian = _Gaussian(:specialization)
+    @test gradient(g -> g.m * g.P, Gaussian(2.0, 3.0))[1] == (m = 3.0, P = 2.0)
+    m = only(methods(Zygote._generate_literal_getproperty))
+    @test !any(Base.specializations(m)) do mi
+        Base.unwrap_unionall(mi.specTypes).parameters[end] <: Type{<:Val}
+    end
+end
+
 @testset "non-differentiable primitives error clearly" begin
     # Regression: the callable pullback's non-differentiable branch referenced a
     # stale argument name `j` (the generator stub names it `methodinstance`), so it

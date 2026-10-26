@@ -42,16 +42,18 @@ runonce(b) = b.id in (1, length(b.ir.blocks)) &&
 function forward_stacks!(adj, F)
   stks, recs = [], []
   pr = adj.primal
-  for b in blocks(pr), α in alphauses(block(adj.adjoint, b.id))
+  for b in blocks(pr)
     not_stack = runonce(b)
-    if not_stack
-      push!(recs, Variable(α))
-    else
-      stk = pushfirst!(pr, xstack(Any))
-      push!(recs, stk)
-      push!(b, xcall(Zygote, :_push!, stk, Variable(α)))
+    for α in alphauses(block(adj.adjoint, b.id))
+      if not_stack
+        push!(recs, Variable(α))
+      else
+        stk = pushfirst!(pr, xstack(Any))
+        push!(recs, stk)
+        push!(b, xcall(Zygote, :_push!, stk, Variable(α)))
+      end
+      push!(stks, (b.id, alpha(α), not_stack))
     end
-    push!(stks, (b.id, alpha(α), not_stack))
   end
   rec = push!(pr, xtuple(recs...))
   P = length(pr.blocks) == 1 ? Pullback{F} : Pullback{F,Any}
