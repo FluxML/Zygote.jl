@@ -40,6 +40,25 @@ unwrapquote(x::QuoteNode) = x.value
 
 is_getproperty(ex) = iscall(ex, Base, :getproperty)
 
+# `Some(value)` if the global `mod.name` is constant in `world`, else `nothing`. Generators run in
+# their own definition world, not the `world` they generate code for, so with world-partitioned
+# bindings (Julia 1.12+) a plain `isconst` misses globals defined after Zygote was loaded (#1680).
+@static if isdefined(Base, :lookup_binding_partition)
+  function const_global(world::UInt, mod::Module, name::Symbol)
+    bpart = Base.lookup_binding_partition(world, GlobalRef(mod, name))
+    while Base.is_some_binding_imported(Base.binding_kind(bpart))
+      bpart = Base.lookup_binding_partition(world, Base.partition_restriction(bpart)::Core.Binding)
+    end
+    Base.is_defined_const_binding(Base.binding_kind(bpart)) || return nothing
+    return Some(Base.partition_restriction(bpart))
+  end
+else
+  const_global(world::UInt, mod::Module, name::Symbol) =
+    isconst(mod, name) ? Some(getfield(mod, name)) : nothing
+end
+
+isconst_global(world, mod, name) = const_global(world, mod, name) !== nothing
+
 # The initial premise of literal_getproperty was in some ways inherently flawed, because for
 # getproperty it was intended that _pullback falls back to literal_getproperty, but we actually
 # want the opposite to happen, since Zygote should fall back to recursing into the getproperty
@@ -47,10 +66,10 @@ is_getproperty(ex) = iscall(ex, Base, :getproperty)
 # literal_getproperty, though. We can't really have mutually recursive definitions here, so we
 # now always instrument getproperty as literal_getproperty, no matter whether the second
 # argument is a literal or not.
-function instrument_getproperty!(ir, v, ex)
+function instrument_getproperty!(ir, v, ex, world)
   if is_getproperty(ex)
     obj, prop = ex.args[2], ex.args[3]
-    if obj isa Module && prop isa QuoteNode && isconst(obj, unwrapquote(prop))
+    if obj isa Module && prop isa QuoteNode && isconst_global(world, obj, unwrapquote(prop))
       # Metaprogramming can generate getproperty(::Module, ...) calls.
       # Like other types, these are type unstable without constprop.
       # However, literal_getproperty's heuristic is also not general enough for modules.
@@ -105,32 +124,33 @@ function instrument_iterate!(ir, v, ex)
   end
 end
 
-function instrument_literals!(ir, v, ex)
-  ex = instrument_getproperty!(ir, v, ex)
+function instrument_literals!(ir, v, ex, world)
+  ex = instrument_getproperty!(ir, v, ex, world)
   ex = instrument_getfield!(ir, v, ex)
   ex = instrument_getindex!(ir, v, ex)
   ex = instrument_iterate!(ir, v, ex)
 end
 
-function istrackable(x)
+function istrackable(x, world)
   x isa GlobalRef && x.mod ∉ (Base, Core) || return false
-  isconst(x.mod, x.name) || return true
-  x = getfield(x.mod, x.name)
+  val = const_global(world, x.mod, x.name)
+  val === nothing && return true
+  x = something(val)
   !(x isa Type || sizeof(x) == 0)
 end
 
-function instrument_global!(ir, v, ex)
-  if istrackable(ex)
+function instrument_global!(ir, v, ex, world)
+  if istrackable(ex, world)
     ir[v] = xcall(Zygote, :unwrap, QuoteNode(ex), ex)
   else
     ir[v] = prewalk(ex) do x
-      istrackable(x) || return x
+      istrackable(x, world) || return x
       insert!(ir, v, xcall(Zygote, :unwrap, QuoteNode(x), x))
     end
   end
 end
 
-function instrument(ir::IR)
+function instrument(ir::IR; world = Base.get_world_counter())
   pr = Pipe(ir)
   for (v, st) in pr
     ex = st.expr
@@ -145,8 +165,8 @@ function instrument(ir::IR)
       pr[v] = true
     else
       ex = instrument_new!(pr, v, ex)
-      ex = instrument_literals!(pr, v, ex)
-      ex = instrument_global!(pr, v, ex)
+      ex = instrument_literals!(pr, v, ex, world)
+      ex = instrument_global!(pr, v, ex, world)
     end
   end
   ir = finish(pr)
@@ -187,7 +207,7 @@ ignored_f(f) = f in (GlobalRef(Base, :not_int),
 ignored_f(ir, f) = ignored_f(f)
 ignored_f(ir, f::Variable) = ignored_f(get(ir, f, nothing))
 
-function ignored(ir, ex)
+function ignored(ir, ex, world)
   isexpr(ex, :call) || return false
   f = ex.args[1]
   ignored_f(ir, f) && return true
@@ -199,20 +219,20 @@ function ignored(ir, ex)
     # Metaprogramming can generate getproperty(::Module, ...) calls.
     # These are type unstable without constprop, which transforming to _pullback breaks.
     # However, we can skip differentiating these if they're const properties.
-    obj isa Module && prop isa QuoteNode && isconst(obj, unwrapquote(prop)) && return true
+    obj isa Module && prop isa QuoteNode && isconst_global(world, obj, unwrapquote(prop)) && return true
   end
   return false
 end
-ignored(ir, ex::Variable) = ignored(ir, ir[ex])
+ignored(ir, ex::Variable, world) = ignored(ir, ir[ex], world)
 
-function primal(ir::IR)
+function primal(ir::IR, world)
   pr = Pipe(ir)
   pbs = Dict{Variable,Variable}()
   argument!(pr, at = 1)
   cx = argument!(pr, Context, at = 2)
   for (v, st) in pr
     ex = st.expr
-    if isexpr(ex, :call) && !ignored(ir, ex)
+    if isexpr(ex, :call) && !ignored(ir, ex, world)
       yJ = insert!(pr, v, stmt(xcall(Zygote, :_pullback, cx, ex.args...),
                                line = ir[v].line))
       pr[v] = xgetindex(yJ, 1)
@@ -234,9 +254,9 @@ struct Primal
   pullbacks::Dict{Variable,Variable}
 end
 
-function Primal(ir::IR; varargs = nothing)
-  ir = instrument(normalise!(ir))
-  pr, brs, pbs = primal(ir)
+function Primal(ir::IR; varargs = nothing, world = Base.get_world_counter())
+  ir = instrument(normalise!(ir); world)
+  pr, brs, pbs = primal(ir, world)
   Primal(expand!(ir), pr, varargs, brs, pbs)
 end
 
@@ -384,8 +404,8 @@ struct Adjoint
   adjoint::IR
 end
 
-function Adjoint(ir::IR; varargs = nothing, normalise = true)
-  pr = Primal(ir, varargs = varargs)
+function Adjoint(ir::IR; varargs = nothing, normalise = true, world = Base.get_world_counter())
+  pr = Primal(ir; varargs, world)
   adj = adjoint(pr) |> prune!
   if normalise
     permute!(adj, length(adj.blocks):-1:1)
