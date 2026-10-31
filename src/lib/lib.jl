@@ -223,8 +223,32 @@ end
 _empty(x) = length(x)
 _empty(x::Union{Tuple,NamedTuple}) = map(_->nothing, x)
 
-_unapply(t::Integer, xs) = xs[1:t], xs[t+1:end]
-_unapply(t, xs) = first(xs), tail(xs)
+# A splatted array gets an array cotangent, so that it can be accumulated with the cotangents of
+# its other uses (#731, #1717).
+struct SplatArray{A<:Tuple}
+  axes::A
+  length::Int
+end
+
+_empty(x::AbstractArray) = SplatArray(axes(x), length(x))
+
+# The flat tuple of cotangents is consumed from the left. Taking the `tail` of a long tuple or
+# slicing it specialises on its length, which made the first gradient take seconds for a hundred
+# arguments (#1716), so a long one is consumed as a vector instead.
+_tail(xs::Tuple) = length(xs) > 32 ? _tail(collect(xs)) : tail(xs)
+_tail(xs::AbstractVector) = @view xs[2:end]
+
+_unapply(t::SplatArray, xs::Tuple) = _unapply(t, collect(xs))
+
+function _unapply(t::SplatArray, xs::AbstractVector)
+  n = t.length
+  dx = n == 0 ? nothing : reshape(xs[1:n], t.axes)
+  dx, @view xs[n+1:end]
+end
+
+_unapply(t::Integer, xs::AbstractVector) = Tuple(xs[1:t]), @view xs[t+1:end]
+_unapply(t::Integer, xs::Tuple) = xs[1:t], xs[t+1:end]
+_unapply(t, xs) = first(xs), _tail(xs)
 _unapply(t::Tuple{}, xs) = (), xs
 
 function _unapply(t::Tuple, xs)
@@ -246,7 +270,7 @@ unapply(t, xs) = _unapply(t, xs)[1]
   y, function (Δ)
     Δ = back(Δ)
     Δ === nothing ? nothing :
-      (first(Δ), unapply(st, Base.tail(Δ))...)
+      (first(Δ), unapply(st, _tail(Δ))...)
   end
 end
 
@@ -256,7 +280,7 @@ end
   y, function (Δ)
     Δ = back(Δ)
     Δ === nothing ? nothing :
-      (nothing, first(Δ), unapply(st, Base.tail(Δ))...)
+      (nothing, first(Δ), unapply(st, _tail(Δ))...)
   end
 end
 

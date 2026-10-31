@@ -162,6 +162,14 @@ for cat in (:vcat, :hcat)
   end
 end
 
+# Splatting a vector of numbers is a reshaped copy, so the cotangent of the vector is that of the result (#1716).
+for cat in (:vcat, :hcat)
+  @eval function _pullback(cx::AContext, ::typeof(Core._apply_iterate), ::typeof(iterate), ::typeof($cat), xs::AbstractVector{<:Number})
+    apply_iterate_cat_pullback(Δ) = (nothing, nothing, nothing, vec(unthunk(Δ)))
+    return $cat(xs...), apply_iterate_cat_pullback
+  end
+end
+
 _repeat_counts(n::Integer) = (n,)
 _repeat_counts(n) = Tuple(n)
 
