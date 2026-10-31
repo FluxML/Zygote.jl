@@ -215,6 +215,14 @@ end
         @test back(D̄)[1] ≈ back(Matrix(D̄))[1]
       end
     end
+
+    @testset "back(::Matrix) allocates a single n×n matrix" begin
+      n = 500
+      _, back = Zygote.pullback(Symmetric, randn(rng, n, n))
+      Δ = randn(rng, n, n)
+      back(Δ)
+      @test (@allocated back(Δ)) < 12n^2  # an n×n Float64 matrix takes 8n^2 bytes
+    end
   end
 
   @testset "complex" begin

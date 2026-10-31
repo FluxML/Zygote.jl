@@ -574,7 +574,7 @@ end
 
 function _symmetric_back(Δ, uplo)
   L, U, D = LowerTriangular(Δ), UpperTriangular(Δ), Diagonal(Δ)
-  return uplo == 'U' ? U .+ transpose(L) - D : L .+ transpose(U) - D
+  return uplo == 'U' ? U .+ transpose(L) .- D : L .+ transpose(U) .- D
 end
 _symmetric_back(Δ::Diagonal, uplo) = Δ
 _symmetric_back(Δ::UpperTriangular, uplo) = collect(uplo == 'U' ? Δ : transpose(Δ))
