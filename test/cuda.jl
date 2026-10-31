@@ -400,4 +400,62 @@ end
   lin = Base.get_extension(Zygote, :ZygoteCUDAExt)._linear_index.(
     Ref(Pbig.colPtr), Pbig.rowVal, eachindex(Pbig.rowVal), m)
   @test collect(lin) == [3, 49_999 + m * 49_997, 50_000 + m * 49_999]
+
+  # https://github.com/FluxML/Zygote.jl/issues/1700 : a sparse cotangent is
+  # looked up in the primal's pattern instead of being densified.
+  stored(A, D) = [D[i, j] for (i, j, _) in zip(findnz(A)...)]
+  for T in (Float32, Float64, ComplexF32), (m, n) in ((200, 300), (300, 200))
+    A = sprand(T, m, n, 0.1)
+    A[:, 2] .= 0
+    A[:, end] .= 0
+    dropzeros!(A)
+    D = sprand(T, m, n, 0.15)
+    D[:, 5] .= 0
+    dropzeros!(D)
+    Ag = CuSparseMatrixCSC(A)
+    P = ProjectTo(Ag)
+    for dx in (D, 2 * A, spzeros(T, m, n)) # differing, same, and empty pattern
+      g = P(CuSparseMatrixCSC(dx))
+      @test g isa CuSparseMatrixCSC{T}
+      @test collect(g.colPtr) == A.colptr
+      @test collect(g.rowVal) == A.rowval
+      @test collect(g.nzVal) == stored(A, dx)
+    end
+    @test isempty(ProjectTo(CuSparseMatrixCSC(spzeros(T, m, n)))(CuSparseMatrixCSC(D)).nzVal)
+  end
+
+  A = sprand(Float32, 50, 40, 0.2)
+  Ag = CuSparseMatrixCSC(A)
+  P = ProjectTo(Ag)
+  D = sprand(Float64, 50, 40, 0.2)
+  @test P(CuSparseMatrixCSC(D)) isa CuSparseMatrixCSC{Float32}
+  @test collect(P(CuSparseMatrixCSC(D)).nzVal) == Float32.(stored(A, D))
+  nz = randn(Float32, nnz(A)) # same arrays as the primal
+  @test collect(P(CuSparseMatrixCSC(Ag.colPtr, Ag.rowVal, cu(nz), size(A))).nzVal) == nz
+  @test_throws DimensionMismatch P(CuSparseMatrixCSC(D[1:end-1, :]))
+
+  # row indices not sorted within the columns: falls back to densifying
+  D = sprand(Float32, 50, 40, 0.5)
+  rowval, nzval = copy(D.rowval), copy(D.nzval)
+  for c in 1:size(D, 2)
+    k = D.colptr[c]:D.colptr[c+1]-1
+    rowval[k], nzval[k] = reverse(rowval[k]), reverse(nzval[k])
+  end
+  Du = CuSparseMatrixCSC(cu(Int32.(D.colptr)), cu(Int32.(rowval)), cu(nzval), size(D))
+  @test collect(P(Du).nzVal) == stored(A, D)
+
+  # no O(m*n) allocation
+  m = n = 4096
+  A, D = sprand(Float32, m, n, 0.002), sprand(Float32, m, n, 0.002)
+  P, Dg = ProjectTo(CuSparseMatrixCSC(A)), CuSparseMatrixCSC(D)
+  P(Dg)
+  @test CUDA.@allocated(P(Dg)) < sizeof(Float32) * m * n / 10
+  @test collect(P(Dg).nzVal) == stored(A, D)
+
+  # sparse cotangents with a pattern of their own reach the projection in `gradient`
+  A, B = sprand(Float32, 60, 50, 0.1), sprand(Float32, 60, 50, 0.1)
+  Ag, Bg = CuSparseMatrixCSC(A), CuSparseMatrixCSC(B)
+  gA = gradient(A -> sum(abs2, A + Bg), Ag)[1]
+  @test gA isa CuSparseMatrixCSC{Float32}
+  @test collect(gA.nzVal) ≈ gradient(A -> sum(abs2, A + B), A)[1].nzval
 end
