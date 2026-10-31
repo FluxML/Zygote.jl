@@ -2,6 +2,7 @@ using LinearAlgebra
 using SparseArrays
 using CUDA
 using CUDA.CUSPARSE: CuSparseMatrixCSC
+using FillArrays: Fill
 using Zygote: Grads
 using Random: randn!
 import FiniteDifferences
@@ -287,6 +288,27 @@ end
     @test g isa CuArray
     @test collect(g) ≈ gradient(x -> sum(abs2, x) - tr(x), collect(x0))[1]
   end
+
+  # the diagonal is added on the device: no n×n host matrix is built
+  # (https://github.com/FluxML/Zygote.jl/issues/1700)
+  n = 512
+  for T in (Float32, Float64, ComplexF32)
+    x = cu(rand(T, n, n))
+    D = Diagonal(Fill(T(2), n))
+    y = Zygote._gpu_like(x, D)
+    @test y isa CuArray{T,2}
+    @test collect(y) == collect(D)
+    @test collect(Zygote.accum(x, D)) == collect(x) + collect(D) == collect(Zygote.accum(D, x))
+  end
+  x = cu(rand(Float32, n, n))
+  D = Diagonal(Fill(2f0, n))
+  Zygote._gpu_like(x, D)
+  @test @allocated(Zygote._gpu_like(x, D)) < n^2
+  @test eltype(Zygote._gpu_like(x, Diagonal(Fill(2.0, n)))) == Float64
+
+  g = gradient(x -> sum(abs2, x) - tr(x), x)[1]
+  @test g isa CuArray
+  @test collect(g) ≈ gradient(x -> sum(abs2, x) - tr(x), collect(x))[1]
 end
 
 @testset "accum wrapped GPU arrays" begin
