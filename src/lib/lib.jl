@@ -14,8 +14,12 @@ accum(x, y) =
 # Unrolled because `map` over tuples of ≥ 32 elements and splats of ≥ 33 arguments are not,
 # which made backward passes over long tuples quadratic and allocation-heavy.
 # The non-generated branches are what inference sees for non-concrete types.
+# `nothing` arguments are dropped up front, leaving fewer (and more often tuple-only) arguments.
 function accum(x, y, zs...)
   if @generated
+    args = Any[:x, :y, [:(zs[$i]) for i in 1:length(zs)]...]
+    keep = findall(!isequal(Nothing), Any[x, y, zs...])
+    length(keep) < length(args) && return :(accum($(args[keep]...)))
     ex = :(accum(x, y))
     for i in 1:length(zs)
       ex = :(accum($ex, zs[$i]))
@@ -34,6 +38,22 @@ function accum(x::Tuple, y::Tuple)
     map(accum, x, y)
   end
 end
+
+# The `getindex` adjoints give mostly-`nothing` tuples. Accumulating each position over its
+# non-`nothing` entries avoids rebuilding the whole tuple at every step (quadratic in its length).
+function accum(x::Tuple, y::Tuple, z::Tuple, zs::Tuple...)
+  if @generated
+    args = Any[:x, :y, :z, [:(zs[$i]) for i in 1:length(zs)]...]
+    types = Any[x, y, z, zs...]
+    N = length(x.parameters)
+    all(t -> length(t.parameters) == N, types) || return :(accum(accum(x, y), z, zs...))
+    Expr(:tuple, [:(accum($([:($a[$i]) for (a, t) in zip(args, types) if t.parameters[i] !== Nothing]...)))
+                  for i in 1:N]...)
+  else
+    accum(accum(x, y), z, zs...)
+  end
+end
+
 accum(x::AbstractArray, ys::AbstractArray...) = Base.broadcast_preserving_zero_d(accum, x, ys...)
 accum(::Tuple{}, ::NamedTuple{}) = ()
 accum(::NamedTuple{}, ::Tuple{}) = ()
@@ -132,11 +152,14 @@ using Base: tail
 
 @_adjoint_keepthunks tuple(xs...) = xs, identity
 
+@generated onehot_tuple(::Val{N}, ::Val{i}, Δ) where {N,i} =
+  Expr(:tuple, [j == i ? :Δ : :nothing for j in 1:N]...)
+
 @_adjoint_keepthunks function literal_getindex(xs::NTuple{N,Any}, ::Val{i}) where {N,i}
   val = xs[i]
   function back(Δ)
     accum_param(__context__, val, Δ) === nothing && return
-    return ntuple(j -> i == j ? Δ : nothing, Val(N)), nothing
+    return onehot_tuple(Val(N), Val(i), Δ), nothing
   end
   val, back
 end
