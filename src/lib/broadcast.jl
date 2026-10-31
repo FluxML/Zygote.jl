@@ -112,7 +112,7 @@ _pow_grad(ȳ, df) = iszero(df) ? zero(ȳ * df) : ȳ * df
 
 @adjoint function broadcasted(::typeof(Base.literal_pow), ::typeof(^), x::Numeric, exp::Val{p}) where p
   y = Base.literal_pow.(^, x, exp)
-  y, ȳ -> (nothing, nothing, _pow_grad.(ȳ, p .* conj.(x .^ (p - 1))), nothing)
+  y, ȳ -> (nothing, nothing, _pow_grad.(ȳ, p .* conj.(Base.literal_pow.(^, x, Val(p - 1)))), nothing)
 end
 
 @adjoint broadcasted(::typeof(identity), x::Numeric) = x, Δ -> (nothing, Δ)
@@ -515,6 +515,12 @@ using GPUArraysCore  # replaces @require CUDA block, weird indenting to preserve
   # the device, so they are not copied (#1676).
   _gpu_like(ref::AnyGPUArray, y::AnyGPUArray) = y
   _gpu_like(ref::AnyGPUArray, y::AbstractArray) = copyto!(similar(ref, eltype(y), size(y)), collect(y))
+  # `collect(y)` would build an n×n host matrix for the `tr` adjoint; build it on the device.
+  function _gpu_like(ref::AnyGPUArray, y::Diagonal{<:Any,<:AbstractFill})
+    z = fill!(similar(ref, eltype(y), size(y)), zero(eltype(y)))
+    view(z, diagind(z)) .= getindex_value(y.diag)
+    return z
+  end
   accum(x::AnyGPUArray, y::AnyGPUArray) = Base.broadcast_preserving_zero_d(accum, x, y)
   accum(x::AnyGPUArray, y::AbstractArray) = accum(x, _gpu_like(x, y))
   accum(x::AbstractArray, y::AnyGPUArray) = accum(_gpu_like(y, x), y)

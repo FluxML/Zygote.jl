@@ -70,6 +70,43 @@ import LogExpFunctions
   @test gradtest((D, Y)-> Y' / Diagonal(D), D, Y)
   @test gradtest((D, Y)-> Y' / Diagonal(D), D, y)
 
+  @testset "Diagonal gradient is Diagonal" begin
+    for (d, Yd, yd) in ((randn(rng, P), Y, y),
+                        (complex.(randn(rng, P), randn(rng, P)),
+                         complex.(Y, randn(rng, P, Q)), complex.(y, randn(rng, P))))
+      Dg = Diagonal(d)
+      for B in (Yd, yd)
+        Z, back = Zygote.pullback(\, Dg, B)
+        D̄, B̄ = back(randn(rng, eltype(Z), size(Z)...))
+        @test D̄ isa Diagonal
+        @test Matrix(D̄) ≈ Diagonal(diag(-B̄ * Z'))
+      end
+      Z, back = Zygote.pullback(/, Yd', Dg)
+      Ȳ, D̄ = back(randn(rng, eltype(Z), size(Z)...))
+      @test D̄ isa Diagonal
+      @test Matrix(D̄) ≈ Diagonal(diag(-Z' * Ȳ))
+    end
+  end
+
+  @testset "Diagonal pullbacks avoid n×n temporaries" begin
+    n = 500
+    d, B, C = rand(rng, n) .+ 1, randn(rng, n, 3), randn(rng, 3, n)
+    for (f, args) in ((\, (Diagonal(d), B)), (/, (C, Diagonal(d))))
+      Z, back = Zygote.pullback(f, args...)
+      Ȳ = ones(size(Z)...)
+      back(Ȳ)
+      @test (@allocated back(Ȳ)) < n^2  # a dense n×n Float64 gradient takes 8n^2 bytes
+    end
+  end
+
+  # complex (Diagonal), checked via real and imaginary parts
+  cplx(f) = (dr, di, Br, Bi) -> (Z = f(Diagonal(complex.(dr, di)), complex.(Br, Bi)); vcat(vec(real(Z)), vec(imag(Z))))
+  dr, di = randn(rng, P), randn(rng, P)
+  @test gradtest(cplx(\), dr, di, Y, randn(rng, P, Q))
+  @test gradtest(cplx(\), dr, di, y, randn(rng, P))
+  @test gradtest(cplx((D, B) -> B' / D), dr, di, Y, randn(rng, P, Q))
+  @test gradtest(cplx((D, B) -> B' / D), dr, di, y, randn(rng, P))
+
   # / (LowerTriangular)
   @test gradtest((L, Y) -> Y' / L, L, Y)
   @test gradtest((L, Y) -> Y' / L, L, y)

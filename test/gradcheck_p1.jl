@@ -49,6 +49,25 @@ end
   @test gradient(xs ->sum(xs .^ 10), [3, -1]) == ([10*3^9, -10],)
   @test gradient(xs ->sum(xs .^ _pow), [4, -1]) == ([_pow*4^9, -10],)
 
+  @testset "broadcasted literal_pow: $T" for T in (Float32, Float64, ComplexF32, ComplexF64)
+    x = T <: Complex ? T.(randn(real(T), 6) .+ im .* randn(real(T), 6)) : T.(randn(6) .+ 3)
+    @testset "p = $p" for p in (0, 1, 2, 3, 4, 9, 20, -1, -2, -3)
+      # `Val(p)` is what `x .^ p` lowers to for a literal `p`
+      g = gradient(x -> real(sum(Base.literal_pow.(^, x, Val(p)))), x)[1]
+      @test g isa Vector{T}
+      @test g ≈ conj.(p .* x .^ (p - 1)) rtol=sqrt(eps(real(T)))
+    end
+    @test gradient(x -> real(sum(x .^ 2)), x)[1] ≈ conj.(2 .* x)
+    @test gradient(x -> real(sum(x .^ 3)), x)[1] ≈ conj.(3 .* x .^ 2)
+    @test gradient(x -> real(sum(x .^ -2)), x)[1] ≈ conj.(-2 .* x .^ -3)
+
+    z = zeros(T, 3)  # exponents 0 and 1 hit `p - 1 == -1` and `0`
+    @test gradient(x -> real(sum(x .^ 1)), z)[1] == ones(T, 3)
+    @test gradient(x -> real(sum(x .^ 2)), z)[1] == zeros(T, 3)
+    @test gradient(x -> real(sum(x .^ 3)), z)[1] == zeros(T, 3)
+    @test gradient(x -> real(sum(x .^ 4)), z)[1] == zeros(T, 3)
+  end
+
   @test gradient(x -> real((1+3im) * x^2), 5+7im) == (-32 - 44im,)
   @test gradient(p -> real((1+3im) * (5+7im)^p), 2)[1] ≈ real((-234 + 2im)*log(5 - 7im))
   # D[(1+3I)x^p, p] /. {x->5+7I, p->2} // Conjugate
@@ -259,6 +278,44 @@ end
 @test gradtest(x -> repeat(x; inner=2), rand(5))
 @test gradtest(x -> repeat(x; inner=2, outer=3), rand(5))
 @test gradtest(x -> repeat(x; inner=(2,2,1), outer=(1,1,3)), rand(5,4,3))
+@test gradtest(x -> repeat(x; outer=3), rand(5))
+@test gradtest(x -> repeat(x; inner=(2,1), outer=(1,3)), rand(5))
+@test gradtest(x -> repeat(x; inner=(2,3)), rand(4,3))
+@test gradtest(x -> repeat(x; outer=(2,3)), rand(4,3))
+@test gradtest(x -> repeat(x; inner=(2,1,2), outer=(1,3,2)), rand(4,3))  # more counts than dims
+@test gradtest(x -> repeat(x; inner=(2,1,3,2), outer=(1,2,1,2)), rand(4,3,2))
+
+@testset "repeat(x; inner, outer) matches the elementwise reference" begin
+  function repeat_ref(Δ, x, inner, outer)  # accumulates each element of Δ into its source in x
+    Δ′ = zero(x)
+    for (dest, val) in pairs(IndexCartesian(), Δ)
+      src = [mod1(div(dest[d] - 1, inner[d]) + 1, size(x, d)) for d in 1:ndims(x)]
+      Δ′[src...] += val
+    end
+    Δ′
+  end
+  for (x, inner, outer) in [
+        (rand(5), (2,), (3,)), (rand(5), (2,1), (1,3)), (rand(4,3), (2,3), (3,2)),
+        (rand(4,3), (2,1,2), (1,3,2)), (rand(4,3,2), (2,2,1), (1,1,3)),
+        (rand(Float32, 4,3), (2,1), (1,2)), (rand(ComplexF64, 4,3), (2,1), (1,2))]
+    y, back = Zygote.pullback(x -> repeat(x; inner, outer), x)
+    Δ = rand(eltype(y), size(y))
+    g = only(back(Δ))
+    @test size(g) == size(x)
+    @test g ≈ repeat_ref(Δ, x, inner, outer)
+  end
+
+  # the keyword arguments given as an integer, a vector or only one of the two
+  y, back = Zygote.pullback(x -> repeat(x; inner=[2,1], outer=3), rand(4))
+  @test only(back(ones(size(y)))) == fill(6.0, 4)
+
+  # no per-element work: the old scalar loop allocated ~25x the size of the cotangent
+  X = rand(100, 100)
+  y, back = Zygote.pullback(X -> repeat(X; inner=(2,1), outer=(1,3)), X)
+  Δ = ones(size(y))
+  back(Δ)
+  @test (@allocated back(Δ)) < sizeof(Δ)
+end
 
 @test gradtest(x -> repeat(x, 3), rand(5))
 @test gradtest(x -> repeat(x, 2, 3), rand(5))
@@ -592,7 +649,20 @@ end
   @test gradtest(pinv, A)
   @test gradtest(inv, B)
   @test gradtest(pinv, C)
+  @test gradtest(pinv, B)
   @test gradient(inv, 2.0)[1] == -0.25
+
+  @testset "pinv pullback avoids max(m, n) square temporaries" for sz in ((600, 4), (4, 600))
+    Z, back = Zygote.pullback(pinv, randn(rng, sz...))
+    Δ = ones(size(Z)...)
+    back(Δ)
+    @test (@allocated back(Δ)) < 600^2  # an m×m Float64 temporary takes 8m^2 bytes
+  end
+
+  @testset "pinv complex $(size(M))" for M in (A, B, C)
+    Mi = randn(rng, size(M)...)
+    @test gradtest((Mr, Mi) -> (W = pinv(complex.(Mr, Mi)); vcat(vec(real(W)), vec(imag(W)))), M, Mi)
+  end
 end
 
 @testset "multiplication" begin

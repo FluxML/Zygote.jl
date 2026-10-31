@@ -2,6 +2,8 @@ using LinearAlgebra
 using SparseArrays
 using CUDA
 using CUDA.CUSPARSE: CuSparseMatrixCSC
+using FillArrays: Fill
+using ChainRulesCore: ProjectTo
 using Zygote: Grads
 using Random: randn!
 import FiniteDifferences
@@ -212,6 +214,19 @@ end
   @test_skip gradient((x,y) -> sum(vcat(x,y)), 1f0, r, 2f0, r)[2] isa CUDA.CuArray{Float32}
 end
 
+@testset "repeat(x; inner, outer)" begin
+  # https://github.com/FluxML/Zygote.jl/issues/1689 : used to scalar-index
+  for (x, kw) in [(rand(Float32, 5), (inner=2, outer=3)),
+                  (rand(Float32, 5), (inner=(2,1), outer=(1,3))),
+                  (rand(Float32, 4, 3), (inner=(2,1,2), outer=(1,3,2))),
+                  (rand(Float32, 4, 3, 2), (inner=(2,2,1), outer=(1,1,3)))]
+    f(x) = sum(abs2, repeat(x; kw...))
+    g_gpu = gradient(f, cu(x))[1]
+    @test g_gpu isa CuArray
+    @test collect(g_gpu) ≈ gradient(f, x)[1]
+  end
+end
+
 
 @testset "CUDA complex broadcasting" begin
     # Issue 961 and 1121 and 1215
@@ -287,6 +302,27 @@ end
     @test g isa CuArray
     @test collect(g) ≈ gradient(x -> sum(abs2, x) - tr(x), collect(x0))[1]
   end
+
+  # the diagonal is added on the device: no n×n host matrix is built
+  # (https://github.com/FluxML/Zygote.jl/issues/1700)
+  n = 512
+  for T in (Float32, Float64, ComplexF32)
+    x = cu(rand(T, n, n))
+    D = Diagonal(Fill(T(2), n))
+    y = Zygote._gpu_like(x, D)
+    @test y isa CuArray{T,2}
+    @test collect(y) == collect(D)
+    @test collect(Zygote.accum(x, D)) == collect(x) + collect(D) == collect(Zygote.accum(D, x))
+  end
+  x = cu(rand(Float32, n, n))
+  D = Diagonal(Fill(2f0, n))
+  Zygote._gpu_like(x, D)
+  @test @allocated(Zygote._gpu_like(x, D)) < n^2
+  @test eltype(Zygote._gpu_like(x, Diagonal(Fill(2.0, n)))) == Float64
+
+  g = gradient(x -> sum(abs2, x) - tr(x), x)[1]
+  @test g isa CuArray
+  @test collect(g) ≈ gradient(x -> sum(abs2, x) - tr(x), collect(x))[1]
 end
 
 @testset "accum wrapped GPU arrays" begin
@@ -331,4 +367,37 @@ end
   # the result must support sparsity-preserving updates (the original bug was an
   # exception in `update!` because the gradient was dense)
   @test Mg - 0.1f0 * g_gpu isa CuSparseMatrixCSC
+
+  # https://github.com/FluxML/Zygote.jl/issues/1700 : the column index of the
+  # stored entries is built on the device when the projection is applied, not
+  # (with a host loop) when it is constructed. Non-square, with empty columns.
+  A = sprand(Float32, 200, 300, 0.1)
+  A[:, 2] .= 0
+  A[:, end] .= 0
+  dropzeros!(A)
+  Ag = CuSparseMatrixCSC(A)
+  P = ProjectTo(Ag)
+  @test @allocated(ProjectTo(Ag)) < nnz(A)
+
+  D = randn(Float32, size(A))
+  @test collect(P(cu(D)).nzVal) ==
+        [D[A.rowval[k], c] for c in 1:size(A, 2) for k in A.colptr[c]:(A.colptr[c+1]-1)]
+  @test_throws DimensionMismatch P(cu(D[1:end-1, :]))
+
+  v = randn(Float32, 300)
+  vg = cu(v)
+  gA = gradient(M -> sum(abs2, M * vg), Ag)[1]
+  @test gA isa CuSparseMatrixCSC{Float32}
+  @test collect(gA.nzVal) ≈ gradient(M -> sum(abs2, M * v), A)[1].nzval
+  gv = gradient(x -> sum(abs2, Ag * x), vg)[1]
+  @test gv isa CuArray
+  @test collect(gv) ≈ gradient(x -> sum(abs2, A * x), v)[1]
+
+  # the linear index must not overflow `Int32` when `m*n > typemax(Int32)`
+  m = n = 50_000
+  big = CuSparseMatrixCSC(sparse(Int32[3, 49_999, 50_000], Int32[1, 49_998, 50_000], Float32[1, 2, 3], m, n))
+  Pbig = ProjectTo(big)
+  lin = Base.get_extension(Zygote, :ZygoteCUDAExt)._linear_index.(
+    Ref(Pbig.colPtr), Pbig.rowVal, eachindex(Pbig.rowVal), m)
+  @test collect(lin) == [3, 49_999 + m * 49_997, 50_000 + m * 49_999]
 end

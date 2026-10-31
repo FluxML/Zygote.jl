@@ -11,32 +11,26 @@ using ChainRulesCore: ChainRulesCore, ProjectTo, project_type
 # back as a dense `CuArray`, breaking `update!` and disagreeing with the CPU
 # sparse path. See FluxML/Zygote.jl#1313.
 function ChainRulesCore.ProjectTo(x::CuSparseMatrixCSC{T}) where {T<:Number}
-    m, n = size(x)
-    Ti = eltype(x.rowVal)
-    # Column index of each stored entry, expanded from `colPtr` on the host
-    # (length `n+1`, cheap) and moved to the device once.
-    colptr = Array(x.colPtr)
-    col = Vector{Ti}(undef, length(x.rowVal))
-    @inbounds for c in 1:n, k in colptr[c]:(colptr[c+1]-1)
-        col[k] = c
-    end
-    # Column-major linear index of each stored entry, used to gather from a
-    # dense cotangent without scalar indexing.
-    lin = x.rowVal .+ Ti(m) .* (CuArray(col) .- one(Ti))
     return ProjectTo{CuSparseMatrixCSC}(;
         element = ProjectTo(zero(T)),
-        dims = (m, n),
+        dims = size(x),
         colPtr = x.colPtr,
         rowVal = x.rowVal,
-        lin = lin,
     )
 end
+
+# Column-major linear index of the `k`-th stored entry (in row `r`), with its
+# column found by binary search in `colPtr`. Evaluated on the device when the
+# projection is applied rather than when it is built, since the `ProjectTo`s of
+# most rrule calls are never used. `Int` arithmetic so that `m*n` can't overflow `Int32`.
+_linear_index(colPtr, r, k, m) = Int(r) + m * (searchsortedlast(colPtr, k) - 1)
 
 function (project::ProjectTo{CuSparseMatrixCSC})(dx::AbstractArray)
     m, n = project.dims
     size(dx) == (m, n) || throw(DimensionMismatch(
         "variable with size(x) == $(project.dims) cannot have a gradient with size(dx) == $(size(dx))"))
-    nzval = vec(dx)[project.lin]
+    lin = _linear_index.(Ref(project.colPtr), project.rowVal, eachindex(project.rowVal), m)
+    nzval = vec(dx)[lin]
     Tv = project_type(project.element)
     nzval = eltype(nzval) === Tv ? nzval : Tv.(nzval)
     return CuSparseMatrixCSC(project.colPtr, project.rowVal, nzval, project.dims)

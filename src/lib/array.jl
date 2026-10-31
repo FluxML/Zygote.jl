@@ -141,20 +141,25 @@ function _pullback(cx::AContext, ::typeof(Base.hvncat), dim::Int, xs...)
   return y, hvncat_pullback
 end
 
-@adjoint function repeat(xs; inner=ntuple(_->1, ndims(xs)), outer=ntuple(_->1, ndims(xs)))
-  repeat(xs, inner = inner, outer = outer), function (Δ)
-    Δ′ = zero(xs)
-    S = size(xs)
+_repeat_counts(n::Integer) = (n,)
+_repeat_counts(n) = Tuple(n)
 
-    # Loop through each element of Δ, calculate source dimensions, accumulate into Δ′
-    for (dest_idx, val) in pairs(IndexCartesian(), Δ)
-        # First, round dest_idx[dim] to nearest gridpoint defined by inner[dim], then
-        # wrap around based on original size S.
-        src_idx = [mod1(div(dest_idx[dim] - 1, inner[dim]) + 1, S[dim]) for dim in 1:length(S)]
-        Δ′[src_idx...] += val
-    end
-    return (Δ′,)
+# Each dim of the output, of size inner*S*outer, is viewed as (inner, S, outer) with
+# inner varying fastest; the cotangent sums over the inner and outer axes.
+function _repeat_pullback(Δ, xs, inner, outer)
+  inner, outer = _repeat_counts(inner), _repeat_counts(outer)
+  N = max(ndims(xs), length(inner), length(outer))
+  reps(c, d) = d <= length(c) ? c[d] : 1
+  shape = ntuple(3N) do k
+    d, r = fldmod1(k, 3)
+    r == 1 ? reps(inner, d) : r == 2 ? size(xs, d) : reps(outer, d)
   end
+  sumdims = ntuple(i -> 3 * ((i - 1) ÷ 2) + (isodd(i) ? 1 : 3), 2N)
+  return reshape(sum(reshape(Δ, shape); dims = sumdims), size(xs))
+end
+
+@adjoint function repeat(xs; inner=ntuple(_->1, ndims(xs)), outer=ntuple(_->1, ndims(xs)))
+  repeat(xs, inner = inner, outer = outer), Δ -> (_repeat_pullback(Δ, xs, inner, outer),)
 end
 
 @adjoint repeat(x::AbstractVector, m::Integer) =
@@ -467,13 +472,23 @@ end
   rtol::Real = (eps(real(float(one(T))))*min(size(A)...))*iszero(atol),
 ) where {T}
   Y = pinv(A)
-  return Y, Δ->(-Y' * Δ * Y' + (I - A * Y) * Δ' * Y * Y' + Y' * Y * Δ' * (I - Y * A),)
+  return Y, Δ->(_pinv_back(A, Y, Δ),)
+end
+
+# Associated so that the intermediates are at most `min(size(A)...)` square,
+# rather than `max(size(A)...)` square.
+function _pinv_back(A, Y, Δ)
+  if size(A, 1) >= size(A, 2)
+    -(Y' * (Δ * Y')) + (Δ' - A * (Y * Δ')) * (Y * Y') + Y' * ((Y * Δ') * (I - Y * A))
+  else
+    Z = (Y' * Y) * Δ'
+    -((Y' * Δ) * Y') + (((I - A * Y) * Δ') * Y) * Y' + (Z - (Z * Y) * A)
+  end
 end
 
 # When `A` is guaranteed to be square, definitely use the simple expression for the adjoint.
 @adjoint function \(
   A::Union{
-    Diagonal,
     AbstractTriangular,
     LinearAlgebra.Adjoint{<:Any, <:AbstractTriangular},
     Transpose{<:Any, <:AbstractTriangular},
@@ -487,11 +502,28 @@ end
   end
 end
 
-@adjoint function /(A::AbstractMatrix, B::Union{Diagonal, AbstractTriangular})
+# Only the diagonal of the dense gradient `-B̄ * Y'` is needed, which avoids an n×n matrix.
+@adjoint function \(A::Diagonal, B::AbstractVecOrMat)
+  Y = A \ B
+  return Y, function(Ȳ)
+    B̄ = A' \ Ȳ
+    return (Diagonal(-vec(sum(B̄ .* conj.(Y); dims=2))), B̄)
+  end
+end
+
+@adjoint function /(A::AbstractMatrix, B::AbstractTriangular)
   Y = A / B
   return Y, function(Ȳ)
     Ā = Ȳ / B'
     return (Ā, -Y' * Ā)
+  end
+end
+
+@adjoint function /(A::AbstractMatrix, B::Diagonal)
+  Y = A / B
+  return Y, function(Ȳ)
+    Ā = Ȳ / B'
+    return (Ā, Diagonal(-vec(sum(conj.(Y) .* Ā; dims=1))))
   end
 end
 
