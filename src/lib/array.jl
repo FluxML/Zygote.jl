@@ -141,6 +141,26 @@ function _pullback(cx::AContext, ::typeof(Base.hvncat), dim::Int, xs...)
   return y, hvncat_pullback
 end
 
+# Splatting a vector of arrays (`vcat(vs...)`) lowers to `_apply_iterate`, whose generic pullback
+# is specialised on `length(vs)`: the first gradient takes seconds and grows with it (#1687).
+# Reuse the `reduce(vcat/hcat, vs)` rule instead. Vectors and matrices are not mixed because
+# that rule would return matrix cotangents for the vectors.
+const _VecOfVecOrVecOfMat = Union{AbstractVector{<:AbstractVector}, AbstractVector{<:AbstractMatrix}}
+
+for cat in (:vcat, :hcat)
+  @eval function _pullback(cx::AContext, ::typeof(Core._apply_iterate), ::typeof(iterate), ::typeof($cat), xs::_VecOfVecOrVecOfMat)
+    isempty(xs) && return $cat(xs...), _ -> nothing  # `reduce` throws on empty input
+    y, back = _pullback(cx, reduce, $cat, xs)
+    function apply_iterate_cat_pullback(Δ)
+      # ChainRules' `reduce(vcat/hcat)` pullbacks index the cotangent without unthunking it, which is
+      # quadratic for a thunk (JuliaDiff/ChainRules.jl#860); remove once fixed upstream
+      dxs = back(unthunk(Δ))
+      dxs === nothing ? nothing : (nothing, nothing, nothing, dxs[3])
+    end
+    return y, apply_iterate_cat_pullback
+  end
+end
+
 _repeat_counts(n::Integer) = (n,)
 _repeat_counts(n) = Tuple(n)
 
