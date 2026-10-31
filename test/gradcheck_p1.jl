@@ -49,6 +49,25 @@ end
   @test gradient(xs ->sum(xs .^ 10), [3, -1]) == ([10*3^9, -10],)
   @test gradient(xs ->sum(xs .^ _pow), [4, -1]) == ([_pow*4^9, -10],)
 
+  @testset "broadcasted literal_pow: $T" for T in (Float32, Float64, ComplexF32, ComplexF64)
+    x = T <: Complex ? T.(randn(real(T), 6) .+ im .* randn(real(T), 6)) : T.(randn(6) .+ 3)
+    @testset "p = $p" for p in (0, 1, 2, 3, 4, 9, 20, -1, -2, -3)
+      # `Val(p)` is what `x .^ p` lowers to for a literal `p`
+      g = gradient(x -> real(sum(Base.literal_pow.(^, x, Val(p)))), x)[1]
+      @test g isa Vector{T}
+      @test g ≈ conj.(p .* x .^ (p - 1)) rtol=sqrt(eps(real(T)))
+    end
+    @test gradient(x -> real(sum(x .^ 2)), x)[1] ≈ conj.(2 .* x)
+    @test gradient(x -> real(sum(x .^ 3)), x)[1] ≈ conj.(3 .* x .^ 2)
+    @test gradient(x -> real(sum(x .^ -2)), x)[1] ≈ conj.(-2 .* x .^ -3)
+
+    z = zeros(T, 3)  # exponents 0 and 1 hit `p - 1 == -1` and `0`
+    @test gradient(x -> real(sum(x .^ 1)), z)[1] == ones(T, 3)
+    @test gradient(x -> real(sum(x .^ 2)), z)[1] == zeros(T, 3)
+    @test gradient(x -> real(sum(x .^ 3)), z)[1] == zeros(T, 3)
+    @test gradient(x -> real(sum(x .^ 4)), z)[1] == zeros(T, 3)
+  end
+
   @test gradient(x -> real((1+3im) * x^2), 5+7im) == (-32 - 44im,)
   @test gradient(p -> real((1+3im) * (5+7im)^p), 2)[1] ≈ real((-234 + 2im)*log(5 - 7im))
   # D[(1+3I)x^p, p] /. {x->5+7I, p->2} // Conjugate
