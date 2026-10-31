@@ -212,6 +212,19 @@ end
   @test_skip gradient((x,y) -> sum(vcat(x,y)), 1f0, r, 2f0, r)[2] isa CUDA.CuArray{Float32}
 end
 
+@testset "repeat(x; inner, outer)" begin
+  # https://github.com/FluxML/Zygote.jl/issues/1689 : used to scalar-index
+  for (x, kw) in [(rand(Float32, 5), (inner=2, outer=3)),
+                  (rand(Float32, 5), (inner=(2,1), outer=(1,3))),
+                  (rand(Float32, 4, 3), (inner=(2,1,2), outer=(1,3,2))),
+                  (rand(Float32, 4, 3, 2), (inner=(2,2,1), outer=(1,1,3)))]
+    f(x) = sum(abs2, repeat(x; kw...))
+    g_gpu = gradient(f, cu(x))[1]
+    @test g_gpu isa CuArray
+    @test collect(g_gpu) ≈ gradient(f, x)[1]
+  end
+end
+
 
 @testset "CUDA complex broadcasting" begin
     # Issue 961 and 1121 and 1215
