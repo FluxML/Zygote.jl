@@ -212,6 +212,14 @@ end
 
   @test_skip gradient((x,y) -> sum(vcat(x,y)), 5f0, r)[2] isa CUDA.CuArray{Float32}  # wrong order
   @test_skip gradient((x,y) -> sum(vcat(x,y)), 1f0, r, 2f0, r)[2] isa CUDA.CuArray{Float32}
+
+  # splatting a vector of arrays (#1687)
+  for cat in (vcat, hcat)
+    vs = [cu(rand(Float32, 3)) for _ in 1:4]
+    g = gradient(vs -> sum(abs2, cat(vs...)), vs)[1]
+    @test g isa Vector{<:CUDA.CuArray{Float32}}
+    @test Array.(g) ≈ 2 .* Array.(vs)
+  end
 end
 
 @testset "repeat(x; inner, outer)" begin

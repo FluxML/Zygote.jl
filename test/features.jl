@@ -757,6 +757,73 @@ end
   @test gradient(rotate1198, 1.0) == (2.0,)  # 4 rotations -> v0 holds 2x
 end
 
+# https://github.com/FluxML/Zygote.jl/issues/1687
+@testset "splatting a vector of arrays into vcat/hcat" begin
+  for cat in (vcat, hcat)
+    vecs = [randn(3) for _ in 1:4]
+    mats = cat === vcat ? [randn(k, 2) for k in 1:4] : [randn(2, k) for k in 1:4]
+    for vs in (vecs, mats, view(mats, 2:4), [view(v, 1:2) for v in vecs])
+      @test gradient(vs -> sum(abs2, cat(vs...)), vs)[1] ≈ 2 .* vs
+      @test gradient(vs -> sum(abs2, cat(vs...)), vs)[1] ≈ gradient(vs -> sum(abs2, reduce(cat, vs)), vs)[1]
+    end
+
+    # cotangent slices go to the right arguments
+    vs = cat === vcat ? [randn(k, 2) for k in 1:4] : [randn(2, k) for k in 1:4]
+    w = randn(size(cat(vs...)))
+    dvs = gradient(vs -> sum(w .* cat(vs...)), vs)[1]
+    @test cat(dvs...) == w
+    @test size.(dvs) == size.(vs)
+    @test gradient(vs -> sum(w .* cat(vs...)), Any[vs...])[1] == dvs  # generic path
+
+    # also when the vector of arrays is computed, or used more than once
+    ps = [1.0, 2.0, 3.0]
+    @test gradient(ps -> sum(abs2, cat(map(p -> p .* vecs[1], ps)...)), ps)[1] ≈ [2p * sum(abs2, vecs[1]) for p in ps]
+    expected = 2 .* vecs
+    expected[1] .+= 1
+    @test gradient(vs -> sum(abs2, cat(vs...)) + sum(vs[1]), vecs)[1] ≈ expected
+    @test Zygote.hessian(ps -> sum(abs2, cat(map(p -> p .* vecs[1], ps)...)), ps) ≈ Diagonal(fill(2sum(abs2, vecs[1]), 3))
+
+    # splats mixed with other arguments are unchanged
+    extra = cat === vcat ? 1.0 : randn(3)
+    @test gradient(vs -> sum(abs2, cat(extra, vs..., extra)), vecs)[1] ≈ 2 .* vecs
+    @test gradient(vs -> sum(abs2, cat(vs[1], vs[2:end]...)), vecs)[1] ≈ 2 .* vecs
+
+    # empty, heterogeneous and non-array containers fall back to the generic splat
+    @test gradient(vs -> length(cat(vs...)), Vector{Vector{Float64}}())[1] === nothing
+    @test Zygote.pullback(vs -> cat(vs...), Vector{Vector{Float64}}())[1] == cat(Vector{Float64}[]...)
+    anys = Any[randn(3), randn(3)]
+    @test gradient(vs -> sum(abs2, cat(vs...)), anys)[1] ≈ 2 .* anys
+    @test all(map(≈, gradient(vs -> sum(abs2, cat(vs...)), Tuple(vecs))[1], 2 .* Tuple(vecs)))
+    xs = randn(4)
+    @test gradient(xs -> sum(abs2, cat(xs...)), xs)[1] ≈ 2 .* xs
+  end
+
+  # a vector mixed with matrices keeps vector cotangents
+  mixed = Union{Vector{Float64}, Matrix{Float64}}[randn(2), randn(3, 1)]
+  @test size.(gradient(vs -> sum(abs2, vcat(vs...)), mixed)[1]) == size.(mixed)
+  mixed = Union{Vector{Float64}, Matrix{Float64}}[randn(2), randn(2, 2)]
+  @test size.(gradient(vs -> sum(abs2, hcat(vs...)), mixed)[1]) == size.(mixed)
+
+  # the pullback must not depend on the number of arguments, which made the first gradient
+  # take seconds for a hundred arguments
+  for cat in (vcat, hcat)
+    pb(n) = typeof(Zygote._pullback(Zygote.Context(), Core._apply_iterate, iterate, cat, [rand(3) for _ in 1:n])[2])
+    @test pb(3) == pb(4)
+
+    vs = [rand(10) for _ in 1:200]
+    f(vs) = gradient(vs -> sum(abs2, cat(vs...)), vs)
+    f(vs)
+    @test @allocated(f(vs)) < 300_000  # ~80 kB, versus ~3 MB for the generic splat
+
+    # the cotangent of `sum` is a thunk, which ChainRules' `reduce(vcat/hcat)` pullbacks index
+    # without unthunking (quadratic, JuliaDiff/ChainRules.jl#860)
+    vs = [rand(10) for _ in 1:1600]
+    g(vs) = gradient(vs -> sum(cat(vs...)), vs)
+    g(vs)
+    @test @allocated(g(vs)) < 20_000_000  # ~0.6 MB, versus ~200 MB when the thunk reaches the rule
+  end
+end
+
 @testset "accumulation" begin
   # from https://github.com/FluxML/Zygote.jl/issues/905
   function net(x1)
