@@ -285,7 +285,7 @@ end
   @test gradient(x -> invoke(invokable, Tuple{Any}, x), 5) == (2,)
 
   y, back = Zygote.pullback(x->tuple(x...), [1, 2, 3])
-  @test back((1, 1, 1)) == ((1,1,1),)
+  @test back((1, 1, 1)) == ([1, 1, 1],)  # the cotangent of an array is an array (#1717)
 end
 
 @testset "nested AD" begin
@@ -732,7 +732,7 @@ end
 
   # https://github.com/FluxML/Zygote.jl/issues/731
   f731(x) = sum([x' * x, x...])
-  @test_broken gradient(f731, ones(3)) # MethodError: no method matching +(::Tuple{Float64, Float64, Float64}, ::Vector{Float64})
+  @test gradient(f731, ones(3))[1] ≈ fill(3.0, 3)
 
   # https://github.com/FluxML/Zygote.jl/issues/1198
   # Loop-carried variables that permute every iteration (a swap or rotation)
@@ -822,6 +822,73 @@ end
     g(vs)
     @test @allocated(g(vs)) < 20_000_000  # ~0.6 MB, versus ~200 MB when the thunk reaches the rule
   end
+end
+
+# https://github.com/FluxML/Zygote.jl/issues/1716
+@testset "splatting a vector of numbers into vcat/hcat" begin
+  for cat in (vcat, hcat), n in (3, 50)
+    xs = randn(n)
+    w = randn(size(cat(xs...)))
+    @test gradient(xs -> sum(abs2, cat(xs...)), xs)[1] ≈ 2 .* xs
+    @test gradient(xs -> sum(w .* cat(xs...)), xs)[1] ≈ vec(w)
+    @test gradient(xs -> sum(abs2, cat(xs...)) + sum(xs), xs)[1] ≈ 2 .* xs .+ 1
+    @test gradient(xs -> sum(abs2, cat(xs...)), view(xs, 2:n))[1] ≈ 2 .* xs[2:n]
+    @test gradient(xs -> sum(abs2, cat(xs...)), 1:n)[1] ≈ 2 .* (1:n)
+    @test gradient(xs -> sum(abs2, cat(xs...)), Real[xs...])[1] ≈ 2 .* xs
+    @test gradient(xs -> real(sum(abs2, cat(xs...))), xs .+ im .* xs)[1] ≈ 2 .* (xs .+ im .* xs)
+    @test Zygote.hessian(xs -> sum(abs2, cat(xs...)), xs) ≈ 2 * I(n)
+    @test Zygote.jacobian(xs -> vec(cat(xs...)), xs)[1] ≈ I(n)
+    @test cat(Zygote.pullback(xs -> cat(xs...), xs)[1]...) == cat(xs...)
+  end
+
+  # the pullback must not depend on the number of elements, which made the first gradient take
+  # seconds for a hundred of them
+  for cat in (vcat, hcat)
+    pb(n) = typeof(Zygote._pullback(Zygote.Context(), Core._apply_iterate, iterate, cat, rand(n))[2])
+    @test pb(3) == pb(4)
+  end
+end
+
+# https://github.com/FluxML/Zygote.jl/issues/1717
+@testset "cotangent of a splatted array" begin
+  # it has the shape of the array, to be accumulated with the cotangents of the other uses
+  for cat in (vcat, hcat)
+    vs = [randn(3) for _ in 1:10]
+    expected = 2 .* vs
+    expected[1] .+= 2 .* vs[1]
+    expected[end] .+= 2 .* vs[end]
+    @test gradient(vs -> sum(abs2, cat(vs[1], vs..., vs[end])), vs)[1] ≈ expected
+    @test gradient(vs -> sum(abs2, cat(vs[1], vs...)) + sum(vs[end]), vs)[1] ≈ 2 .* vs .+ [i == 1 ? 2vs[1] : i == 10 ? ones(3) : zeros(3) for i in 1:10]
+    @test gradient(vs -> sum(abs2, cat(vs[1], vs..., vs[end])), Any[vs...])[1] ≈ expected
+
+    xs = randn(50)
+    expected = 2 .* xs
+    expected[1] += 2xs[1]
+    expected[end] += 2xs[end]
+    @test gradient(xs -> sum(abs2, cat(xs[1], xs..., xs[end])), xs)[1] ≈ expected
+    da, dxs, db = gradient((a, xs, b) -> sum(abs2, cat(a, xs..., b)), 1.0, xs, 2.0)
+    @test (da, db) == (2.0, 4.0)
+    @test dxs ≈ 2 .* xs
+  end
+
+  M = randn(3, 4)
+  expected = 2 .* M
+  expected[1] += 2M[1]
+  @test gradient(M -> sum(abs2, vcat(M[1], M...)), M)[1] ≈ expected
+  @test gradient(x -> x[] * +(x...), fill(2.0))[1] == fill(4.0)
+  @test gradient(xs -> length(vcat(1.0, xs...)), Float64[])[1] === nothing
+
+  # a tuple keeps a tuple cotangent, however long
+  @test gradient(t -> t[1] * +(t...), (1.0, 2.0, 3.0))[1] === (7.0, 1.0, 1.0)
+  t = Tuple(1.0:40.0)
+  @test gradient(t -> t[1] * +(t...), t)[1] == (821.0, ntuple(_ -> 1.0, 39)...)
+  @test gradient((a, t, b) -> a * +(t...) * b, 2.0, t, 3.0) == (3 * 820.0, ntuple(_ -> 6.0, 40), 2 * 820.0)
+
+  # the cotangents of the elements go back to the right places
+  @test Zygote.unapply((2, 1), Any[1, 2, 3]) == ((1, 2), (3,))
+  @test Zygote.unapply((nothing, 2), (1, 2, 3)) == (1, (2, 3))
+  @test Zygote.unapply((Zygote.SplatArray((Base.OneTo(2), Base.OneTo(2)), 4), nothing), Any[1, 2, 3, 4, 5]) == ([1 3; 2 4], 5)
+  @test Zygote.unapply((Zygote.SplatArray((Base.OneTo(2),), 2), (nothing, nothing)), Tuple(1:50)) == ([1, 2], (3, 4))
 end
 
 @testset "accumulation" begin
