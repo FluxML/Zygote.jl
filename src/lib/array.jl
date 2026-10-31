@@ -141,20 +141,25 @@ function _pullback(cx::AContext, ::typeof(Base.hvncat), dim::Int, xs...)
   return y, hvncat_pullback
 end
 
-@adjoint function repeat(xs; inner=ntuple(_->1, ndims(xs)), outer=ntuple(_->1, ndims(xs)))
-  repeat(xs, inner = inner, outer = outer), function (Δ)
-    Δ′ = zero(xs)
-    S = size(xs)
+_repeat_counts(n::Integer) = (n,)
+_repeat_counts(n) = Tuple(n)
 
-    # Loop through each element of Δ, calculate source dimensions, accumulate into Δ′
-    for (dest_idx, val) in pairs(IndexCartesian(), Δ)
-        # First, round dest_idx[dim] to nearest gridpoint defined by inner[dim], then
-        # wrap around based on original size S.
-        src_idx = [mod1(div(dest_idx[dim] - 1, inner[dim]) + 1, S[dim]) for dim in 1:length(S)]
-        Δ′[src_idx...] += val
-    end
-    return (Δ′,)
+# Each dim of the output, of size inner*S*outer, is viewed as (inner, S, outer) with
+# inner varying fastest; the cotangent sums over the inner and outer axes.
+function _repeat_pullback(Δ, xs, inner, outer)
+  inner, outer = _repeat_counts(inner), _repeat_counts(outer)
+  N = max(ndims(xs), length(inner), length(outer))
+  reps(c, d) = d <= length(c) ? c[d] : 1
+  shape = ntuple(3N) do k
+    d, r = fldmod1(k, 3)
+    r == 1 ? reps(inner, d) : r == 2 ? size(xs, d) : reps(outer, d)
   end
+  sumdims = ntuple(i -> 3 * ((i - 1) ÷ 2) + (isodd(i) ? 1 : 3), 2N)
+  return reshape(sum(reshape(Δ, shape); dims = sumdims), size(xs))
+end
+
+@adjoint function repeat(xs; inner=ntuple(_->1, ndims(xs)), outer=ntuple(_->1, ndims(xs)))
+  repeat(xs, inner = inner, outer = outer), Δ -> (_repeat_pullback(Δ, xs, inner, outer),)
 end
 
 @adjoint repeat(x::AbstractVector, m::Integer) =
