@@ -121,6 +121,123 @@ end
   @test gradtest(x -> cumsum(x, dims=3), (3,4)) # trivial
 end
 
+@testset "mapreduce, reduce with + and *" begin
+  for (op, red) in ((+, sum), (*, prod)), f in (identity, abs2, sin, x -> x^2 + 1)
+    @test gradtest(x -> mapreduce(f, op, x), (7,))
+    @test gradtest(x -> mapreduce(f, op, x), (3, 4))
+    @test gradtest(x -> mapreduce(f, op, x; dims=1), (3, 4))
+    @test gradtest(x -> mapreduce(f, op, x; dims=(1, 2)), (3, 4))
+    @test gradtest(x -> mapreduce(f, op, x; init=2.0), (3, 4))
+    @test gradtest(x -> mapreduce(f, op, x; dims=2, init=2.0), (3, 4))
+    @test gradtest(x -> reduce(op, f.(x)), (3, 4))
+    @test gradtest(x -> reduce(op, f.(x); dims=2), (3, 4))
+    @test gradtest(x -> reduce(op, f.(x); dims=2, init=2.0), (3, 4))
+
+    x = randn(5, 4)
+    @test gradient(x -> mapreduce(f, op, x), x)[1] == gradient(x -> red(f, x), x)[1]
+  end
+
+  # differentiable `init`, closures, ranges
+  @test gradient((x, p) -> mapreduce(abs2, +, x; init=p), [1.0, 2.0], 3.0) == ([2.0, 4.0], 1.0)
+  @test gradient((x, p) -> mapreduce(abs2, *, x; init=p), [1.0, 2.0], 3.0) == ([24.0, 12.0], 4.0)
+  @test gradient((x, p) -> sum(mapreduce(abs2, +, x; dims=1, init=p)), [1.0 2.0; 3.0 4.0], 3.0) ==
+        ([2.0 4.0; 6.0 8.0], 2.0)
+  @test gradient((x, p) -> reduce(+, x; init=p), [1.0, 2.0], 3.0) == ([1.0, 1.0], 1.0)
+  @test gradient((p, x) -> mapreduce(z -> z * p, +, x), 2.0, [1.0, 2.0]) == (3.0, [2.0, 2.0])
+  @test gradient((p, x) -> mapreduce(z -> z * p, *, x), 2.0, [1.0, 2.0]) == (8.0, [8.0, 4.0])
+  @test gradient(p -> mapreduce(i -> p * i, +, 1:3), 2.0) == (6.0,)
+  @test gradient(xs -> sum(reduce(+, xs)), [[1.0, 2.0], [3.0, 4.0]])[1] == [[1.0, 1.0], [1.0, 1.0]]
+
+  # non-commutative `*` and other operators
+  @test gradtest((A, B, C) -> reduce(*, [A, B, C]), (3, 3), (3, 3), (3, 3))
+  @test gradient(x -> mapreduce(abs2, max, x), [1.0, 3.0, 2.0]) == ([0.0, 6.0, 0.0],)
+  @test gradient(x -> reduce(max, x), [1.0, 3.0, 2.0]) == ([0.0, 1.0, 0.0],)
+
+  @test hessian(x -> mapreduce(abs2, +, x), [1.0, 2.0]) ≈ [2.0 0.0; 0.0 2.0]
+
+  # several arrays go through `reduce(op, map(f, xs, ys))`, keeping Base's shape rules
+  for op in (+, *)
+    @test gradtest((x, y) -> mapreduce((a, b) -> a * b + 1, op, x, y), (7,), (7,))
+    @test gradtest((x, y) -> mapreduce((a, b) -> a * b + 1, op, x, y), (3, 4), (3, 4))
+    @test gradtest((x, y) -> mapreduce((a, b) -> a * b + 1, op, x, y; dims=1), (3, 4), (3, 4))
+    @test gradtest((x, y) -> mapreduce((a, b) -> a * b + 1, op, x, y; init=2.0), (3, 4), (3, 4))
+    @test gradtest((x, y, z) -> mapreduce((a, b, c) -> a * b + c, op, x, y, z), (3, 4), (3, 4), (3, 4))
+  end
+  x, y = randn(3, 4), randn(3, 4)
+  @test gradient((x, y) -> mapreduce(*, +, x, y), x, y) == gradient((x, y) -> sum(x .* y), x, y)
+  @test_throws DimensionMismatch gradient((x, y) -> mapreduce(*, +, x, y), randn(3, 3), randn(2, 2))
+
+  # a lazy broadcast built inside the function is materialized by the `broadcasted` adjoint
+  @test all(map(≈, gradient((x, y) -> mapreduce(abs2, +, Broadcast.broadcasted(*, x, y)), x, y),
+                   gradient((x, y) -> sum(abs2.(x .* y)), x, y)))
+
+  # empty arrays: Base's result (`init` if given) and a zero gradient
+  @test gradient(x -> mapreduce(abs2, +, x), Float64[]) == (Float64[],)
+  @test gradient(x -> mapreduce(a -> a^2, +, x; init=0.0), Float64[]) == (Float64[],)
+  @test gradient((x, p) -> mapreduce(a -> a^2, *, x; init=p), Float64[], 2.0) == (Float64[], 1.0)
+  @test gradient((x, p) -> sum(mapreduce(a -> a^2, +, x; dims=1, init=p)), zeros(0, 3), 2.0) == (zeros(0, 3), 3.0)
+  @test_throws ArgumentError gradient(x -> mapreduce(a -> a^2, +, x), Float64[])
+
+  # the generic path is quadratic in the length (#1691): ~32 MiB for this input
+  x = rand(2000)
+  for g in (x -> mapreduce(abs2, +, x), x -> mapreduce(abs2, *, x), x -> reduce(+, x), x -> reduce(*, x),
+            x -> mapreduce(*, +, x, x), x -> mapreduce(*, *, x, x))
+    gradient(g, x)
+    @test @allocated(gradient(g, x)) < 2^20
+  end
+end
+
+@testset "sum, prod, reduce, mapreduce of generators" begin
+  for f in (a -> a^2, sin, a -> 2a + 1)
+    @test gradtest(x -> sum(f(a) for a in x), (7,))
+    @test gradtest(x -> sum(f(a) for a in x), (3, 4))
+    @test gradtest(x -> prod(f(a) for a in x), (3, 4))
+    @test gradtest(x -> reduce(+, f(a) for a in x), (3, 4))
+    @test gradtest(x -> reduce(*, f(a) for a in x), (3, 4))
+    x = randn(5, 4)
+    @test gradient(x -> sum(f(a) for a in x), x)[1] ≈ gradient(x -> sum(f, x), x)[1]
+    @test gradient(x -> prod(f(a) for a in x), x)[1] ≈ gradient(x -> prod(f, x), x)[1]
+  end
+
+  for op in (+, *)
+    @test gradtest(x -> mapreduce(abs2, op, a^2 + 1 for a in x), (7,))
+    @test gradtest(x -> mapreduce(sin, op, a^2 + 1 for a in x), (3, 4))
+    @test gradtest((x, p, q) -> mapreduce(b -> p[1] * b, op, q[1] * a for a in x), (3, 4), (1,), (1,))
+    @test gradient((x, p) -> mapreduce(identity, op, p * a for a in x), [1.0, 2.0], 3.0) ==
+          gradient((x, p) -> reduce(op, p * a for a in x), [1.0, 2.0], 3.0)
+  end
+  @test gradient(x -> mapreduce(abs2, +, a for a in x), Float64[]) == (Float64[],)
+  @test_throws ArgumentError gradient(x -> mapreduce(a -> a^2, +, a for a in x), Float64[])
+
+  # captured parameters, ranges, nested generators, arrays of arrays
+  @test gradient((x, p) -> sum(p * a for a in x), [1.0, 2.0], 3.0) == ([3.0, 3.0], 3.0)
+  @test gradient((x, p) -> prod(p * a for a in x), [1.0, 2.0], 3.0) == ([18.0, 9.0], 12.0)
+  @test gradient(p -> sum(p * i for i in 1:3), 2.0) == (6.0,)
+  @test gradient(p -> prod(p * i for i in 1:3), 2.0) == (72.0,)
+  @test gradtest(x -> sum(sum(a * b for b in x) for a in x), (6,))
+  @test gradient(vs -> sum(sum(v) for v in vs), [[1.0, 2.0], [3.0, 4.0]])[1] == [[1.0, 1.0], [1.0, 1.0]]
+
+  # other iterators keep the generic path
+  @test gradtest(x -> sum(a^2 for a in x if a > 0.5), (4, 3))
+  @test gradient(x -> sum(a * b for (a, b) in zip(x, x)), [1.0, 2.0])[1] == [2.0, 4.0]
+  @test gradient(x -> sum(a * x for a in (1.0, 2.0)), 1.0) == (3.0,)
+
+  # like Base, empty generators error
+  @test_throws ArgumentError gradient(x -> sum(a^2 for a in x), Float64[])
+  @test_throws ArgumentError gradient(x -> prod(a^2 for a in x), Float64[])
+
+  @test hessian(x -> sum(a^2 for a in x), [1.0, 2.0]) ≈ [2.0 0.0; 0.0 2.0]
+
+  # the generic path is quadratic in the length: ~38 MiB for this input
+  x = rand(2000)
+  for g in (x -> sum(a^2 for a in x), x -> prod(a^2 for a in x), x -> reduce(+, a^2 for a in x),
+            x -> reduce(*, a^2 for a in x), x -> mapreduce(abs2, +, a^2 for a in x),
+            x -> mapreduce(abs2, *, a^2 for a in x))
+    gradient(g, x)
+    @test @allocated(gradient(g, x)) < 2^20
+  end
+end
+
 @test gradtest(x -> x', rand(5))
 
 @test gradtest(det, (4, 4))
