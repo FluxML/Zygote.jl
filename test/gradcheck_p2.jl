@@ -14,6 +14,7 @@ using Base.Broadcast: broadcast_shape
 using Distributed: pmap, CachingPool, workers
 
 import FiniteDifferences
+import ForwardDiff
 import LogExpFunctions
 
 @testset "backsolve" begin
@@ -35,6 +36,37 @@ import LogExpFunctions
   @test gradtest(\, A, y)
   @test gradtest(\, B, Y)
   @test gradtest(\, B, y)
+
+  # \ (Dense, complex), checked via real and imaginary parts
+  cplxd(f) = (Ar, Ai, Br, Bi) -> (Z = f(complex.(Ar, Ai), complex.(Br, Bi)); vcat(vec(real(Z)), vec(imag(Z))))
+  @testset "complex dense $(size(Ar))" for Ar in (X, A, B)
+    Ai = randn(rng, size(Ar)...)
+    @test gradtest(cplxd(\), Ar, Ai, Y, randn(rng, P, Q))
+    @test gradtest(cplxd(\), Ar, Ai, y, randn(rng, P))
+  end
+
+  # \ (views, adjoints, other matrix types)
+  @test gradtest((A, Y) -> view(A, :, 1:7) \ Y, A, Y)
+  @test gradtest((A, W) -> A' \ W, A, randn(rng, M, Q))
+  @test gradtest((B, W) -> B' \ W, B, randn(rng, Q, 3))
+  @test gradtest((X, Y) -> Symmetric(X) \ Y, X, Y)
+  @test gradtest((X, Y) -> Symmetric(X, :L) \ Y, X, Y)
+
+  @testset "dense \\ pullbacks avoid refactorization and m×m temporaries" for (m, n) in ((300, 300), (600, 4))
+    Mx, W = randn(rng, m, n), randn(rng, m, 2)
+    Z, back = Zygote.pullback(\, Mx, W)
+    Z̄ = ones(size(Z)...)
+    back(Z̄)
+    # square: the result takes 8m^2 bytes and refactorizing copies `A` once more;
+    # tall: a single m×m temporary would take 8m^2 bytes
+    @test (@allocated back(Z̄)) < (m == n ? 12m^2 : 4m^2)
+  end
+
+  @testset "dense \\ reverse-over-reverse $((m, n))" for (m, n) in ((6, 6), (8, 4))
+    loss(x) = sum(abs2, reshape(x[1:m*n], m, n) \ reshape(x[m*n+1:end], m, 2))
+    x = randn(rng, m * n + 2m)
+    @test Zygote.jacobian(x -> gradient(loss, x)[1], x)[1] ≈ ForwardDiff.hessian(loss, x)
+  end
 
   # \ (Diagonal)
   @test gradtest(\, D, Y)
@@ -182,6 +214,14 @@ end
         @test back(D̄)[2] === nothing
         @test back(D̄)[1] ≈ back(Matrix(D̄))[1]
       end
+    end
+
+    @testset "back(::Matrix) allocates a single n×n matrix" begin
+      n = 500
+      _, back = Zygote.pullback(Symmetric, randn(rng, n, n))
+      Δ = randn(rng, n, n)
+      back(Δ)
+      @test (@allocated back(Δ)) < 12n^2  # an n×n Float64 matrix takes 8n^2 bytes
     end
   end
 

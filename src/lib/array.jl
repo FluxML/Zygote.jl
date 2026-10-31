@@ -4,6 +4,7 @@ using Base.Broadcast: broadcasted, broadcast_shape
 using Distributed: pmap, AbstractWorkerPool
 using LinearAlgebra: Diagonal, Hermitian, LowerTriangular, UpperTriangular
 using LinearAlgebra: UnitLowerTriangular, UnitUpperTriangular
+using LinearAlgebra: BlasFloat, ColumnNorm, LU, QRPivoted
 
 @adjoint Array(xs::AbstractArray) = Array(xs), ȳ -> (ȳ,)
 @adjoint Array(xs::Array) = Array(xs), ȳ -> (ȳ,)
@@ -561,17 +562,78 @@ end
 
 @adjoint function \(A::AbstractMatrix, B::AbstractVecOrMat)
   Z = A \ B
-  return Z, function(Z̄)
-    B̄ = A' \ Z̄
-    if size(A, 1) == size(A, 2)
-      return (-B̄ * Z', B̄)
-    else
-      a = -B̄ * Z'
-      b = (B - A * Z) * B̄' / A'
-      c = A' \ Z * (Z̄' - B̄' * A)
-      return (a + b + c, B̄)
-    end
+  return Z, Z̄ -> _ldiv_back(A, B, Z, Z̄)
+end
+
+function _ldiv_back(A, B, Z, Z̄)
+  B̄ = A' \ Z̄
+  if size(A, 1) == size(A, 2)
+    return (-B̄ * Z', B̄)
+  else
+    a = -B̄ * Z'
+    b = (B - A * Z) * B̄' / A'
+    c = A' \ Z * (Z̄' - B̄' * A)
+    return (a + b + c, B̄)
   end
+end
+
+# Dense CPU `A`: reuse the factorization that `A \ B` itself computes (`lu` if square and not
+# triangular, pivoted `qr` otherwise), so the pullback does not refactorize `A`.
+# Other types may solve differently, so they keep using the generic method.
+@adjoint function \(A::Matrix{<:BlasFloat}, B::AbstractVecOrMat)
+  F, Z = _ldiv_factorize(A, B)
+  return Z, Z̄ -> _ldiv_back(F, A, B, Z, Z̄)
+end
+
+# Wrapped so that the pullback has a single type, whichever factorization is used.
+struct _LdivFactor
+  F::Union{Nothing,LU,QRPivoted}
+end
+
+function _ldiv_factorize(A, B)
+  F = if size(A, 1) != size(A, 2)
+    qr(A, ColumnNorm())
+  elseif istril(A) || istriu(A)  # solved as triangular
+    nothing
+  else
+    lu(A)
+  end
+  return _LdivFactor(F), F === nothing ? A \ B : F \ B
+end
+
+_ldiv_back(F::_LdivFactor, A, B, Z, Z̄) = _ldiv_back(F.F, A, B, Z, Z̄)
+
+_ldiv_back(::Nothing, A, B, Z, Z̄) = _ldiv_back(A, B, Z, Z̄)
+
+function _ldiv_back(F::LU, A, B, Z, Z̄)
+  B̄ = F' \ Z̄
+  return (-B̄ * Z', B̄)
+end
+
+# Same as the generic rectangular case, but reassociated so that no m×m matrix is formed:
+# `(B - A * Z) * B̄' / A'` equals `(B - A * Z) * (A \ B̄)'`.
+function _ldiv_back(F::QRPivoted, A, B, Z, Z̄)
+  Fᴴ = qr(A', ColumnNorm())
+  W = Fᴴ \ hcat(Z̄, Z)  # a single solve, since each one is costly when `A` is tall
+  k = size(Z̄, 2)
+  B̄ = reshape(W[:, 1:k], size(B))
+  X = reshape(W[:, k+1:end], size(B))  # A' \ Z
+  a = -B̄ * Z'
+  b = (B - A * Z) * (F \ B̄)'
+  c = X * (Z̄' - B̄' * A)
+  return (a + b + c, B̄)
+end
+
+# Nested AD cannot differentiate the LAPACK calls on the cached factorization,
+# so it goes through the generic formulas instead.
+@adjoint function _ldiv_factorize(A, B)
+  F, Z = _ldiv_factorize(A, B)
+  return (F, Z), Δ -> _ldiv_back(A, B, Z, Δ[2])
+end
+
+@adjoint function _ldiv_back(F, A, B, Z, Z̄)
+  y, back = _pullback(__context__, _ldiv_back, A, B, Z, Z̄)
+  return y, Δ -> (nothing, Base.tail(back(Δ))...)
 end
 
 # LinAlg Matrix Types
@@ -584,7 +646,7 @@ end
 
 function _symmetric_back(Δ, uplo)
   L, U, D = LowerTriangular(Δ), UpperTriangular(Δ), Diagonal(Δ)
-  return uplo == 'U' ? U .+ transpose(L) - D : L .+ transpose(U) - D
+  return uplo == 'U' ? U .+ transpose(L) .- D : L .+ transpose(U) .- D
 end
 _symmetric_back(Δ::Diagonal, uplo) = Δ
 _symmetric_back(Δ::UpperTriangular, uplo) = collect(uplo == 'U' ? Δ : transpose(Δ))
