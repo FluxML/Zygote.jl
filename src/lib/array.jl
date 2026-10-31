@@ -377,6 +377,46 @@ function _pullback(cx::AContext, ::typeof(prod), f, xs::AbstractArray)
   return _pullback(cx, (f, xs) -> prod(f.(xs)), f, xs)
 end
 
+# `mapreduce`/`reduce` with `+` or `*` over an array are routed to `sum`/`prod`: the
+# generic Base reduction would otherwise be differentiated element by element, with
+# a quadratic cost (#1691). Other operators keep using the generic path.
+for (op, red) in ((:+, :sum), (:*, :prod))
+  @eval begin
+    function _pullback(cx::AContext, ::typeof(mapreduce), f, ::typeof($op), xs::AbstractArray)
+      y, back = _pullback(cx, $red, f, xs)
+      mapreduce_pullback(Δ) = (b = back(Δ); b === nothing ? nothing : (nothing, b[2], nothing, b[3]))
+      return y, mapreduce_pullback
+    end
+
+    function _pullback(cx::AContext, ::typeof(reduce), ::typeof($op), xs::AbstractArray)
+      y, back = _pullback(cx, $red, xs)
+      reduce_pullback(Δ) = (b = back(Δ); b === nothing ? nothing : (nothing, nothing, b[2]))
+      return y, reduce_pullback
+    end
+  end
+end
+
+# Keyword arguments: `init` is applied once on top of the `dims` reduction.
+_reduce_dims(f, ::typeof(+), xs, dims) = sum(f, xs; dims)
+_reduce_dims(::typeof(identity), ::typeof(+), xs, dims) = sum(xs; dims)
+_reduce_dims(f, ::typeof(*), xs, dims) = prod(f.(xs); dims)
+_reduce_dims(::typeof(identity), ::typeof(*), xs, dims) = prod(xs; dims)
+
+function _mapreduce_init(f, op, xs; dims=:, init=nothing)
+  y = _reduce_dims(f, op, xs, dims)
+  init === nothing && return y
+  dims isa Colon ? op(init, y) : map(yi -> op(init, yi), y)
+end
+
+_mapreduce_kw(kws, f, op, xs) = _mapreduce_init(f, op, xs; kws...)
+
+function _pullback(cx::AContext, ::Core.kwftype(typeof(mapreduce)), kws::NamedTuple,
+                   ::typeof(mapreduce), f, op::Union{typeof(+), typeof(*)}, xs::AbstractArray)
+  y, back = _pullback(cx, _mapreduce_kw, kws, f, op, xs)
+  mapreduce_kw_pullback(Δ) = (b = back(Δ); b === nothing ? nothing : (nothing, b[2], nothing, b[3], nothing, b[5]))
+  return y, mapreduce_kw_pullback
+end
+
 @adjoint real(x::AbstractArray) = real(x), r̄ -> (real(r̄),)
 @adjoint conj(x::AbstractArray) = conj(x), r̄ -> (conj(r̄),)
 @adjoint imag(x::AbstractArray) = imag(x), ī -> (complex.(0, real.(ī)),)

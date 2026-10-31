@@ -102,6 +102,48 @@ end
   @test gradtest(x -> cumsum(x, dims=3), (3,4)) # trivial
 end
 
+@testset "mapreduce, reduce with + and *" begin
+  for (op, red) in ((+, sum), (*, prod)), f in (identity, abs2, sin, x -> x^2 + 1)
+    @test gradtest(x -> mapreduce(f, op, x), (7,))
+    @test gradtest(x -> mapreduce(f, op, x), (3, 4))
+    @test gradtest(x -> mapreduce(f, op, x; dims=1), (3, 4))
+    @test gradtest(x -> mapreduce(f, op, x; dims=(1, 2)), (3, 4))
+    @test gradtest(x -> mapreduce(f, op, x; init=2.0), (3, 4))
+    @test gradtest(x -> mapreduce(f, op, x; dims=2, init=2.0), (3, 4))
+    @test gradtest(x -> reduce(op, f.(x)), (3, 4))
+    @test gradtest(x -> reduce(op, f.(x); dims=2), (3, 4))
+    @test gradtest(x -> reduce(op, f.(x); dims=2, init=2.0), (3, 4))
+
+    x = randn(5, 4)
+    @test gradient(x -> mapreduce(f, op, x), x)[1] == gradient(x -> red(f, x), x)[1]
+  end
+
+  # differentiable `init`, closures, ranges
+  @test gradient((x, p) -> mapreduce(abs2, +, x; init=p), [1.0, 2.0], 3.0) == ([2.0, 4.0], 1.0)
+  @test gradient((x, p) -> mapreduce(abs2, *, x; init=p), [1.0, 2.0], 3.0) == ([24.0, 12.0], 4.0)
+  @test gradient((x, p) -> sum(mapreduce(abs2, +, x; dims=1, init=p)), [1.0 2.0; 3.0 4.0], 3.0) ==
+        ([2.0 4.0; 6.0 8.0], 2.0)
+  @test gradient((x, p) -> reduce(+, x; init=p), [1.0, 2.0], 3.0) == ([1.0, 1.0], 1.0)
+  @test gradient((p, x) -> mapreduce(z -> z * p, +, x), 2.0, [1.0, 2.0]) == (3.0, [2.0, 2.0])
+  @test gradient((p, x) -> mapreduce(z -> z * p, *, x), 2.0, [1.0, 2.0]) == (8.0, [8.0, 4.0])
+  @test gradient(p -> mapreduce(i -> p * i, +, 1:3), 2.0) == (6.0,)
+  @test gradient(xs -> sum(reduce(+, xs)), [[1.0, 2.0], [3.0, 4.0]])[1] == [[1.0, 1.0], [1.0, 1.0]]
+
+  # non-commutative `*` and other operators
+  @test gradtest((A, B, C) -> reduce(*, [A, B, C]), (3, 3), (3, 3), (3, 3))
+  @test gradient(x -> mapreduce(abs2, max, x), [1.0, 3.0, 2.0]) == ([0.0, 6.0, 0.0],)
+  @test gradient(x -> reduce(max, x), [1.0, 3.0, 2.0]) == ([0.0, 1.0, 0.0],)
+
+  @test hessian(x -> mapreduce(abs2, +, x), [1.0, 2.0]) ≈ [2.0 0.0; 0.0 2.0]
+
+  # the generic path is quadratic in the length (#1691): ~32 MiB for this input
+  x = rand(2000)
+  for g in (x -> mapreduce(abs2, +, x), x -> mapreduce(abs2, *, x), x -> reduce(+, x), x -> reduce(*, x))
+    gradient(g, x)
+    @test @allocated(gradient(g, x)) < 2^20
+  end
+end
+
 @test gradtest(x -> x', rand(5))
 
 @test gradtest(det, (4, 4))
