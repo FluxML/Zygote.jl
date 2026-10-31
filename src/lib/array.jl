@@ -432,13 +432,23 @@ end
   rtol::Real = (eps(real(float(one(T))))*min(size(A)...))*iszero(atol),
 ) where {T}
   Y = pinv(A)
-  return Y, Δ->(-Y' * Δ * Y' + (I - A * Y) * Δ' * Y * Y' + Y' * Y * Δ' * (I - Y * A),)
+  return Y, Δ->(_pinv_back(A, Y, Δ),)
+end
+
+# Associated so that the intermediates are at most `min(size(A)...)` square,
+# rather than `max(size(A)...)` square.
+function _pinv_back(A, Y, Δ)
+  if size(A, 1) >= size(A, 2)
+    -(Y' * (Δ * Y')) + (Δ' - A * (Y * Δ')) * (Y * Y') + Y' * ((Y * Δ') * (I - Y * A))
+  else
+    Z = (Y' * Y) * Δ'
+    -((Y' * Δ) * Y') + (((I - A * Y) * Δ') * Y) * Y' + (Z - (Z * Y) * A)
+  end
 end
 
 # When `A` is guaranteed to be square, definitely use the simple expression for the adjoint.
 @adjoint function \(
   A::Union{
-    Diagonal,
     AbstractTriangular,
     LinearAlgebra.Adjoint{<:Any, <:AbstractTriangular},
     Transpose{<:Any, <:AbstractTriangular},
@@ -452,11 +462,28 @@ end
   end
 end
 
-@adjoint function /(A::AbstractMatrix, B::Union{Diagonal, AbstractTriangular})
+# Only the diagonal of the dense gradient `-B̄ * Y'` is needed, which avoids an n×n matrix.
+@adjoint function \(A::Diagonal, B::AbstractVecOrMat)
+  Y = A \ B
+  return Y, function(Ȳ)
+    B̄ = A' \ Ȳ
+    return (Diagonal(-vec(sum(B̄ .* conj.(Y); dims=2))), B̄)
+  end
+end
+
+@adjoint function /(A::AbstractMatrix, B::AbstractTriangular)
   Y = A / B
   return Y, function(Ȳ)
     Ā = Ȳ / B'
     return (Ā, -Y' * Ā)
+  end
+end
+
+@adjoint function /(A::AbstractMatrix, B::Diagonal)
+  Y = A / B
+  return Y, function(Ȳ)
+    Ā = Ȳ / B'
+    return (Ā, Diagonal(-vec(sum(conj.(Y) .* Ā; dims=1))))
   end
 end
 
