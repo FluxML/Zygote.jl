@@ -28,6 +28,7 @@ using PrecompileTools: @setup_workload, @compile_workload
     gradient(x -> (p = Pair(x, 2x); p.first * p.second), 2.0)
     gradient(v -> sum(sum, v), [[1.0, 2.0], [3.0]])
     gradient(d -> d[:a] * d[:b], Dict(:a => 1.0, :b => 2.0))
+    gradient(t -> t[1] * t[2] + t[3], (1.0, 2.0, 3.0))
     for T in (Float32, Float64)
       x, b, W = T[1, 2, 3], T[1, 2], T[1 2 3; 4 5 6]
       gradient(x -> sum(abs2, x), x)
