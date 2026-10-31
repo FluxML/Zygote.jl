@@ -550,7 +550,20 @@ end
   @test gradtest(pinv, A)
   @test gradtest(inv, B)
   @test gradtest(pinv, C)
+  @test gradtest(pinv, B)
   @test gradient(inv, 2.0)[1] == -0.25
+
+  @testset "pinv pullback avoids max(m, n) square temporaries" for sz in ((600, 4), (4, 600))
+    Z, back = Zygote.pullback(pinv, randn(rng, sz...))
+    Δ = ones(size(Z)...)
+    back(Δ)
+    @test (@allocated back(Δ)) < 600^2  # an m×m Float64 temporary takes 8m^2 bytes
+  end
+
+  @testset "pinv complex $(size(M))" for M in (A, B, C)
+    Mi = randn(rng, size(M)...)
+    @test gradtest((Mr, Mi) -> (W = pinv(complex.(Mr, Mi)); vcat(vec(real(W)), vec(imag(W)))), M, Mi)
+  end
 end
 
 @testset "multiplication" begin
