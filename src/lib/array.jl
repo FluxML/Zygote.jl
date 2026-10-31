@@ -382,21 +382,47 @@ function _pullback(cx::AContext, ::typeof(prod), f, xs::AbstractArray)
   return _pullback(cx, (f, xs) -> prod(f.(xs)), f, xs)
 end
 
-# `mapreduce`/`reduce` with `+` or `*` over an array are routed to `sum`/`prod`: the
-# generic Base reduction would otherwise be differentiated element by element, with
-# a quadratic cost (#1691). Other operators keep using the generic path.
+# `mapreduce`/`reduce` with `+` or `*` over an array, and `sum`/`prod`/`reduce` over a
+# generator of an array, are routed to `sum`/`prod`: the generic Base reduction would
+# otherwise be differentiated element by element, with a quadratic cost (#1691).
+# Other operators keep using the generic path.
+const ArrayOrGenerator = Union{AbstractArray, Base.Generator{<:AbstractArray}}
+
 for (op, red) in ((:+, :sum), (:*, :prod))
   @eval begin
     function _pullback(cx::AContext, ::typeof(mapreduce), f, ::typeof($op), xs::AbstractArray)
+      isempty(xs) && return mapreduce(f, $op, xs), _ -> (nothing, nothing, nothing, zero.(xs))
       y, back = _pullback(cx, $red, f, xs)
       mapreduce_pullback(Δ) = (b = back(Δ); b === nothing ? nothing : (nothing, b[2], nothing, b[3]))
       return y, mapreduce_pullback
     end
 
-    function _pullback(cx::AContext, ::typeof(reduce), ::typeof($op), xs::AbstractArray)
+    function _pullback(cx::AContext, ::typeof(mapreduce), f, ::typeof($op), g::Base.Generator{<:AbstractArray})
+      isempty(g.iter) && return mapreduce(f, $op, g), _ -> (nothing, nothing, nothing, (f = nothing, iter = zero.(g.iter)))
+      gf = g.f
+      fg = x -> f(gf(x))
+      y, back = _pullback(cx, mapreduce, fg, $op, g.iter)
+      function mapreduce_generator_pullback(Δ)
+        b = back(Δ)
+        b === nothing && return nothing
+        Δfg = b[2]  # tangent of the closure `fg`, with fields `f` and `gf`
+        (nothing, Δfg === nothing ? nothing : Δfg.f, nothing,
+         (f = Δfg === nothing ? nothing : Δfg.gf, iter = b[4]))
+      end
+      return y, mapreduce_generator_pullback
+    end
+
+    function _pullback(cx::AContext, ::typeof(reduce), ::typeof($op), xs::ArrayOrGenerator)
       y, back = _pullback(cx, $red, xs)
       reduce_pullback(Δ) = (b = back(Δ); b === nothing ? nothing : (nothing, nothing, b[2]))
       return y, reduce_pullback
+    end
+
+    function _pullback(cx::AContext, ::typeof($red), g::Base.Generator{<:AbstractArray})
+      isempty(g.iter) && return $red(g), _ -> nothing
+      y, back = _pullback(cx, $red, g.f, g.iter)
+      generator_pullback(Δ) = (b = back(Δ); b === nothing ? nothing : (nothing, (f = b[2], iter = b[3])))
+      return y, generator_pullback
     end
   end
 end
@@ -415,8 +441,14 @@ end
 
 _mapreduce_kw(kws, f, op, xs) = _mapreduce_init(f, op, xs; kws...)
 
+# For an empty array the result is `init` (or Base's error), and `f` is never called.
+_empty_kw_tangent(kws, Δ) =
+  haskey(kws, :init) && Δ !== nothing ? merge(map(_ -> nothing, kws), (init = sum(Δ),)) : nothing
+
 function _pullback(cx::AContext, ::Core.kwftype(typeof(mapreduce)), kws::NamedTuple,
                    ::typeof(mapreduce), f, op::Union{typeof(+), typeof(*)}, xs::AbstractArray)
+  isempty(xs) && return mapreduce(f, op, xs; kws...),
+                        Δ -> (nothing, _empty_kw_tangent(kws, Δ), nothing, nothing, nothing, zero.(xs))
   y, back = _pullback(cx, _mapreduce_kw, kws, f, op, xs)
   mapreduce_kw_pullback(Δ) = (b = back(Δ); b === nothing ? nothing : (nothing, b[2], nothing, b[3], nothing, b[5]))
   return y, mapreduce_kw_pullback
