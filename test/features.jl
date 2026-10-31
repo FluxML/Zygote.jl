@@ -1001,6 +1001,24 @@ end
   @inferred pb(MyFloat64[1., 1., 1.])
 end
 
+@testset "lazy cotangents of scalar broadcast operands" begin
+  # https://github.com/FluxML/Zygote.jl/issues/1694
+  x = [0.5, -2.0, 3.0]
+  for (f, ds) in [((x, s) -> x .+ s, 3.0), ((x, s) -> s .- x, 3.0), ((x, s) -> x .- s, -3.0),
+                  ((x, s) -> x .* s .* x, sum(abs2, x)), ((x, s) -> s ./ x, sum(inv, x)),
+                  ((x, s) -> max.(x, s), 1.0)]
+    _, back = Zygote._pullback(Zygote.Context(), f, x, 0.25)
+    dxs = back(ones(3))
+    @test dxs[3] isa Zygote.AbstractThunk
+    @test Zygote.unthunk(dxs[3]) ≈ ds
+    @test gradient((x, s) -> sum(f(x, s)), x, 0.25)[2] ≈ ds
+  end
+
+  # nested AD evaluates them eagerly
+  @test gradient(a -> gradient(b -> sum(b .* a .+ 1), 2.0)[1], 3.0) == (1.0,)
+  @test gradient(a -> sum(gradient(b -> sum(abs2, b .+ a), x)[1]), 0.5) == (6.0,)
+end
+
 @testset "Dict" begin
   # issue #717
   @test gradient(x -> (() -> x[:y])(), Dict(:y => 0.4)) == (Dict(:y => 1.0),)

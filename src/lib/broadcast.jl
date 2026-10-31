@@ -73,6 +73,18 @@ unbroadcast(x::Tuple{<:Any}, x̄::Nothing) = nothing
 
 unbroadcast(x::AbstractArray, x̄::Nothing) = nothing
 
+# A scalar operand's cotangent is a reduction over the whole broadcast (a device-to-host
+# copy on GPU) that is often unused, as for the literal in `x .+ 1f-5`, so defer it.
+lazy_cotangent(x::Number, dx) = Thunk(dx)
+lazy_cotangent(x, dx) = dx()
+
+# Nested AD cannot differentiate the construction of a `Thunk`, so evaluate eagerly.
+function _pullback(cx::AContext, ::typeof(lazy_cotangent), x, dx)
+  y, back = _pullback(cx, dx)
+  lazy_cotangent_pullback(Δ) = (nothing, nothing, last_or_nothing(back(Δ)))
+  return y, lazy_cotangent_pullback
+end
+
 # Split Reverse Mode
 # ==================
 
@@ -81,17 +93,19 @@ unbroadcast(x::AbstractArray, x̄::Nothing) = nothing
 # right arrays.
 
 @adjoint broadcasted(::typeof(+), xs::Numeric...) =
-  broadcast(+, xs...), ȳ -> (nothing, map(x -> unbroadcast(x, ȳ), xs)...)
+  broadcast(+, xs...), ȳ -> (nothing, map(x -> lazy_cotangent(x, () -> unbroadcast(x, ȳ)), xs)...)
 
 @adjoint broadcasted(::typeof(-), x::Numeric, y::Numeric) = x .- y,
-  Δ -> (nothing, unbroadcast(x, Δ), _minus(unbroadcast(y, Δ)))
+  Δ -> (nothing, lazy_cotangent(x, () -> unbroadcast(x, Δ)),
+        lazy_cotangent(y, () -> _minus(unbroadcast(y, Δ))))
 @adjoint broadcasted(::typeof(-), x::Numeric) = .-x,
   Δ -> (nothing, _minus(Δ))
 _minus(Δ) = -Δ
 _minus(::Nothing) = nothing
 
 @adjoint broadcasted(::typeof(*), x::Numeric, y::Numeric) = x.*y,
-   Δ -> (nothing, unbroadcast(x, Δ .* conj.(y)), unbroadcast(y, Δ .* conj.(x)))
+   Δ -> (nothing, lazy_cotangent(x, () -> unbroadcast(x, Δ .* conj.(y))),
+         lazy_cotangent(y, () -> unbroadcast(y, Δ .* conj.(x))))
 @adjoint broadcasted(::typeof(*), x::Number, y::AbstractArray{<:Number}) =
   _pullback(__context__, *, x, y)  # this uses dot(y,Δ) instead of sum(Δ .* conj.(y))
 @adjoint broadcasted(::typeof(*), x::AbstractArray{<:Number}, y::Number) =
@@ -99,7 +113,8 @@ _minus(::Nothing) = nothing
 
 @adjoint function broadcasted(::typeof(/), x::Numeric, y::Numeric)
   res = x ./ y
-  res, Δ -> (nothing, unbroadcast(x, Δ ./ conj.(y)), unbroadcast(y, .-Δ .* conj.(res ./ y)))
+  res, Δ -> (nothing, lazy_cotangent(x, () -> unbroadcast(x, Δ ./ conj.(y))),
+             lazy_cotangent(y, () -> unbroadcast(y, .-Δ .* conj.(res ./ y))))
 end
 @adjoint broadcasted(::typeof(/), x::AbstractArray{<:Number}, y::Number) =
   _pullback(__context__, /, x, y)
@@ -360,7 +375,7 @@ end
   y = broadcast(_strip_dual, out)
   function bc_fwd_back(ȳ)
     dargs = ntuple(valN) do i
-      unbroadcast(args[i], broadcast((ȳ1, o1) -> _dual_partial(ȳ1, o1, i), ȳ, out))
+      lazy_cotangent(args[i], () -> unbroadcast(args[i], broadcast((ȳ1, o1) -> _dual_partial(ȳ1, o1, i), ȳ, out)))
     end
     (nothing, nothing, dargs...) # nothings for broadcasted & f
   end
@@ -373,7 +388,7 @@ end
   y = broadcast(x -> value(x), out)
   function bc_fwd_back(ȳ)
     dargs = ntuple(valN) do i
-      unbroadcast(args[i], broadcast((y1, o1) -> y1 * partials(o1,i), ȳ, out))
+      lazy_cotangent(args[i], () -> unbroadcast(args[i], broadcast((y1, o1) -> y1 * partials(o1,i), ȳ, out)))
     end
     (nothing, nothing, dargs...) # nothings for broadcasted & f
   end
@@ -386,7 +401,7 @@ end
     y = broadcast(x -> Complex(value(real(x)), value(imag(x))), out)
     function bc_fwd_back(ȳ)
       dargs = ntuple(valN) do i
-        unbroadcast(args[i], broadcast((y1, o1) -> (real(y1)*partials(real(o1),i) + imag(y1)*partials(imag(o1), i)), ȳ, out))
+        lazy_cotangent(args[i], () -> unbroadcast(args[i], broadcast((y1, o1) -> (real(y1)*partials(real(o1),i) + imag(y1)*partials(imag(o1), i)), ȳ, out)))
       end
       (nothing, nothing, dargs...) # nothings for broadcasted & f
     end
@@ -400,7 +415,7 @@ end
     y = broadcast(x -> value(x), out)
     function bc_fwd_back(ȳ)
       dargs = ntuple(valN) do i
-        unbroadcast(args[i], broadcast((y1, o1) -> y1 * Complex(partials(o1, i), partials(o1, i+N)), ȳ, out))
+        lazy_cotangent(args[i], () -> unbroadcast(args[i], broadcast((y1, o1) -> y1 * Complex(partials(o1, i), partials(o1, i+N)), ȳ, out)))
       end
       (nothing, nothing, dargs...) # nothings for broadcasted & f
     end
@@ -424,7 +439,7 @@ end
     y = broadcast(x -> Complex(value(real(x)), value(imag(x))), out)
     function bc_fwd_back(ȳ)
       dargs = ntuple(valN) do i
-        unbroadcast(args[i], broadcast((y1, o1) -> _adjoint_complex(N, y1, o1, i), ȳ, out))
+        lazy_cotangent(args[i], () -> unbroadcast(args[i], broadcast((y1, o1) -> _adjoint_complex(N, y1, o1, i), ȳ, out)))
       end
       (nothing, nothing, dargs...) # nothings for broadcasted & f
     end
