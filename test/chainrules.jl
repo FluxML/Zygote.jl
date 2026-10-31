@@ -424,6 +424,37 @@ end
     @test Zygote.wrap_chainrules_input([2.0; 4.0]) == [2.0; 4.0]
     @test Zygote.wrap_chainrules_input([[2.0; 4.0], [1.0; 3.0]]) == [[2.0; 4.0], [1.0; 3.0]]
     @test Zygote.wrap_chainrules_input([nothing; 4.0]) == [0.0; 4.0] # ChainRules uses the numeric zero where possible
+    @test Zygote.wrap_chainrules_input(@thunk([2.0; 4.0])) == [2.0; 4.0]
+end
+
+@testset "Cotangent is unthunked before reaching ChainRules pullbacks" begin
+    saw_thunk = Ref(false)
+    thunk_probe(x) = copy(x)
+    function ChainRulesCore.rrule(::typeof(thunk_probe), x)
+        function thunk_probe_pullback(Δ)
+            saw_thunk[] |= Δ isa AbstractThunk
+            return NoTangent(), Δ
+        end
+        return thunk_probe(x), thunk_probe_pullback
+    end
+
+    x = rand(5)
+    @test gradient(x -> sum(thunk_probe(x)), x)[1] == ones(5)  # `sum` hands back a thunk
+    @test !saw_thunk[]
+
+    # ChainRules' `reduce(vcat/hcat)` rules index into the cotangent; with a thunk it was quadratic (#1686)
+    vs = [rand(10) for _ in 1:30]
+    for cat in (vcat, hcat)
+        @test gradient(vs -> sum(reduce(cat, vs)), vs)[1] == fill(ones(10), 30)
+        @test gradient(vs -> sum(abs2, reduce(cat, vs)), vs)[1] ≈ 2 .* vs
+    end
+
+    vs = [rand(10) for _ in 1:1600]
+    for cat in (vcat, hcat)
+        f(vs) = gradient(vs -> sum(reduce(cat, vs)), vs)
+        f(vs)
+        @test @allocated(f(vs)) < 20_000_000  # ~0.6 MB, versus ~200 MB when the thunk reaches the rule
+    end
 end
 
 @testset "Lazy" begin

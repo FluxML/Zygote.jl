@@ -159,6 +159,8 @@ end
 Convert `dx` from the format Zygote uses internally to differentials types ChainRules uses.
 """
 @inline wrap_chainrules_input(dx) = dx
+# Rules that index their input without `unthunk` would rebuild an `InplaceableThunk` on every access.
+@inline wrap_chainrules_input(dx::AbstractThunk) = unthunk(dx)
 @inline wrap_chainrules_input(::Nothing) = ChainRules.ZeroTangent()
 @inline wrap_chainrules_input(::Tuple{Vararg{Nothing}}) = ChainRules.ZeroTangent()
 @inline wrap_chainrules_input(::AbstractArray{Nothing}) = ChainRules.ZeroTangent()
