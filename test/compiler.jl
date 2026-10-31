@@ -420,3 +420,17 @@ end
     @test readchomp(cmd) == "([8.0, 16.0],)"
   end
 end
+
+@testset "precompile workload covers keyword arguments and tuple loops" begin
+  script = """
+    using Zygote
+    m = only(filter(methods(Zygote._pullback)) do m
+      m.sig == Tuple{typeof(Zygote._pullback), Zygote.AContext, Any, Vararg{Any}}
+    end)
+    sigs = [Base.unwrap_unionall(mi.specTypes).parameters for mi in Base.specializations(m)]
+    print(any(p -> p[3] === typeof(Core.kwcall), sigs), " ",
+          any(p -> p[3] === typeof(iterate) && length(p) > 3 && p[4] <: Tuple, sigs))
+    """
+  cmd = `$(Base.julia_cmd()) --project=$(Base.active_project()) -e $script`
+  @test readchomp(cmd) == "true true"
+end
