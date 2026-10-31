@@ -7,6 +7,74 @@
         @test Zygote.accum(fill(0.0), fill(0.0)) == fill(0.0)
     end
 
+    @testset "accum tuples" begin
+        accum = Zygote.accum
+        @test accum((1, 2), (3, 4)) == (4, 6)
+        @test accum((), ()) === ()
+        @test accum((1.0, nothing, 3.0), (nothing, 2.0, 4.0)) === (1.0, 2.0, 7.0)
+        @test accum((nothing, nothing), (nothing, nothing)) === (nothing, nothing)
+        @test accum((1.0, (2.0, nothing)), (nothing, (3.0, 4.0))) === (1.0, (5.0, 4.0))
+        @test accum(((a=1.0, b=nothing), 1.0), ((a=2.0, b=3.0), nothing)) === ((a=3.0, b=3.0), 1.0)
+        @test accum(([1.0, 2.0], nothing), (nothing, 3.0)) == ([1.0, 2.0], 3.0)
+        @test accum((1.0, 2.0)) === (1.0, 2.0)
+        # n-ary: left fold of the binary method
+        @test accum((1, nothing), (2, 3), (nothing, 4)) === (3, 7)
+        # the shorter tuple wins, as with `map`
+        @test accum((1, 2, 3), (10, 20)) === (11, 22)
+        @test accum((1, 2), (10, 20, 30)) === (11, 22)
+
+        # long tuples, past the unrolling limit of `map`
+        for n in (31, 32, 33, 64)
+            x = ntuple(i -> iseven(i) ? nothing : Float64(i), n)
+            y = ntuple(i -> i % 3 == 0 ? nothing : Float64(10i), n)
+            z = ntuple(i -> Float64(100i), n)
+            @test accum(x, y) == map(accum, x, y)
+            @test accum(x, y, z) == map(accum, x, y, z)
+            @test @inferred(accum(z, z)) == map(a -> 2a, z)
+        end
+        # n-ary accumulation over many arguments, past the splat limit of the compiler
+        for n in (3, 32, 33, 34, 40, 100)
+            xs = ntuple(i -> i % 2 == 0 ? nothing : Float64(i), n)
+            @test accum(xs...) == sum(something(x, 0.0) for x in xs)
+            ts = ntuple(i -> (Float64(i), nothing, i % 2 == 0 ? nothing : 1.0), n)
+            @test accum(ts...) == (n * (n + 1) / 2, nothing, Float64(cld(n, 2)))
+        end
+    end
+
+    @testset "gradient through long tuples" begin
+        # product of the entries of a tuple, one sequential update per entry
+        @generated function chainprod(t::NTuple{N,Float64}) where N
+            quote
+                r = 1.0
+                $([:(r *= t[$i]) for i in 1:N]...)
+                r
+            end
+        end
+        for n in (16, 31, 32, 33, 40, 64, 100)
+            t = ntuple(i -> 1 + i / 100, n)
+            p = prod(t)
+            g, = gradient(chainprod, t)
+            @test g isa NTuple{n,Float64}
+            @test collect(g) ≈ p ./ collect(t)
+        end
+
+        # a flat tuple of 64 layers: the backward pass used to be quadratic and box every element
+        struct Scale; w::Float64; end
+        (l::Scale)(x) = l.w * x
+        @generated function applychain(layers::Tuple{Vararg{Any,N}}, x) where N
+            quote
+                $([:(x = layers[$i](x)) for i in 1:N]...)
+                x
+            end
+        end
+        layers = ntuple(i -> Scale(1 + i / 100), 64)
+        _, back = pullback(ls -> applychain(ls, 1.0), layers)
+        g, = back(1.0)
+        @test [l.w for l in g] ≈ prod(l.w for l in layers) ./ [l.w for l in layers]
+        allocated(f) = (f(1.0); @allocated f(1.0))
+        @test allocated(back) < 100_000  # was ~2.5 MB
+    end
+
     @testset "module getproperty/getfield (#194, #252)" begin
         # Reading a binding from a module reached via an SSA value (qualified access)
         # is non-differentiable; the gradient flows only to the other operand. These

@@ -11,9 +11,29 @@ accum(x, y) =
   y === nothing ? x :
   x + y
 
-accum(x, y, zs...) = accum(accum(x, y), zs...)
+# Unrolled because `map` over tuples of ≥ 32 elements and splats of ≥ 33 arguments are not,
+# which made backward passes over long tuples quadratic and allocation-heavy.
+# The non-generated branches are what inference sees for non-concrete types.
+function accum(x, y, zs...)
+  if @generated
+    ex = :(accum(x, y))
+    for i in 1:length(zs)
+      ex = :(accum($ex, zs[$i]))
+    end
+    ex
+  else
+    accum(accum(x, y), zs...)
+  end
+end
 
-accum(x::Tuple, ys::Tuple...) = map(accum, x, ys...)
+function accum(x::Tuple, y::Tuple)
+  if @generated
+    N = min(length(x.parameters), length(y.parameters))
+    Expr(:tuple, [:(accum(x[$i], y[$i])) for i in 1:N]...)
+  else
+    map(accum, x, y)
+  end
+end
 accum(x::AbstractArray, ys::AbstractArray...) = Base.broadcast_preserving_zero_d(accum, x, ys...)
 accum(::Tuple{}, ::NamedTuple{}) = ()
 accum(::NamedTuple{}, ::Tuple{}) = ()
