@@ -186,6 +186,9 @@ end
   @test gradtest(x -> cumsum(x, dims=3), (3,4)) # trivial
 end
 
+# What Base throws when reducing an empty collection: a `MethodError` on Julia 1.10.
+const EmptyReduceError = typeof(try sum(a^2 for a in Float64[]) catch e; e end)
+
 @testset "mapreduce, reduce with + and *" begin
   for (op, red) in ((+, sum), (*, prod)), f in (identity, abs2, sin, x -> x^2 + 1)
     @test gradtest(x -> mapreduce(f, op, x), (7,))
@@ -241,7 +244,7 @@ end
   @test gradient(x -> mapreduce(a -> a^2, +, x; init=0.0), Float64[]) == (Float64[],)
   @test gradient((x, p) -> mapreduce(a -> a^2, *, x; init=p), Float64[], 2.0) == (Float64[], 1.0)
   @test gradient((x, p) -> sum(mapreduce(a -> a^2, +, x; dims=1, init=p)), zeros(0, 3), 2.0) == (zeros(0, 3), 3.0)
-  @test_throws ArgumentError gradient(x -> mapreduce(a -> a^2, +, x), Float64[])
+  @test_throws EmptyReduceError gradient(x -> mapreduce(a -> a^2, +, x), Float64[])
 
   # the generic path is quadratic in the length (#1691): ~32 MiB for this input
   x = rand(2000)
@@ -272,7 +275,7 @@ end
           gradient((x, p) -> reduce(op, p * a for a in x), [1.0, 2.0], 3.0)
   end
   @test gradient(x -> mapreduce(abs2, +, a for a in x), Float64[]) == (Float64[],)
-  @test_throws ArgumentError gradient(x -> mapreduce(a -> a^2, +, a for a in x), Float64[])
+  @test_throws EmptyReduceError gradient(x -> mapreduce(a -> a^2, +, a for a in x), Float64[])
 
   # captured parameters, ranges, nested generators, arrays of arrays
   @test gradient((x, p) -> sum(p * a for a in x), [1.0, 2.0], 3.0) == ([3.0, 3.0], 3.0)
@@ -288,8 +291,8 @@ end
   @test gradient(x -> sum(a * x for a in (1.0, 2.0)), 1.0) == (3.0,)
 
   # like Base, empty generators error
-  @test_throws ArgumentError gradient(x -> sum(a^2 for a in x), Float64[])
-  @test_throws ArgumentError gradient(x -> prod(a^2 for a in x), Float64[])
+  @test_throws EmptyReduceError gradient(x -> sum(a^2 for a in x), Float64[])
+  @test_throws EmptyReduceError gradient(x -> prod(a^2 for a in x), Float64[])
 
   @test hessian(x -> sum(a^2 for a in x), [1.0, 2.0]) ≈ [2.0 0.0; 0.0 2.0]
 
