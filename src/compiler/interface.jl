@@ -21,6 +21,20 @@ end
 
 Pullback{S}(x) where S = Pullback{S,typeof(x)}(x)
 
+typenodes(T::DataType) = 1 + sum(typenodes, T.parameters; init = 0)
+typenodes(T::Union) = typenodes(T.a) + typenodes(T.b)
+typenodes(T::UnionAll) = typenodes(Base.unwrap_unionall(T))
+typenodes(_) = 1
+
+const MAX_BRANCHY_PULLBACK_NODES = 60
+
+# Pullbacks of multi-block code nest the types of their callees' pullbacks, so a concrete type is
+# only worth its compile time while it stays small (#1697).
+@generated function branchy_pullback(::Type{F}, t::T) where {F,T}
+  P = typenodes(T) <= MAX_BRANCHY_PULLBACK_NODES ? Pullback{F,T} : Pullback{F,Any}
+  return :($P(t))
+end
+
 struct CompileError
   T
   e

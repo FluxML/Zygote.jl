@@ -56,9 +56,8 @@ function forward_stacks!(adj, F)
     end
   end
   rec = push!(pr, xtuple(recs...))
-  P = length(pr.blocks) == 1 ? Pullback{F} : Pullback{F,Any}
-  # P = Pullback{F,Any} # reduce specialisation
-  rec = push!(pr, Expr(:call, P, rec))
+  rec = length(pr.blocks) == 1 ? push!(pr, Expr(:call, Pullback{F}, rec)) :
+                                 push!(pr, xcall(Zygote, :branchy_pullback, F, rec))
   ret = xtuple(pr.blocks[end].branches[end].args[1], rec)
   ret = push!(pr, ret)
   pr.blocks[end].branches[end].args[1] = ret
