@@ -188,7 +188,7 @@ end
   @test gradtest(x->exp.(Fill(3 * first(x), N)), [x])
 
   # Ops with a single-argument rule on `Numeric` used to be ambiguous with the `Fill` one (#1688).
-  @testset "unary broadcast of $f" for f in (+, -, identity, tanh, conj, real, imag, abs2, Float32,
+  @testset "unary broadcast of $f" for f in (+, -, identity, tanh, exp, log, sqrt, inv, conj, real, imag, abs2, Float32,
                                               LogExpFunctions.xlogx, LogExpFunctions.log1pexp)
     xf = Fill(0.7, N)
     out, back = Zygote.pullback(x -> f.(x), xf)
