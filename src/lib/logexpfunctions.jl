@@ -24,6 +24,10 @@ end
     return log1pexp.(x), δ -> (nothing, unbroadcast(x, δ .* dx))
 end
 
+for f in (:xlogx, :log1pexp)  # see the `AbstractFill` methods in broadcast.jl
+    @eval @adjoint broadcasted(::typeof($f), x::AbstractFill{<:Real}) = _broadcast_fill(__context__, $f, x)
+end
+
 @adjoint function xlogy(x::Real, y::Real)
     result, dx, dy = ∇xlogy(x, y)
     back(δ) = (δ * dx, δ * dy)

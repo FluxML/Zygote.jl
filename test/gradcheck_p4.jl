@@ -187,6 +187,27 @@ end
   @test back(ones(N))[1] == ones(N) .* exp(x)
   @test gradtest(x->exp.(Fill(3 * first(x), N)), [x])
 
+  # Ops with a single-argument rule on `Numeric` used to be ambiguous with the `Fill` one (#1688).
+  @testset "unary broadcast of $f" for f in (+, -, identity, tanh, conj, real, imag, abs2, Float32,
+                                              LogExpFunctions.xlogx, LogExpFunctions.log1pexp)
+    xf = Fill(0.7, N)
+    out, back = Zygote.pullback(x -> f.(x), xf)
+    _, back_dense = Zygote.pullback(x -> f.(x), collect(xf))
+    @test out isa Fill
+    @test out == f.(collect(xf))
+    @test back(Fill(y, N))[1] isa Fill
+    @test back(Fill(y, N))[1] ≈ back_dense(fill(y, N))[1]
+    @test back(z)[1] ≈ back_dense(z)[1]
+  end
+
+  # A new single-argument broadcast rule needs an `AbstractFill` method too, see broadcast.jl.
+  # Ambiguities with the broadcast-style rules would need a `Fill` broadcast as a function.
+  on_fill(m) = m.sig <: Tuple{Any, Any, typeof(Base.broadcasted), Any, FillArrays.AbstractFill}
+  on_style(m) = m.sig <: Tuple{Any, Any, typeof(Base.broadcasted), Base.Broadcast.BroadcastStyle, Vararg}
+  @test isempty(filter(Test.detect_ambiguities(Zygote)) do ms
+    any(on_fill, ms) && !any(on_style, ms)
+  end)
+
   @testset "broadcast +, -, *, /" begin
     for sx in [(M, N), (M, 1), (1, N), (1, 1)]
       for sy in [(M, N), (M, 1), (1, N), (1, 1)]

@@ -920,8 +920,10 @@ end
 # FillArray functionality
 # =======================
 
-@adjoint function broadcasted(op, r::AbstractFill{<:Real})
-  y, _back = _pullback(__context__, op, getindex_value(r))
+@adjoint broadcasted(op, r::AbstractFill{<:Real}) = _broadcast_fill(__context__, op, r)
+
+function _broadcast_fill(cx, op, r)
+  y, _back = _pullback(cx, op, getindex_value(r))
   back(Δ::AbstractFill) = (nothing, Fill(last(_back(getindex_value(Δ))), size(r)))
   back(Δ::AbstractArray) = (nothing, last.(_back.(Δ)))
   return Fill(y, size(r)), back
