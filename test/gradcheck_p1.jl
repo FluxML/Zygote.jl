@@ -146,6 +146,16 @@ end
 @test gradtest((x, W, b) -> tanh.(W*x .+ b), 5, (2,5), 2)
 @test gradtest((x, W, b) -> tanh.(W*x .+ b), (5,3), (2,5), 2)
 
+@testset "broadcasted $f: $T" for f in (exp, log, sqrt, inv), T in (Float32, Float64, ComplexF32, ComplexF64)
+  x = T <: Complex ? T.(randn(real(T), 6) .+ im .* randn(real(T), 6)) : T.(rand(6) .+ 0.5)
+  g = gradient(x -> real(sum(f.(x))), x)[1]
+  @test g isa Vector{T}
+  @test g ≈ gradient(x -> real(sum(map(f, x))), x)[1]
+  @test gradtest(x -> f.(x), rand(3, 2) .+ 0.5)
+  @test gradient(x -> sum(f.(x)), Diagonal(rand(3) .+ 0.5))[1] isa Diagonal
+  @test gradient(x -> sum(f.(x)), (rand(3) .+ 0.5)')[1] isa Adjoint
+end
+
 @test gradtest((w, x) -> w'*x, randn(10, 2), randn(10))
 @test gradtest((w, x) -> Adjoint(w)*x, randn(10, 2), randn(10))
 @test gradtest((w, x) -> transpose(w)*x, randn(5,5), randn(5,5))

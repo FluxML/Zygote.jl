@@ -160,6 +160,26 @@ end
   y, ȳ -> (nothing, ȳ .* conj.(1 .- y.^2))
 end
 
+# Cheaper than the `Dual` path, which stores the derivative next to each value. No trig
+# functions here: their `Dual`s compute `sin` and `cos` together, which is faster.
+@adjoint function broadcasted(::typeof(exp), x::Numeric)
+  y = exp.(x)
+  y, ȳ -> (nothing, unbroadcast(x, ȳ .* conj.(y)))
+end
+
+@adjoint broadcasted(::typeof(log), x::Numeric) =
+  log.(x), ȳ -> (nothing, unbroadcast(x, ȳ ./ conj.(x)))
+
+@adjoint function broadcasted(::typeof(sqrt), x::Numeric)
+  y = sqrt.(x)
+  y, ȳ -> (nothing, unbroadcast(x, ȳ ./ (2 .* conj.(y))))
+end
+
+@adjoint function broadcasted(::typeof(inv), x::Numeric)
+  y = inv.(x)
+  y, ȳ -> (nothing, unbroadcast(x, .-ȳ .* conj.(y) .^ 2))
+end
+
 @adjoint broadcasted(::typeof(conj), x::Numeric) =
   conj(x), z̄ -> (nothing, conj(z̄))
 
@@ -174,7 +194,7 @@ end
 
 # Each single-argument rule on `Numeric` is ambiguous with the generic `AbstractFill` one
 # (array.jl), so list its function here to send `Fill`s to the latter (#1688).
-for f in (:+, :-, :identity, :tanh, :conj, :real, :imag, :abs2)
+for f in (:+, :-, :identity, :tanh, :exp, :log, :sqrt, :inv, :conj, :real, :imag, :abs2)
   @eval @adjoint broadcasted(::typeof($f), x::AbstractFill{<:Real}) = _broadcast_fill(__context__, $f, x)
 end
 
