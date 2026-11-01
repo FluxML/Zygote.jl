@@ -69,6 +69,20 @@ end
   # non-differentiables
   @test gradient((x,y) -> sum(x.^2 .+ y'), a_gpu, a_gpu .> 0)[2] === nothing
 
+  # https://github.com/FluxML/Zygote.jl/issues/1696 : a runtime exponent has its own rule.
+  # Through `Dual`s, the exponent's partial `log(x)` made the gradient `NaN` for `x < 0`.
+  let xn = Float32[-2, -1, 0.5, 3], xp = Float32[0.5, 1, 2, 3]
+    cpu(x) = x isa CuArray ? collect(x) : x
+    for (x, p) in ((xn, 2), (xn, 3f0), (xn, 0), (xp, 0.5f0), (xp, Float32[0.5, 1, -1, 2]))
+      g = gradient((x, p) -> sum(x .^ p), x, p)
+      g_gpu = gradient((x, p) -> sum(x .^ p), cu(x), p isa Array ? cu(p) : p)
+      @test g_gpu[1] isa CuArray{Float32}
+      @test collect(g_gpu[1]) ≈ g[1]
+      @test cpu(g_gpu[2]) ≈ g[2]
+    end
+    @test gradient(x -> sum(x .^ 0.5), cu(xp)')[1] isa Adjoint{Float32, <:CuArray}
+  end
+
   # https://github.com/FluxML/Zygote.jl/issues/1424 : a broadcast whose output
   # element is a Tuple (here `tuple.(x, y)`) must not leak ForwardDiff `Dual`s
   # into the primal, and its pullback must not be `nothing`.

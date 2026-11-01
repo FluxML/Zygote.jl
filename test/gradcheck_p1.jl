@@ -68,6 +68,71 @@ end
     @test gradient(x -> real(sum(x .^ 4)), z)[1] == zeros(T, 3)
   end
 
+  # https://github.com/FluxML/Zygote.jl/issues/1696 : a runtime exponent has its own rule
+  @testset "broadcasted runtime power: p = $p" for p in (0.5, 2.0, 2.5f0, 3, 1, 0, -1, -2)
+    x = rand(5) .+ 0.5
+    @test gradient(x -> sum(x .^ p), x)[1] ≈ p .* x .^ (p - 1)
+    @test gradcheck(x -> sum(x .^ p), x)
+    @test gradcheck((x, p) -> sum(x .^ p[1]), x, [Float64(p)])
+    @test gradient(x -> sum(x .^ p), Float32.(x))[1] isa Vector{Float32}
+    p >= 0 && @test gradient(x -> sum(x .^ p), [1, 2, 3])[1] ≈ p .* [1.0, 2.0, 3.0] .^ (p - 1) rtol=1e-6
+    if isinteger(p)
+      # negative bases, where the exponent's derivative is `real(y * log(complex(x)))`
+      xn = [-2.0, -1.5, 0.5, 3.0]
+      dx, dp = gradient((x, p) -> sum(x .^ p), xn, p)
+      @test dx ≈ p .* xn .^ (p - 1)
+      @test dp ≈ sum(xn .^ p .* log.(abs.(xn)))
+    end
+  end
+
+  @testset "broadcasted runtime power" begin
+    # same values as the scalar `^` rule, including ChainRules' conventions at `x == 0`
+    for x in ([0.0, 1.5, 2.0], [-2.0, -1.0, 0.0, 3.0]), p in (0.5, 1.0, 2.0, 0.0, 0, 1, 2, 3, -1, 1.5)
+      any(<(0), x) && !isinteger(p) && continue
+      g = gradient((x, p) -> sum(x .^ p), x, p)
+      gmap = gradient((x, p) -> sum(map(xi -> xi^p, x)), x, p)
+      @test isapprox(g[1], gmap[1]; nans = true)
+      @test isapprox(g[2], gmap[2]; nans = true)
+    end
+
+    x, pv = rand(4) .+ 0.5, [0.5, 2.0, -1.0, 3.0]
+    @test gradcheck((x, p) -> sum(x .^ p), x, pv)
+    @test gradcheck((x, p) -> sum(x .^ p'), x, pv)
+    @test gradcheck((b, p) -> sum(b[1] .^ p), [2.0], pv)
+    @test gradient((x, p) -> sum(x .^ p), [-2.0, 3.0], [2, -1])[1] ≈ [-4.0, -1/9]
+
+    x32 = Float32.(x)
+    @test gradient((x, p) -> sum(x .^ p), x32, 0.5f0) isa Tuple{Vector{Float32}, Float32}
+    @test gradient((x, p) -> sum(x .^ p), x32, Float32.(pv)) isa NTuple{2, Vector{Float32}}
+    @test gradient(x -> sum(x .^ 0.5), x32)[1] isa Vector{Float32}
+
+    # exact where `p * y / x` would over- or underflow
+    p = 2
+    @test gradient(x -> sum(x .^ p), Float32[1f-25, 1f20]) == (Float32[2f-25, 2f20],)
+
+    # a zero local derivative is a strong zero, as for `literal_pow` (#1598)
+    @test gradient(x -> sum(sqrt.(x .^ p)), [0.0, 2.0]) == ([0.0, 1.0],)
+
+    # the exponent's cotangent is deferred
+    _, back = Zygote._pullback(Zygote.Context(), (x, p) -> x .^ p, [-2.0, 3.0], 2.0)
+    dxs = back([1.0, 1.0])
+    @test dxs[2] ≈ [-4.0, 6.0]
+    @test dxs[3] isa Zygote.AbstractThunk
+    @test Zygote.unthunk(dxs[3]) ≈ 4log(2) + 9log(3)
+
+    # complex bases keep the generic path
+    z = [1.0 + 2im, 3 - 1im]
+    for p in (2, 0.5)
+      @test gradient(x -> real(sum(x .^ p)), z)[1] ≈ conj.(p .* z .^ (p - 1))
+    end
+
+    # higher order
+    x, p = [1.0, 2.0], 2.5
+    @test gradient(x -> sum(gradient(y -> sum(y .^ p), x)[1]), x)[1] ≈ p .* (p - 1) .* x .^ (p - 2)
+    @test gradient(p -> sum(gradient(y -> sum(y .^ p), x)[1]), p)[1] ≈ sum(x .^ (p - 1) .* (1 .+ p .* log.(x)))
+    @test Zygote.hessian(y -> sum(y .^ p), x) ≈ Diagonal(p .* (p - 1) .* x .^ (p - 2))
+  end
+
   @test gradient(x -> real((1+3im) * x^2), 5+7im) == (-32 - 44im,)
   @test gradient(p -> real((1+3im) * (5+7im)^p), 2)[1] ≈ real((-234 + 2im)*log(5 - 7im))
   # D[(1+3I)x^p, p] /. {x->5+7I, p->2} // Conjugate
