@@ -409,7 +409,7 @@ end
 
 function Base.getindex(gs::Grads, x)
   isbits(x) && error("Only reference types can be differentiated with `Params`.")
-  return _maybe_unthunk(gs.grads[x])
+  return gs.grads[x]
 end
 
 """
@@ -502,7 +502,10 @@ function pullback(f, ps::Params)
       cache(cx)[p] = nothing
     end
     back(Δ)
-    Grads(_maybe_unthunk(cx.cache), ps)
+    for p in ps
+      cache(cx)[p] = _maybe_unthunk(cache(cx)[p])
+    end
+    Grads(cx.cache, ps)
   end
 end
 
