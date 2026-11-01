@@ -64,6 +64,7 @@ using InteractiveUtils
 # signature, since the cached generated code does not always get invalidated
 # (see https://github.com/FluxML/Zygote.jl/issues/1599).
 function refresh()
+  clear_decompositions!()
   include(joinpath(@__DIR__, "compiler", "interface2.jl"))
   return
 end
