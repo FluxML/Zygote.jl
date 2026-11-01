@@ -59,6 +59,14 @@ y, back = @test_inferred pullback(f, 5)
 y, back = @test_inferred pullback(Core._apply, +, (1, 2, 3))
 @test_inferred back(1)
 
+# #1697: pullbacks of code with branches are concretely typed, unless the type gets large
+branchy(x) = x > 0 ? sin(x) * x : cos(x)
+y, back = @test_inferred Zygote._pullback(Context(), branchy, 0.5)
+@test isconcretetype(fieldtype(typeof(back), :t))
+@test back(1.0)[2] ≈ cos(0.5) * 0.5 + sin(0.5)
+@test Zygote.branchy_pullback(Tuple{typeof(sin)}, (1, 2.0)) isa Zygote.Pullback{Tuple{typeof(sin)}, Tuple{Int,Float64}}
+@test Zygote.branchy_pullback(Tuple{typeof(sin)}, ntuple(_ -> (1, 2.0), 30)) isa Zygote.Pullback{Tuple{typeof(sin)}, Any}
+
 # TODO fix bcast inference
 # bcast(x) = x .* 5
 # y, back = @test_inferred pullback(bcast, [1,2,3])
