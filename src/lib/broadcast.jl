@@ -380,8 +380,16 @@ _has_dual(::Type{Union{}}) = false
 @inline _dual_partial(ȳ1::Number, o1::Dual, i) = ȳ1 * partials(o1, i)
 @inline _dual_partial(ȳ1::Number, o1::Complex{<:Dual}, i) =
   real(ȳ1) * partials(real(o1), i) + imag(ȳ1) * partials(imag(o1), i)
-@inline _dual_partial(ȳ1::Tuple, o1::Tuple, i) = mapreduce((y1, p1) -> _dual_partial(y1, p1, i), +, ȳ1, o1)
+@inline _dual_partial(ȳ1::Tuple, o1::Tuple, i) = _dual_partial_sum(false, ȳ1, o1, i)
 @inline _dual_partial(ȳ1, o1, i) = false  # missing cotangent component, or no partials → zero contribution
+
+# A left fold like `mapreduce`, which on Julia 1.10 indexes heterogeneous tuples at runtime
+# and fails to compile in a GPU kernel. `false + x === x`, so the sum is unchanged.
+@inline _dual_partial_sum(acc, ȳ1::Tuple, o1::Tuple, i) =
+  _dual_partial_sum(acc + _dual_partial(first(ȳ1), first(o1), i), Base.tail(ȳ1), Base.tail(o1), i)
+@inline _dual_partial_sum(acc, ::Tuple{}, ::Tuple, i) = acc
+@inline _dual_partial_sum(acc, ::Tuple, ::Tuple{}, i) = acc
+@inline _dual_partial_sum(acc, ::Tuple{}, ::Tuple{}, i) = acc
 
 # Forward mode also differentiates w.r.t. the floating-point fields of `f` (e.g.
 # variables captured by a closure), which the GPU path has no other way to reach
