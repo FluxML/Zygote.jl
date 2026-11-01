@@ -436,3 +436,12 @@ end
   grads = gradient(() -> sumvals(d_arr), ps)
   @test (grads[d_arr[:a]], grads[d_arr[:b]], grads[d_arr["c"]]) == ([1], [1], [1])
 end
+
+@testset "implicit params: Grads holds unthunked gradients (#1721)" begin
+  W = rand(2, 2); x = rand(2)
+  gs = gradient(() -> sum(W * x), Params([W]))
+  k, v = first(pairs(gs))
+  @test v isa AbstractArray
+  @test v === gs[W]
+  @test all(g isa AbstractArray for g in values(gs))
+end
