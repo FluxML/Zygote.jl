@@ -127,6 +127,83 @@ end
   end
 end
 
+# https://github.com/FluxML/Zygote.jl/issues/1701 : `∇map` stored per-element
+# pullbacks in a device array, which failed GPU compilation.
+@testset "map" begin
+  a = Float32[-1.5, -9.0, 2.4, -1.3, 0.01]
+  b = Float32[0.3, 2.0, -1.1, 4.2, 1.5]
+  a_gpu, b_gpu = cu(a), cu(b)
+
+  g_gpu = gradient(x -> sum(map(abs2, x)), a_gpu)[1]
+  @test g_gpu isa CuArray
+  @test collect(g_gpu) ≈ gradient(x -> sum(map(abs2, x)), a)[1]
+
+  f2(x, y) = sum(map((xi, yi) -> sin(xi) * yi, x, y))
+  g2_gpu = gradient(f2, a_gpu, b_gpu)
+  @test all(g -> g isa CuArray, g2_gpu)
+  @test all(map((g, g_cpu) -> collect(g) ≈ g_cpu, g2_gpu, gradient(f2, a, b)))
+
+  @test collect(gradient(x -> sum(map(*, x, 1:5)), a_gpu)[1]) ≈ 1:5
+
+  M = randn(Float32, 3, 4)
+  gM_gpu = gradient(x -> sum(map(tanh, x)), cu(M))[1]
+  @test gM_gpu isa CuMatrix
+  @test collect(gM_gpu) ≈ gradient(x -> sum(map(tanh, x)), M)[1]
+  @test collect(gradient(x -> sum(map(tanh, x)), cu(M)')[1]) ≈ gradient(x -> sum(map(tanh, x)), M')[1]
+
+  c = ComplexF32[1 + 2im, 3 - 1im]
+  @test collect(gradient(x -> sum(abs2, map(z -> z^2, x)), cu(c))[1]) ≈ gradient(x -> sum(abs2, map(z -> z^2, x)), c)[1]
+
+  @test gradient(x -> sum(map(xi -> xi > 0, x)), a_gpu) == (nothing,)
+end
+
+# Forward-mode GPU broadcasts used to return `nothing` for variables captured by
+# the broadcast function. #1701
+@testset "captured variables" begin
+  a = Float32[-1.5, -9.0, 2.4, -1.3, 0.01]
+  a_gpu = cu(a)
+
+  for h in ((x, w) -> sum(map(xi -> xi * w, x)),
+            (x, w) -> sum((xi -> sin(xi * w)).(x)),
+            (x, w) -> sum(xi -> abs2(xi - w), x),
+            (x, w) -> sum(Base.Fix2(*, w).(x)))
+    g = gradient(w -> h(a_gpu, w), 2f0)[1]
+    @test g isa Float32
+    @test g ≈ gradient(w -> h(a, w), 2f0)[1]
+  end
+
+  f3(x, w, b) = sum(map(xi -> tanh(xi * w + b), x))
+  g3_gpu = gradient(f3, a_gpu, 2f0, 0.5f0)
+  g3 = gradient(f3, a, 2f0, 0.5f0)
+  @test g3_gpu[1] isa CuArray
+  @test collect(g3_gpu[1]) ≈ g3[1]
+  @test g3_gpu[2] ≈ g3[2]
+  @test g3_gpu[3] ≈ g3[3]
+
+  # the argument gradient is not polluted by the `NaN` partial of `p` at `xi < 0`
+  @test collect(gradient((x, p) -> sum(map(xi -> xi^p, x)), a_gpu, 2f0)[1]) ≈ 2 .* a
+
+  # integer fields are not differentiated
+  f4(x, w) = sum(let n = 2; map(xi -> xi^n * w, x) end)
+  @test gradient(w -> f4(a_gpu, w), 2f0)[1] ≈ gradient(w -> f4(a, w), 2f0)[1]
+
+  c = ComplexF32[1 + 2im, 3 - 1im]
+  f5(x, w) = sum(abs2, map(z -> z * w, x))
+  @test gradient(w -> f5(cu(c), w), 1f0 + 2f0im)[1] ≈ gradient(w -> f5(c, w), 1f0 + 2f0im)[1]
+  @test gradient(w -> f5(cu(c), w), 0.5f0)[1] ≈ gradient(w -> f5(c, w), 0.5f0)[1]
+  @test gradient(w -> f5(cu(a), w), 1f0 + 2f0im)[1] ≈ gradient(w -> f5(a, w), 1f0 + 2f0im)[1]
+
+  # `Tuple` output, with one component independent of `w`
+  o, back = pullback(w -> map(xi -> (xi * w, xi), a_gpu), 2f0)
+  @test back(o)[1] ≈ pullback(w -> map(xi -> (xi * w, xi), a), 2f0)[2](collect(o))[1]
+
+  @test gradient(w -> sum(map(xi -> xi > w, a_gpu)), 2f0) == (nothing,)
+
+  # nested forward mode: `hessian` still sees `w` as a constant
+  f6(x) = sum(let w = 3f0; map(xi -> sin(xi) * w, x) end)
+  @test collect(Zygote.hessian(f6, a_gpu)) ≈ Zygote.hessian(f6, a)
+end
+
 @testset "jacobian" begin
   v1 = cu(collect(1:3f0))
 
