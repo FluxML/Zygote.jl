@@ -149,6 +149,12 @@ end
 @adjoint broadcasted(::typeof(abs2), x::Numeric) =
   abs2.(x), z̄ -> (nothing, 2 .* real.(z̄) .* x)
 
+# Each single-argument rule on `Numeric` is ambiguous with the generic `AbstractFill` one
+# (array.jl), so list its function here to send `Fill`s to the latter (#1688).
+for f in (:+, :-, :identity, :tanh, :conj, :real, :imag, :abs2)
+  @eval @adjoint broadcasted(::typeof($f), x::AbstractFill{<:Real}) = _broadcast_fill(__context__, $f, x)
+end
+
 @adjoint function broadcasted(::typeof(+), a::AbstractArray{<:Number}, b::Bool)
   y = b === false ? a : a .+ b
   y, Δ -> (nothing, Δ, nothing)
@@ -183,6 +189,8 @@ end
 
 @adjoint broadcasted(::Type{T}, x::Numeric) where {T<:Number} =
   T.(x), ȳ -> (nothing, _project(x, ȳ),)
+@adjoint broadcasted(::Type{T}, x::AbstractFill{<:Real}) where {T<:Number} =
+  _broadcast_fill(__context__, T, x)
 
 
 # Fix https://github.com/FluxML/Zygote.jl/issues/1399 by ensuring we avoid a lazier CR rule
