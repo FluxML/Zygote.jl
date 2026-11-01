@@ -29,11 +29,19 @@ typenodes(_) = 1
 const MAX_BRANCHY_PULLBACK_NODES = 60
 
 # Pullbacks of multi-block code nest the types of their callees' pullbacks, so a concrete type is
-# only worth its compile time while it stays small (#1697).
-@generated function branchy_pullback(::Type{F}, t::T) where {F,T}
-  P = typenodes(T) <= MAX_BRANCHY_PULLBACK_NODES ? Pullback{F,T} : Pullback{F,Any}
+# only worth its compile time while it stays small (#1697). Code with loops records its stacks in
+# `StackRef`s, whose element types only show at runtime: the backward pass rebuilds the pullback
+# with them (`typed_pullback`), and `Pullback{F,Tuple}` marks a large record that needs this.
+@generated function branchy_pullback(::Type{F}, t::T, ::Val{loopy}) where {F,T,loopy}
+  P = typenodes(T) <= MAX_BRANCHY_PULLBACK_NODES ? Pullback{F,T} :
+      loopy ? Pullback{F,Tuple} : Pullback{F,Any}
   return :($P(t))
 end
+
+typed_pullback(j::Pullback{S}) where S = Pullback{S}(map(unstack, j.t))
+
+needs_typed_pullback(::Type{<:Pullback{S,T}}) where {S,T} =
+  T === Tuple || (T <: Tuple && isconcretetype(T) && StackRef in fieldtypes(T))
 
 struct CompileError
   T

@@ -20,6 +20,31 @@ function _push!(a::Vector{T}, x::T) where T
   return
 end
 
+# Grows a vector typed after the first value pushed, so that values aren't boxed; the backward
+# pass sees the concrete type through `typed_pullback`.
+mutable struct StackRef
+  v::Any
+end
+
+StackRef() = StackRef(nothing)
+
+function _push!(s::StackRef, x::T) where T
+  v = s.v
+  if v isa Vector{T}
+    _push!(v, x)
+  elseif v === nothing
+    s.v = T[x]
+  elseif x isa eltype(v)
+    push!(v, x)
+  else
+    s.v = push!(Vector{Any}(v), x)
+  end
+  return
+end
+
+unstack(x) = x
+unstack(s::StackRef) = s.v === nothing ? Any[] : s.v
+
 # Emit
 
 xstack(T) = Expr(:call, Vector{T})
@@ -36,19 +61,23 @@ concrete(T::DataType) = T
 concrete(::Type{Type{T}}) where T = typeof(T)
 concrete(T) = Any
 
+# a cycle needs a branch to an earlier (or the same) block
+hasloops(ir) = any(b -> any(br -> 0 < br.block <= b.id, branches(b)), blocks(ir))
+
 runonce(b) = b.id in (1, length(b.ir.blocks)) &&
              !any(((_,stmt),) -> isexpr(stmt.expr, :catch), b)
 
 function forward_stacks!(adj, F)
   stks, recs = [], []
   pr = adj.primal
+  loopy = hasloops(pr)
   for b in blocks(pr)
     not_stack = runonce(b)
     for α in alphauses(block(adj.adjoint, b.id))
       if not_stack
         push!(recs, Variable(α))
       else
-        stk = pushfirst!(pr, xstack(Any))
+        stk = pushfirst!(pr, loopy ? xcall(Zygote, :StackRef) : xstack(Any))
         push!(recs, stk)
         push!(b, xcall(Zygote, :_push!, stk, Variable(α)))
       end
@@ -57,7 +86,7 @@ function forward_stacks!(adj, F)
   end
   rec = push!(pr, xtuple(recs...))
   rec = length(pr.blocks) == 1 ? push!(pr, Expr(:call, Pullback{F}, rec)) :
-                                 push!(pr, xcall(Zygote, :branchy_pullback, F, rec))
+                                 push!(pr, xcall(Zygote, :branchy_pullback, F, rec, Val(loopy)))
   ret = xtuple(pr.blocks[end].branches[end].args[1], rec)
   ret = push!(pr, ret)
   pr.blocks[end].branches[end].args[1] = ret

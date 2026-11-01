@@ -46,6 +46,8 @@ end
 
 function _generate_callable_pullback(j::Type{<:Pullback{T}}, world, Δ) where T
   ignore_sig(T) && return :nothing
+  # `methodinstance` is the pullback object here, see below
+  needs_typed_pullback(j) && return :(typed_pullback(methodinstance)(Δ))
   g = try
     _generate_pullback_via_decomposition(T, world, :backward)
   catch e
