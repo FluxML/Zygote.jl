@@ -130,6 +130,29 @@ _pow_grad(ȳ, df) = iszero(df) ? zero(ȳ * df) : ȳ * df
   y, ȳ -> (nothing, nothing, _pow_grad.(ȳ, p .* conj.(Base.literal_pow.(^, x, Val(p - 1)))), nothing)
 end
 
+# The derivatives of `y = x^p`, with ChainRules' values at `x == 0`. `p * y / x` saves a
+# second `^`; `p * x^(p - 1)` takes over where it fails: at `x == 0`, or if `y` overflows
+# or underflows. A negative `x` has a real power only for integer `p`, and the derivative
+# in `p` is then the real part of `y * log(complex(x))`: `log(abs(x))` can't throw.
+function _pow_dx(x::Real, p::Real, y::Real)
+  dx = p * y / x
+  iszero(p) && return zero(dx)
+  isfinite(dx) && !iszero(dx) ? dx : oftype(dx, p * float(x)^(p - 1))
+end
+function _pow_dp(x::Real, p::Real, y::Real)
+  dp = y * log(abs(x))
+  iszero(x) ? (p > 0 ? zero(dp) : oftype(dp, NaN)) : dp
+end
+
+# A runtime exponent misses the `literal_pow` rule, and would otherwise be differentiated
+# per element (the CPU fallback can't use `Dual`s for `^`) or with a `Dual` exponent,
+# whose partial is `NaN` for a negative `x` (the GPU path).
+@adjoint function broadcasted(::typeof(^), x::Numeric{<:Real}, p::Numeric{<:Real})
+  y = x .^ p
+  y, ȳ -> (nothing, lazy_cotangent(x, () -> unbroadcast(x, _pow_grad.(ȳ, _pow_dx.(x, p, y)))),
+           lazy_cotangent(p, () -> unbroadcast(p, _pow_grad.(ȳ, _pow_dp.(x, p, y)))))
+end
+
 @adjoint broadcasted(::typeof(identity), x::Numeric) = x, Δ -> (nothing, Δ)
 
 @adjoint function broadcasted(::typeof(tanh), x::Numeric)
