@@ -15,8 +15,11 @@ julia --project=.            # then: using Zygote
 # Instantiate the test environment (first time)
 julia --project=test -e 'using Pkg; Pkg.instantiate()'
 
-# Run the full test suite (CUDA tests auto-skip unless a GPU is present)
+# Run the full test suite: only `cuda` if a GPU is present, else everything but `cuda`
 julia --project=test test/runtests.jl
+
+# Run the CPU tests on a machine with a GPU
+GITHUB_ACTION=1 julia --project=test test/runtests.jl
 
 # Run specific test files by name (matched with `startswith`)
 julia --project=test test/runtests.jl compiler gradcheck
@@ -32,6 +35,8 @@ julia --project=docs -e 'using Documenter, Zygote; doctest(Zygote)'
 ```
 
 Tests use **ParallelTestRunner**: `test/runtests.jl` autodiscovers each `test/*.jl` file with `find_tests` and runs it as a plain script in an isolated subprocess. Test names are the file stems (use these as positional args, matched with `startswith`): `compiler`, `chainrules`, `complex`, `features`, `interface`, `lib`, `structures`, `tools`, `utils`, `forward`, `deprecated`, `gradcheck_p1`–`p4`, `cuda` (GPU-only), `python` (disabled by default). The `gradcheck_p*` files `include("gradcheck_testsetup.jl"); using .GradCheckSetup` for the shared finite-difference gradient checking helpers (`gradcheck`, `gradtest`, `ngradient`). Files that are not standalone tests — `gradcheck_testsetup.jl` and the `lib/` helpers included by `lib.jl` — are removed from the discovered testsuite in `runtests.jl`.
+
+**GPU machines:** when `CUDA.has_cuda()` and `GITHUB_ACTION` is unset, `runtests.jl` drops every test but `cuda` *before* matching the names you pass, so `runtests.jl lib features` silently runs nothing. Prefix CPU runs with `GITHUB_ACTION=1`, and check that the runner's "Running N tests" line matches the request.
 
 Supported Julia: **1.10+** (`Project.toml` `compat`; the README's "1.6 onwards" is stale).
 
