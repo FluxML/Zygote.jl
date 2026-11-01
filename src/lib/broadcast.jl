@@ -421,6 +421,10 @@ end
 end
 
 @inline function _broadcast_forward_args(f, args::Vararg{Any,N}) where N
+  if _recompute_duals(args) && !any(a -> eltype(a) <: Complex, args)
+    T = Broadcast.combine_eltypes(dual_function(f), args)
+    isconcretetype(T) && T <: Dual && return _broadcast_forward_recompute(f, args...)
+  end
   out = dual_function(f).(args...)
   T = eltype(out)
   if T <: Union{Dual, Complex{<:Dual}}
@@ -479,6 +483,23 @@ end
     return y, bc_fwd_back
   end
 
+_dual_inert(x) = !(eltype(x) <: Real) || eltype(x) <: Bool
+
+# Real input and output, computing `f` on plain values and the `Dual`s again in the pullback,
+# rather than keeping the (N+1)× larger `Dual` array from the forward pass.
+@inline function _broadcast_forward_recompute(f, args::Vararg{Any, N}) where {N}
+  y = broadcast(f, args...)
+  df = dual_function(f)
+  function bc_fwd_back(ȳ)
+    dargs = ntuple(Val(N)) do i
+      _dual_inert(args[i]) && return nothing
+      lazy_cotangent(args[i], () -> unbroadcast(args[i], broadcast((y1, xs...) -> y1 * partials(df(xs...), i), ȳ, args...)))
+    end
+    (nothing, nothing, dargs...) # nothings for broadcasted & f
+  end
+  return y, bc_fwd_back
+end
+
 # This handles complex input and real output. We use the gradient definition from ChainRules here
 # since it agrees with what Zygote did for real(x).
 @inline function _broadcast_forward_complex(::Type{<:Dual}, out, args::Vararg{Any, N}) where {N}
@@ -534,6 +555,9 @@ using GPUArraysCore  # replaces @require CUDA block, weird indenting to preserve
     end
     broadcast_forward(f, args...)
   end
+
+  # GPU broadcasts are bound by memory traffic, not arithmetic (#1696).
+  _recompute_duals(args) = any(a -> a isa AnyGPUArray, args)
 
   @adjoint (::Type{T})(xs::Array) where {T <: AbstractGPUArray} =
     T(xs), Δ -> (convert(Array, Δ), )

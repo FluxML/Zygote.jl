@@ -204,6 +204,29 @@ end
   @test collect(Zygote.hessian(f6, a_gpu)) ≈ Zygote.hessian(f6, a)
 end
 
+# GPU broadcasts recompute the `Dual`s in the pullback instead of storing them. #1696
+@testset "broadcast_forward recompute" begin
+  σ(x) = 1 / (1 + exp(-x))
+  lstm(f, c, i, g) = σ(f) * c + σ(i) * tanh(g)
+  F, C = randn(Float32, 4, 3), randn(Float32, 4, 3)
+  i, g = randn(Float32, 4), 0.7f0
+  h(F, C, i, g) = sum(lstm.(F, C, i, g))
+  @test all(map((a, b) -> (a isa CuArray ? collect(a) : a) ≈ b, gradient(h, cu(F), cu(C), cu(i), g), gradient(h, F, C, i, g)))
+
+  y = first(pullback(x -> σ.(x), cu(F)))
+  @test y isa CuMatrix{Float32}
+  @test collect(y) ≈ σ.(F)
+
+  mul(a, b) = a * b
+  m = rand(Bool, 4, 3)
+  gx, gm = gradient((x, m) -> sum(ifelse.(m, σ.(x), 0f0)), cu(F), cu(m))
+  @test collect(gx) ≈ gradient(x -> sum(ifelse.(m, σ.(x), 0f0)), F)[1]
+  @test gm === nothing
+  n = rand(1:3, 4, 3)
+  @test collect(gradient(x -> sum(mul.(x, cu(n))), cu(F))[1]) ≈ n
+  @test gradient(s -> sum(mul.(cu(F), s)), 2f0)[1] ≈ sum(F)
+end
+
 @testset "jacobian" begin
   v1 = cu(collect(1:3f0))
 
