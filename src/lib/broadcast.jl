@@ -336,6 +336,7 @@ _has_dual(::Type{<:Dual}) = true
 _has_dual(::Type{<:Complex{<:Dual}}) = true
 _has_dual(::Type{T}) where {T<:Tuple} = any(_has_dual, fieldtypes(T))
 _has_dual(::Type) = false
+_has_dual(::Type{Union{}}) = false
 
 # Recursively strip `ForwardDiff.Dual` values from a broadcast output element,
 # descending into `Tuple`s (e.g. the result of `broadcast(tuple, x, y)`).
@@ -345,11 +346,81 @@ _has_dual(::Type) = false
 
 # Contract an incoming cotangent element `ȳ1` with the partials of the output
 # element `o1` w.r.t. the i-th broadcast argument, descending into `Tuple`s.
-@inline _dual_partial(ȳ1, o1::Dual, i) = ȳ1 * partials(o1, i)
+@inline _dual_partial(ȳ1::Number, o1::Dual, i) = ȳ1 * partials(o1, i)
+@inline _dual_partial(ȳ1::Number, o1::Complex{<:Dual}, i) =
+  real(ȳ1) * partials(real(o1), i) + imag(ȳ1) * partials(imag(o1), i)
 @inline _dual_partial(ȳ1::Tuple, o1::Tuple, i) = mapreduce((y1, p1) -> _dual_partial(y1, p1, i), +, ȳ1, o1)
-@inline _dual_partial(::Nothing, o1, i) = false  # missing cotangent component → zero contribution
+@inline _dual_partial(ȳ1, o1, i) = false  # missing cotangent component, or no partials → zero contribution
+
+# Forward mode also differentiates w.r.t. the floating-point fields of `f` (e.g.
+# variables captured by a closure), which the GPU path has no other way to reach
+# (#1701). Integer fields are left alone: as `Dual`s they would break `x^n`.
+_dual_field(x::Union{AbstractFloat, Complex{<:AbstractFloat}}, i, n, c) = dual(x, i, n, c)
+_dual_field(x, i, n, c) = x
+
+# The type of `f::F` with field types `fieldtypes(D)`, valid when each changed field
+# is typed by its own type parameter (as for closures), else `nothing`.
+@generated function _retype(::Type{F}, ::Type{D}) where {F, D}
+  fieldtypes(D) == fieldtypes(F) && return nothing
+  W = F.name.wrapper
+  vars, body = Any[], W
+  while body isa UnionAll
+    push!(vars, body.var)
+    body = body.body
+  end
+  params = Any[F.parameters...]
+  for (i, T) in enumerate(fieldtypes(D))
+    T == fieldtype(F, i) && continue
+    k = findfirst(v -> v === body.types[i], vars)
+    (k === nothing || !(vars[k].lb <: T <: vars[k].ub)) && return nothing
+    params[k] = T
+  end
+  R = W{params...}
+  return fieldtypes(R) == fieldtypes(D) ? R : nothing
+end
+
+# A copy of `f` with its floating-point fields as `Dual`s, or `nothing`.
+@inline function _dualize_fields(f::F) where {F}
+  (isbitstype(F) && fieldcount(F) > 0) || return nothing
+  n = Val(fieldcount(F))
+  fs = ntuple(i -> getfield(f, i), n)
+  c = Val(any(_iscomplex, fs))
+  ds = ntuple(i -> _dual_field(fs[i], i, n, c), n)
+  R = _retype(F, typeof(ds))
+  return R === nothing ? nothing : __splatnew__(R, ds)
+end
+
+@inline _field_partial(ȳ1, o1, ::Real, i, n) = _dual_partial(ȳ1, o1, i)
+@inline _field_partial(ȳ1, o1, ::Complex, i, n) = Complex(_dual_partial(ȳ1, o1, i), _dual_partial(ȳ1, o1, n + i))
+
+# The cotangent of `f`, through `fd = _dualize_fields(f)` evaluated at the plain
+# `args`, so that the partials of the fields and of the arguments never mix.
+function _dual_fields_grad(f::F, fd, ȳ, args...) where {F}
+  _has_dual(Broadcast.combine_eltypes(fd, args)) || return nothing
+  n = fieldcount(F)
+  grads = ntuple(Val(n)) do i
+    x = getfield(f, i)
+    typeof(getfield(fd, i)) == typeof(x) && return nothing
+    bc = Broadcast.broadcasted((ȳ1, xs...) -> _field_partial(ȳ1, fd(xs...), x, i, n), ȳ, args...)
+    sum(Broadcast.instantiate(bc))
+  end
+  return NamedTuple{fieldnames(F)}(grads)
+end
 
 @inline function broadcast_forward(f, args::Vararg{Any,N}) where N
+  y, back = _broadcast_forward_args(f, args...)
+  fd = _dualize_fields(f)
+  # `Dual` arguments (nested forward mode, e.g. `hessian`) would clash with `fd`'s fields.
+  (fd === nothing || any(a -> _has_dual(eltype(a)), args)) && return y, back
+  function bc_fwd_back_fields(ȳ)
+    dargs = back(ȳ)
+    dxs = dargs === nothing ? map(_ -> nothing, args) : Base.tail(Base.tail(dargs))
+    (nothing, _dual_fields_grad(f, fd, ȳ, args...), dxs...)
+  end
+  return y, bc_fwd_back_fields
+end
+
+@inline function _broadcast_forward_args(f, args::Vararg{Any,N}) where N
   out = dual_function(f).(args...)
   T = eltype(out)
   if T <: Union{Dual, Complex{<:Dual}}
@@ -494,6 +565,18 @@ using GPUArraysCore  # replaces @require CUDA block, weird indenting to preserve
     res, back = _pullback(cx, (f, xs) -> sum(f.(xs); kws...), f, xs)
     sum_gpuarray_kw_pullback(Δ) = (nothing, nothing, back(unthunk_tangent(Δ))...)
     return res, sum_gpuarray_kw_pullback
+  end
+
+  # `∇map` stores each element's pullback, which captures the `Context`, in a device
+  # array, which fails to compile on the GPU (#1701). When the sizes agree, GPUArrays'
+  # `map` is a broadcast, so differentiate it as one. Other cases keep `∇map`.
+  function _pullback(cx::AContext, ::typeof(map), f, x::AnyGPUArray,
+                     xs::Union{AnyGPUArray, AbstractRange}...)
+    args = (x, xs...)
+    if ndims(x) > 0 && allequal(map(size, args))
+      return _pullback(cx, broadcast, f, args...)
+    end
+    return ∇map(cx, f, args...)
   end
 
   @adjoint function Base.convert(::Type{T}, xs::Array)  where {T<:AbstractGPUArray}
