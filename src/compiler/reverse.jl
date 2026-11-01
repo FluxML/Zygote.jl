@@ -1,5 +1,5 @@
 using IRTools: IRTools, IR, Variable, Pipe, xcall, var, prewalk, postwalk,
-  blocks, predecessors, successors, argument!, arguments, branches,
+  blocks, argument!, arguments, branches,
   insertafter!, finish, expand!, prune!, substitute!, substitute,
   block, block!, branch!, return!, stmt, meta
 
@@ -180,15 +180,32 @@ end
 
 const BranchNumber = UInt8
 
+# Ids of the predecessors of every block, in increasing order. Same relation as
+# `IRTools.predecessors` (fall-through included), but `predecessors` rescans the whole IR per block.
+function predecessor_ids(ir::IR)
+  nblocks = length(ir.blocks)
+  preds = [Int[] for _ in 1:nblocks]
+  for (id, bb) in enumerate(ir.blocks)
+    for br in bb.branches
+      br.block > 0 && addpred!(preds[br.block], id)
+    end
+    id < nblocks && all(IRTools.isconditional, bb.branches) && addpred!(preds[id+1], id)
+  end
+  return preds
+end
+
+addpred!(ps, id) = (isempty(ps) || last(ps) != id) && push!(ps, id)
+
 function record_branches!(ir::IR)
   brs = Dict{Int,Variable}()
+  preds = predecessor_ids(ir)
   for bb in blocks(ir)
-    preds = predecessors(bb)
-    length(preds) > 1 || continue
+    length(preds[bb.id]) > 1 || continue
     brs[bb.id] = argument!(bb, BranchNumber(0), BranchNumber)
     i = length(arguments(bb))
     n = 0
-    for aa in blocks(ir), br in branches(aa)
+    # `argument!` makes a fall-through from the previous block explicit, which is a predecessor too
+    for aa in preds[bb.id], br in branches(block(ir, aa))
       br.block == bb.id && (arguments(br)[i] = BranchNumber(n += 1))
     end
   end
@@ -278,14 +295,15 @@ sig(pr::Primal) = Dict(b.id => sig(b) for b in blocks(pr.ir))
 function adjointcfg(pr::Primal)
   ir = empty(pr.ir)
   return!(ir, nothing)
+  allpreds = predecessor_ids(pr.ir)
   for b in blocks(pr.ir)[2:end]
     block!(ir)
-    preds = predecessors(b)
+    preds = allpreds[b.id]
     rb = block(ir, b.id)
     for i = 1:length(preds)
       cond = i == length(preds) ? nothing :
         push!(rb, xcall(Base, :(!==), alpha(pr.branches[b.id]), BranchNumber(i)))
-      branch!(rb, preds[i].id, unless = cond)
+      branch!(rb, preds[i], unless = cond)
     end
     if isempty(preds) || (!isempty(branches(b)) && branches(b)[end] == IRTools.unreachable)
       # If `b` is unreachable, then no context produced by the primal should end up branching to `rb`
@@ -323,7 +341,7 @@ function adjoint(pr::Primal)
   for b in reverse(blocks(pr.ir))
     rb = block(ir, b.id)
     grads = Dict()
-    grad(x, x̄) = push!(get!(grads, x, []), x̄)
+    grad(x, x̄) = push!(get!(Vector{Any}, grads, x), x̄)
     grad(x) = xaccum(rb, get(grads, x, [])...)
     # Backprop through (successor) branch arguments
     for i = 1:length(sigs[b.id])

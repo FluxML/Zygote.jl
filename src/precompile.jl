@@ -36,4 +36,5 @@ using PrecompileTools: @setup_workload, @compile_workload
       withgradient(m -> sum(m.W * x .+ m.b), (; W, b))
     end
   end
+  clear_decompositions!()
 end

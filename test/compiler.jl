@@ -1,4 +1,5 @@
 using LinearAlgebra
+using ForwardDiff
 using Zygote: pullback, @adjoint, Context
 
 macro test_inferred(ex)
@@ -433,4 +434,131 @@ end
     """
   cmd = `$(Base.julia_cmd()) --project=$(Base.active_project()) -e $script`
   @test readchomp(cmd) == "true true"
+end
+
+function branchy_decomposition(x, n)
+  r = one(x)
+  while n > 0
+    n -= 1
+    r *= x > 0 ? x : -x
+  end
+  return r
+end
+
+@testset "decomposition cache" begin
+  T = Tuple{typeof(branchy_decomposition), Float64, Int}
+  # closures in this body would otherwise move the world between calls
+  w = Base.get_world_counter()
+  decompose(side, world = w) = Zygote._generate_pullback_via_decomposition(T, world, side)
+  sides = (:forward, :backward)
+
+  Zygote.clear_decompositions!()
+  uncached = [string(decompose(side)[2]) for side in sides]
+  @test Zygote.cached_decomposition(T, w) !== nothing
+  @test [string(decompose(side)[2]) for side in sides] == uncached
+
+  @testset "callers get their own copy" begin
+    m1, _ = decompose(:forward)
+    m2, _ = decompose(:forward)
+    @test m1.code !== m2.code
+    for side in sides
+      _, ir = decompose(side)
+      for (_, st) in ir
+        Meta.isexpr(st.expr, :call) && empty!(st.expr.args)
+      end
+      push!(ir, :(rewritten))
+    end
+    @test [string(decompose(side)[2]) for side in sides] == uncached
+  end
+
+  @testset "worlds" begin
+    w0 = w
+    Core.eval(@__MODULE__, :(bump_decomposition_world() = 1))
+    w1 = Base.get_world_counter()
+    @test w1 > w0
+
+    Zygote.clear_decompositions!()
+    decompose(:forward, w1)
+    @test Zygote.cached_decomposition(T, w1) !== nothing
+    @test Zygote.cached_decomposition(T, w0) === nothing
+    @test Zygote.cached_decomposition(T, w1 + 1) === nothing
+
+    # an older world neither reads nor replaces what is cached for a newer one
+    @test string(decompose(:backward, w0)[2]) == uncached[2]
+    @test Zygote.decompositions_world[] == w1
+    @test Zygote.cached_decomposition(T, w1) !== nothing
+
+    # a newer world drops the older entries
+    Core.eval(@__MODULE__, :(bump_decomposition_world() = 2))
+    w2 = Base.get_world_counter()
+    decompose(:forward, w2)
+    @test Zygote.decompositions_world[] == w2
+    @test length(Zygote.decompositions) == 1
+  end
+
+  @testset "concurrent generators" begin
+    Zygote.clear_decompositions!()
+    tasks = [Threads.@spawn string(decompose(side)[2]) for side in sides for _ in 1:8]
+    @test fetch.(tasks) == repeat(uncached, inner = 8)
+  end
+
+  @testset "gradients across contexts" begin
+    for _ in 1:2
+      @test gradient(branchy_decomposition, 2.0, 3) == (12.0, nothing)
+      @test gradient(branchy_decomposition, -2.0, 3) == (-12.0, nothing)
+      w = [2.0]
+      @test gradient(() -> branchy_decomposition(w[1], 3), Params([w]))[w] == [12.0]
+    end
+  end
+end
+
+@testset "predecessor_ids" begin
+  IRTools = Zygote.IRTools
+  reference(ir) = [[c.id for c in IRTools.predecessors(b)] for b in IRTools.blocks(ir)]
+
+  function elseifs(x, y)
+    if x > 1
+      return y
+    elseif x > 0 && y > 0
+      y += 1
+    elseif y < -1
+      y -= 1
+    end
+    for i in 1:3
+      i == 2 && continue
+      y += i
+      y > 10 && break
+    end
+    return y
+  end
+  for (f, Ts...) in ((branchy_decomposition, Float64, Int), (elseifs, Float64, Float64),
+                     (sum, Vector{Float64}), (sort, Vector{Int}))
+    ir = IRTools.IR(typeof(f), Ts...)
+    @test Zygote.predecessor_ids(ir) == reference(ir)
+  end
+
+  # fall-through edges and several branches from one block to the same target
+  ir = IRTools.IR()
+  x = IRTools.argument!(ir)
+  b2 = IRTools.block!(ir)
+  b3 = IRTools.block!(ir)
+  b4 = IRTools.block!(ir)
+  IRTools.branch!(IRTools.block(ir, 1), 3, unless = x)
+  IRTools.branch!(IRTools.block(ir, 1), 3, unless = x)
+  IRTools.branch!(b2, 4, unless = x)
+  IRTools.return!(b3, x)
+  IRTools.return!(b4, x)
+  @test reference(ir) == [[], [1], [1, 2], [2]]
+  @test Zygote.predecessor_ids(ir) == reference(ir)
+end
+
+@eval function many_blocks(x)
+  $(Expr(:block, [:(x > $(i / 100) && (x = x * 1.01 + 0.001)) for i in 1:100]...))
+  return x
+end
+
+@testset "gradients through many basic blocks" begin
+  for x in (0.0, 0.5, 1.2, 3.0)
+    @test gradient(many_blocks, x)[1] ≈ ForwardDiff.derivative(many_blocks, x)
+  end
 end

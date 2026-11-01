@@ -71,18 +71,15 @@ function reverse_stacks!(adj, stks)
   self = argument!(entry, at = 1)
   t = pushfirst!(blocks(ir)[end], xcall(:getfield, self, QuoteNode(:t)))
   repl = Dict()
-  for b in blocks(ir)
-    for (i, (b′, α, not_stack)) in enumerate(stks)
-      b.id == b′ || continue
-      if not_stack
-        val = insertafter!(ir, t, xcall(:getindex, t, i))
-      else
-        stk = push!(entry, xcall(:getindex, t, i))
-        stk = push!(entry, xcall(Zygote, :Stack, stk))
-        val = pushfirst!(b, xcall(:pop!, stk))
-      end
-      repl[α] = val
+  for (i, (b′, α, not_stack)) in enumerate(stks)
+    if not_stack
+      val = insertafter!(ir, t, xcall(:getindex, t, i))
+    else
+      stk = push!(entry, xcall(:getindex, t, i))
+      stk = push!(entry, xcall(Zygote, :Stack, stk))
+      val = pushfirst!(block(ir, b′), xcall(:pop!, stk))
     end
+    repl[α] = val
   end
   return IRTools.prewalk!(x -> get(repl, x, x), ir)
 end
@@ -97,11 +94,55 @@ end
 
 varargs(m::Method, n) = m.isva ? n - m.nargs + 1 : nothing
 
-function _generate_pullback_via_decomposition(T, world)
+# The generators decompose the same signature many times in a row (the forward and the backward
+# pass, for each context and cotangent type), so the result is kept until the world age moves.
+# an `IdDict`, since a `Dict` would be recompiled for the type of every signature used as key
+const decompositions = IdDict{Any,Tuple{IR,IR}}()
+const decompositions_world = Ref(UInt(0))
+const decompositions_lock = ReentrantLock()
+
+function clear_decompositions!()
+  @lock decompositions_lock begin
+    empty!(decompositions)
+    decompositions_world[] = 0
+  end
+end
+
+function cached_decomposition(T, world)
+  @lock decompositions_lock begin
+    decompositions_world[] == world ? get(decompositions, T, nothing) : nothing
+  end
+end
+
+function cache_decomposition!(T, world, forw, back)
+  # drop the metadata, which holds the `CodeInfo` that the generators go on to rewrite
+  entry = (IR(forw.defs, forw.blocks, forw.lines, nothing),
+           IR(back.defs, back.blocks, back.lines, nothing))
+  @lock decompositions_lock begin
+    if world > decompositions_world[]
+      empty!(decompositions)
+      decompositions_world[] = world
+    end
+    # a generator for an older world can't reuse or replace what newer ones use
+    world == decompositions_world[] && (decompositions[T] = entry)
+  end
+  return
+end
+
+# `copy(::IR)` shares the expressions, which the passes after `stacks!` rewrite in place.
+copy_ir(ir::IR, meta) = (ir = copy(IRTools.prewalk(identity, ir)); IR(ir.defs, ir.blocks, ir.lines, meta))
+
+# `meta` and one of the two pieces of IR (`:forward` or `:backward`) for `T`, to be modified freely.
+function _generate_pullback_via_decomposition(T, world, side::Symbol)
   (m = meta(T; world)) === nothing && return
-  va = varargs(m.method, length(T.parameters))
-  forw, back = stacks!(Adjoint(IR(m); varargs = va, normalise = false, world), T)
-  m, forw, back
+  entry = cached_decomposition(T, world)
+  if entry === nothing
+    va = varargs(m.method, length(T.parameters))
+    forw, back = stacks!(Adjoint(IR(m); varargs = va, normalise = false, world), T)
+    cache_decomposition!(T, world, forw, back)
+    entry = (forw, back)
+  end
+  return m, copy_ir(side === :forward ? entry[1] : entry[2], m)
 end
 
 function stacklines(T::Type)

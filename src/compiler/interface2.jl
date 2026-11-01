@@ -29,12 +29,12 @@ function _generate_pullback(ctx, world, f, args...)
   ignore_sig(T) && return :(f(args...), Pullback{$T}(()))
 
   g = try
-    _generate_pullback_via_decomposition(T, world)
+    _generate_pullback_via_decomposition(T, world, :forward)
   catch e
     return :(throw($(CompileError(T,e))))
   end
   g === nothing && return :(f(args...), Pullback{$T}((f,)))
-  meta, forw, _ = g
+  meta, forw = g
   argnames!(meta, Symbol("#self#"), :ctx, :f, :args)
   forw = varargs!(meta, forw, 3)
   # IRTools.verify(forw)
@@ -47,7 +47,7 @@ end
 function _generate_callable_pullback(j::Type{<:Pullback{T}}, world, Δ) where T
   ignore_sig(T) && return :nothing
   g = try
-    _generate_pullback_via_decomposition(T, world)
+    _generate_pullback_via_decomposition(T, world, :backward)
   catch e
     return :(throw($(CompileError(T,e))))
   end
@@ -61,7 +61,7 @@ function _generate_callable_pullback(j::Type{<:Pullback{T}}, world, Δ) where T
     # matching how the sibling `_generate_pullback` refers to its stub's `f`/`args`.
     return :(error("Non-differentiable function $(repr(methodinstance.t[1]))"))
   end
-  meta, _, back = g
+  meta, back = g
   argnames!(meta, Symbol("#self#"), :Δ)
   # IRTools.verify(back)
   back = slots!(inlineable!(back))
