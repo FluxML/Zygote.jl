@@ -39,6 +39,8 @@ using Base.Broadcast: Broadcasted, AbstractArrayStyle, broadcasted, materialize
 end
 
 accum_sum(xs; dims = :) = reduce(accum, xs, dims = dims)
+accum_sum(xs::AbstractArray; dims = :) =
+  dims === (:) ? unbuffer(reduce(accum!!, xs)) : reduce(accum, xs; dims)
 
 # Work around reducedim_init issue
 # https://github.com/JuliaLang/julia/issues/31427

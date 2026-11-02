@@ -91,6 +91,103 @@ accum(x, y::AbstractThunk) = accum(x, unthunk(y))
 accum(x::AbstractThunk, y) = accum(unthunk(x), y)
 accum(x::AbstractThunk, y::AbstractThunk) = accum(unthunk(x), unthunk(y))
 
+# In-place accumulation (#365)
+
+"""
+    AccumBuffer(data::Array)
+
+A cotangent array allocated by `accum!!`, and referenced by nothing but the sum
+being accumulated, so that further cotangents can be added into it in place. Otherwise
+each `x[i]` in a loop would copy the whole cotangent of `x`.
+
+The reverse pass uses each partial sum once, and calls `unbuffer` on it before
+handing it to a pullback or returning it, so the buffer never escapes.
+"""
+struct AccumBuffer{A<:Array{<:Number}}
+  data::A
+end
+
+unbuffer(x) = x
+unbuffer(x::AccumBuffer) = x.data
+unbuffer(x::NamedTuple) = map(unbuffer, x)
+
+"""
+    accum!!(x, y, zs...)
+
+Like `accum`, but may return an `AccumBuffer`, and mutates any `AccumBuffer` it is given.
+"""
+accum!!() = nothing
+accum!!(x) = x
+
+accum!!(x, y) = accum(unbuffer(x), unbuffer(y))
+accum!!(x, ::Nothing) = x
+accum!!(::Nothing, y) = y
+accum!!(::Nothing, ::Nothing) = nothing
+
+accum!!(x::Union{AbstractArray,AbstractThunk}, y::Union{AbstractArray,AbstractThunk}) =
+  _buffer(unthunk(x), unthunk(y))
+
+accum!!(x::AccumBuffer, y) = _add!!(x, y)
+accum!!(x, y::AccumBuffer) = _add!!(y, x)
+accum!!(x::AccumBuffer, y::AccumBuffer) = _add!!(x, y.data)
+accum!!(x::AccumBuffer, ::Nothing) = x
+accum!!(::Nothing, y::AccumBuffer) = y
+
+@generated function accum!!(x::NamedTuple, y::NamedTuple)
+  fieldnames(y) ⊆ fieldnames(x) || return :(accum(unbuffer(x), unbuffer(y)))
+  grad(field) = field in fieldnames(y) ? :(y.$field) : :nothing
+  Expr(:tuple, [:($f=accum!!(x.$f, $(grad(f)))) for f in fieldnames(x)]...)
+end
+
+# Unrolled like `accum(x, y, zs...)`, which it defers to when nothing can be buffered
+# (keeping its position-wise accumulation of tuples). Without a buffer to add into,
+# arrays are summed by one broadcast, as `accum` does.
+function accum!!(x, y, zs...)
+  if @generated
+    args = Any[:x, :y, [:(zs[$i]) for i in 1:length(zs)]...]
+    types = Any[x, y, zs...]
+    any(T -> T <: Union{AbstractArray,AbstractThunk,AccumBuffer,NamedTuple}, types) ||
+      return :(accum($(args...)))
+    keep = findall(!isequal(Nothing), types)
+    length(keep) < length(args) && return :(accum!!($(args[keep]...)))
+    all(T -> T <: Union{AbstractArray,AbstractThunk}, types) &&
+      return :(_buffer($([:(unthunk($a)) for a in args]...)))
+    ex = :(accum!!(x, y))
+    for i in 1:length(zs)
+      ex = :(accum!!($ex, zs[$i]))
+    end
+    ex
+  else
+    accum!!(accum!!(x, y), zs...)
+  end
+end
+
+# `accum` of arrays broadcasts into a fresh array, which can then be owned.
+function _buffer(xs...)
+  z = accum(xs...)
+  z isa Array{<:Number} && !any(x -> _mightalias(z, x), xs) ? AccumBuffer(z) : z
+end
+_mightalias(z, x) = x isa AbstractArray && Base.mightalias(z, x)
+
+_add!!(b::AccumBuffer, ::Nothing) = b
+_add!!(b::AccumBuffer, y::AbstractThunk) = _add!!(b, unthunk(y))
+_add!!(b::AccumBuffer, y) = accum(b.data, y)
+function _add!!(b::AccumBuffer, y::AbstractArray)
+  x = b.data
+  # `add!!` adds a `OneElement` (from scalar `getindex`) in O(1).
+  if ChainRulesCore.is_inplaceable_destination(x) && axes(x) == axes(y) &&
+     promote_type(eltype(x), eltype(y)) == eltype(x) &&
+     Broadcast.combine_styles(x, y) isa Broadcast.DefaultArrayStyle
+    add!!(x, y)
+    return b
+  end
+  return _buffer(x, y)
+end
+
+# Nested AD differentiates the reverse pass, so must not see the mutation.
+_pullback(cx::AContext, ::typeof(accum!!), xs...) = _pullback(cx, accum, xs...)
+@_adjoint_keepthunks unbuffer(x) = unbuffer(x), Δ -> (Δ,)
+
 # Core functions
 @_adjoint_keepthunks deepcopy(x) = deepcopy(x), ȳ -> (ȳ,)
 

@@ -270,7 +270,7 @@ for (mapfunc,∇mapfunc) in [(:map,:∇map),(:pmap,:∇pmap)]
         # Apply pullbacks in reverse order. Needed for correctness if `f` is stateful.
         Δf_and_args_zipped = $mapfunc(((_,pb), δ) -> pb(δ), _tryreverse($mapfunc, ys_and_backs, Δ)...)
         Δf_and_args = _unzip(_tryreverse($mapfunc, Δf_and_args_zipped), Val(N + 1))
-        Δf = reduce(accum, Δf_and_args[1]; init=nothing)
+        Δf = unbuffer(reduce(accum!!, Δf_and_args[1]; init=nothing))
         Δargs = map(_restore, Δf_and_args[2:end], arg_ax)
         (Δf, Δargs...)
       end

@@ -927,6 +927,59 @@ end
   @test gradient(x -> (dc = deepcopy(Dict(:a => x, :b => 2x)); dc[:a] + 3 * dc[:b]), 2.0) == (7.0,)
 end
 
+@testset "in-place accumulation (#365)" begin
+  function loopsum(x)
+    s = zero(eltype(x))
+    for i in eachindex(x)
+      s += x[i]^2
+    end
+    s
+  end
+  x = rand(7)
+  @test gradient(loopsum, x)[1] ≈ 2x
+  @test gradient(loopsum, x)[1] isa Vector{Float64}
+  @test gradient(loopsum, Float32[1, 2])[1] isa Vector{Float32}
+  @test gradient(x -> [x[i]^2 for i in eachindex(x)] |> sum, x)[1] ≈ 2x
+  @test gradient(x -> sum(map(i -> x[i] * x[end], 1:3)), [1.0, 2, 3, 4])[1] ≈ [4, 4, 4, 6]
+  @test gradient(x -> sum((i -> x[i]).(1:length(x))), x)[1] ≈ ones(7)
+
+  # each `x[i]` used to copy the whole cotangent of `x`
+  y = rand(10_000)
+  gradient(loopsum, y)
+  @test @allocated(gradient(loopsum, y)) < 50_000_000
+  f_map(x) = sum(map(i -> x[i]^2, eachindex(x)))
+  gradient(f_map, y)
+  @test @allocated(gradient(f_map, y)) < 50_000_000
+
+  # the buffer's element type is widened when needed
+  z = [1.0 + 2im, 3.0 - im, 2im, 1 + 0im]
+  f_complex(z) = (s = 0.0; for i in 1:2; s += real(z[i]); end; for i in 3:4; s += abs2(z[i]); end; s)
+  @test gradient(f_complex, z)[1] ≈ [1, 1, 2z[3], 2z[4]]
+  @test gradient(x -> sum(x) + (s = 0.0; for i in 1:3; s += x[i] / 2; end; s), [1, 2, 3])[1] ≈ [1.5, 1.5, 1.5]
+
+  # cotangents which are referenced elsewhere are not mutated
+  f_alias(x) = (a = x .* 1; b = a + a; s = 0.0; for i in eachindex(a); s += a[i] * i; end; sum(b) + s)
+  @test gradient(f_alias, x)[1] ≈ 2 .+ (1:7)
+  f_loop(x) = (s = x; for i in 1:3; s = s + x; end; s)
+  Δ = ones(7)
+  @test pullback(f_loop, x)[2](Δ)[1] ≈ fill(4, 7)
+  @test Δ == ones(7)
+  f_branch(x) = (s = 0.0; for i in eachindex(x); s += isodd(i) ? x[i] : 2x[i]; end; s)
+  @test gradient(f_branch, x)[1] ≈ [isodd(i) ? 1 : 2 for i in 1:7]
+
+  # closures, struct fields, slices, implicit parameters
+  f_closure(x) = (g = i -> x[i]^2; s = 0.0; for i in eachindex(x); s += g(i); end; s)
+  @test gradient(f_closure, x)[1] ≈ 2x
+  m = (W = [1.0 2; 3 4], b = [1.0, 2])
+  @test gradient(m -> (s = 0.0; for i in eachindex(m.W); s += m.W[i] * m.b[1]; end; s), m)[1] == (W = fill(1.0, 2, 2), b = [10.0, 0])
+  X = [1.0 2 3; 4 5 6]
+  @test gradient(X -> (s = 0.0; for j in axes(X, 2); s += sum(X[:, j]) * X[1, j]; end; s), X)[1] == [6 9 12; 1 2 3]
+  W = rand(5)
+  gs = gradient(() -> loopsum(W) + sum(W), Params([W]))
+  @test gs[W] ≈ 2W .+ 1
+  @test Zygote.hessian(loopsum, x) ≈ 2I
+end
+
 @testset "tricky broadcasting" begin
   @test gradient(x -> sum(x .+ ones(2,2)), (1,2)) == ((2,2),)
   @test gradient(x -> sum(x .+ ones(2,2)), (1,)) == ((4,),)
