@@ -64,8 +64,39 @@ branchy(x) = x > 0 ? sin(x) * x : cos(x)
 y, back = @test_inferred Zygote._pullback(Context(), branchy, 0.5)
 @test isconcretetype(fieldtype(typeof(back), :t))
 @test back(1.0)[2] ≈ cos(0.5) * 0.5 + sin(0.5)
-@test Zygote.branchy_pullback(Tuple{typeof(sin)}, (1, 2.0)) isa Zygote.Pullback{Tuple{typeof(sin)}, Tuple{Int,Float64}}
-@test Zygote.branchy_pullback(Tuple{typeof(sin)}, ntuple(_ -> (1, 2.0), 30)) isa Zygote.Pullback{Tuple{typeof(sin)}, Any}
+@test Zygote.branchy_pullback(Tuple{typeof(sin)}, (1, 2.0), Val(false)) isa Zygote.Pullback{Tuple{typeof(sin)}, Tuple{Int,Float64}}
+@test Zygote.branchy_pullback(Tuple{typeof(sin)}, ntuple(_ -> (1, 2.0), 30), Val(false)) isa Zygote.Pullback{Tuple{typeof(sin)}, Any}
+@test Zygote.branchy_pullback(Tuple{typeof(sin)}, ntuple(_ -> (1, 2.0), 30), Val(true)) isa Zygote.Pullback{Tuple{typeof(sin)}, Tuple}
+
+# loops record into stacks typed after their values, which the backward pass picks up
+function looppow(x, n)
+  r = one(x)
+  for _ in 1:n
+    r *= x
+  end
+  return r
+end
+y, back = Zygote._pullback(Context(), looppow, 2.0, 3)
+@test Zygote.StackRef in fieldtypes(fieldtype(typeof(back), :t))
+tback = Zygote.typed_pullback(back)
+@test isconcretetype(fieldtype(typeof(tback), :t))
+@test @inferred(Tuple{Nothing,Union{Nothing,Float64},Nothing}, tback(1.0)) == (nothing, 12.0, nothing)
+@test back(1.0) == (nothing, 12.0, nothing)
+@test gradient(looppow, 2.0, 0) == (nothing, nothing)
+@test gradient(x -> gradient(x -> looppow(x, 3), x)[1], 2.0) == (12.0,)
+bigloop(x, n) = (a = sin(x) * cos(x) * tan(x) * exp(x) * log(x) * sqrt(x); looppow(a, n))
+y, back = Zygote._pullback(Context(), bigloop, 2.0, 2)
+@test back(1.0)[2] ≈ ForwardDiff.derivative(x -> bigloop(x, 2), 2.0)
+
+# a stack whose values change type falls back to `Vector{Any}`
+function mixedloop(xs)
+  s = 0.0
+  for x in xs
+    s += x isa Int ? x : sin(x)
+  end
+  return s
+end
+@test gradient(mixedloop, Any[1, 2.0, 3, 4f0])[1] == [1, cos(2.0), 1, cos(4f0)]
 
 # TODO fix bcast inference
 # bcast(x) = x .* 5

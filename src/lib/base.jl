@@ -9,6 +9,14 @@ grad_mut(::AbstractVector) = []
   end
 end
 
+@adjoint! function _push!(s::StackRef, x)
+  _push!(s, x), function (y)
+    # by now `s.v` is the vector the backward pass popped from, even if it was widened
+    dstk = grad_mut(__context__, s.v)
+    return (nothing, pop!(dstk))
+  end
+end
+
 @adjoint! function pop!(stk::Stack)
   pop!(stk), function (Δ)
     dstk = grad_mut(__context__, stk.data)
