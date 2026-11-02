@@ -316,7 +316,7 @@ end
   end
 end
 
-@testset "foldl, accumulate with init" begin
+@testset "foldl, accumulate with init or dims" begin
   # the cotangent of `init` used to be dropped (#1684, #1558)
   @test gradient(p -> last(accumulate(*, [2.0, 3.0]; init=p)), 1.0) == (6.0,)
   @test gradient(p -> foldl(*, [2.0, 3.0]; init=p), 1.0) == (6.0,)
@@ -332,6 +332,14 @@ end
     @test gradtest((x, p) -> sum(f((a, b) -> a .* b, x; init=p)), (4,), (2,))
     @test gradtest((x, p) -> sum(first, f((a, b) -> (a[1] * b, a[2] + b), x; init=(p[1], p[2]))), (4,), (2,))
   end
+
+  for d in 1:3, kw in ((dims=d,), (dims=d, init=0.5))
+    @test gradtest(x -> accumulate(op, x; kw...), (2, 3, 4))
+  end
+  @test gradtest((x, p) -> accumulate(op, x; init=p[1], dims=2), (3, 4), (1,))
+  @test gradtest((x, p) -> sum(first, accumulate((a, b) -> (a[1] * b, a[2] + b), x; dims=2, init=(p[1], p[2]))), (3, 4), (2,))
+  @test gradient(p -> sum(accumulate(op, [1.0 2.0]; dims=3, init=p)), 0.5) == (nothing,)  # Base ignores `init`
+  @test gradient((x, p) -> sum(accumulate(op, x; dims=1, init=p)), zeros(0, 3), 1.0) == (zeros(0, 3), nothing)
 
   # a range iterated only for its length (ChainRules.jl#567)
   K, v = randn(3, 3), randn(3)

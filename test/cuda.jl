@@ -218,6 +218,30 @@ end
   @test collect(Zygote.hessian(f6, a_gpu)) ≈ Zygote.hessian(f6, a)
 end
 
+# The CPU rule for `accumulate` keeps a pullback per step. #1684
+@testset "accumulate" begin
+  op(a, b) = a + b + a * b / 2  # associative, as CUDA's `accumulate` assumes
+  v, M, p = rand(Float32, 7), rand(Float32, 3, 4), 0.7f0
+  for (h, args) in [
+      ((x, p) -> sum(abs2, accumulate(op, x; init=p)), (v, p)),
+      (x -> sum(abs2, accumulate(op, x)), (v,)),
+      ((x, p) -> sum(accumulate(*, x; init=p)), (v, 0.7)),
+      ((x, p) -> sum(accumulate(op, x; init=p)), (rand(Float32, 10_000) ./ 1000, p)),
+      ((x, p) -> sum(abs2, accumulate(op, x; init=p)), (M, p)),
+      (x -> sum(abs2, accumulate(op, x)), (M,)),
+      ((x, p) -> sum(abs2, accumulate(op, x; dims=1, init=p)), (M, p)),
+      ((x, p) -> sum(abs2, accumulate(op, x; init=p, dims=2)), (M, p)),
+      (x -> sum(abs2, accumulate(op, x; dims=2)), (M,)),
+      ((x, p) -> sum(abs2, accumulate(op, x; dims=3, init=p)), (M, p)),
+      ((x, p) -> sum(abs2, accumulate(op, x; dims=2, init=p)), (rand(Float32, 2, 3, 4), p)),
+      ((x, α) -> sum(abs2, accumulate((a, b) -> a + b + α * a * b, x; dims=2, init=α)), (M, 0.9f0)),
+    ]
+    g = gradient(h, map(a -> a isa Array ? cu(a) : a, args)...)
+    @test g[1] isa CuArray
+    @test all(map((g, g_cpu) -> g === g_cpu || (g isa CuArray ? collect(g) : g) ≈ g_cpu, g, gradient(h, args...)))
+  end
+end
+
 # GPU broadcasts recompute the `Dual`s in the pullback instead of storing them. #1696
 @testset "broadcast_forward recompute" begin
   σ(x) = 1 / (1 + exp(-x))
