@@ -483,6 +483,66 @@ function _pullback(cx::AContext, ::Core.kwftype(typeof(mapreduce)), kws::NamedTu
   return y, mapreduce_kw_pullback
 end
 
+# The ChainRules rules for `foldl` and `accumulate` work out the cotangent of `init`, but
+# cannot return it, as an `rrule` has no slot for keywords (ChainRules.jl#567, #1684).
+# These run the same algorithm, keeping each step's pullback to call them in reverse order.
+
+_vec_or_tuple(xs::AbstractArray) = vec(xs)
+_vec_or_tuple(xs::Tuple) = xs
+
+_reshape_as(ys, xs::AbstractArray) = reshape(ys, axes(xs))
+_reshape_as(ys, ::Tuple) = ys
+
+_lazy_reverse(xs) = Iterators.reverse(xs)
+_lazy_reverse(xs::Tuple) = reverse(xs)
+
+_zip2(xs, ys) = zip(xs, ys)
+_zip2(xs::Tuple, ys::Tuple) = map(tuple, xs, ys)
+
+_nothing3(::Nothing) = (nothing, nothing, nothing)
+_nothing3(Δs::Tuple) = Δs
+
+function _scan_pullbacks(cx, op::F, init, xs) where {F}
+  accumulate(_vec_or_tuple(xs); init = (init, nothing)) do (acc, _), x
+    _pullback(cx, op, acc, x)
+  end
+end
+
+# `Δacc` is the cotangent of the last result, `Δys` those of all of them (or `nothing`).
+function _scan_back(xs, steps, Δacc, Δys)
+  isempty(steps) && return nothing, Δacc, nothing
+  rsteps = _lazy_reverse(steps)
+  rΔys = Δys === nothing ? map(_ -> nothing, rsteps) : _lazy_reverse(_vec_or_tuple(Δys))
+  rΔs = accumulate(_zip2(rsteps, rΔys); init = (nothing, Δacc, nothing)) do (_, δacc, _), ((_, back), δy)
+    _nothing3(back(accum(δacc, δy)))
+  end
+  Δop = reduce(accum, map(first, rΔs); init = nothing)
+  Δxs = _project(xs, _reshape_as(map(last, _lazy_reverse(rΔs)), xs))
+  return Δop, last(rΔs)[2], Δxs
+end
+
+function _pullback(cx::AContext, ::Core.kwftype(typeof(foldl)), kws::NamedTuple{(:init,)},
+                   ::typeof(foldl), op::F, xs::Union{AbstractArray, Tuple}) where {F}
+  steps = _scan_pullbacks(cx, op, kws.init, xs)
+  function foldl_kw_pullback(Δ)
+    Δop, Δinit, Δxs = _scan_back(xs, steps, unthunk_tangent(Δ), nothing)
+    return (nothing, (init = Δinit,), nothing, Δop, Δxs)
+  end
+  foldl_kw_pullback(::Nothing) = nothing
+  return isempty(steps) ? kws.init : first(last(steps)), foldl_kw_pullback
+end
+
+function _pullback(cx::AContext, ::Core.kwftype(typeof(accumulate)), kws::NamedTuple{(:init,)},
+                   ::typeof(accumulate), op::F, xs::Union{AbstractArray, Tuple}) where {F}
+  steps = _scan_pullbacks(cx, op, kws.init, xs)
+  function accumulate_kw_pullback(Δ)
+    Δop, Δinit, Δxs = _scan_back(xs, steps, nothing, unthunk_tangent(Δ))
+    return (nothing, (init = Δinit,), nothing, Δop, Δxs)
+  end
+  accumulate_kw_pullback(::Nothing) = nothing
+  return _reshape_as(map(first, steps), xs), accumulate_kw_pullback
+end
+
 @adjoint real(x::AbstractArray) = real(x), r̄ -> (real(r̄),)
 @adjoint conj(x::AbstractArray) = conj(x), r̄ -> (conj(r̄),)
 @adjoint imag(x::AbstractArray) = imag(x), ī -> (complex.(0, real.(ī)),)
