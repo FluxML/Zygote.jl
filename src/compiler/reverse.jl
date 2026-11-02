@@ -324,7 +324,7 @@ branchfor(ir, (from,to)) =
 
 xaccum(ir) = nothing
 xaccum(ir, x) = x
-xaccum(ir, xs...) = push!(ir, xcall(Zygote, :accum, xs...))
+xaccum(ir, xs...) = push!(ir, xcall(Zygote, :accum!!, xs...))
 
 function passthrough_expr(ex::Expr)
     # Metadata we want to preserve
@@ -341,8 +341,16 @@ function adjoint(pr::Primal)
   for b in reverse(blocks(pr.ir))
     rb = block(ir, b.id)
     grads = Dict()
+    # Partial sums, which `accum!!` may have left in an `AccumBuffer`
+    buffered = Set{Any}(arguments(rb))
     grad(x, x̄) = push!(get!(Vector{Any}, grads, x), x̄)
-    grad(x) = xaccum(rb, get(grads, x, [])...)
+    function grad(x)
+      x̄s = get(grads, x, [])
+      x̄ = xaccum(rb, x̄s...)
+      length(x̄s) > 1 && push!(buffered, x̄)
+      return x̄
+    end
+    unbuffer(x̄) = x̄ in buffered ? push!(rb, xcall(Zygote, :unbuffer, x̄)) : x̄
     # Backprop through (successor) branch arguments
     for i = 1:length(sigs[b.id])
       grad(sigs[b.id][i], arguments(rb)[i])
@@ -357,7 +365,7 @@ function adjoint(pr::Primal)
       end
 
       if haskey(pr.pullbacks, v)
-        g = push!(rb, stmt(Expr(:call, alpha(pr.pullbacks[v]), grad(v)),
+        g = push!(rb, stmt(Expr(:call, alpha(pr.pullbacks[v]), unbuffer(grad(v))),
                            line = b[v].line))
         for (i, x) in enumerate(ex.args)
           x isa Variable || continue
@@ -387,11 +395,13 @@ function adjoint(pr::Primal)
         ins = br′.args
         for i = 1:length(br.args)
           ā = [gs[j] for j = 1:length(ins) if ins[j] == sigs[br.block][i]]
+          # Each branch's sums are computed before branching, and may share terms.
+          length(ā) > 1 && (ā = map(unbuffer, ā))
           br.args[i] = xaccum(rb, ā...)
         end
       end
     else # Backprop function arguments
-      gs = [grad(arg) for arg = arguments(pr.ir)]
+      gs = [unbuffer(grad(arg)) for arg = arguments(pr.ir)]
       Δ = push!(rb, pr.varargs === nothing ?
                       xcall(Zygote, :tuple, gs...) :
                       xcall(Zygote, :tuple_va, Val(pr.varargs), gs...))
