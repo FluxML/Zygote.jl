@@ -483,6 +483,100 @@ function _pullback(cx::AContext, ::Core.kwftype(typeof(mapreduce)), kws::NamedTu
   return y, mapreduce_kw_pullback
 end
 
+# The ChainRules rules for `foldl` and `accumulate` work out the cotangent of `init`, but
+# cannot return it, as an `rrule` has no slot for keywords (ChainRules.jl#567, #1684).
+# These run the same algorithm, keeping each step's pullback to call them in reverse order.
+
+_vec_or_tuple(xs::AbstractArray) = vec(xs)
+_vec_or_tuple(xs::Tuple) = xs
+
+_reshape_as(ys, xs::AbstractArray) = reshape(ys, axes(xs))
+_reshape_as(ys, ::Tuple) = ys
+
+_lazy_reverse(xs) = Iterators.reverse(xs)
+_lazy_reverse(xs::Tuple) = reverse(xs)
+
+_zip2(xs, ys) = zip(xs, ys)
+_zip2(xs::Tuple, ys::Tuple) = map(tuple, xs, ys)
+
+_nothing3(::Nothing) = (nothing, nothing, nothing)
+_nothing3(Δs::Tuple) = Δs
+
+function _scan_pullbacks(cx, op::F, init, xs) where {F}
+  accumulate(_vec_or_tuple(xs); init = (init, nothing)) do (acc, _), x
+    _pullback(cx, op, acc, x)
+  end
+end
+
+# `Δacc` is the cotangent of the last result, `Δys` those of all of them (or `nothing`).
+function _scan_back(xs, steps, Δacc, Δys)
+  isempty(steps) && return nothing, Δacc, nothing
+  rsteps = _lazy_reverse(steps)
+  rΔys = Δys === nothing ? map(_ -> nothing, rsteps) : _lazy_reverse(_vec_or_tuple(Δys))
+  rΔs = accumulate(_zip2(rsteps, rΔys); init = (nothing, Δacc, nothing)) do (_, δacc, _), ((_, back), δy)
+    _nothing3(back(accum(δacc, δy)))
+  end
+  Δop = reduce(accum, map(first, rΔs); init = nothing)
+  Δxs = _project(xs, _reshape_as(map(last, _lazy_reverse(rΔs)), xs))
+  return Δop, last(rΔs)[2], Δxs
+end
+
+function _pullback(cx::AContext, ::Core.kwftype(typeof(foldl)), kws::NamedTuple{(:init,)},
+                   ::typeof(foldl), op::F, xs::Union{AbstractArray, Tuple}) where {F}
+  steps = _scan_pullbacks(cx, op, kws.init, xs)
+  function foldl_kw_pullback(Δ)
+    Δop, Δinit, Δxs = _scan_back(xs, steps, unthunk_tangent(Δ), nothing)
+    return (nothing, (init = Δinit,), nothing, Δop, Δxs)
+  end
+  foldl_kw_pullback(::Nothing) = nothing
+  return isempty(steps) ? kws.init : first(last(steps)), foldl_kw_pullback
+end
+
+function _pullback(cx::AContext, ::Core.kwftype(typeof(accumulate)),
+                   kws::Union{NamedTuple{(:init,)}, NamedTuple{(:dims,)}, NamedTuple{(:dims, :init)}, NamedTuple{(:init, :dims)}},
+                   ::typeof(accumulate), op::F, xs::Union{AbstractArray, Tuple}) where {F}
+  kw = haskey(kws, :init) ? (init = kws.init,) : NamedTuple()
+  y, back = _accumulate_pullback(cx, op, xs, get(kws, :dims, nothing), kw)
+  function accumulate_kw_pullback(Δ)
+    Δop, Δxs, Δkw = back(unthunk_tangent(Δ))
+    return (nothing, Δkw === nothing ? nothing : merge(map(_ -> nothing, kws), Δkw), nothing, Δop, Δxs)
+  end
+  accumulate_kw_pullback(::Nothing) = nothing
+  return y, accumulate_kw_pullback
+end
+
+# Each method returns `y` and a pullback giving the cotangents of `op`, `xs` and `kw`.
+_accumulate_pullback(cx, op, xs::Tuple, ::Nothing, kw::NamedTuple{(:init,)}) = _accumulate_scan(cx, op, xs, kw.init)
+
+function _accumulate_pullback(cx, op::F, xs::AbstractArray, dims, kw) where {F}
+  if dims === nothing || (dims == 1 && xs isa AbstractVector)
+    isempty(kw) || return _accumulate_scan(cx, op, xs, kw.init)
+    y, back = _pullback(cx, accumulate, op, xs)
+    return y, Δ -> (b = back(Δ); b === nothing ? (nothing, nothing, nothing) : (b[2], b[3], nothing))
+  elseif dims > ndims(xs) || isempty(xs)  # beyond `ndims`, Base copies `xs` and ignores `init`
+    return accumulate(op, xs; dims, kw...), Δ -> (nothing, Δ, nothing)
+  end
+  perm = ntuple(i -> i == 1 ? dims : i <= dims ? i - 1 : i, ndims(xs))
+  y, back = _pullback(cx, _accumulate_dims, op, xs, perm, kw)
+  return y, Δ -> (b = back(Δ); b === nothing ? (nothing, nothing, nothing) : (b[2], b[3], b[5]))
+end
+
+function _accumulate_scan(cx, op::F, xs, init) where {F}
+  steps = _scan_pullbacks(cx, op, init, xs)
+  function accumulate_scan_back(Δ)
+    Δop, Δinit, Δxs = _scan_back(xs, steps, nothing, Δ)
+    return Δop, Δxs, (init = Δinit,)
+  end
+  return _reshape_as(map(first, steps), xs), accumulate_scan_back
+end
+
+# The ChainRules rule has no `dims`. This scans the columns, with `dims` moved first.
+function _accumulate_dims(op, xs, perm, kw)
+  xp = permutedims(xs, perm)
+  ys = stack(map(col -> accumulate(op, col; kw...), eachcol(reshape(xp, size(xp, 1), :))))
+  return permutedims(reshape(ys, size(xp)), invperm(perm))
+end
+
 @adjoint real(x::AbstractArray) = real(x), r̄ -> (real(r̄),)
 @adjoint conj(x::AbstractArray) = conj(x), r̄ -> (conj(r̄),)
 @adjoint imag(x::AbstractArray) = imag(x), ī -> (complex.(0, real.(ī)),)

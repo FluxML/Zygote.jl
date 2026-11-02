@@ -662,6 +662,56 @@ using GPUArraysCore  # replaces @require CUDA block, weird indenting to preserve
     return ∇map(cx, f, args...)
   end
 
+  # `accumulate` on the CPU keeps the pullback of each step (#1684), which the GPU can't.
+  # But the cotangent of a scan is a scan backwards, of the affine maps `g -> ∂a * g + Δy`
+  # (`∂a` the partial of `op` in its accumulator), which compose associatively, so it can
+  # use the GPU's parallel `accumulate`, with the partials from forward mode.
+  _affine_compose((a1, c1), (a2, c2)) = (a1 * a2, a2 * c1 + c2)
+  _partials2(o) = (_dual_partial(true, o, 1), _dual_partial(true, o, 2))
+
+  function _pullback(cx::AContext, ::typeof(accumulate), op::F, xs::AnyGPUArray{<:AbstractFloat}) where {F}
+    y, back = _accumulate_pullback(cx, op, xs, nothing, NamedTuple())
+    accumulate_gpu_pullback(Δ) = ((Δop, Δxs, _) = back(unthunk_tangent(Δ)); (nothing, Δop, Δxs))
+    accumulate_gpu_pullback(::Nothing) = nothing
+    return y, accumulate_gpu_pullback
+  end
+
+  function _accumulate_pullback(cx, op::F, xs::AnyGPUArray{<:AbstractFloat}, dims::Union{Nothing, Integer},
+                                kw::Union{NamedTuple{()}, NamedTuple{(:init,), <:Tuple{Real}}}) where {F}
+    if dims === nothing  # in linear order, like Base
+      y, back = _accumulate_pullback(cx, op, vec(xs), 1, kw)
+      return reshape(y, axes(xs)), Δ -> ((Δop, Δxs, Δkw) = back(vec(Δ)); (Δop, reshape(Δxs, axes(xs)), Δkw))
+    end
+    y = accumulate(op, xs; dims, kw...)
+    (dims > ndims(xs) || isempty(xs)) && return y, Δ -> (nothing, Δ, nothing)
+    return y, Δ -> _∇accumulate_gpu(op, xs, y, dims, kw, Δ)
+  end
+
+  function _∇accumulate_gpu(op::F, xs, y, d, kw, Δy) where {F}
+    n = size(xs, d)
+    head(a) = selectdim(a, d, 1:1)
+    prev(a) = selectdim(a, d, 1:n-1)
+    rest(a) = selectdim(a, d, 2:n)
+    df = dual_function(op)
+    ∂rest = broadcast((a, b) -> _partials2(df(a, b)), prev(y), rest(xs))
+    ∂a = fill!(similar(y), 0)
+    prev(∂a) .= first.(∂rest)  # shifted, to pair step k + 1 with the cotangent of y[k]
+    h = accumulate(_affine_compose, reverse(tuple.(∂a, Δy); dims=d); dims=d)
+    g = reverse(last.(h); dims=d)  # the cotangent of y, through all later steps
+    Δxs = similar(g)
+    rest(Δxs) .= last.(∂rest) .* rest(g)
+    fd = _dualize_fields(op)
+    Δop = fd === nothing ? nothing : _dual_fields_grad(op, fd, rest(g), prev(y), rest(xs))
+    if isempty(kw)  # y[1] = xs[1]
+      head(Δxs) .= head(g)
+      return Δop, Δxs, nothing
+    end
+    ∂head = broadcast(b -> _partials2(df(kw.init, b)), head(xs))
+    head(Δxs) .= last.(∂head) .* head(g)
+    fd === nothing || (Δop = accum(Δop, _dual_fields_grad(op, fd, head(g), kw.init, head(xs))))
+    return Δop, Δxs, (init = sum(first.(∂head) .* head(g)),)
+  end
+
   @adjoint function Base.convert(::Type{T}, xs::Array)  where {T<:AbstractGPUArray}
     Base.convert(T, xs), Δ -> (nothing, Base.convert(Array, Δ),)
   end

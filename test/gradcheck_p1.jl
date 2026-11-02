@@ -316,6 +316,50 @@ end
   end
 end
 
+@testset "foldl, accumulate with init or dims" begin
+  # the cotangent of `init` used to be dropped (#1684, #1558)
+  @test gradient(p -> last(accumulate(*, [2.0, 3.0]; init=p)), 1.0) == (6.0,)
+  @test gradient(p -> foldl(*, [2.0, 3.0]; init=p), 1.0) == (6.0,)
+  @test gradient(p -> foldl(*, (2.0, 3.0); init=p), 1.0) == (6.0,)
+  @test gradient(v -> foldl(getindex, (1, 2); init=v), [[1.1, 2.2]])[1] == [[0.0, 1.0]]
+
+  op(a, b) = a * b + sin(b)
+  for f in (foldl, accumulate)
+    @test gradtest((x, p) -> f(op, x; init=p[1]), (5,), (1,))
+    @test gradtest((x, p) -> f(op, x; init=p[1]), (2, 3), (1,))
+    @test gradtest((x, p) -> f(op, Tuple(x); init=p[1]), (4,), (1,))
+    @test gradtest((x, p) -> f((a, b) -> a * b + p[2], x; init=p[1]), (5,), (2,))
+    @test gradtest((x, p) -> sum(f((a, b) -> a .* b, x; init=p)), (4,), (2,))
+    @test gradtest((x, p) -> sum(first, f((a, b) -> (a[1] * b, a[2] + b), x; init=(p[1], p[2]))), (4,), (2,))
+  end
+
+  for d in 1:3, kw in ((dims=d,), (dims=d, init=0.5))
+    @test gradtest(x -> accumulate(op, x; kw...), (2, 3, 4))
+  end
+  @test gradtest((x, p) -> accumulate(op, x; init=p[1], dims=2), (3, 4), (1,))
+  @test gradtest((x, p) -> sum(first, accumulate((a, b) -> (a[1] * b, a[2] + b), x; dims=2, init=(p[1], p[2]))), (3, 4), (2,))
+  @test gradient(p -> sum(accumulate(op, [1.0 2.0]; dims=3, init=p)), 0.5) == (nothing,)  # Base ignores `init`
+  @test gradient((x, p) -> sum(accumulate(op, x; dims=1, init=p)), zeros(0, 3), 1.0) == (zeros(0, 3), nothing)
+
+  # a range iterated only for its length (ChainRules.jl#567)
+  K, v = randn(3, 3), randn(3)
+  @test all(map(≈, gradient((K, v) -> sum(sum, accumulate((u, _) -> K * u, 1:3; init=v)), K, v),
+                   gradient((K, v) -> sum(K * v) + sum(K * K * v) + sum(K * K * K * v), K, v)))
+
+  # `op` runs in order, its pullbacks in reverse order
+  fwd, bwd = Float64[], Float64[]
+  logged(a, b) = (Zygote.ignore_derivatives(() -> push!(fwd, b)); Zygote.hook(Δ -> (push!(bwd, b); Δ), a * b))
+  @test gradient(p -> foldl(logged, [2.0, 3.0]; init=p), 1.0) == (6.0,)
+  @test fwd == [2.0, 3.0] && bwd == [3.0, 2.0]
+
+  @test gradient(p -> foldl(*, Float64[]; init=p), 2.0) == (1.0,)
+  @test gradient(p -> foldl(*, (); init=p), 2.0) == (1.0,)
+  @test gradient(p -> sum(accumulate(*, Float64[]; init=p)), 2.0) == (nothing,)
+
+  @test gradient(x -> foldl(+, x; init=0.0), Float32[1, 2])[1] isa Vector{Float32}
+  @test hessian(p -> foldl(*, [2.0, 3.0]; init=p[1]^2), [1.5]) ≈ [12.0;;]
+end
+
 @test gradtest(x -> x', rand(5))
 
 @test gradtest(det, (4, 4))
