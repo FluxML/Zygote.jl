@@ -125,7 +125,7 @@ accum!!(::Nothing, y) = y
 accum!!(::Nothing, ::Nothing) = nothing
 
 accum!!(x::Union{AbstractArray,AbstractThunk}, y::Union{AbstractArray,AbstractThunk}) =
-  _buffer(unthunk(x), unthunk(y))
+  _buffer(unthunk_tangent(x), unthunk_tangent(y))
 
 accum!!(x::AccumBuffer, y) = _add!!(x, y)
 accum!!(x, y::AccumBuffer) = _add!!(y, x)
