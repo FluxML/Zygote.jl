@@ -216,7 +216,7 @@ accum!!(::Nothing, y) = y
 accum!!(::Nothing, ::Nothing) = nothing
 
 accum!!(x::Union{AbstractArray,AbstractThunk}, y::Union{AbstractArray,AbstractThunk}) =
-  _buffer(unthunk(x), unthunk(y))
+  _buffer(unthunk_tangent(x), unthunk_tangent(y))
 accum!!(x::AbstractThunk, y::AbstractThunk) = defer(_buffer, x, y)
 accum!!(x::DeferredThunk, y::DeferredThunk) = defer(accum, x, y)
 
