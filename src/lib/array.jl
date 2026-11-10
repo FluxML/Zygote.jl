@@ -608,7 +608,7 @@ function _pullback(cx::AContext, ::typeof(kron), a::AbstractVecOrMat, b::Abstrac
   return res, back ∘ unthunk_tangent
 end
 
-@adjoint function inv(A::Union{Number, AbstractMatrix})
+@adjoint function inv(A::AbstractMatrix)
   Ainv = inv(A)
   return Ainv, function (Δ)
     ∇A = - Ainv' * Δ * Ainv'

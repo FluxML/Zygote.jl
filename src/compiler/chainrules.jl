@@ -231,6 +231,35 @@ end
 @inline (s::ZBack)(::Nothing) = nothing
 
 """
+  ScalarZBack(back::ZBack) <: Function
+
+The pullback of a rule of numbers, such as `inv` or `-`. Given a thunk, it returns
+thunks sharing one evaluation of `back`, so that the incoming cotangent is not computed
+if those of the arguments are dropped, being those of constants (#1741).
+"""
+struct ScalarZBack{F} <: Function
+  back::ZBack{F}
+end
+@inline (s::ScalarZBack)(dy) = s.back(dy)
+(s::ScalarZBack)(dy::AbstractThunk) = defer_pullback(s.back, dy)
+
+defer_pullback(s::S, dy::D) where {S,D} = defer_pullback(s, dy, Base.promote_op(_unthunked, S, D))
+
+# Only when it is known which cotangents are `nothing`: a thunk of `nothing` would reach rules.
+@generated function defer_pullback(s, dy, ::Type{T}) where {T}
+  T === Nothing && return :nothing
+  Ts = T <: Tuple && isconcretetype(T) ? fieldtypes(T) : ()
+  all(S -> S === Nothing || S <: Number, Ts) && any(S -> S <: Number, Ts) || return :(s(dy))
+  slots = [S === Nothing ? :nothing : :(Thunk(DeferredSlot{$i}(dxs))) for (i, S) in enumerate(Ts)]
+  return :(dxs = _deferred_pullback($T, s, dy); $(Expr(:tuple, slots...)))
+end
+_deferred_pullback(::Type{T}, s, dy) where {T} = deferred(T, () -> s(unthunk(dy)), defer_depth(dy) + 1)
+
+# Eager under nested AD, like `defer`.
+_pullback(cx::AContext, ::typeof(defer_pullback), s, dy) =
+  _pullback(cx, (s, dy) -> s(dy), s, dy)
+
+"""
     chain_rrule(config, f, args...)
 
 Returns a the (primal) value of `f(args...)` and a pullback, by invoking `ChainRulesCore.rrule(f, args...)`.
@@ -238,8 +267,12 @@ The pullback is appropriately wrapped up to follow Zygote conventions.
 """
 @inline function chain_rrule(config, f, args...)
   y, back = rrule(config, f, args...)
-  return y, ZBack(back)
+  return y, zback(back, args)
 end
+
+zback(back, args) = ZBack(back)
+# Functions, types and `Val`s for e.g. `literal_pow(^, x, Val(2))` and `convert(T, x)`.
+zback(back, ::Tuple{Vararg{Union{Number,Function,Type,Val}}}) = ScalarZBack(ZBack(back))
 
 
 """

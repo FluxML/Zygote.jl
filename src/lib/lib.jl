@@ -84,12 +84,75 @@ end
 accum(x::NamedTuple, y::ChainRulesCore.Tangent) = accum(x, wrap_chainrules_output(y))
 accum(x::ChainRulesCore.Tangent, y::NamedTuple) = accum(wrap_chainrules_output(x), y)
 
+# Deferred scalar cotangents (#1741)
+
+"""
+    Deferred{T}(f, depth)
+
+The function of a `Thunk` of `f()::T`, computed at most once, as it may be shared or
+unthunked more than once. `depth` is the length of the chain of `Deferred`s it waits on,
+which a loop could make arbitrarily long, each link holding what its value is computed from
+(e.g. the arrays of a broadcast). `f` is untyped so that the type doesn't grow with it.
+"""
+mutable struct Deferred{T}
+  f::Any
+  depth::Int
+  val::T
+  Deferred{T}(f, depth) where {T} = new{T}(f, depth)
+end
+
+function (d::Deferred{T})() where {T}
+  f = d.f
+  if f !== nothing
+    d.val = f()::T
+    d.f = nothing
+    d.depth = 0
+  end
+  return d.val
+end
+
+# The `i`-th of a tuple of cotangents in a `Deferred`.
+struct DeferredSlot{i,D<:Deferred}
+  d::D
+end
+DeferredSlot{i}(d::D) where {i,D} = DeferredSlot{i,D}(d)
+(s::DeferredSlot{i})() where {i} = s.d()[i]
+
+defer_depth(x) = 0
+defer_depth(x::Thunk{<:Deferred}) = x.f.depth
+defer_depth(x::Thunk{<:DeferredSlot}) = x.f.d.depth
+
+const MAX_DEFER_DEPTH = 8
+
+function deferred(::Type{T}, f, depth) where {T}
+  d = Deferred{T}(f, depth)
+  depth > MAX_DEFER_DEPTH && d()
+  return d
+end
+
+_unthunked(f, xs...) = f(map(unthunk, xs)...)
+
+"""
+    defer(f, xs...)
+
+`f(unthunk.(xs)...)`, deferred if it is a number: the cotangent of a scalar is often a
+reduction (read back to the host on a GPU) that is then dropped, being that of a constant.
+"""
+function defer(f::F, xs::Vararg{Any,N}) where {F,N}  # specialized, for `promote_op` to be inferred
+  T = Base.promote_op(_unthunked, F, map(Core.Typeof, xs)...)
+  (T <: Number && isconcretetype(T)) || return _unthunked(f, xs...)
+  return Thunk(deferred(T, () -> _unthunked(f, xs...), maximum(defer_depth, xs) + 1))
+end
+
+# Nested AD cannot differentiate the construction of a `Thunk`, so evaluate eagerly.
+_pullback(cx::AContext, ::typeof(defer), f, xs...) = _pullback(cx, _unthunked, f, xs...)
+
 accum(x::Nothing, y::AbstractThunk) = y
 accum(x::AbstractThunk, y::Nothing) = x
 
 accum(x, y::AbstractThunk) = accum(x, unthunk(y))
 accum(x::AbstractThunk, y) = accum(unthunk(x), y)
-accum(x::AbstractThunk, y::AbstractThunk) = accum(unthunk(x), unthunk(y))
+accum(x::AbstractThunk, y::AbstractThunk) = defer(accum, x, y)
 
 # In-place accumulation (#365)
 
@@ -126,6 +189,7 @@ accum!!(::Nothing, ::Nothing) = nothing
 
 accum!!(x::Union{AbstractArray,AbstractThunk}, y::Union{AbstractArray,AbstractThunk}) =
   _buffer(unthunk(x), unthunk(y))
+accum!!(x::AbstractThunk, y::AbstractThunk) = defer(_buffer, x, y)
 
 accum!!(x::AccumBuffer, y) = _add!!(x, y)
 accum!!(x, y::AccumBuffer) = _add!!(y, x)
@@ -150,6 +214,7 @@ function accum!!(x, y, zs...)
       return :(accum($(args...)))
     keep = findall(!isequal(Nothing), types)
     length(keep) < length(args) && return :(accum!!($(args[keep]...)))
+    all(T -> T <: AbstractThunk, types) && return :(defer(_buffer, $(args...)))
     all(T -> T <: Union{AbstractArray,AbstractThunk}, types) &&
       return :(_buffer($([:(unthunk($a)) for a in args]...)))
     ex = :(accum!!(x, y))
