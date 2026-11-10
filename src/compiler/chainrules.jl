@@ -283,8 +283,9 @@ As per [`chain_rrule`](@ref) but with support for kwargs.
 """
 @inline function chain_rrule_kw(config, kwf, kwargs, f, args...)
   y, back = rrule(config, f, args...; kwargs...)
+  zb = zback(back, args)
   function kw_zpullback(dy)
-    dxs = ZBack(back)(dy)
+    dxs = zb(dy)
     if dxs === nothing  # if dxs is nothing, then all partiaols are nothing
       # Zygote convention is a single nothing no mather how partials, if all are nothing
       return nothing

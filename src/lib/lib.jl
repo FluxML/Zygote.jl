@@ -153,6 +153,8 @@ accum(x::AbstractThunk, y::Nothing) = x
 accum(x, y::AbstractThunk) = accum(x, unthunk(y))
 accum(x::AbstractThunk, y) = accum(unthunk(x), y)
 accum(x::AbstractThunk, y::AbstractThunk) = defer(accum, x, y)
+accum(x::Number, y::AbstractThunk) = defer(accum, x, y)
+accum(x::AbstractThunk, y::Number) = defer(accum, x, y)
 
 # In-place accumulation (#365)
 

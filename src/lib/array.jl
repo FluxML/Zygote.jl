@@ -34,7 +34,7 @@ end
 
 # Array Constructors
 @adjoint function (::Type{T})(x::Number, sz) where {T <: Fill}
-    back(Δ::AbstractArray) = (sum(Δ), nothing)
+    back(Δ::AbstractArray) = (lazy_cotangent(x, () -> sum(Δ)), nothing)
     back(Δ::NamedTuple) = (Δ.value, nothing)
     return Fill(x, sz), back
 end
@@ -201,7 +201,7 @@ end
    end
 end
 
-@adjoint getindex(i::Int, j::Int) = i[j], _ -> nothing
+@_adjoint_keepthunks getindex(i::Int, j::Int) = i[j], _ -> nothing
 
 struct StaticGetter{i} end
 (::StaticGetter{i})(v) where {i} = v[i]
@@ -323,7 +323,7 @@ function reconstruct_if_dict(x̄, _keys)
   return d̄
 end
 
-@adjoint iterate(r::UnitRange, i...) = iterate(r, i...), _ -> nothing
+@_adjoint_keepthunks iterate(r::UnitRange, i...) = iterate(r, i...), _ -> nothing
 
 # Iterators
 

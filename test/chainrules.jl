@@ -2,6 +2,8 @@ using ChainRulesCore
 using ChainRulesTestUtils
 using Zygote: ZygoteRuleConfig
 using LinearAlgebra
+using FillArrays: Fill
+using LogExpFunctions: logaddexp
 
 @testset "ChainRules integration" begin
     @testset "ChainRules basics" begin
@@ -449,12 +451,19 @@ end
         scale_pullback(Δ) = (NoTangent(), @thunk(unthunk(Δ) * s), @thunk((nevals[] += 1; dot(unthunk(Δ), x))))
         return scale(x, s), scale_pullback
     end
+    kwscale(s; k) = k * s
+    function ChainRulesCore.rrule(::typeof(kwscale), s::Number; k)
+        return kwscale(s; k), Δ -> (NoTangent(), k * Δ)
+    end
     x, t = [0.5, -2.0, 3.0], 4.0
 
     # not computed for a constant, through scalar rules (`inv` and `-` as in NNlib and Flux's losses)
     for (f, dx) in [(x -> sum(scale(x, 1 - t)), -3.0), (x -> sum(scale(x, inv(sqrt(t)))), 0.5),
                     (x -> sum(scale(x, t)) + sum(scale(x, 1 - t)), 1.0),
-                    (x -> sum((x .+ t) .* scale(x, t)), 2t .* x .+ t^2)]
+                    (x -> sum((x .+ t) .* scale(x, t)), 2t .* x .+ t^2), (x -> sum(scale(x, t)) + t^2, t),
+                    (x -> sum(scale(x, logaddexp(t, 1.0))), logaddexp(t, 1.0)),
+                    (x -> sum(scale(x, kwscale(t; k = 2))), 2t),
+                    (x -> (y = 0.0; for i in 1:2; y += sum(scale(x, i * t)); end; y), 3t)]
         nevals[] = 0
         @test gradient(f, x)[1] ≈ dx .* ones(3)
         @test nevals[] == 0
@@ -467,7 +476,8 @@ end
     # deferred, with the right value
     s = 0.25
     for (f, ds) in [((x, s) -> sum((x .+ s) .* (x .- s)), -6s), ((x, s) -> sum(x .+ s) + sum(x .* s), 3 + sum(x)),
-                    ((x, s) -> sum(x .+ inv(s)), -3 / s^2), ((x, s) -> sum(x .* (1 - s)), -sum(x))]
+                    ((x, s) -> sum(x .+ inv(s)), -3 / s^2), ((x, s) -> sum(x .* (1 - s)), -sum(x)),
+                    ((x, s) -> sum(x .* Fill(s, 3)), sum(x))]
         dxs = Zygote._pullback(Zygote.Context(), f, x, s)[2](1.0)
         @test dxs[3] isa AbstractThunk
         @test unthunk(dxs[3]) ≈ ds

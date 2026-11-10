@@ -1,10 +1,12 @@
 using LogExpFunctions: xlogx, xlogy, logistic, log1pexp, logsumexp, logaddexp, logsubexp
 using Base.Broadcast: broadcasted
 
-@adjoint function xlogx(x::Real)
+# The scalar rules are `rrule`s, as an `@adjoint` would unthunk a deferred cotangent (#1741).
+
+function ChainRulesCore.rrule(::ZygoteRuleConfig, ::typeof(xlogx), x::Real)
     result, dx = ∇xlogx(x)
-    back(δ) = (dx * δ,)
-    return result, back
+    xlogx_pullback(δ) = (NoTangent(), dx * δ)
+    return result, xlogx_pullback
 end
 @adjoint function broadcasted(::typeof(xlogx), x::Numeric)
     result, dx = ∇xlogx(x)
@@ -28,10 +30,10 @@ for f in (:xlogx, :log1pexp)  # see the `AbstractFill` methods in broadcast.jl
     @eval @adjoint broadcasted(::typeof($f), x::AbstractFill{<:Real}) = _broadcast_fill(__context__, $f, x)
 end
 
-@adjoint function xlogy(x::Real, y::Real)
+function ChainRulesCore.rrule(::ZygoteRuleConfig, ::typeof(xlogy), x::Real, y::Real)
     result, dx, dy = ∇xlogy(x, y)
-    back(δ) = (δ * dx, δ * dy)
-    return result, back
+    xlogy_pullback(δ) = (NoTangent(), δ * dx, δ * dy)
+    return result, xlogy_pullback
 end
 @adjoint function broadcasted(::typeof(xlogy), x::Numeric, y::Numeric)
     result, dx, dy = ∇xlogy(x, y)
@@ -46,10 +48,10 @@ function ∇xlogy(x::Numeric, y::Numeric)
     return result, dx, dy
 end
 
-@adjoint function logaddexp(x::Real, y::Real)
+function ChainRulesCore.rrule(::ZygoteRuleConfig, ::typeof(logaddexp), x::Real, y::Real)
     result, dx, dy = ∇logaddexp(x, y)
-    back(δ) = (δ * dx, δ * dy)
-    return result, back
+    logaddexp_pullback(δ) = (NoTangent(), δ * dx, δ * dy)
+    return result, logaddexp_pullback
 end
 @adjoint function broadcasted(::typeof(logaddexp), x::Numeric, y::Numeric)
     result, dx, dy = ∇logaddexp(x, y)
@@ -63,10 +65,10 @@ function ∇logaddexp(x::Numeric, y::Numeric)
     return result, dx, dy
 end
 
-@adjoint function logsubexp(x::Real, y::Real)
+function ChainRulesCore.rrule(::ZygoteRuleConfig, ::typeof(logsubexp), x::Real, y::Real)
     result, dx, dy = ∇logsubexp(x, y)
-    back(δ) = (δ * dx, δ * dy)
-    return result, back
+    logsubexp_pullback(δ) = (NoTangent(), δ * dx, δ * dy)
+    return result, logsubexp_pullback
 end
 @adjoint function broadcasted(::typeof(logsubexp), x::Numeric, y::Numeric)
     result, dx, dy = ∇logsubexp(x, y)
