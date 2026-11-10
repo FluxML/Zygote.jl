@@ -77,13 +77,37 @@ unbroadcast(x::AbstractArray, x̄::Nothing) = nothing
 
 # A scalar operand's cotangent is a reduction over the whole broadcast (a device-to-host
 # copy on GPU) that is often unused, as for the literal in `x .+ 1f-5`, so defer it.
-lazy_cotangent(x::Number, dx) = Thunk(dx)
+lazy_cotangent(x::Number, dx) = _deferred_cotangent(dx, false)
 lazy_cotangent(x, dx) = dx()
+
+# Given the broadcast's `Δ`, so is an array's, a new array that is unused for data such as
+# the target in `ŷ .- y` (#1722). Not if it is a reduction, as the thunk would keep the
+# larger `Δ` alive, maybe to the end of the reverse pass: it is then computed at once.
+lazy_cotangent(x, Δ, dx) = lazy_cotangent(x, dx)
+lazy_cotangent(x::AbstractArray, Δ, dx) = _deferred_cotangent(dx, length(x) != length(Δ))
+
+# Memoized, as a thunk may be unthunked more than once, and of one type, computed or not.
+function _deferred_cotangent(dx::D, now::Bool) where {D}
+  T = Base.promote_op(dx)
+  T === Union{} && return dx()
+  d = Deferred{T}(dx, 1)
+  now && d()
+  return Thunk(d)
+end
+
+# The cotangents of the generic path are computed, but a scalar's still needs a sum.
+_lazy_unbroadcast(x, dx) = lazy_cotangent(x, () -> unbroadcast(x, dx))
+_lazy_unbroadcast(x, ::Nothing) = nothing
 
 # Nested AD cannot differentiate the construction of a `Thunk`, so evaluate eagerly.
 function _pullback(cx::AContext, ::typeof(lazy_cotangent), x, dx)
   y, back = _pullback(cx, dx)
   lazy_cotangent_pullback(Δ) = (nothing, nothing, last_or_nothing(back(Δ)))
+  return y, lazy_cotangent_pullback
+end
+function _pullback(cx::AContext, ::typeof(lazy_cotangent), x, Δ, dx)
+  y, back = _pullback(cx, dx)
+  lazy_cotangent_pullback(Δy) = (nothing, nothing, nothing, last_or_nothing(back(Δy)))
   return y, lazy_cotangent_pullback
 end
 
@@ -94,29 +118,49 @@ end
 # to do CSE, then broadcast-ify the expression so that the closure captures the
 # right arrays.
 
-@adjoint broadcasted(::typeof(+), xs::Numeric...) =
-  broadcast(+, xs...), ȳ -> (nothing, map(x -> lazy_cotangent(x, () -> unbroadcast(x, ȳ)), xs)...)
+"""
+    BroadcastBack(back)
 
-@adjoint broadcasted(::typeof(-), x::Numeric, y::Numeric) = x .- y,
-  Δ -> (nothing, lazy_cotangent(x, () -> unbroadcast(x, Δ)),
-        lazy_cotangent(y, () -> _minus(unbroadcast(y, Δ))))
-@adjoint broadcasted(::typeof(-), x::Numeric) = .-x,
-  Δ -> (nothing, _minus(Δ))
+The pullback `back` of a broadcast with one array operand, such as `1 .- y`. Given the
+deferred cotangent of an operand of a later broadcast, it returns thunks sharing one
+evaluation of `back`, like `ScalarZBack`, so that neither is computed if those of its
+operands are dropped too, as for data `y` (#1722). The thunks of rules, such as that of
+`sum`, are mostly used, so are unthunked.
+"""
+struct BroadcastBack{F} <: Function
+  back::F
+end
+(b::BroadcastBack)(Δ) = b.back(unthunk_tangent(Δ))
+(b::BroadcastBack)(Δ::DeferredThunk) = defer_pullback(b.back ∘ unthunk_tangent, Δ)
+
+# With more, one is usually a parameter, whose cotangent is needed, and deferring would make
+# chains of small broadcasts ~50% slower.
+broadcast_back(back, xs...) =
+  count(x -> x isa AbstractArray, xs) > 1 ? back ∘ unthunk_tangent : BroadcastBack(back)
+
+@_adjoint_keepthunks broadcasted(::typeof(+), xs::Numeric...) = broadcast(+, xs...),
+  broadcast_back(ȳ -> (nothing, map(x -> lazy_cotangent(x, () -> unbroadcast(x, ȳ)), xs)...), xs...)
+
+@_adjoint_keepthunks broadcasted(::typeof(-), x::Numeric, y::Numeric) = x .- y,
+  broadcast_back(Δ -> (nothing, lazy_cotangent(x, () -> unbroadcast(x, Δ)),
+                       lazy_cotangent(y, Δ, () -> _minus(unbroadcast(y, Δ)))), x, y)
+@_adjoint_keepthunks broadcasted(::typeof(-), x::Numeric) = .-x,
+  BroadcastBack(Δ -> (nothing, _minus(Δ)))
 _minus(Δ) = -Δ
 _minus(::Nothing) = nothing
 
-@adjoint broadcasted(::typeof(*), x::Numeric, y::Numeric) = x.*y,
-   Δ -> (nothing, lazy_cotangent(x, () -> unbroadcast(x, Δ .* conj.(y))),
-         lazy_cotangent(y, () -> unbroadcast(y, Δ .* conj.(x))))
+@_adjoint_keepthunks broadcasted(::typeof(*), x::Numeric, y::Numeric) = x.*y,
+  broadcast_back(Δ -> (nothing, lazy_cotangent(x, Δ, () -> unbroadcast(x, Δ .* conj.(y))),
+                       lazy_cotangent(y, Δ, () -> unbroadcast(y, Δ .* conj.(x)))), x, y)
 @adjoint broadcasted(::typeof(*), x::Number, y::AbstractArray{<:Number}) =
   _pullback(__context__, *, x, y)  # this uses dot(y,Δ) instead of sum(Δ .* conj.(y))
 @adjoint broadcasted(::typeof(*), x::AbstractArray{<:Number}, y::Number) =
   _pullback(__context__, *, x, y)
 
-@adjoint function broadcasted(::typeof(/), x::Numeric, y::Numeric)
+@_adjoint_keepthunks function broadcasted(::typeof(/), x::Numeric, y::Numeric)
   res = x ./ y
-  res, Δ -> (nothing, lazy_cotangent(x, () -> unbroadcast(x, Δ ./ conj.(y))),
-             lazy_cotangent(y, () -> unbroadcast(y, .-Δ .* conj.(res ./ y))))
+  res, broadcast_back(Δ -> (nothing, lazy_cotangent(x, Δ, () -> unbroadcast(x, Δ ./ conj.(y))),
+                            lazy_cotangent(y, Δ, () -> unbroadcast(y, .-Δ .* conj.(res ./ y)))), x, y)
 end
 @adjoint broadcasted(::typeof(/), x::AbstractArray{<:Number}, y::Number) =
   _pullback(__context__, /, x, y)
@@ -149,10 +193,10 @@ end
 # A runtime exponent misses the `literal_pow` rule, and would otherwise be differentiated
 # per element (the CPU fallback can't use `Dual`s for `^`) or with a `Dual` exponent,
 # whose partial is `NaN` for a negative `x` (the GPU path).
-@adjoint function broadcasted(::typeof(^), x::Numeric{<:Real}, p::Numeric{<:Real})
+@_adjoint_keepthunks function broadcasted(::typeof(^), x::Numeric{<:Real}, p::Numeric{<:Real})
   y = x .^ p
-  y, ȳ -> (nothing, lazy_cotangent(x, () -> unbroadcast(x, _pow_grad.(ȳ, _pow_dx.(x, p, y)))),
-           lazy_cotangent(p, () -> unbroadcast(p, _pow_grad.(ȳ, _pow_dp.(x, p, y)))))
+  y, broadcast_back(ȳ -> (nothing, lazy_cotangent(x, ȳ, () -> unbroadcast(x, _pow_grad.(ȳ, _pow_dx.(x, p, y)))),
+                          lazy_cotangent(p, ȳ, () -> unbroadcast(p, _pow_grad.(ȳ, _pow_dp.(x, p, y))))), x, p)
 end
 
 @adjoint broadcasted(::typeof(identity), x::Numeric) = x, Δ -> (nothing, Δ)
@@ -240,7 +284,7 @@ end
 
 # Fix https://github.com/FluxML/Zygote.jl/issues/1399 by ensuring we avoid a lazier CR rule
 # https://github.com/JuliaDiff/ChainRules.jl/blob/5855c10bdbe691fc07822752f5b5865b9cea44d3/src/rulesets/Base/broadcast.jl#L199
-@adjoint function broadcasted(::typeof(*), x::Numeric, y::Numeric, zs::Numeric...)
+@_adjoint_keepthunks function broadcasted(::typeof(*), x::Numeric, y::Numeric, zs::Numeric...)
   y, back = _broadcast_generic(__context__, *, x, y, zs...)
   return y, Base.tail∘back
 end
@@ -277,14 +321,15 @@ _dual_safearg(x::Ref{<:Numeric{<:Complex}}) = true
 _dual_safearg(x::Union{Type,Val,Symbol}) = true  # non-differentiable types
 _dual_safearg(x) = false
 
-@adjoint broadcasted(::AbstractArrayStyle, f::F, args...) where {F} = _broadcast_generic(__context__, f, args...)
+@_adjoint_keepthunks broadcasted(::AbstractArrayStyle, f::F, args...) where {F} = _broadcast_generic(__context__, f, args...)
 @inline function _broadcast_generic(__context__, f::F, args...) where {F}
   T = Broadcast.combine_eltypes(f, args)
   # Avoid generic broadcasting in two easy cases:
   if T == Bool
     return (f.(args...), _ -> nothing)
   elseif T <: Union{Real, Complex} && isconcretetype(T) && _dual_purefun(F) && all(_dual_safearg, args) && !isderiving()
-    return broadcast_forward(f, args...)
+    y, back = broadcast_forward(f, args...)
+    return y, broadcast_back(back, args...)
   end
   len = inclen(args)
   y∂b = _broadcast((x...) -> _pullback(__context__, f, x...), args...)
@@ -293,9 +338,9 @@ _dual_safearg(x) = false
     dxs_zip = map(((_, pb), ȳ₁) -> pb(ȳ₁), y∂b, ȳ)
     getters = ntuple(i -> StaticGetter{i}(), len)
     dxs = map(g -> collapse_nothings(map(g, dxs_zip)), getters)
-    (nothing, accum_sum(dxs[1]), map(unbroadcast, args, Base.tail(dxs))...)
+    (nothing, accum_sum(dxs[1]), map(_lazy_unbroadcast, args, Base.tail(dxs))...)
   end
-  return y, ∇broadcasted
+  return y, broadcast_back(∇broadcasted, args...)
 end
 
 @adjoint function broadcasted(::AbstractArrayStyle{0}, f, args...)
@@ -511,7 +556,7 @@ end
   y = broadcast(_strip_dual, out)
   function bc_fwd_back(ȳ)
     dargs = ntuple(valN) do i
-      lazy_cotangent(args[i], () -> unbroadcast(args[i], broadcast((ȳ1, o1) -> _dual_partial(ȳ1, o1, i), ȳ, out)))
+      lazy_cotangent(args[i], ȳ, () -> unbroadcast(args[i], broadcast((ȳ1, o1) -> _dual_partial(ȳ1, o1, i), ȳ, out)))
     end
     (nothing, nothing, dargs...) # nothings for broadcasted & f
   end
@@ -524,7 +569,7 @@ end
   y = broadcast(x -> value(x), out)
   function bc_fwd_back(ȳ)
     dargs = ntuple(valN) do i
-      lazy_cotangent(args[i], () -> unbroadcast(args[i], broadcast((y1, o1) -> y1 * partials(o1,i), ȳ, out)))
+      lazy_cotangent(args[i], ȳ, () -> unbroadcast(args[i], broadcast((y1, o1) -> y1 * partials(o1,i), ȳ, out)))
     end
     (nothing, nothing, dargs...) # nothings for broadcasted & f
   end
@@ -537,7 +582,7 @@ end
     y = broadcast(x -> Complex(value(real(x)), value(imag(x))), out)
     function bc_fwd_back(ȳ)
       dargs = ntuple(valN) do i
-        lazy_cotangent(args[i], () -> unbroadcast(args[i], broadcast((y1, o1) -> (real(y1)*partials(real(o1),i) + imag(y1)*partials(imag(o1), i)), ȳ, out)))
+        lazy_cotangent(args[i], ȳ, () -> unbroadcast(args[i], broadcast((y1, o1) -> (real(y1)*partials(real(o1),i) + imag(y1)*partials(imag(o1), i)), ȳ, out)))
       end
       (nothing, nothing, dargs...) # nothings for broadcasted & f
     end
@@ -554,7 +599,7 @@ _dual_inert(x) = !(eltype(x) <: Real) || eltype(x) <: Bool
   function bc_fwd_back(ȳ)
     dargs = ntuple(Val(N)) do i
       _dual_inert(args[i]) && return nothing
-      lazy_cotangent(args[i], () -> unbroadcast(args[i], broadcast((y1, xs...) -> y1 * partials(df(xs...), i), ȳ, args...)))
+      lazy_cotangent(args[i], ȳ, () -> unbroadcast(args[i], broadcast((y1, xs...) -> y1 * partials(df(xs...), i), ȳ, args...)))
     end
     (nothing, nothing, dargs...) # nothings for broadcasted & f
   end
@@ -568,7 +613,7 @@ end
     y = broadcast(x -> value(x), out)
     function bc_fwd_back(ȳ)
       dargs = ntuple(valN) do i
-        lazy_cotangent(args[i], () -> unbroadcast(args[i], broadcast((y1, o1) -> y1 * Complex(partials(o1, i), partials(o1, i+N)), ȳ, out)))
+        lazy_cotangent(args[i], ȳ, () -> unbroadcast(args[i], broadcast((y1, o1) -> y1 * Complex(partials(o1, i), partials(o1, i+N)), ȳ, out)))
       end
       (nothing, nothing, dargs...) # nothings for broadcasted & f
     end
@@ -592,7 +637,7 @@ end
     y = broadcast(x -> Complex(value(real(x)), value(imag(x))), out)
     function bc_fwd_back(ȳ)
       dargs = ntuple(valN) do i
-        lazy_cotangent(args[i], () -> unbroadcast(args[i], broadcast((y1, o1) -> _adjoint_complex(N, y1, o1, i), ȳ, out)))
+        lazy_cotangent(args[i], ȳ, () -> unbroadcast(args[i], broadcast((y1, o1) -> _adjoint_complex(N, y1, o1, i), ȳ, out)))
       end
       (nothing, nothing, dargs...) # nothings for broadcasted & f
     end
@@ -604,7 +649,7 @@ using GPUArraysCore  # replaces @require CUDA block, weird indenting to preserve
        # Ordinary broadcasting calls broadcast_forward anyway when certain its' safe,
        # so perhaps this can be deleted? Possible edge case here:
        # https://github.com/FluxML/Zygote.jl/pull/1018#issuecomment-873629415
-  @adjoint function broadcasted(::AbstractGPUArrayStyle, f, args...)
+  @_adjoint_keepthunks function broadcasted(::AbstractGPUArrayStyle, f, args...)
     # Bool-valued broadcasts (e.g. `x .> 3`) are non-differentiable and must be
     # evaluated on the plain values: running predicates like `>` through ForwardDiff
     # `Dual`s gives wrong results, because ForwardDiff (>= v1) compares Duals with a
@@ -614,7 +659,8 @@ using GPUArraysCore  # replaces @require CUDA block, weird indenting to preserve
     if Broadcast.combine_eltypes(f, args) == Bool
       return (f.(args...), _ -> nothing)
     end
-    broadcast_forward(f, args...)
+    y, back = broadcast_forward(f, args...)
+    return y, broadcast_back(back, args...)
   end
 
   # GPU broadcasts are bound by memory traffic, not arithmetic (#1696).

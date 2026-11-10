@@ -1057,9 +1057,13 @@ end
 @testset "lazy cotangents of scalar broadcast operands" begin
   # https://github.com/FluxML/Zygote.jl/issues/1694
   x = [0.5, -2.0, 3.0]
+  h = let c = 1.0; (x, s) -> x * s + c; end
   for (f, ds) in [((x, s) -> x .+ s, 3.0), ((x, s) -> s .- x, 3.0), ((x, s) -> x .- s, -3.0),
                   ((x, s) -> x .* s .* x, sum(abs2, x)), ((x, s) -> s ./ x, sum(inv, x)),
-                  ((x, s) -> max.(x, s), 1.0)]
+                  ((x, s) -> max.(x, s), 1.0),
+                  # third and later arguments, and the generic path (#1720)
+                  ((x, s) -> clamp.(x, -1.0, s), 2.0), ((x, s) -> muladd.(x, 2.0, s), 3.0),
+                  ((x, s) -> ifelse.(x .> 0, x, s), 1.0), ((x, s) -> h.(x, s), sum(x))]
     _, back = Zygote._pullback(Zygote.Context(), f, x, 0.25)
     dxs = back(ones(3))
     @test dxs[3] isa Zygote.AbstractThunk
@@ -1070,6 +1074,36 @@ end
   # nested AD evaluates them eagerly
   @test gradient(a -> gradient(b -> sum(b .* a .+ 1), 2.0)[1], 3.0) == (1.0,)
   @test gradient(a -> sum(gradient(b -> sum(abs2, b .+ a), x)[1]), 0.5) == (6.0,)
+end
+
+@testset "lazy cotangents of array broadcast operands" begin
+  # https://github.com/FluxML/Zygote.jl/issues/1722
+  pending(dx::Zygote.Thunk{<:Zygote.Deferred}) = dx.f.f !== nothing
+  pending(dx::Zygote.Thunk{<:Zygote.DeferredSlot}) = dx.f.d.f !== nothing
+  ŷ, t = [0.2, 0.6, 0.9], [0.0, 1.0, 1.0]
+  dbce = log.(1 .- ŷ) .- log.(ŷ)
+
+  # not computed for data, also through broadcasts of it and when it is used twice
+  for (f, dt) in [((ŷ, t) -> sum(abs2.(ŷ .- t)), 2 .* (t .- ŷ)),
+                  ((ŷ, t) -> sum(ŷ ./ (t .+ 1)), .-ŷ ./ (t .+ 1) .^ 2),
+                  ((ŷ, t) -> sum(ŷ .* max.(t, 0.5)), ŷ .* (t .> 0.5)),
+                  ((ŷ, t) -> sum(@. -t * log(ŷ) - (1 - t) * log(1 - ŷ)), dbce),
+                  ((ŷ, t) -> sum(@. -Zygote.xlogy(t, ŷ) - Zygote.xlogy(1 - t, 1 - ŷ)), dbce)]
+    dxs = Zygote._pullback(Zygote.Context(), f, ŷ, t)[2](1.0)
+    @test pending(dxs[3])
+    @test Zygote.unthunk(dxs[3]) ≈ dt
+    @test Zygote.unthunk(dxs[3]) === Zygote.unthunk(dxs[3])
+    @test gradient(f, ŷ, t)[2] ≈ dt
+  end
+
+  # a reduction is computed at once, as its thunk would keep the larger cotangent alive
+  b = [1.0 2.0]
+  dxs = Zygote._pullback(Zygote.Context(), (ŷ, b) -> sum(ŷ .* b), ŷ, b)[2](1.0)
+  @test !pending(dxs[3])
+  @test Zygote.unthunk(dxs[3]) ≈ fill(sum(ŷ), 1, 2)
+
+  # nested AD evaluates them eagerly
+  @test gradient(w -> sum(gradient(ŷ -> sum(abs2.(ŷ .- t) .* w), ŷ)[1]), ones(3))[1] ≈ 2 .* (ŷ .- t)
 end
 
 @testset "Dict" begin

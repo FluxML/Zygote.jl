@@ -84,7 +84,7 @@ end
 accum(x::NamedTuple, y::ChainRulesCore.Tangent) = accum(x, wrap_chainrules_output(y))
 accum(x::ChainRulesCore.Tangent, y::NamedTuple) = accum(wrap_chainrules_output(x), y)
 
-# Deferred scalar cotangents (#1741)
+# Deferred cotangents (#1741, #1722)
 
 """
     Deferred{T}(f, depth)
@@ -111,12 +111,14 @@ function (d::Deferred{T})() where {T}
   return d.val
 end
 
-# The `i`-th of a tuple of cotangents in a `Deferred`.
+# The `i`-th of a tuple of cotangents in a `Deferred`, each of which may be deferred too.
 struct DeferredSlot{i,D<:Deferred}
   d::D
 end
 DeferredSlot{i}(d::D) where {i,D} = DeferredSlot{i,D}(d)
-(s::DeferredSlot{i})() where {i} = s.d()[i]
+(s::DeferredSlot{i})() where {i} = unthunk(s.d()[i])
+
+const DeferredThunk = Thunk{<:Union{Deferred,DeferredSlot}}
 
 defer_depth(x) = 0
 defer_depth(x::Thunk{<:Deferred}) = x.f.depth
@@ -137,15 +139,39 @@ _unthunked(f, xs...) = f(map(unthunk, xs)...)
 
 `f(unthunk.(xs)...)`, deferred if it is a number: the cotangent of a scalar is often a
 reduction (read back to the host on a GPU) that is then dropped, being that of a constant.
+So is an array if all `xs` were deferred by Zygote, as the cotangents of data used twice
+in broadcasts (#1722), but not by rules, as those of the weights of `W * x` in a loop.
 """
 function defer(f::F, xs::Vararg{Any,N}) where {F,N}  # specialized, for `promote_op` to be inferred
   T = Base.promote_op(_unthunked, F, map(Core.Typeof, xs)...)
-  (T <: Number && isconcretetype(T)) || return _unthunked(f, xs...)
+  isconcretetype(T) && (T <: Number || T <: AbstractArray{<:Number} && all(x -> x isa DeferredThunk, xs)) ||
+    return _unthunked(f, xs...)
   return Thunk(deferred(T, () -> _unthunked(f, xs...), maximum(defer_depth, xs) + 1))
 end
 
 # Nested AD cannot differentiate the construction of a `Thunk`, so evaluate eagerly.
 _pullback(cx::AContext, ::typeof(defer), f, xs...) = _pullback(cx, _unthunked, f, xs...)
+
+_deferrable(::Type) = false
+_deferrable(::Type{<:Number}) = true
+_deferrable(::Type{<:AbstractArray{<:Number}}) = true
+_deferrable(::Type{Thunk{Deferred{T}}}) where {T} = _deferrable(T)
+
+defer_pullback(s::S, dy::D) where {S,D} = defer_pullback(s, dy, Base.promote_op(_unthunked, S, D))
+
+# Only when it is known which cotangents are `nothing`: a thunk of `nothing` would reach rules.
+@generated function defer_pullback(s, dy, ::Type{T}) where {T}
+  T === Nothing && return :nothing
+  Ts = T <: Tuple && isconcretetype(T) ? fieldtypes(T) : ()
+  all(S -> S === Nothing || _deferrable(S), Ts) && any(_deferrable, Ts) || return :(s(dy))
+  slots = [S === Nothing ? :nothing : :(Thunk(DeferredSlot{$i}(dxs))) for (i, S) in enumerate(Ts)]
+  return :(dxs = _deferred_pullback($T, s, dy); $(Expr(:tuple, slots...)))
+end
+_deferred_pullback(::Type{T}, s, dy) where {T} = deferred(T, () -> s(unthunk(dy)), defer_depth(dy) + 1)
+
+# Eager under nested AD, like `defer`.
+_pullback(cx::AContext, ::typeof(defer_pullback), s, dy) =
+  _pullback(cx, (s, dy) -> s(dy), s, dy)
 
 accum(x::Nothing, y::AbstractThunk) = y
 accum(x::AbstractThunk, y::Nothing) = x
@@ -192,6 +218,7 @@ accum!!(::Nothing, ::Nothing) = nothing
 accum!!(x::Union{AbstractArray,AbstractThunk}, y::Union{AbstractArray,AbstractThunk}) =
   _buffer(unthunk(x), unthunk(y))
 accum!!(x::AbstractThunk, y::AbstractThunk) = defer(_buffer, x, y)
+accum!!(x::DeferredThunk, y::DeferredThunk) = defer(accum, x, y)
 
 accum!!(x::AccumBuffer, y) = _add!!(x, y)
 accum!!(x, y::AccumBuffer) = _add!!(y, x)
