@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Internals · Zygote</title><script>(function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+(i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+})(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+ga('create', 'UA-36890222-9', 'auto');
+ga('send', 'pageview');
+</script><link href="https://cdnjs.cloudflare.com/ajax/libs/normalize/4.2.0/normalize.min.css" rel="stylesheet" type="text/css"/><link href="https://fonts.googleapis.com/css?family=Lato|Roboto+Mono" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/default.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL=".."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.2.0/require.min.js" data-main="../assets/documenter.js"></script><script src="../siteinfo.js"></script><script src="../../versions.js"></script><link href="../assets/documenter.css" rel="stylesheet" type="text/css"/></head><body><nav class="toc"><h1>Zygote</h1><select id="version-selector" onChange="window.location.href=this.value" style="visibility: hidden"></select><form class="search" id="search-form" action="../search/"><input id="search-query" name="q" type="text" placeholder="Search docs"/></form><ul><li><a class="toctext" href="../">Home</a></li><li><a class="toctext" href="../adjoints/">Custom Adjoints</a></li><li><a class="toctext" href="../utils/">Utilities</a></li><li><a class="toctext" href="../complex/">Complex Differentiation</a></li><li><a class="toctext" href="../flux/">Flux</a></li><li><a class="toctext" href="../profiling/">Profiling</a></li><li class="current"><a class="toctext" href>Internals</a><ul class="internal"><li><a class="toctext" href="#What-Zygote-Does-1">What Zygote Does</a></li><li><a class="toctext" href="#Closures-1">Closures</a></li><li><a class="toctext" href="#Entry-Points-1">Entry Points</a></li><li><a class="toctext" href="#Closure-Conversion-1">Closure Conversion</a></li><li><a class="toctext" href="#Debugging-1">Debugging</a></li></ul></li><li><a class="toctext" href="../glossary/">Glossary</a></li></ul></nav><article id="docs"><header><nav><ul><li><a href>Internals</a></li></ul><a class="edit-page" href="https://github.com/FluxML/Zygote.jl/blob/master/docs/src/internals.md"><span class="fa"></span> Edit on GitHub</a></nav><hr/><div id="topbar"><span>Internals</span><a class="fa fa-bars" href="#"></a></div></header><h1><a class="nav-anchor" id="Internals-1" href="#Internals-1">Internals</a></h1><h2><a class="nav-anchor" id="What-Zygote-Does-1" href="#What-Zygote-Does-1">What Zygote Does</a></h2><p><a href="https://github.com/MikeInnes/diff-zoo">These notebooks</a> and the <a href="https://arxiv.org/abs/1810.07951">Zygote paper</a> provide useful background on Zygote&#39;s transform; this page is particularly focused on implementation details.</p><p>Given a function like</p><pre><code class="language-julia">function foo(x)
+  a = bar(x)
+  b = baz(a)
+  return b
+end</code></pre><p>how do we differentiate it? The key is that we can differentiate <code>foo</code> if we can differentiate <code>bar</code> and <code>baz</code>. If we assume we can get pullbacks for those functions, the pullback for <code>foo</code> looks as follows.</p><pre><code class="language-julia">function J(::typeof(foo), x)
+  a, da = J(bar, x)
+  b, db = J(baz, a)
+  return b, function(b̄)
+    ā = db(b̄)
+    x̄ = da(ā)
+    return x̄
+  end
+end</code></pre><p>Thus, where the forward pass calculates <code>x -&gt; a -&gt; b</code>, the backwards takes <code>b̄ -&gt; ā -&gt; x̄</code> via the pullbacks. The AD transform is recursive; we&#39;ll differentiate <code>bar</code> and <code>baz</code> in the same way, until we hit a case where gradient is explicitly defined.</p><p>Here&#39;s a working example that illustrates the concepts.</p><pre><code class="language-julia">J(::typeof(sin), x) = sin(x), ȳ -&gt; ȳ*cos(x)
+J(::typeof(cos), x) = cos(x), ȳ -&gt; -ȳ*sin(x)
+
+foo(x) = sin(cos(x))
+
+function J(::typeof(foo), x)
+  a, da = J(sin, x)
+  b, db = J(cos, a)
+  return b, function(b̄)
+    ā = db(b̄)
+    x̄ = da(ā)
+    return x̄
+  end
+end
+
+gradient(f, x) = J(f, x)[2](1)
+
+gradient(foo, 1)</code></pre><p>Now, clearly this is a mechanical transformation, so the only remaining thing is to automate it – a small matter of programming.</p><h2><a class="nav-anchor" id="Closures-1" href="#Closures-1">Closures</a></h2><p>The <code>J</code> function here corresponds to <code>forward</code> in Zygote. However, <code>forward</code> actually a wrapper around the lower level <code>_forward</code> function.</p><pre><code class="language-julia">julia&gt; y, back = Zygote._forward(sin, 0.5);
+
+julia&gt; back(1)
+(nothing, 0.8775825618903728)</code></pre><p>Why the extra <code>nothing</code> here? This actually represents the gradient of the function <code>sin</code>. This is often <code>nothing</code>, but when we have closures the function contains data we need gradients for.</p><pre><code class="language-julia">julia&gt; f = let a = 3; x -&gt; x*a; end
+#19 (generic function with 1 method)
+
+julia&gt; y, back = Zygote._forward(f, 2);
+
+julia&gt; back(1)
+((a = 2,), 3)</code></pre><p>This is a minor point for the most part, but <code>_forward</code> will come up in future examples.</p><h2><a class="nav-anchor" id="Entry-Points-1" href="#Entry-Points-1">Entry Points</a></h2><p>We could do this transform with a macro, but don&#39;t want to require that all differentiable code is annotated. Instead a <a href="https://github.com/FluxML/Zygote.jl/blob/daf1032488a2cd1fc739bc95a9fc05f93f90f2b6/src/compiler/interface2.jl#L3">generated function</a> gets us much of the power of a macro without this annotation, because we can use it to get lowered code for a function. We can then modify the code as we please and return it to implement <code>J(foo, x)</code>.</p><pre><code class="language-julia">julia&gt; foo(x) = baz(bar(x))
+foo (generic function with 1 method)
+
+julia&gt; @code_lowered foo(1)
+CodeInfo(
+1 ─ %1 = (Main.bar)(x)
+│   %2 = (Main.baz)(%1)
+└──      return %2</code></pre><p>We convert the code to SSA form using Julia&#39;s built-in IR data structure, after which it looks like this.</p><pre><code class="language-julia">julia&gt; Zygote.@code_ir foo(1)
+1 1 ─ %1 = (Main.bar)(_2)::Any
+  │   %2 = (Main.baz)(%1)::Any
+  └──      return %2    </code></pre><p>(There isn&#39;t much difference unless there&#39;s some control flow.)</p><p>The code is then differentiated by the code in <code>compiler/reverse.jl</code>. You can see the output with <code>@code_adjoint</code>.</p><pre><code class="language-julia">julia&gt; Zygote.@code_adjoint foo(1)
+1 1 ─ %1  = (Zygote._forward)(_2, Zygote.unwrap, Main.bar)::Any
+  │   %2  = (Base.getindex)(%1, 1)::Any
+  │         (Base.getindex)(%1, 2)::Any
+  │   %4  = (Zygote._forward)(_2, %2, _4)::Any
+  │   %5  = (Base.getindex)(%4, 1)::Any
+  │         (Base.getindex)(%4, 2)::Any
+  │   %7  = (Zygote._forward)(_2, Zygote.unwrap, Main.baz)::Any
+  │   %8  = (Base.getindex)(%7, 1)::Any
+  │         (Base.getindex)(%7, 2)::Any
+  │   %10 = (Zygote._forward)(_2, %8, %5)::Any
+  │   %11 = (Base.getindex)(%10, 1)::Any
+  │         (Base.getindex)(%10, 2)::Any
+  └──       return %11
+  1 ─ %1  = Δ()::Any
+1 │   %2  = (@12)(%1)::Any
+  │   %3  = (Zygote.gradindex)(%2, 1)::Any
+  │   %4  = (Zygote.gradindex)(%2, 2)::Any
+  │         (@9)(%3)::Any
+  │   %6  = (@6)(%4)::Any
+  │   %7  = (Zygote.gradindex)(%6, 1)::Any
+  │   %8  = (Zygote.gradindex)(%6, 2)::Any
+  │         (@3)(%7)::Any
+  │   %10 = (Zygote.tuple)(nothing, %8)::Any
+  └──       return %10
+, [1])</code></pre><p>This code is quite verbose, mainly due to all the tuple unpacking (<code>gradindex</code> is just like <code>getindex</code>, but handles <code>nothing</code> gracefully). The are two pieces of IR here, one for the modified forward pass and one for the pullback closure. The <code>@</code> nodes allow the closure to refer to values from the forward pass, and the <code>Δ()</code> represents the incoming gradient <code>ȳ</code>. In essence, this is just what we wrote above by hand for <code>J(::typeof(foo), x)</code>.</p><p><code>compiler/emit.jl</code> lowers this code into runnable IR (e.g. by turning <code>@</code> references into <code>getfield</code>s and stacks), and it&#39;s then turned back into lowered code for Julia to run.</p><h2><a class="nav-anchor" id="Closure-Conversion-1" href="#Closure-Conversion-1">Closure Conversion</a></h2><p>There are no closures in lowered Julia code, so we can&#39;t actually emit one directly in lowered code. To work around this we have a trick: we have a generic struct like</p><pre><code class="language-julia">struct Pullback{F}
+  data
+end</code></pre><p>We can put whatever we want in <code>data</code>, and the <code>F</code> will be the signature for the <em>original</em> call, like <code>Tuple{typeof(foo),Int}</code>. When the pullback gets called it hits <a href="https://github.com/FluxML/Zygote.jl/blob/daf1032488a2cd1fc739bc95a9fc05f93f90f2b6/src/compiler/interface2.jl#L15">another generated function</a> which emits the pullback code.</p><p>In hand written code this would look like:</p><pre><code class="language-julia">struct Pullback{F}
+  data
+end
+
+function J(::typeof(foo), x)
+  a, da = J(sin, x)
+  b, db = J(cos, a)
+  return b, Pullback{typeof(foo)}((da, db))
+end
+
+function(p::Pullback{typeof(foo)})(b̄)
+  da, db = p.data[1], p.data[2]
+  ā = db(b̄)
+  x̄ = da(ā)
+  return x̄
+end</code></pre><h2><a class="nav-anchor" id="Debugging-1" href="#Debugging-1">Debugging</a></h2><p>Say some of our code is throwing an error.</p><pre><code class="language-julia">bad(x) = x
+
+Zygote.@adjoint bad(x) = x, _ -&gt; error(&quot;bad&quot;)
+
+foo(x) = bad(sin(x))
+
+gradient(foo, 1) # error!</code></pre><p>Zygote can usually give a stacktrace pointing right to the issue here, but in some cases there are compiler crashes that make this harder. In these cases it&#39;s best to (a) use <code>_forward</code> and (b) take advantage of Zygote&#39;s recursion to narrow down the problem function.</p><pre><code class="language-julia">julia&gt; y, back = Zygote._forward(foo, 1);
+
+julia&gt; back(1) # just make up a value here, it just needs to look similar to `y`
+ERROR: bad
+
+# Ok, so we try functions that foo calls
+
+julia&gt; y, back = Zygote._forward(sin, 1);
+
+julia&gt; back(1)
+(nothing, 0.5403023058681398)
+
+# Looks like that&#39;s fine
+
+julia&gt; y, back = Zygote._forward(bad, 1);
+
+julia&gt; back(1) # ok, here&#39;s our issue. Lather, rinse, repeat.
+ERROR: bad</code></pre><p>Of course, our goal is that you never have to do this, but until Zygote is more mature it can be a useful way to narrow down test cases.</p><footer><hr/><a class="previous" href="../profiling/"><span class="direction">Previous</span><span class="title">Profiling</span></a><a class="next" href="../glossary/"><span class="direction">Next</span><span class="title">Glossary</span></a></footer></article></body></html>
