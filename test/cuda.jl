@@ -169,6 +169,12 @@ end
   @test collect(gradient(x -> sum(abs2, map(z -> z^2, x)), cu(c))[1]) ≈ gradient(x -> sum(abs2, map(z -> z^2, x)), c)[1]
 
   @test gradient(x -> sum(map(xi -> xi > 0, x)), a_gpu) == (nothing,)
+
+  # 0-dim, whose broadcast returns a scalar #1725
+  x0 = fill!(similar(a_gpu, ()), 2f0)
+  g0 = gradient(x -> sum(map(abs2, x)), x0)[1]
+  @test g0 isa CuArray{Float32, 0}
+  @test Array(g0) == fill(4f0)
 end
 
 # Forward-mode GPU broadcasts used to return `nothing` for variables captured by
@@ -194,8 +200,13 @@ end
   @test g3_gpu[2] ≈ g3[2]
   @test g3_gpu[3] ≈ g3[3]
 
-  # the argument gradient is not polluted by the `NaN` partial of `p` at `xi < 0`
-  @test collect(gradient((x, p) -> sum(map(xi -> xi^p, x)), a_gpu, 2f0)[1]) ≈ 2 .* a
+  # ChainRules' derivative of `xi^p` in `p` for `xi < 0`, not ForwardDiff's `NaN` (#1725)
+  g_pow = gradient((x, p) -> sum(map(xi -> xi^p, x)), a_gpu, 2f0)
+  @test collect(g_pow[1]) ≈ 2 .* a
+  @test g_pow[2] ≈ gradient((x, p) -> sum(map(xi -> xi^p, x)), a, 2f0)[2]
+  q = Float32[1, 2, 1, 0, 3]
+  fq(x, q) = sum(map((xi, qi) -> xi^(qi + 1), x, q))
+  @test all(map((g, g_cpu) -> collect(g) ≈ g_cpu, gradient(fq, a_gpu, cu(q)), gradient(fq, a, q)))
 
   # integer fields are not differentiated
   f4(x, w) = sum(let n = 2; map(xi -> xi^n * w, x) end)
@@ -213,9 +224,40 @@ end
 
   @test gradient(w -> sum(map(xi -> xi > w, a_gpu)), 2f0) == (nothing,)
 
-  # nested forward mode: `hessian` still sees `w` as a constant
   f6(x) = sum(let w = 3f0; map(xi -> sin(xi) * w, x) end)
   @test collect(Zygote.hessian(f6, a_gpu)) ≈ Zygote.hessian(f6, a)
+end
+
+# Floats nested in the function's fields, and captured `Dual`s of nested forward mode. #1725
+struct AffineC; a::Float32; b::Float32; end
+(m::AffineC)(x) = m.a * x + m.b
+approx_tangent(x, y) = x === y || (x isa Number && y isa Number && x ≈ y) ||
+  (x isa Union{Tuple, NamedTuple} && y isa typeof(x).name.wrapper && all(map(approx_tangent, Tuple(x), Tuple(y))))
+
+@testset "captured variables, nested" begin
+  a = Float32[-1.5, -9.0, 2.4, -1.3, 0.01]
+  a_gpu = cu(a)
+
+  g = let w = 2f0; yi -> yi * w end
+  for (h, p) in (((x, p) -> sum(map(xi -> xi * p.a + p.b, x)), (a = 2f0, b = 0.5f0)),
+                 ((x, t) -> sum((xi -> xi * t[1] + t[2]).(x)), (2f0, 0.5f0)),
+                 ((x, g) -> sum(map(xi -> g(xi) + 1, x)), g),
+                 ((x, g) -> sum(map(g ∘ sin, x)), g))
+    @test approx_tangent(gradient(p -> h(a_gpu, p), p)[1], gradient(p -> h(a, p), p)[1])
+  end
+
+  # `hessian` with respect to a captured scalar, also used outside the `map`
+  for h in ((x, w) -> (w1 = w[1]; sum(map(xi -> sin(xi * w1), x))),
+            (x, w) -> (w1 = w[1]; sum(map(xi -> sin(xi * w1), x)) * w1))
+    @test Zygote.hessian(w -> h(a_gpu, w), [2f0]) ≈ Zygote.hessian(w -> h(a, w), [2f0])
+  end
+  v = Float32[0.3, -0.5, 0.8]
+  h2(v) = (w = sum(v); sum(map(xi -> sin(xi * w), v)))
+  @test collect(Zygote.hessian(h2, cu(v))) ≈ Zygote.hessian(h2, v)
+
+  # can't hold or take `Dual`s: warns
+  @test (@test_logs (:warn, r"f\.a, f\.b") gradient(m -> sum(map(m, a_gpu)), AffineC(2f0, 0.5f0))) == (nothing,)
+  @test (@test_logs (:warn, r"type assertion") gradient(w -> sum(map(xi -> xi * (w::Float32), a_gpu)), 2f0)) == (nothing,)
 end
 
 # The CPU rule for `accumulate` keeps a pullback per step. #1684
