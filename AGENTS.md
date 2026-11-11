@@ -53,6 +53,8 @@ Everything funnels through `_pullback(ctx, f, args...)`, a **generated function*
 
 `@code_adjoint f(x)` shows the transformed IR; `Zygote.@code_ir f(x)` shows the input IR. See `docs/src/internals.md` for a worked example of what the transform produces.
 
+Before the transform, `instrument_broadcasts!` (`reverse.jl`) rewrites nested dot-broadcasts such as `@. a * tanh(b) + c` into `zbroadcasted`/`zmaterialize` calls. Without GPU arrays these are `broadcasted`/`materialize`; with them, `src/lib/broadcast_fusion.jl` differentiates the tree as one broadcast of `Dual`s, keeping nodes with their own `rrule`/`@adjoint` separate.
+
 ### Layout
 
 - **`src/compiler/`** — the AD engine. `interface.jl` (user-facing `gradient`, `withgradient`, `pullback`, `jacobian`, `hessian`, `diaghessian`, `Params`/`Grads`, `Context`); `interface2.jl` (the two generated functions); `reverse.jl` (the IR→IR adjoint transform, built on **IRTools**); `emit.jl` (lowering, stacks for control flow); `chainrules.jl` (rule lookup + ChainRules↔Zygote tangent conversion); `show.jl`.

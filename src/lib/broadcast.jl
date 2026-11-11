@@ -729,14 +729,43 @@ _dual_inert(x) = !(eltype(x) <: Real) || eltype(x) <: Bool
 @inline function _broadcast_forward_recompute(f, args::Vararg{Any, N}) where {N}
   y = broadcast(f, args...)
   df = dual_function(f)
+  lanes = _array_lanes(args, Val(ndims(y)))
   function bc_fwd_back(ȳ)
+    ps = _lane_partials(df, ȳ, args, lanes)
     dargs = ntuple(Val(N)) do i
       _dual_inert(args[i]) && return nothing
-      lazy_cotangent(args[i], ȳ, () -> unbroadcast(args[i], broadcast((y1, xs...) -> y1 * partials(df(xs...), i), ȳ, args...)))
+      lazy_cotangent(args[i], ȳ, () -> unbroadcast(args[i], _arg_partials(ps, lanes, df, ȳ, args, i)))
     end
     (nothing, nothing, dargs...) # nothings for broadcasted & f
   end
   return y, bc_fwd_back
+end
+
+# Each partial needs all the `Dual`s, so those of all array arguments come from one broadcast, along an
+# extra last dimension (#1695). It runs when one is needed, and their slices are arrays of their own.
+@generated function _array_lanes(args::Tuple, ::Val{nd}) where {nd}
+  L = Tuple(i for (i, T) in enumerate(fieldtypes(args)) if T <: AbstractArray && !_dual_inert(T))
+  return length(L) > 1 && nd > 0 ? Val((L, nd)) : nothing
+end
+
+_lane_partials(df, ȳ, args, ::Nothing) = nothing
+function _lane_partials(df, ȳ, args, ::Val{Lnd}) where {Lnd}
+  L, nd = Lnd
+  k = reshape(Base.OneTo(length(L)), ntuple(_ -> 1, Val(nd))..., length(L))
+  lane(k, y1, xs...) = (o = df(xs...); y1 * _select(map(i -> partials(o, i), L), k))
+  return _deferred_cotangent(() -> broadcast(lane, k, ȳ, args...), false)
+end
+
+# `t[k]` without indexing a tuple at runtime, which on the GPU spills it to local memory.
+@inline _select(t::Tuple{Any}, k) = t[1]
+@inline _select(t::Tuple, k) = ifelse(k == 1, first(t), _select(Base.tail(t), k - 1))
+
+_arg_partials(::Nothing, ::Nothing, df, ȳ, args, i) = broadcast((y1, xs...) -> y1 * partials(df(xs...), i), ȳ, args...)
+function _arg_partials(ps, ::Val{Lnd}, df, ȳ, args, i) where {Lnd}
+  L, nd = Lnd
+  j = findfirst(==(i), L)
+  j === nothing && return _arg_partials(nothing, nothing, df, ȳ, args, i)
+  return selectdim(unthunk(ps), nd + 1, j)
 end
 
 # This handles complex input and real output. We use the gradient definition from ChainRules here

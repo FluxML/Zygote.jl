@@ -109,3 +109,8 @@ end
   $(Expr(:meta, :generated, _callable_pullback_generator))
   $(Expr(:meta, :generated_only))
 end
+
+@eval function _zfusable(cx::AContext, bc::ZBroadcasted)
+  $(Expr(:meta, :generated, _zfusable_generator))
+  $(Expr(:meta, :generated_only))
+end
