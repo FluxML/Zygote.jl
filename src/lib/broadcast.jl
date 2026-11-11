@@ -369,6 +369,15 @@ end
 import ForwardDiff
 using ForwardDiff: Dual, Partials, value, partials
 
+# The tag of the broadcast's `Dual`s. Their derivative is the innermost, so they go outside
+# those of nested forward mode (`hessian`'s, tagged `Nothing`, or ForwardDiff's), which
+# they would otherwise be mistaken for when `f` captures one (#1725).
+struct BroadcastTag end
+ForwardDiff.:≺(::Type, ::Type{BroadcastTag}) = true
+ForwardDiff.:≺(::Type{BroadcastTag}, ::Type) = false
+# Like `Nothing`, it can't be ordered against itself: ForwardDiff's fallback throws.
+ForwardDiff.:≺(::Type{BroadcastTag}, ::Type{BroadcastTag}) =
+  invoke(ForwardDiff.:≺, Tuple{Any, Any}, BroadcastTag, BroadcastTag)
 
 # We do this because it ensures type stability so it compiles nicely on the gpu
 # The val is needed for some type stability
@@ -379,15 +388,36 @@ using ForwardDiff: Dual, Partials, value, partials
 @inline dual(x, i, ::Val{N}, ::Val{C}) where {N,C} = x
 @inline dual(x::Bool, i, ::Val{N}, ::Val{false}) where {N} = x
 @inline dual(x::Bool, i, ::Val{N}, ::Val{true}) where {N} = x
-@inline dual(x::Real, i, ::Val{N}, ::Val{false}) where {N} = Dual(x, ntuple(==(i), N))
-@inline dual(x::Real, i, ::Val{N}, ::Val{true}) where {N} = Dual(x, ntuple(==(i), 2N))
+@inline dual(x::Real, i, ::Val{N}, ::Val{false}) where {N} = Dual{BroadcastTag}(x, ntuple(==(i), N))
+@inline dual(x::Real, i, ::Val{N}, ::Val{true}) where {N} = Dual{BroadcastTag}(x, ntuple(==(i), 2N))
 # For complex since ForwardDiff.jl doesn't play nicely with complex numbers we
 # construct a Complex dual number and tag the real and imaginary parts separately
 @inline function dual(x::Complex{T}, i, ::Val{N}, ::Val{C}) where {T,N,C}
-    re_dual = Dual(real(x), ntuple(==(i), 2N))
-    im_dual = Dual(imag(x), ntuple(==(N+i), 2N))
+    re_dual = Dual{BroadcastTag}(real(x), ntuple(==(i), 2N))
+    im_dual = Dual{BroadcastTag}(imag(x), ntuple(==(N+i), 2N))
     return Complex(re_dual, im_dual)
 end
+
+# ForwardDiff's derivative of `x^p` in `p` is `NaN` for `x < 0`, from `log(x)`, and `0 * NaN`
+# for the partials of the other variables. Use ChainRules' derivatives, as on the CPU, and
+# add each partial only where it is nonzero (`_pow_grad`), so that one doesn't spoil another.
+@inline function Base.:^(x::Dual{BroadcastTag}, p::Dual{BroadcastTag})
+  vx, vp = value(x), value(p)
+  y = vx^vp
+  dx, dp = _pow_dx(vx, vp, y), _pow_dp(oftype(y, vx), vp, y)
+  ps = map((a, b) -> _pow_grad(dx, a) + _pow_grad(dp, b), partials(x).values, partials(p).values)
+  return Dual{BroadcastTag}(y, Partials(ps))
+end
+@inline function _pow_dual_exponent(x, p::Dual{BroadcastTag})
+  vp = value(p)
+  y = x^vp
+  dp = _pow_dp(oftype(y, x), vp, y)
+  return Dual{BroadcastTag}(y, Partials(map(b -> _pow_grad(dp, b), partials(p).values)))
+end
+for R in (AbstractFloat, Irrational, Integer, Rational, Real, Dual)  # ForwardDiff's, for ambiguities
+  @eval @inline Base.:^(x::$R, p::Dual{BroadcastTag}) = _pow_dual_exponent(x, p)
+end
+Base.:^(::Irrational{:ℯ}, p::Dual{BroadcastTag}) = exp(p)
 
 _iscomplex(::Complex) = true
 _iscomplex(_) = false
@@ -429,23 +459,24 @@ end
 end
 
 
-# Does this (possibly nested) type contain a `ForwardDiff.Dual` anywhere?
-_has_dual(::Type{<:Dual}) = true
-_has_dual(::Type{<:Complex{<:Dual}}) = true
+# Does this (possibly nested) type contain one of the broadcast's `Dual`s anywhere?
+_has_dual(::Type{<:Dual{BroadcastTag}}) = true
+_has_dual(::Type{<:Complex{<:Dual{BroadcastTag}}}) = true
 _has_dual(::Type{T}) where {T<:Tuple} = any(_has_dual, fieldtypes(T))
 _has_dual(::Type) = false
 _has_dual(::Type{Union{}}) = false
 
-# Recursively strip `ForwardDiff.Dual` values from a broadcast output element,
+# Recursively strip the broadcast's `Dual`s from an output element,
 # descending into `Tuple`s (e.g. the result of `broadcast(tuple, x, y)`).
-@inline _strip_dual(x::Dual) = value(x)
-@inline _strip_dual(x::Complex{<:Dual}) = Complex(value(real(x)), value(imag(x)))
+@inline _strip_dual(x::Dual{BroadcastTag}) = value(x)
+@inline _strip_dual(x::Complex{<:Dual{BroadcastTag}}) = Complex(value(real(x)), value(imag(x)))
 @inline _strip_dual(x::Tuple) = map(_strip_dual, x)
+@inline _strip_dual(x) = x
 
 # Contract an incoming cotangent element `ȳ1` with the partials of the output
 # element `o1` w.r.t. the i-th broadcast argument, descending into `Tuple`s.
-@inline _dual_partial(ȳ1::Number, o1::Dual, i) = ȳ1 * partials(o1, i)
-@inline _dual_partial(ȳ1::Number, o1::Complex{<:Dual}, i) =
+@inline _dual_partial(ȳ1::Number, o1::Dual{BroadcastTag}, i) = ȳ1 * partials(o1, i)
+@inline _dual_partial(ȳ1::Number, o1::Complex{<:Dual{BroadcastTag}}, i) =
   real(ȳ1) * partials(real(o1), i) + imag(ȳ1) * partials(imag(o1), i)
 @inline _dual_partial(ȳ1::Tuple, o1::Tuple, i) = _dual_partial_sum(false, ȳ1, o1, i)
 @inline _dual_partial(ȳ1, o1, i) = false  # missing cotangent component, or no partials → zero contribution
@@ -458,42 +489,142 @@ _has_dual(::Type{Union{}}) = false
 @inline _dual_partial_sum(acc, ::Tuple, ::Tuple{}, i) = acc
 @inline _dual_partial_sum(acc, ::Tuple{}, ::Tuple{}, i) = acc
 
-# Forward mode also differentiates w.r.t. the floating-point fields of `f` (e.g.
-# variables captured by a closure), which the GPU path has no other way to reach
-# (#1701). Integer fields are left alone: as `Dual`s they would break `x^n`.
-_dual_field(x::Union{AbstractFloat, Complex{<:AbstractFloat}}, i, n, c) = dual(x, i, n, c)
-_dual_field(x, i, n, c) = x
+# Forward mode also differentiates w.r.t. the floating-point fields of `f` (e.g. variables
+# captured by a closure), which the GPU path has no other way to reach (#1701), also when
+# nested in tuples, structs or other closures, or `Dual`s of nested forward mode (#1725).
+# Integer fields are left alone: as `Dual`s they would break `x^n`.
+_float_leaf(::Type{<:Union{AbstractFloat, Dual}}) = true
+_float_leaf(::Type{Complex{T}}) where {T} = _float_leaf(T)
+_float_leaf(::Type) = false
 
-# The type of `f::F` with field types `fieldtypes(D)`, valid when each changed field
-# is typed by its own type parameter (as for closures), else `nothing`.
-@generated function _retype(::Type{F}, ::Type{D}) where {F, D}
-  fieldtypes(D) == fieldtypes(F) && return nothing
-  W = F.name.wrapper
+# The floating-point leaves of a `T`, as a tree like its fields: a leaf is its type, a field
+# without any is `nothing`. This and the next helpers work on types, for the generators below.
+function _float_tree(T)
+  _float_leaf(T) && return T
+  (isconcretetype(T) && isstructtype(T) && !ismutabletype(T) && !(T <: Union{Number, AbstractArray})) ||
+    return nothing
+  ts = Any[_float_tree(fieldtype(T, i)) for i in 1:fieldcount(T)]
+  return all(isnothing, ts) ? nothing : ts
+end
+
+_dual_leaftype(::Type{T}, n) where {T<:Real} = Dual{BroadcastTag, promote_type(T, Bool), n}
+_dual_leaftype(::Type{Complex{T}}, n) where {T} = Complex{_dual_leaftype(T, n)}
+
+# The type of a `T` with fields of types `S`, valid when each changed field is typed by its own
+# type parameter (as for closures), else `nothing`.
+function _retype(T, S)
+  T <: Tuple && return Tuple{S...}
+  T <: NamedTuple && return NamedTuple{fieldnames(T), Tuple{S...}}
+  W = T.name.wrapper
   vars, body = Any[], W
   while body isa UnionAll
     push!(vars, body.var)
     body = body.body
   end
-  params = Any[F.parameters...]
-  for (i, T) in enumerate(fieldtypes(D))
-    T == fieldtype(F, i) && continue
+  params = Any[T.parameters...]
+  for (i, Si) in enumerate(S)
+    Si == fieldtype(T, i) && continue
     k = findfirst(v -> v === body.types[i], vars)
-    (k === nothing || !(vars[k].lb <: T <: vars[k].ub)) && return nothing
-    params[k] = T
+    (k === nothing || !(vars[k].lb <: Si <: vars[k].ub)) && return nothing
+    params[k] = Si
   end
   R = W{params...}
-  return fieldtypes(R) == fieldtypes(D) ? R : nothing
+  return fieldtypes(R) == Tuple(S) ? R : nothing
 end
 
-# A copy of `f` with its floating-point fields as `Dual`s, or `nothing`.
-@inline function _dualize_fields(f::F) where {F}
-  (isbitstype(F) && fieldcount(F) > 0) || return nothing
-  n = Val(fieldcount(F))
-  fs = ntuple(i -> getfield(f, i), n)
-  c = Val(any(_iscomplex, fs))
-  ds = ntuple(i -> _dual_field(fs[i], i, n, c), n)
-  R = _retype(F, typeof(ds))
-  return R === nothing ? nothing : __splatnew__(R, ds)
+# With the leaves of `tree` as `Dual`s of `n` partials, the type of a copy of a `T`, and the
+# tree of the leaves it can hold, whose nodes are `(type of the copy, children)`.
+function _dual_plan(T, tree, n)
+  tree === nothing && return T, nothing
+  tree isa Type && return _dual_leaftype(T, n), T
+  sub = [_dual_plan(fieldtype(T, i), tree[i], n) for i in eachindex(tree)]
+  all(s -> s[2] === nothing, sub) && return T, nothing
+  R = _retype(T, first.(sub))
+  R === nothing && return T, nothing
+  return R, (R, Any[last(s) for s in sub])
+end
+
+_dual_leaves(t) = t === nothing ? Any[] : t isa Type ? Any[t] : reduce(vcat, map(_dual_leaves, t[2]))
+_dual_shape(t) = t isa Tuple ? map(_dual_shape, t[2]) : t
+
+# The tree of the leaves of `F` that a copy can hold as `Dual`s, and their number of partials,
+# which only the type parameters' bounds could make depend on each other.
+function _dual_plan(F)
+  tree = _float_tree(F)
+  tree === nothing && return nothing, nothing, 0
+  _, kept = _dual_plan(F, tree, 0)
+  ls = _dual_leaves(kept)
+  n = any(T -> T <: Complex, ls) ? 2 * length(ls) : length(ls)
+  _, kept′ = _dual_plan(F, tree, n)
+  return tree, (_dual_shape(kept′) == _dual_shape(kept) ? kept′ : nothing), n
+end
+
+# The paths, as in `f.a.b` or `f.t[1]`, to the leaves of `tree` not in `kept`.
+function _lost_leaves(T, tree, kept, path = "f", out = String[])
+  tree === nothing && return out
+  if tree isa Type
+    kept === nothing && push!(out, path)
+  else
+    for i in eachindex(tree)
+      p = T <: Tuple ? "$path[$i]" : "$path.$(fieldname(T, i))"
+      _lost_leaves(fieldtype(T, i), tree[i], kept === nothing ? nothing : kept[2][i], p, out)
+    end
+  end
+  return out
+end
+
+# A copy of `f` with its floating-point leaves as `Dual`s where it can hold them (`f` itself if
+# nowhere), or `nothing` if it has none.
+@generated function _dualize_fields(f::F) where {F}
+  tree, kept, n = _dual_plan(F)
+  tree === nothing && return nothing
+  ls = _dual_leaves(kept)
+  N, C = Val(length(ls)), Val(n > length(ls))
+  k = 0
+  function build(ex, t)
+    t === nothing && return ex
+    t isa Type && return :(dual($ex, $(k += 1), $N, $C))
+    R, fs = t[1], [build(:(getfield($ex, $i)), c) for (i, c) in enumerate(t[2])]
+    R <: Tuple ? :(($(fs...),)) : R <: NamedTuple ? :($R(($(fs...),))) : :(__splatnew__($R, ($(fs...),)))
+  end
+  return build(:f, kept)
+end
+
+# The leaves of `f` that `_dualize_fields(f)` turns into `Dual`s, in the order of their partials.
+@generated function _dual_leaf_values(f::F) where {F}
+  _, kept, _ = _dual_plan(F)
+  exs = Any[]
+  walk(ex, t) = t === nothing ? nothing : t isa Type ? push!(exs, ex) :
+    foreach(((i, c),) -> walk(:(getfield($ex, $i)), c), enumerate(t[2]))
+  walk(:f, kept)
+  return :(($(exs...),))
+end
+
+# The cotangent of an `F`, given those of the leaves of `_dual_leaf_values`.
+@generated function _dual_leaves_tangent(::Type{F}, grads) where {F}
+  _, kept, _ = _dual_plan(F)
+  k = 0
+  function build(T, t)
+    t === nothing && return nothing
+    t isa Type && return :(grads[$(k += 1)])
+    fs = [build(fieldtype(T, i), c) for (i, c) in enumerate(t[2])]
+    T <: Tuple ? :(($(fs...),)) : :(NamedTuple{$(fieldnames(T))}(($(fs...),)))
+  end
+  return build(F, kept)
+end
+
+# With `all`, all the leaves, as when calling `f` with `Dual`s fails.
+@generated function _lost_dual_leaves(::Type{F}, ::Val{all}) where {F, all}
+  tree, kept, _ = _dual_plan(F)
+  return Tuple(_lost_leaves(F, tree, all ? nothing : kept))
+end
+
+@noinline function _warn_lost_dual_leaves(F, lost, failed)
+  why = failed ?
+    "calling `f` with `ForwardDiff.Dual`s in their place fails, e.g. at a type assertion or `Float32(x)`" :
+    "`ForwardDiff.Dual`s don't fit in a field of a concrete type, unlike one typed by a type parameter"
+  @warn """Zygote returns `nothing` for the gradient with respect to $(join(lost, ", ")), where \
+           `f::$F` is broadcast over a GPU array, as forward mode can't differentiate them: $why.""" maxlog=1 _id=Symbol(:dual_leaves_, objectid(F))
 end
 
 @inline _field_partial(ȳ1, o1, ::Real, i, n) = _dual_partial(ȳ1, o1, i)
@@ -502,22 +633,24 @@ end
 # The cotangent of `f`, through `fd = _dualize_fields(f)` evaluated at the plain
 # `args`, so that the partials of the fields and of the arguments never mix.
 function _dual_fields_grad(f::F, fd, ȳ, args...) where {F}
-  _has_dual(Broadcast.combine_eltypes(fd, args)) || return nothing
-  n = fieldcount(F)
-  grads = ntuple(Val(n)) do i
-    x = getfield(f, i)
-    typeof(getfield(fd, i)) == typeof(x) && return nothing
+  T = Broadcast.combine_eltypes(fd, args)
+  failed = !isconcretetype(T)
+  lost = _lost_dual_leaves(F, Val(failed))
+  isempty(lost) || _warn_lost_dual_leaves(F, lost, failed)
+  (failed || !_has_dual(T)) && return nothing
+  leaves = _dual_leaf_values(f)
+  n = length(leaves)
+  grads = map(leaves, ntuple(identity, Val(n))) do x, i
     bc = Broadcast.broadcasted((ȳ1, xs...) -> _field_partial(ȳ1, fd(xs...), x, i, n), ȳ, args...)
     sum(Broadcast.instantiate(bc))
   end
-  return NamedTuple{fieldnames(F)}(grads)
+  return _dual_leaves_tangent(F, grads)
 end
 
 @inline function broadcast_forward(f, args::Vararg{Any,N}) where N
   y, back = _broadcast_forward_args(f, args...)
   fd = _dualize_fields(f)
-  # `Dual` arguments (nested forward mode, e.g. `hessian`) would clash with `fd`'s fields.
-  (fd === nothing || any(a -> _has_dual(eltype(a)), args)) && return y, back
+  fd === nothing && return y, back
   function bc_fwd_back_fields(ȳ)
     dargs = back(ȳ)
     dxs = dargs === nothing ? map(_ -> nothing, args) : Base.tail(Base.tail(dargs))
@@ -529,11 +662,11 @@ end
 @inline function _broadcast_forward_args(f, args::Vararg{Any,N}) where N
   if _recompute_duals(args) && !any(a -> eltype(a) <: Complex, args)
     T = Broadcast.combine_eltypes(dual_function(f), args)
-    isconcretetype(T) && T <: Dual && return _broadcast_forward_recompute(f, args...)
+    isconcretetype(T) && T <: Dual{BroadcastTag} && return _broadcast_forward_recompute(f, args...)
   end
   out = dual_function(f).(args...)
   T = eltype(out)
-  if T <: Union{Dual, Complex{<:Dual}}
+  if T <: Union{Dual{BroadcastTag}, Complex{<:Dual{BroadcastTag}}}
     if any(eltype(a) <: Complex for a in args)
       return _broadcast_forward_complex(T, out, args...)
     else
@@ -704,11 +837,16 @@ using GPUArraysCore  # replaces @require CUDA block, weird indenting to preserve
   function _pullback(cx::AContext, ::typeof(map), f, x::AnyGPUArray,
                      xs::Union{AnyGPUArray, AbstractRange}...)
     args = (x, xs...)
-    if ndims(x) > 0 && allequal(map(size, args))
-      return _pullback(cx, broadcast, f, args...)
-    end
-    return ∇map(cx, f, args...)
+    allequal(map(size, args)) || return ∇map(cx, f, args...)
+    # A 0-dim broadcast returns a scalar, unlike `map`.
+    ndims(x) == 0 && return _pullback(cx, _map0, f, args...)
+    return _pullback(cx, broadcast, f, args...)
   end
+  _map0(f, xs...) = _device_cotangent(reshape(broadcast(f, map(vec, xs)...), ()))
+
+  # The cotangent of a 0-dim GPU array may be on the host, as from ChainRules' `sum`.
+  _device_cotangent(x) = x
+  @adjoint _device_cotangent(x) = x, Δ -> (Δ isa AbstractArray ? _gpu_cotangent(x, Δ) : Δ,)
 
   # `accumulate` on the CPU keeps the pullback of each step (#1684), which the GPU can't.
   # But the cotangent of a scan is a scan backwards, of the affine maps `g -> ∂a * g + Δy`
