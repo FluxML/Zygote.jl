@@ -3,7 +3,7 @@ using SparseArrays
 using CUDA
 using CUDA.CUSPARSE: CuSparseMatrixCSC
 using FillArrays: Fill
-using ChainRulesCore: ProjectTo
+using ChainRulesCore: ChainRulesCore, ProjectTo, NoTangent, unthunk
 using Zygote: Grads
 using Random: randn!
 import FiniteDifferences
@@ -263,6 +263,45 @@ end
   n = rand(1:3, 4, 3)
   @test collect(gradient(x -> sum(mul.(x, cu(n))), cu(F))[1]) ≈ n
   @test gradient(s -> sum(mul.(cu(F), s)), 2f0)[1] ≈ sum(F)
+end
+
+# Nested dot-broadcasts are differentiated as one broadcast of `Dual`s, but for nodes with their own rules. #1695
+fusedact(x) = x > 0 ? x : x / 10
+function ChainRulesCore.rrule(::typeof(Broadcast.broadcasted), ::typeof(fusedact), x::AbstractArray{<:Real})
+  fusedact.(x), Δ -> (NoTangent(), NoTangent(), 7 .* unthunk(Δ))
+end
+fusedlate(x) = 2x
+@testset "fused nested broadcasts" begin
+  σ(x) = 1 / (1 + exp(-x))
+  gelu(x) = @. 0.5f0 * x * (1 + tanh(0.79788456f0 * (x + 0.044715f0 * x^3)))
+  x, y, z, w = (randn(Float32, 4, 3) for _ in 1:4)
+  b, x0 = randn(Float32, 4), Float32[0, 1, -2]
+  for (f, args) in [
+      (gelu, (x,)),
+      ((f, c, i, g) -> @.(σ(f) * c + σ(i) * tanh(g)), (x, y, z, w)),
+      ((x, b, s) -> @.(tanh((x - b) * s + 1f-5)^2), (x, b, 0.7f0)),
+      ((x, m) -> @.(x * m + x^2), (x, x .> 0)),
+      ((x, v, p) -> @.((x^2 + 1)^p + v'), (x, randn(Float32, 3), 1.5f0)),
+      ((x, s) -> (t -> t * s).(x .+ 1), (x, 2f0)),
+      (x -> @.(ifelse(x > 0, x, 0f0) * 2 + sqrt(x^2) + abs(x)), (x0,)),
+      ((ŷ, y) -> @.((ŷ - y)^2), (x, y)),
+    ]
+    gc = gradient((args...) -> sum(f(args...)), args...)
+    gg = gradient((args...) -> sum(f(args...)), map(a -> a isa AbstractArray ? cu(a) : a, args)...)
+    @test all(map((dg, dc) -> dg === dc === nothing || (dg isa CUDA.AnyCuArray ? Array(dg) : dg) ≈ dc, gg, gc))
+  end
+  _, back = pullback(gelu, cu(x))
+  @test occursin("ZFused", string(typeof(back)))
+  @test gradient(x -> sum(@. ifelse(x > 0, x, 0f0) * 2), cu(x0))[1] |> collect == [0, 2, 0]
+  @test gradient(x -> count(@. (x > 0) & (x < 1)), cu(x0)) == (nothing,)
+
+  # A rule of its own is kept, also when defined after a gradient was compiled.
+  @test collect(gradient(x -> sum(@. fusedact(x * 2) + x), cu(x0))[1]) == [15, 15, 15]
+  @test collect(gradient(x -> sum(@. fusedlate(x * 2) + x), cu(x0))[1]) == [5, 5, 5]
+  @eval function ChainRulesCore.rrule(::typeof(Broadcast.broadcasted), ::typeof(fusedlate), x::AbstractArray{<:Real})
+    fusedlate.(x), Δ -> (NoTangent(), NoTangent(), 100 .* unthunk(Δ))
+  end
+  @test collect(Base.invokelatest(gradient, x -> sum(@. fusedlate(x * 2) + x), cu(x0))[1]) == [201, 201, 201]
 end
 
 @testset "jacobian" begin

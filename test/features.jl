@@ -1,6 +1,7 @@
 using Zygote, Test, LinearAlgebra
 using Zygote: Params, gradient, forwarddiff
 using FillArrays: Fill
+using Zygote.IRTools: IR, argument!, xcall, return!
 
 @testset "gradient checkpointing" begin
 
@@ -1104,6 +1105,40 @@ end
 
   # nested AD evaluates them eagerly
   @test gradient(w -> sum(gradient(ŷ -> sum(abs2.(ŷ .- t) .* w), ŷ)[1]), ones(3))[1] ≈ 2 .* (ŷ .- t)
+end
+
+@testset "nested broadcast trees" begin
+  # https://github.com/FluxML/Zygote.jl/issues/1695
+  calls(ir, f) = count(((_, st),) -> Zygote.iscall(st.expr, Zygote, f), ir)
+  zir(f, args...) = Zygote.instrument_broadcasts!(Zygote.instrument(IR(typeof(f), map(typeof, args)...)))
+  gelu(x) = @. 0.5 * x * (1 + tanh(0.79788456 * (x + 0.044715 * x^3)))
+  ir = zir(gelu, rand(3))
+  @test calls(ir, :zmaterialize) == 1 && calls(ir, :zbroadcasted) == 7
+  @test calls(zir(x -> tanh.(x), rand(3)), :zmaterialize) == 0
+  @test calls(zir(x -> (y = tanh.(x); y .* x), rand(3)), :zmaterialize) == 0
+
+  # a node used outside the tree, or twice, stays as it is
+  ir = IR(); x = argument!(ir)
+  a = push!(ir, xcall(Base, :broadcasted, tanh, x))
+  b = push!(ir, xcall(Base, :broadcasted, +, a, x))
+  return!(ir, push!(ir, xcall(Base, :sum, b)))
+  @test calls(Zygote.instrument_broadcasts!(ir), :zbroadcasted) == 0
+  ir = IR(); x = argument!(ir)
+  a = push!(ir, xcall(Base, :broadcasted, tanh, x))
+  b = push!(ir, xcall(Base, :broadcasted, +, a, a))
+  return!(ir, push!(ir, xcall(Base, :materialize, b)))
+  @test calls(Zygote.instrument_broadcasts!(ir), :zmaterialize) == 0
+
+  # without GPU arrays, each node keeps its own rule, also in nested AD
+  x = [0.5, -0.3]
+  @test Zygote.hessian(x -> sum(@. tanh(x) * x), x) ≈ Zygote.hessian(x -> (t = tanh.(x); sum(t .* x)), x)
+  @test gradient(x -> sum(gradient(x -> sum(@. tanh(x) * x), x)[1]), x)[1] ≈
+        gradient(x -> sum(gradient(x -> (t = tanh.(x); sum(t .* x)), x)[1]), x)[1]
+  W, v = randn(3, 3), randn(3)
+  gs = gradient(() -> sum(@. tanh(W * 2 + v)), Params([W, v]))
+  gr = gradient(() -> (t = W .* 2; t = t .+ v; sum(tanh.(t))), Params([W, v]))
+  @test gs[W] ≈ gr[W]
+  @test gs[v] ≈ gr[v]
 end
 
 @testset "Dict" begin

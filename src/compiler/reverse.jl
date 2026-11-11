@@ -178,6 +178,46 @@ function instrument(ir::IR; world = Base.get_world_counter())
   return ir
 end
 
+is_broadcasted(ex) = iscall(ex, Base, :broadcasted)
+is_materialize(ex) = iscall(ex, Base, :materialize) && length(ex.args) == 2
+
+# A nested dot-broadcast lowers to `materialize(broadcasted(f, broadcasted(g, x), y))`. Rewrite
+# each such tree of two or more `broadcasted` calls, whose results are each used once, by the next,
+# into `zbroadcasted` calls and `zmaterialize(_, Val(spec))`, which may differentiate it as a whole
+# (#1695). `spec` mirrors the tree, recording which leaves are the same variable, or literals.
+function instrument_broadcasts!(ir::IR)
+  nodes = Dict{Variable,Expr}()
+  uses = Dict{Variable,Int}()
+  use!(x) = (x isa Variable && (uses[x] = get(uses, x, 0) + 1); x)
+  for (v, st) in ir
+    is_broadcasted(st.expr) && (nodes[v] = st.expr)
+    prewalk(use!, st.expr)
+  end
+  isempty(nodes) && return ir
+  for b in blocks(ir), br in branches(b)
+    use!(br.condition)
+    foreach(use!, arguments(br))
+  end
+  child(x) = x isa Variable && haskey(nodes, x) && uses[x] == 1
+  children(v) = filter(child, nodes[v].args[3:end])
+  nnodes(v) = 1 + sum(nnodes, children(v); init = 0)
+  spec(x) = child(x) ? (:node, map(spec, nodes[x].args[3:end])...) :
+            x isa Variable ? (:var, x.id) :
+            x isa Union{Number,Char} && isbits(x) ? (:lit, x) : (:other,)
+  function rewrite!(v)
+    foreach(rewrite!, children(v))
+    ir[v] = xcall(Zygote, :zbroadcasted, nodes[v].args[2:end]...)
+  end
+  roots = [v => st.expr.args[2] for (v, st) in ir
+           if is_materialize(st.expr) && child(st.expr.args[2]) && nnodes(st.expr.args[2]) >= 2]
+  for (v, r) in roots
+    s = spec(r)
+    rewrite!(r)
+    ir[v] = xcall(Zygote, :zmaterialize, r, Val(s))
+  end
+  return ir
+end
+
 const BranchNumber = UInt8
 
 # Ids of the predecessors of every block, in increasing order. Same relation as
@@ -272,7 +312,7 @@ struct Primal
 end
 
 function Primal(ir::IR; varargs = nothing, world = Base.get_world_counter())
-  ir = instrument(normalise!(ir); world)
+  ir = instrument_broadcasts!(instrument(normalise!(ir); world))
   pr, brs, pbs = primal(ir, world)
   Primal(expand!(ir), pr, varargs, brs, pbs)
 end
