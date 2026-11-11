@@ -284,6 +284,15 @@ for (mapfunc,∇mapfunc) in [(:map,:∇map),(:pmap,:∇pmap)]
   end
 end
 
+# The cotangents in a tuple stay deferred, as those of the third and later arguments of a
+# broadcast, which Base passes through `map(broadcastable, args)` (#1720).
+@_adjoint_keepthunks function map(f, args::Tuple...)
+  ys, back = ∇map(__context__, f, args...)
+  return ys, back ∘ _unthunk_whole
+end
+_unthunk_whole(Δ) = Δ
+_unthunk_whole(Δ::AbstractThunk) = unthunk_tangent(Δ)
+
 @adjoint function pmap(f, wp::AbstractWorkerPool, args...; kwargs...)
   ys_backs = pmap((x...) -> _pullback(__context__, f, x...), wp, args...; kwargs...)
   ys, backs = unzip(ys_backs)

@@ -243,22 +243,6 @@ end
 @inline (s::ScalarZBack)(dy) = s.back(dy)
 (s::ScalarZBack)(dy::AbstractThunk) = defer_pullback(s.back, dy)
 
-defer_pullback(s::S, dy::D) where {S,D} = defer_pullback(s, dy, Base.promote_op(_unthunked, S, D))
-
-# Only when it is known which cotangents are `nothing`: a thunk of `nothing` would reach rules.
-@generated function defer_pullback(s, dy, ::Type{T}) where {T}
-  T === Nothing && return :nothing
-  Ts = T <: Tuple && isconcretetype(T) ? fieldtypes(T) : ()
-  all(S -> S === Nothing || S <: Number, Ts) && any(S -> S <: Number, Ts) || return :(s(dy))
-  slots = [S === Nothing ? :nothing : :(Thunk(DeferredSlot{$i}(dxs))) for (i, S) in enumerate(Ts)]
-  return :(dxs = _deferred_pullback($T, s, dy); $(Expr(:tuple, slots...)))
-end
-_deferred_pullback(::Type{T}, s, dy) where {T} = deferred(T, () -> s(unthunk(dy)), defer_depth(dy) + 1)
-
-# Eager under nested AD, like `defer`.
-_pullback(cx::AContext, ::typeof(defer_pullback), s, dy) =
-  _pullback(cx, (s, dy) -> s(dy), s, dy)
-
 """
     chain_rrule(config, f, args...)
 

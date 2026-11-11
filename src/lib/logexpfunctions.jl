@@ -35,10 +35,11 @@ function ChainRulesCore.rrule(::ZygoteRuleConfig, ::typeof(xlogy), x::Real, y::R
     xlogy_pullback(δ) = (NoTangent(), δ * dx, δ * dy)
     return result, xlogy_pullback
 end
-@adjoint function broadcasted(::typeof(xlogy), x::Numeric, y::Numeric)
+@_adjoint_keepthunks function broadcasted(::typeof(xlogy), x::Numeric, y::Numeric)
     result, dx, dy = ∇xlogy(x, y)
-    back(δ) = (nothing, unbroadcast(x, δ .* dx), unbroadcast(y, δ .* dy))
-    return result, back
+    back(δ) = (nothing, lazy_cotangent(x, δ, () -> unbroadcast(x, δ .* dx)),
+                        lazy_cotangent(y, δ, () -> unbroadcast(y, δ .* dy)))
+    return result, broadcast_back(back, x, y)
 end
 function ∇xlogy(x::Numeric, y::Numeric)
     dx = logy = log.(y)
@@ -53,10 +54,11 @@ function ChainRulesCore.rrule(::ZygoteRuleConfig, ::typeof(logaddexp), x::Real, 
     logaddexp_pullback(δ) = (NoTangent(), δ * dx, δ * dy)
     return result, logaddexp_pullback
 end
-@adjoint function broadcasted(::typeof(logaddexp), x::Numeric, y::Numeric)
+@_adjoint_keepthunks function broadcasted(::typeof(logaddexp), x::Numeric, y::Numeric)
     result, dx, dy = ∇logaddexp(x, y)
-    back(δ) = (nothing, unbroadcast(x, δ .* dx), unbroadcast(y, δ .* dy))
-    return result, back
+    back(δ) = (nothing, lazy_cotangent(x, δ, () -> unbroadcast(x, δ .* dx)),
+                        lazy_cotangent(y, δ, () -> unbroadcast(y, δ .* dy)))
+    return result, broadcast_back(back, x, y)
 end
 function ∇logaddexp(x::Numeric, y::Numeric)
     result = logaddexp.(x, y)
@@ -70,10 +72,11 @@ function ChainRulesCore.rrule(::ZygoteRuleConfig, ::typeof(logsubexp), x::Real, 
     logsubexp_pullback(δ) = (NoTangent(), δ * dx, δ * dy)
     return result, logsubexp_pullback
 end
-@adjoint function broadcasted(::typeof(logsubexp), x::Numeric, y::Numeric)
+@_adjoint_keepthunks function broadcasted(::typeof(logsubexp), x::Numeric, y::Numeric)
     result, dx, dy = ∇logsubexp(x, y)
-    back(δ) = (nothing, unbroadcast(x, δ .* dx), unbroadcast(y, δ .* dy))
-    return result, back
+    back(δ) = (nothing, lazy_cotangent(x, δ, () -> unbroadcast(x, δ .* dx)),
+                        lazy_cotangent(y, δ, () -> unbroadcast(y, δ .* dy)))
+    return result, broadcast_back(back, x, y)
 end
 function ∇logsubexp(x::Numeric, y::Numeric)
     result = logsubexp.(x, y)

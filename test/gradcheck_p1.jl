@@ -113,10 +113,10 @@ end
     # a zero local derivative is a strong zero, as for `literal_pow` (#1598)
     @test gradient(x -> sum(sqrt.(x .^ p)), [0.0, 2.0]) == ([0.0, 1.0],)
 
-    # the exponent's cotangent is deferred
+    # both cotangents are deferred
     _, back = Zygote._pullback(Zygote.Context(), (x, p) -> x .^ p, [-2.0, 3.0], 2.0)
     dxs = back([1.0, 1.0])
-    @test dxs[2] ≈ [-4.0, 6.0]
+    @test Zygote.unthunk(dxs[2]) ≈ [-4.0, 6.0]
     @test dxs[3] isa Zygote.AbstractThunk
     @test Zygote.unthunk(dxs[3]) ≈ 4log(2) + 9log(3)
 
