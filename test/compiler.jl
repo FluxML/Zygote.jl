@@ -601,3 +601,26 @@ end
     @test gradient(many_blocks, x)[1] ≈ ForwardDiff.derivative(many_blocks, x)
   end
 end
+
+function reassign(x, y, c)
+  a = x
+  if c
+    a = y
+  end
+  sum(a) + sum(x)
+end
+
+function swaps(x, y, n)
+  a, b = x, y
+  for _ in 1:n
+    a, b = b, a
+  end
+  sum(a) + 2sum(b) + sum(x)
+end
+
+@testset "sums of cotangents only on the branch taken (#1746)" begin
+  @test gradient(reassign, ones(2), ones(3), true) == (ones(2), ones(3), nothing)
+  @test gradient(reassign, ones(2), ones(3), false) == (2ones(2), nothing, nothing)
+  @test gradient(swaps, ones(2), ones(3), 2) == (2ones(2), 2ones(3), nothing)
+  @test gradient(swaps, ones(2), ones(3), 3) == (3ones(2), ones(3), nothing)
+end

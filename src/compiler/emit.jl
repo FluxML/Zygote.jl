@@ -95,9 +95,9 @@ end
 
 function reverse_stacks!(adj, stks)
   ir = adj.adjoint
-  entry = blocks(ir)[end]
+  entry = block(ir, length(blocks(adj.primal)))
   self = argument!(entry, at = 1)
-  t = pushfirst!(blocks(ir)[end], xcall(:getfield, self, QuoteNode(:t)))
+  t = pushfirst!(entry, xcall(:getfield, self, QuoteNode(:t)))
   repl = Dict()
   for (i, (b′, α, not_stack)) in enumerate(stks)
     if not_stack
@@ -115,7 +115,7 @@ end
 function stacks!(adj, T)
   forw, stks = forward_stacks!(adj, T)
   back = reverse_stacks!(adj, stks)
-  permute!(back, length(back.blocks):-1:1)
+  permute!(back, reverse_order(back, length(blocks(adj.primal))))
   IRTools.domorder!(back)
   return forw, back
 end
