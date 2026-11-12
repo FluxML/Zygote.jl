@@ -132,7 +132,12 @@ function deferred(::Type{T}, f, depth) where {T}
   return d
 end
 
-_unthunked(f, xs...) = f(map(unthunk, xs)...)
+# A rule's thunk unthunks to ChainRules tangents (e.g. an array of `ZeroTangent()`s, #1740),
+# which Zygote's own pullbacks can't take.
+_unthunk(x) = x
+_unthunk(x::AbstractThunk) = unthunk_tangent(x)
+
+_unthunked(f, xs...) = f(map(_unthunk, xs)...)
 
 """
     defer(f, xs...)
@@ -167,7 +172,7 @@ defer_pullback(s::S, dy::D) where {S,D} = defer_pullback(s, dy, Base.promote_op(
   slots = [S === Nothing ? :nothing : :(Thunk(DeferredSlot{$i}(dxs))) for (i, S) in enumerate(Ts)]
   return :(dxs = _deferred_pullback($T, s, dy); $(Expr(:tuple, slots...)))
 end
-_deferred_pullback(::Type{T}, s, dy) where {T} = deferred(T, () -> s(unthunk(dy)), defer_depth(dy) + 1)
+_deferred_pullback(::Type{T}, s, dy) where {T} = deferred(T, () -> s(_unthunk(dy)), defer_depth(dy) + 1)
 
 # Eager under nested AD, like `defer`.
 _pullback(cx::AContext, ::typeof(defer_pullback), s, dy) =
@@ -176,8 +181,8 @@ _pullback(cx::AContext, ::typeof(defer_pullback), s, dy) =
 accum(x::Nothing, y::AbstractThunk) = y
 accum(x::AbstractThunk, y::Nothing) = x
 
-accum(x, y::AbstractThunk) = accum(x, unthunk(y))
-accum(x::AbstractThunk, y) = accum(unthunk(x), y)
+accum(x, y::AbstractThunk) = accum(x, _unthunk(y))
+accum(x::AbstractThunk, y) = accum(_unthunk(x), y)
 accum(x::AbstractThunk, y::AbstractThunk) = defer(accum, x, y)
 accum(x::Number, y::AbstractThunk) = defer(accum, x, y)
 accum(x::AbstractThunk, y::Number) = defer(accum, x, y)
@@ -216,7 +221,7 @@ accum!!(::Nothing, y) = y
 accum!!(::Nothing, ::Nothing) = nothing
 
 accum!!(x::Union{AbstractArray,AbstractThunk}, y::Union{AbstractArray,AbstractThunk}) =
-  _buffer(unthunk_tangent(x), unthunk_tangent(y))
+  _buffer(_unthunk(x), _unthunk(y))
 accum!!(x::AbstractThunk, y::AbstractThunk) = defer(_buffer, x, y)
 accum!!(x::DeferredThunk, y::DeferredThunk) = defer(accum, x, y)
 
@@ -245,7 +250,7 @@ function accum!!(x, y, zs...)
     length(keep) < length(args) && return :(accum!!($(args[keep]...)))
     all(T -> T <: AbstractThunk, types) && return :(defer(_buffer, $(args...)))
     all(T -> T <: Union{AbstractArray,AbstractThunk}, types) &&
-      return :(_buffer($([:(unthunk($a)) for a in args]...)))
+      return :(_buffer($([:(_unthunk($a)) for a in args]...)))
     ex = :(accum!!(x, y))
     for i in 1:length(zs)
       ex = :(accum!!($ex, zs[$i]))
@@ -264,7 +269,7 @@ end
 _mightalias(z, x) = x isa AbstractArray && Base.mightalias(z, x)
 
 _add!!(b::AccumBuffer, ::Nothing) = b
-_add!!(b::AccumBuffer, y::AbstractThunk) = _add!!(b, unthunk(y))
+_add!!(b::AccumBuffer, y::AbstractThunk) = _add!!(b, _unthunk(y))
 _add!!(b::AccumBuffer, y) = accum(b.data, y)
 function _add!!(b::AccumBuffer, y::AbstractArray)
   x = b.data
