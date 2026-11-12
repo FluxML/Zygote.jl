@@ -502,3 +502,20 @@ end
     @test g[1] isa NamedTuple
     @test g[1].w isa Array
 end
+
+@testset "Accumulated thunks of rules in Zygote's format" begin
+    # https://github.com/JuliaGraphs/GraphNeuralNetworks.jl/issues/731
+    # the `getindex` rule's thunks hold `ZeroTangent()`s, which the broadcast's pullback can't take
+    xs, b = [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]], [0.5, 0.5]
+    @test gradient(xs -> (ys = map(x -> x .+ b, xs); sum(ys[1]) + sum(ys[2])), xs)[1] ==
+          [[1.0, 1.0], [1.0, 1.0], nothing]
+
+    struct TwoFields
+        a::Float64
+        b::Float64
+    end
+    first_field(t::TwoFields) = t.a
+    ChainRulesCore.rrule(::typeof(first_field), t::TwoFields) =
+        t.a, Δ -> (NoTangent(), @thunk(Tangent{TwoFields}(a = Δ)))
+    @test gradient(a -> (t = TwoFields(a, 2.0); first_field(t) + first_field(t)), 1.0) == (2.0,)
+end
