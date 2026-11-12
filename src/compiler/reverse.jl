@@ -1,7 +1,7 @@
 using IRTools: IRTools, IR, Variable, Pipe, xcall, var, prewalk, postwalk,
   blocks, argument!, arguments, branches,
   insertafter!, finish, expand!, prune!, substitute!, substitute,
-  block, block!, branch!, return!, stmt, meta
+  block, block!, branch!, Branch, return!, stmt, meta
 
 
 # TODO: Temporary, to be removed when ChainRulesCore rrules are required to
@@ -428,16 +428,23 @@ function adjoint(pr::Primal)
 
     if b.id > 1 # Backprop through (predecessor) branch arguments
       gs = grad.(arguments(b))
-      for br in branches(rb)
+      for (k, br) in enumerate(branches(rb))
         br.block == 0 && continue
         br′ = branchfor(pr.ir, br.block=>b.id)
         br′ === nothing && continue
         ins = br′.args
-        for i = 1:length(br.args)
-          ā = [gs[j] for j = 1:length(ins) if ins[j] == sigs[br.block][i]]
-          # Each branch's sums are computed before branching, and may share terms.
-          length(ā) > 1 && (ā = map(unbuffer, ā))
-          br.args[i] = xaccum(rb, ā...)
+        ās = [[gs[j] for j = 1:length(ins) if ins[j] == sigs[br.block][i]] for i = 1:length(br.args)]
+        # A branch's sums are computed only when it is taken, as those of another may not
+        # add up (e.g. arrays of different sizes, #1746), in a block appended for it.
+        if length(branches(rb)) > 1 && any(ā -> length(ā) > 1, ās)
+          # `slots!` passes the arguments of every branch before taking one, which can overwrite
+          # those of `rb` when it loops to itself, so they are read before.
+          ās = [[x in arguments(rb) ? push!(rb, xcall(Base, :identity, x)) : x for x in ā] for ā in ās]
+          eb = block!(ir)
+          branch!(eb, br.block, [xaccum(eb, ā...) for ā in ās]...)
+          branches(rb)[k] = Branch(br, block = eb.id, args = [])
+        else
+          br.args .= [xaccum(rb, ā...) for ā in ās]
         end
       end
     else # Backprop function arguments
@@ -467,6 +474,10 @@ function adjoint(pr::Primal)
   return ir
 end
 
+# The reverse pass starts in the adjoint of the primal's last block `n`, followed by those of
+# the others, in reverse, and the blocks appended for summing cotangents on one branch.
+reverse_order(adj::IR, n) = [n:-1:1; n+1:length(blocks(adj))]
+
 struct Adjoint
   primal::IR
   adjoint::IR
@@ -476,7 +487,7 @@ function Adjoint(ir::IR; varargs = nothing, normalise = true, world = Base.get_w
   pr = Primal(ir; varargs, world)
   adj = adjoint(pr) |> prune!
   if normalise
-    permute!(adj, length(adj.blocks):-1:1)
+    permute!(adj, reverse_order(adj, length(blocks(pr.ir))))
     adj = IRTools.domorder!(adj) |> IRTools.renumber
   end
   Adjoint(pr.pr, adj)
