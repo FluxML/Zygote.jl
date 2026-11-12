@@ -54,6 +54,12 @@
             @test accum(ts..., nothing) === ntuple(Float64, n)
             @test accum(ts..., ts...) === ntuple(i -> 2.0 * i, n)
         end
+        # a lone array is passed on, not copied (#1748)
+        a, b, c = [1.0], [2.0], [3.0]
+        @test accum((a, nothing, nothing), (nothing, b, nothing), (nothing, nothing, c)) === (a, b, c)
+        @test accum(nothing, a, nothing) === a
+        th(x) = Zygote.ChainRulesCore.@thunk(x)
+        @test Zygote.unbuffer(Zygote.accum!!(th(a), th(nothing), th(nothing))) === a
     end
 
     @testset "gradient through long tuples" begin

@@ -54,7 +54,9 @@ function accum(x::Tuple, y::Tuple, z::Tuple, zs::Tuple...)
   end
 end
 
-accum(x::AbstractArray, ys::AbstractArray...) = Base.broadcast_preserving_zero_d(accum, x, ys...)
+# Two or more: `accum(x)`, left by the n-ary methods above dropping `nothing`s, must not copy `x` (#1748).
+accum(x::AbstractArray, y::AbstractArray, zs::AbstractArray...) =
+  Base.broadcast_preserving_zero_d(accum, x, y, zs...)
 accum(::Tuple{}, ::NamedTuple{}) = ()
 accum(::NamedTuple{}, ::Tuple{}) = ()
 
