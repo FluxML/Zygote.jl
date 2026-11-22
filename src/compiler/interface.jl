@@ -26,16 +26,46 @@ typenodes(T::Union) = typenodes(T.a) + typenodes(T.b)
 typenodes(T::UnionAll) = typenodes(Base.unwrap_unionall(T))
 typenodes(_) = 1
 
-const MAX_BRANCHY_PULLBACK_NODES = 60
-
 # Pullbacks of multi-block code nest the types of their callees' pullbacks, so a concrete type is
-# only worth its compile time while it stays small (#1697). Code with loops records its stacks in
-# `StackRef`s, whose element types only show at runtime: the backward pass rebuilds the pullback
-# with them (`typed_pullback`), and `Pullback{F,Tuple}` marks a large record that needs this.
+# only worth its compile time while it stays small (#1697). The record of branch-only code types the
+# pullbacks of all its blocks, a few hundred nodes for a small scalar kernel (#1754), and a callee
+# called on two branches doubles the size of its type, which the limit stops.
+const MAX_BRANCHY_PULLBACK_NODES = 1000
+
+# Code with loops records its stacks in `StackRef`s, whose element types only show at runtime: the
+# backward pass rebuilds the pullback with them (`typed_pullback`), and `Pullback{F,Tuple}` marks a
+# large record that needs this.
 @generated function branchy_pullback(::Type{F}, t::T, ::Val{loopy}) where {F,T,loopy}
   P = typenodes(T) <= MAX_BRANCHY_PULLBACK_NODES ? Pullback{F,T} :
       loopy ? Pullback{F,Tuple} : Pullback{F,Any}
   return :($P(t))
+end
+
+# An entry of the record of branch-only code, typed after all the paths: a tuple with a field of type
+# `Union{Nothing,T}` would be abstract, and so boxed.
+struct Slot{T}
+  x::T
+end
+
+unslot(x) = x
+unslot(s::Slot) = s.x
+
+# The types of the entries of the record of branch-only code, from `R`, the inferred return type of
+# `_pullback_record`. Those that aren't concrete go in a `Slot`, which is untyped, as a stack would
+# be, if typing them all makes too large a type.
+function slottypes(R)
+  R isa DataType && R <: Tuple && length(R.parameters) == 2 || return nothing
+  T = R.parameters[2]
+  T isa DataType && T <: Tuple && !any(Base.isvarargtype, T.parameters) || return nothing
+  S = Any[isconcretetype(U) ? U : Slot{U} for U in T.parameters]
+  typenodes(Tuple{S...}) <= MAX_BRANCHY_PULLBACK_NODES && return S
+  return Any[isconcretetype(U) ? U : Slot{Any} for U in T.parameters]
+end
+
+@generated function slot(::Type{R}, ::Val{i}, x) where {R,i}
+  S = slottypes(R)
+  S = S === nothing || i > length(S) ? Slot{Any} : S[i]
+  return S <: Slot ? :($S(x)) : :x
 end
 
 typed_pullback(j::Pullback{S}) where S = Pullback{S}(map(unstack, j.t))

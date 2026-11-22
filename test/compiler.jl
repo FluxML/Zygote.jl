@@ -65,8 +65,21 @@ y, back = @test_inferred Zygote._pullback(Context(), branchy, 0.5)
 @test isconcretetype(fieldtype(typeof(back), :t))
 @test back(1.0)[2] ≈ cos(0.5) * 0.5 + sin(0.5)
 @test Zygote.branchy_pullback(Tuple{typeof(sin)}, (1, 2.0), Val(false)) isa Zygote.Pullback{Tuple{typeof(sin)}, Tuple{Int,Float64}}
-@test Zygote.branchy_pullback(Tuple{typeof(sin)}, ntuple(_ -> (1, 2.0), 30), Val(false)) isa Zygote.Pullback{Tuple{typeof(sin)}, Any}
-@test Zygote.branchy_pullback(Tuple{typeof(sin)}, ntuple(_ -> (1, 2.0), 30), Val(true)) isa Zygote.Pullback{Tuple{typeof(sin)}, Tuple}
+big = (ntuple(_ -> 1, Zygote.MAX_BRANCHY_PULLBACK_NODES),)
+@test Zygote.branchy_pullback(Tuple{typeof(sin)}, big, Val(false)) isa Zygote.Pullback{Tuple{typeof(sin)}, Any}
+@test Zygote.branchy_pullback(Tuple{typeof(sin)}, big, Val(true)) isa Zygote.Pullback{Tuple{typeof(sin)}, Tuple}
+
+# #1754: code without loops records the values of its branches without stacks, typed on all paths
+@test !any(T -> T <: Vector, fieldtypes(fieldtype(typeof(back), :t)))
+@test_inferred back(1.0)
+@test gradient(x -> gradient(branchy, x)[1], -0.5)[1] ≈ -cos(-0.5)
+ternary(F, K, r, T, c) = exp(-r * T) * (c ? F - K : zero(F - K))
+y, back = @test_inferred Zygote._pullback(Context(), ternary, 100.0, 95.0, 0.02, 0.5, true)
+@test any(T -> T <: Zygote.Slot, fieldtypes(fieldtype(typeof(back), :t)))
+@test collect(back(1.0)[2:3]) ≈ exp(-0.01) .* [1, -1]
+@test gradient(ternary, 100.0, 95.0, 0.02, 0.5, false)[1:3] == (nothing, nothing, -0.0)
+@test Zygote.slottypes(Tuple{Float64, Tuple{Int, Union{Nothing,Float64}}}) == [Int, Zygote.Slot{Union{Nothing,Float64}}]
+@test Zygote.slottypes(Tuple{Float64, Tuple{Int, Union{Nothing,typeof(big)}}}) == [Int, Zygote.Slot{Any}]
 
 # loops record into stacks typed after their values, which the backward pass picks up
 function looppow(x, n)
