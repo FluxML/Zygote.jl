@@ -98,6 +98,13 @@ function mixedloop(xs)
 end
 @test gradient(mixedloop, Any[1, 2.0, 3, 4f0])[1] == [1, cos(2.0), 1, cos(4f0)]
 
+# #1753: capturing a variable in a closure records no branch stacks
+anystacks(T) = T == Vector{Any} || T <: Zygote.Pullback && any(anystacks, fieldtypes(fieldtype(T, :t)))
+capture(x) = (y -> x * y)(2.0)
+y, back = Zygote._pullback(Context(), capture, 1.0)
+@test !anystacks(typeof(back))
+@test back(1.0) == (nothing, 2.0)
+
 # TODO fix bcast inference
 # bcast(x) = x .* 5
 # y, back = @test_inferred pullback(bcast, [1,2,3])
