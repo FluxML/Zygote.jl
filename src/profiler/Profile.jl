@@ -1,6 +1,6 @@
 module Profile
 
-using ..Zygote: Pullback, meta, stacklines
+using ..Zygote: Pullback, Slot, meta, stacklines
 
 function loc(f)
   # TODO perhaps find most general method
@@ -68,7 +68,8 @@ end
 function profile(x::Pullback{T}, seen) where T
   ls = []
   for (c, l) in zip(x.t, stacklines(T))
-    c isa Union{Integer,Vector{<:Integer}} && continue
+    c isa Slot && (c = c.x)
+    c isa Union{Nothing,Integer,Vector{<:Integer}} && continue
     cs = c isa Vector ? merge(vcat(map(x -> profile(x, seen),c)...)) : profile(c, seen)
     push!(ls, Node(loc(x)[1],String(l.file),l.line,cs))
   end

@@ -67,30 +67,78 @@ hasloops(ir) = any(b -> any(br -> 0 < br.block <= b.id, branches(b)), blocks(ir)
 runonce(b) = b.id in (1, length(b.ir.blocks)) &&
              !any(((_,stmt),) -> isexpr(stmt.expr, :catch), b)
 
+# Each block of acyclic code runs at most once, so the values it records can reach the last block
+# as block arguments (`threaded!`) instead of going through stacks. The record then holds `nothing`
+# for the blocks that didn't run, and `_pullback` types it with its inferred type (#1754). Not with
+# `try`, as a `catch` block is entered without a branch.
+typed_branches(ir) = length(blocks(ir)) > 1 && !hasloops(ir) &&
+                     !any(((_,st),) -> isexpr(st.expr, :enter, :catch), ir)
+
+# `x`, defined in block `b`, as seen at the start of the last block: `nothing` on the paths that
+# skip `b`. Blocks are in topological order, since no branch goes back.
+function threaded!(ir, preds, b, x)
+  out = Vector{Any}(undef, length(blocks(ir)))
+  local x′
+  for blk in blocks(ir)
+    xs = [out[p] for p in preds[blk.id]]
+    if isempty(xs)
+      x′ = nothing
+    elseif allequal(xs)
+      x′ = xs[1]
+    else
+      x′ = argument!(blk, nothing)
+      for p in preds[blk.id], br in branches(block(ir, p))
+        br.block == blk.id && (arguments(br)[end] = out[p])
+      end
+    end
+    out[blk.id] = blk.id == b ? x : x′
+  end
+  return x′
+end
+
 function forward_stacks!(adj, F)
   stks, recs = [], []
   pr = adj.primal
   loopy = hasloops(pr)
+  typed = typed_branches(pr)
+  preds = predecessor_ids(pr)
   for b in blocks(pr)
     not_stack = runonce(b)
     for α in alphauses(block(adj.adjoint, b.id))
       if not_stack
         push!(recs, Variable(α))
+      elseif typed
+        push!(recs, threaded!(pr, preds, b.id, Variable(α)))
       else
         stk = pushfirst!(pr, loopy ? xcall(Zygote, :StackRef) : xstack(Any))
         push!(recs, stk)
         push!(b, xcall(Zygote, :_push!, stk, Variable(α)))
       end
-      push!(stks, (b.id, alpha(α), not_stack))
+      push!(stks, (b.id, alpha(α), typed ? :slot : not_stack ? :value : :stack))
     end
   end
   rec = push!(pr, xtuple(recs...))
   rec = length(pr.blocks) == 1 ? push!(pr, Expr(:call, Pullback{F}, rec)) :
-                                 push!(pr, xcall(Zygote, :branchy_pullback, F, rec, Val(loopy)))
+        typed ? rec : push!(pr, xcall(Zygote, :branchy_pullback, F, rec, Val(loopy)))
   ret = xtuple(pr.blocks[end].branches[end].args[1], rec)
   ret = push!(pr, ret)
   pr.blocks[end].branches[end].args[1] = ret
   return pr, stks
+end
+
+# The forward pass of `typed_branches` code returns its record untyped, which `_pullback_record`
+# keeps. `_pullback` types it after the type inferred for `_pullback_record`, a constant.
+function typed_record!(forw, T)
+  b = blocks(forw)[end]
+  ret = forw[branches(b)[end].args[1]].expr
+  y, rec = ret.args[2], ret.args[3]
+  cx = push!(b, xcall(Core, :typeof, arguments(forw)[2]))
+  sig = push!(b, xcall(Core, :apply_type, Tuple, cx, T.parameters...))
+  R = push!(b, xcall(Core.Compiler, :return_type, GlobalRef(Zygote, :_pullback_record), sig))
+  xs = [push!(b, xcall(Zygote, :slot, R, Val(i), x)) for (i, x) in enumerate(forw[rec].expr.args[2:end])]
+  pb = push!(b, xcall(Zygote, :branchy_pullback, T, push!(b, xtuple(xs...)), Val(false)))
+  branches(b)[end].args[1] = push!(b, xtuple(y, pb))
+  return forw
 end
 
 function reverse_stacks!(adj, stks)
@@ -99,13 +147,14 @@ function reverse_stacks!(adj, stks)
   self = argument!(entry, at = 1)
   t = pushfirst!(entry, xcall(:getfield, self, QuoteNode(:t)))
   repl = Dict()
-  for (i, (b′, α, not_stack)) in enumerate(stks)
-    if not_stack
-      val = insertafter!(ir, t, xcall(:getindex, t, i))
-    else
+  for (i, (b′, α, kind)) in enumerate(stks)
+    if kind === :stack
       stk = push!(entry, xcall(:getindex, t, i))
       stk = push!(entry, xcall(Zygote, :Stack, stk))
       val = pushfirst!(block(ir, b′), xcall(:pop!, stk))
+    else
+      val = insertafter!(ir, t, xcall(:getindex, t, i))
+      kind === :slot && (val = insertafter!(ir, val, xcall(Zygote, :unslot, val)))
     end
     repl[α] = val
   end

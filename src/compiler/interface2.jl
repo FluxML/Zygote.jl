@@ -35,13 +35,29 @@ function _generate_pullback(ctx, world, f, args...)
   end
   g === nothing && return :(f(args...), Pullback{$T}((f,)))
   meta, forw = g
+  typed_branches(forw) && typed_record!(forw, T)
+  # be ready to swap to using chainrule if one is declared
+  cr_edge != nothing && edge!(meta, cr_edge)
+  return forward_codeinfo(meta, forw)
+end
+
+function forward_codeinfo(meta, forw)
   argnames!(meta, Symbol("#self#"), :ctx, :f, :args)
   forw = varargs!(meta, forw, 3)
   # IRTools.verify(forw)
   forw = slots!(pis!(inlineable!(forw)))
-  # be ready to swap to using chainrule if one is declared
-  cr_edge != nothing && edge!(meta, cr_edge)
   return update!(meta.code, forw)
+end
+
+function _generate_pullback_record(world, f, args...)
+  T = Tuple{f,args...}
+  g = try
+    _generate_pullback_via_decomposition(T, world, :forward)
+  catch e
+    return :(throw($(CompileError(T,e))))
+  end
+  g === nothing && return :(error("No code to differentiate for ", $T))
+  return forward_codeinfo(g...)
 end
 
 function _generate_callable_pullback(j::Type{<:Pullback{T}}, world, Δ) where T
@@ -72,8 +88,7 @@ end
 
 # on Julia 1.10, generated functions need to keep track of the world age
 
-function _pullback_generator(world::UInt, source, self, ctx, f, args)
-  ret = _generate_pullback(ctx, world, f, args...)
+function _forward_generator(world::UInt, source, ret)
   if ret isa Core.CodeInfo
     if isdefined(Base, :__has_internal_change) && Base.__has_internal_change(v"1.12-alpha", :codeinfonargs)
       ret.nargs = 4
@@ -86,8 +101,19 @@ function _pullback_generator(world::UInt, source, self, ctx, f, args)
   stub(world, source, ret)
 end
 
+_pullback_generator(world::UInt, source, self, ctx, f, args) =
+  _forward_generator(world, source, _generate_pullback(ctx, world, f, args...))
+
 @eval function _pullback(ctx::AContext, f, args...)
   $(Expr(:meta, :generated, _pullback_generator))
+  $(Expr(:meta, :generated_only))
+end
+
+_pullback_record_generator(world::UInt, source, self, ctx, f, args) =
+  _forward_generator(world, source, _generate_pullback_record(world, f, args...))
+
+@eval function _pullback_record(ctx::AContext, f, args...)
+  $(Expr(:meta, :generated, _pullback_record_generator))
   $(Expr(:meta, :generated_only))
 end
 
