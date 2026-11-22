@@ -264,6 +264,23 @@ using LogExpFunctions: logaddexp
         @test oout_id_rrule_hitcount[] == 0
     end
 
+    # https://github.com/FluxML/Zygote.jl/issues/1759
+    @testset "rrule defined after first use" begin
+        late_rule(x) = 2x
+        late_rule_outer(x) = late_rule(x) + 1
+        late_configured_rule(x) = 2x
+        @test gradient(late_rule, 1.0) == (2.0,)
+        @test gradient(late_rule_outer, 1.0) == (2.0,)
+        @test gradient(late_configured_rule, 1.0) == (2.0,)
+
+        ChainRulesCore.rrule(::typeof(late_rule), x) = late_rule(x), Δ -> (NoTangent(), 100Δ)
+        ChainRulesCore.rrule(::ZygoteRuleConfig, ::typeof(late_configured_rule), x) =
+            late_configured_rule(x), Δ -> (NoTangent(), 100Δ)
+        @test gradient(late_rule, 1.0) == (100.0,)
+        @test gradient(late_rule_outer, 1.0) == (100.0,)
+        @test gradient(late_configured_rule, 1.0) == (100.0,)
+    end
+
     # issue #1204
     @testset "NotImplemented" begin
         f_notimplemented(x) = x

@@ -68,12 +68,15 @@ function has_chain_rrule(T, world)
 
 
   if !is_ambig && matching_cr_sig(no_rrule_m, rrule_m)  # Not ambiguous, and opted-out.
-    # Return instance for configured_rrule_m as that will be invalidated 
-    # directly if configured rule added, or indirectly if unconfigured rule added
+    # Return the instance for configured_rrule_m, which is invalidated if a configured rule
+    # is added, and for rrule_m, which is invalidated if an unconfigured rule is added
+    # (the redispatcher instance is never inferred, so it has no backedge to rrule_m).
     # Do not need an edge for `no_rrule` as no addition of methods to that can cause this
     # decision to need to be revisited (only changes to `rrule`), since we are already not
     # using the rrule, so not using more rules wouldn't change anything.
-    return false, configured_rrule_m.instance
+    edges = rrule_m === configured_rrule_m ? (rrule_m.instance,) :
+      (configured_rrule_m.instance, rrule_m.instance)
+    return false, edges
   else
     # Either is ambiguous, and we should try to use it, and then error
     # or we are uses a rrule, no need to add any edges for `rrule`, as it will generate 
@@ -81,7 +84,7 @@ function has_chain_rrule(T, world)
     # We also do not need an edge to `no_rrule`, as any time a method is added to `no_rrule`
     # a corresponding method is added to `rrule` (to return `nothing`), thus we will already
     # be revisiting this decision when a new opt-out is added.
-    return true, nothing
+    return true, ()
   end
 end
 

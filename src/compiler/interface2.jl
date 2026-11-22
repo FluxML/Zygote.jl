@@ -21,7 +21,7 @@ function _generate_pullback(ctx, world, f, args...)
     chain_rrule_f = :chain_rrule
   end
 
-  hascr, cr_edge = has_chain_rrule(cr_T, world)
+  hascr, cr_edges = has_chain_rrule(cr_T, world)
   hascr && return :($chain_rrule_f(ZygoteRuleConfig(ctx), f, args...))
 
   # No ChainRule, going to have to work it out.
@@ -36,9 +36,11 @@ function _generate_pullback(ctx, world, f, args...)
   g === nothing && return :(f(args...), Pullback{$T}((f,)))
   meta, forw = g
   typed_branches(forw) && typed_record!(forw, T)
-  # be ready to swap to using chainrule if one is declared
-  cr_edge != nothing && edge!(meta, cr_edge)
-  return forward_codeinfo(meta, forw)
+  ci = forward_codeinfo(meta, forw)
+  # be ready to swap to using chainrule if one is declared;
+  # after `update!`, which overwrites `ci.edges`
+  foreach(e -> edge!(meta, e), cr_edges)
+  return ci
 end
 
 function forward_codeinfo(meta, forw)
