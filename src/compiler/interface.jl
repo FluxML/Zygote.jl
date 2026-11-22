@@ -116,8 +116,8 @@ julia> back([2.0, nothing])
 (2.0,)
 ```
 """
-@inline pullback(f, args...) = pullback(f, Context(), args...)
-function pullback(f, cx::AContext, args...)
+@inline pullback(f::F, args::Vararg{Any,N}) where {F,N} = pullback(f, Context(), args...)
+function pullback(f::F, cx::AContext, args::Vararg{Any,N}) where {F,N}
   y, back = _pullback(cx, f, args...)
   y, Δ -> tailmemaybe(back(Δ))
 end
@@ -174,7 +174,7 @@ julia> gradient([7, 11], 0, 1) do x, y, d
 ([14.0, 22.0], 2.0, nothing)
 ```
 """
-function gradient(f, args...)
+function gradient(f::F, args::Vararg{Any,N}) where {F,N}
   y, back = pullback(f, args...)
   grad = back(sensitivity(y))
   return _project_all(args, unthunk_tangent(grad))
@@ -232,7 +232,7 @@ julia> res.grad[w]
  6.0
 ```
 """
-function withgradient(f, args...)
+function withgradient(f::F, args::Vararg{Any,N}) where {F,N}
   y, back = pullback(f, args...)
   grad = if y isa Tuple
     dy = (sensitivity(first(y)), map(_ -> nothing, Base.tail(y))...)
