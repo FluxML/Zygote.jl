@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Home · Zygote</title><script>(function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+(i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+})(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+ga('create', 'UA-36890222-9', 'auto');
+ga('send', 'pageview', {'page': location.pathname + location.search + location.hash});
+</script><link href="https://fonts.googleapis.com/css?family=Lato|Roboto+Mono" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.11.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.11.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.11.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.11.1/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="assets/documenter.js"></script><script src="siteinfo.js"></script><script src="../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/documenter-dark.css" data-theme-name="documenter-dark"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit">Zygote</span></div><form class="docs-search" action="search/"><input class="docs-search-query" id="documenter-search-query" name="q" type="text" placeholder="Search docs"/></form><ul class="docs-menu"><li class="is-active"><a class="tocitem" href>Home</a><ul class="internal"><li><a class="tocitem" href="#Setup-1"><span>Setup</span></a></li><li><a class="tocitem" href="#Taking-Gradients-1"><span>Taking Gradients</span></a></li><li><a class="tocitem" href="#Structs-and-Types-1"><span>Structs and Types</span></a></li><li><a class="tocitem" href="#Explicit-and-Implicit-Parameters-1"><span>Explicit and Implicit Parameters</span></a></li></ul></li><li><a class="tocitem" href="adjoints/">Custom Adjoints</a></li><li><a class="tocitem" href="utils/">Utilities</a></li><li><a class="tocitem" href="complex/">Complex Differentiation</a></li><li><a class="tocitem" href="profiling/">Profiling</a></li><li><a class="tocitem" href="internals/">Internals</a></li><li><a class="tocitem" href="glossary/">Glossary</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><nav class="breadcrumb"><ul class="is-hidden-mobile"><li class="is-active"><a href>Home</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Home</a></li></ul></nav><div class="docs-right"><a class="docs-edit-link" href="https://github.com/FluxML/Zygote.jl/blob/master/docs/src/index.md" title="Edit on GitHub"><span class="docs-icon fab"></span><span class="docs-label is-hidden-touch">Edit on GitHub</span></a><a class="docs-settings-button fas fa-cog" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-sidebar-button fa fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a></div></header><article class="content" id="documenter-page"><h1 id="Zygote-1"><a class="docs-heading-anchor" href="#Zygote-1">Zygote</a><a class="docs-heading-anchor-permalink" href="#Zygote-1" title="Permalink"></a></h1><p>Welcome! Zygote extends the Julia language to support <a href="https://fluxml.ai/blog/2019/02/07/what-is-differentiable-programming.html">differentiable programming</a>. With Zygote you can write down any Julia code you feel like – including using existing Julia packages – then get gradients and optimise your program. Deep learning, ML and probabilistic programming are all different kinds of differentiable programming that you can do with Zygote.</p><p>At least, that&#39;s the idea. We&#39;re still in beta so expect some adventures.</p><h2 id="Setup-1"><a class="docs-heading-anchor" href="#Setup-1">Setup</a><a class="docs-heading-anchor-permalink" href="#Setup-1" title="Permalink"></a></h2><p>Zygote can be installed from the package manager in Julia&#39;s REPL:</p><pre><code class="language-julia">] add Zygote</code></pre><h2 id="Taking-Gradients-1"><a class="docs-heading-anchor" href="#Taking-Gradients-1">Taking Gradients</a><a class="docs-heading-anchor-permalink" href="#Taking-Gradients-1" title="Permalink"></a></h2><p>Zygote is easy to understand since, at its core, it has a one-function API (<code>pullback</code>), along with a few simple conveniences. Before explaining <code>pullback</code>, we&#39;ll look at the higher-level function <code>gradient</code>.</p><p><code>gradient</code> calculates derivatives. For example, the derivative of <span>$3x^2 + 2x + 1$</span> is <span>$6x + 2$</span>, so when <code>x = 5</code>, <code>dx = 32</code>.</p><pre><code class="language-julia">julia&gt; using Zygote
+
+julia&gt; gradient(x -&gt; 3x^2 + 2x + 1, 5)
+(32,)</code></pre><p><code>gradient</code> returns a tuple, with a gradient for each argument to the function.</p><pre><code class="language-julia">julia&gt; gradient((a, b) -&gt; a*b, 2, 3)
+(3, 2)</code></pre><p>This will work equally well if the arguments are arrays, structs, or any other Julia type, but the function should return a scalar (like a loss or objective <span>$l$</span>, if you&#39;re doing optimisation / ML).</p><pre><code class="language-julia">julia&gt; W = rand(2, 3); x = rand(3);
+
+julia&gt; gradient(W -&gt; sum(W*x), W)[1]
+2×3 Array{Float64,2}:
+ 0.0462002  0.817608  0.979036
+ 0.0462002  0.817608  0.979036
+
+julia&gt; gradient(x -&gt; 3x^2 + 2x + 1, 1//4)
+(7//2,)</code></pre><p>Control flow is fully supported, including recursion.</p><pre><code class="language-julia">julia&gt; function pow(x, n)
+         r = 1
+         for i = 1:n
+           r *= x
+         end
+         return r
+       end
+pow (generic function with 1 method)
+
+julia&gt; gradient(x -&gt; pow(x, 3), 5)
+(75,)
+
+julia&gt; pow2(x, n) = n &lt;= 0 ? 1 : x*pow2(x, n-1)
+pow2 (generic function with 1 method)
+
+julia&gt; gradient(x -&gt; pow2(x, 3), 5)
+(75,)</code></pre><p>Data structures are also supported, including mutable ones like dictionaries. Arrays are currently immutable, though <a href="https://github.com/FluxML/Zygote.jl/pull/75">this may change</a> in future.</p><pre><code class="language-julia">julia&gt; d = Dict()
+Dict{Any,Any} with 0 entries
+
+julia&gt; gradient(5) do x
+         d[:x] = x
+         d[:x] * d[:x]
+       end
+(10,)
+
+julia&gt; d[:x]
+5</code></pre><h2 id="Structs-and-Types-1"><a class="docs-heading-anchor" href="#Structs-and-Types-1">Structs and Types</a><a class="docs-heading-anchor-permalink" href="#Structs-and-Types-1" title="Permalink"></a></h2><p>Julia makes it easy to work with custom types, and Zygote makes it easy to differentiate them. For example, given a simple <code>Point</code> type:</p><pre><code class="language-julia">import Base: +, -
+
+struct Point
+  x::Float64
+  y::Float64
+end
+
+a::Point + b::Point = Point(a.x + b.x, a.y + b.y)
+a::Point - b::Point = Point(a.x - b.x, a.y - b.y)
+dist(p::Point) = sqrt(p.x^2 + p.y^2)</code></pre><pre><code class="language-julia">julia&gt; a = Point(1, 2)
+Point(1.0, 2.0)
+
+julia&gt; b = Point(3, 4)
+Point(3.0, 4.0)
+
+julia&gt; dist(a + b)
+7.211102550927978
+
+julia&gt; gradient(a -&gt; dist(a + b), a)[1]
+(x = 0.5547001962252291, y = 0.8320502943378437)</code></pre><p>Zygote&#39;s default representation of the &quot;point adjoint&quot; is a named tuple with gradients for both fields, but this can of course be customised too.</p><p>This means we can do something very powerful: differentiating through Julia libraries, even if they weren&#39;t designed for this. For example, <code>colordiff</code> might be a smarter loss function on colours than simple mean-squared-error:</p><pre><code class="language-julia">julia&gt; using Colors
+
+julia&gt; colordiff(RGB(1, 0, 0), RGB(0, 1, 0))
+86.60823557376344
+
+julia&gt; gradient(colordiff, RGB(1, 0, 0), RGB(0, 1, 0))
+((r = 0.4590887719632896, g = -9.598786801605689, b = 14.181383399012862), (r = -1.7697549557037275, g = 28.88472330558805, b = -0.044793892637761346))</code></pre><h2 id="Explicit-and-Implicit-Parameters-1"><a class="docs-heading-anchor" href="#Explicit-and-Implicit-Parameters-1">Explicit and Implicit Parameters</a><a class="docs-heading-anchor-permalink" href="#Explicit-and-Implicit-Parameters-1" title="Permalink"></a></h2><p>It&#39;s easy to work with even very large and complex models, and there are few ways to do this. Autograd-style models pass around a collection of weights. Depending on how you write your model, there are multiple ways to <em>explicity</em> take gradients with respect to parameters. For example, the function <code>linear</code> accepts the parameters as an argument to the model. So, we directly pass in the parameters, <code>θ</code>, as an argument to the function being differentiated.</p><pre><code class="language-julia">julia&gt; linear(θ, x) = θ[:W] * x .+ θ[:b]
+linear (generic function with 1 method)
+
+julia&gt; x = rand(5);
+
+julia&gt; θ = Dict(:W =&gt; rand(2, 5), :b =&gt; rand(2))
+Dict{Any,Any} with 2 entries:
+  :b =&gt; [0.0430585, 0.530201]
+  :W =&gt; [0.923268 … 0.589691]
+
+# Alternatively, use a named tuple or struct rather than a dict.
+# θ = (W = rand(2, 5), b = rand(2))
+
+julia&gt; θ̄ = gradient(θ -&gt; sum(linear(θ, x)), θ)[1]
+Dict{Any,Any} with 2 entries:
+  :b =&gt; [1.0, 1.0]
+  :W =&gt; [0.628998 … 0.433006]</code></pre><p>We can combine the role of the dictionary and the function here by making a callable struct which contains the parameters, equivalent to a closure. Passed explicitly to <code>gradient</code>, we get a named tuple with the same field names:</p><pre><code class="language-julia">julia&gt; struct Linear
+         W
+         b
+       end
+
+julia&gt; (l::Linear)(x) = l.W * x .+ l.b
+
+julia&gt; model = Linear(rand(2, 5), rand(2))
+Linear([0.267663 … 0.334385], [0.0386873, 0.0203294])
+
+julia&gt; dmodel = gradient(model -&gt; sum(model(x)), model)[1]
+(W = [0.652543 … 0.683588], b = [1.0, 1.0])</code></pre><p>Zygote also supports another way to take gradients, via <em>implicit parameters</em>. Here the loss function takes zero arguments, but the variables of interest are indicated by a special <code>Params</code> object. The function <code>linear</code> which depends on <code>W</code> and <code>b</code> is executed when the loss function <code>() -&gt; sum(linear(x))</code> is called, and hence this dependence is visible to Zygote:</p><pre><code class="language-julia">julia&gt; W = rand(2, 5); b = rand(2);
+
+julia&gt; linear(x) = W * x .+ b
+linear (generic function with 2 methods)
+
+julia&gt; grads = gradient(() -&gt; sum(linear(x)), Params([W, b]))
+Grads(...)
+
+julia&gt; grads[W], grads[b] # access gradients using arrays as keys
+([0.652543 … 0.683588], [1.0, 1.0])</code></pre><p>Here <code>grads</code> is a dictionary-like object, whose keys are the same parameters we indicated in <code>Params</code>. (In fact it wraps a dictionary using <code>objectid(W)</code> as keys, which does not change if the values in <code>W</code> are mutated).</p><p>This implicit style is the one presently used by <a href="https://github.com/FluxML/Flux.jl">Flux.jl</a>, a closely related machine learning library. It uses structs like <code>Linear</code> above to define layers, and the function <code>Flux.params(model)</code> returns a <code>Params</code> object containing all the parameters of all layers. See <a href="https://fluxml.ai/Flux.jl/stable/models/basics/">its documentation</a> for more details. When using Zygote for most other purposes, however, the explicit style is usually preferred.</p></article><nav class="docs-footer"><a class="docs-footer-nextpage" href="adjoints/">Custom Adjoints »</a></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> on <span class="colophon-date" title="Thursday 25 November 2021 19:38">Thursday 25 November 2021</span>. Using Julia version 1.6.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
