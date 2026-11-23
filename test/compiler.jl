@@ -59,6 +59,18 @@ y, back = @test_inferred pullback(f, 5)
 y, back = @test_inferred pullback(Core._apply, +, (1, 2, 3))
 @test_inferred back(1)
 
+@testset "oftype pullback (#1751)" begin
+  f(x, y) = sin(x) * cos(y) + x * oftype(x, y)
+  for y in (2.0, 2.0f0)
+    x = 1.0
+    val, back = @inferred pullback(f, x, y)
+    @test val == f(x, y)
+    dx, dy = @inferred back(1.0)
+    @test dx ≈ cos(x) * cos(y) + y
+    @test dy ≈ x - sin(x) * sin(y) rtol = sqrt(eps(typeof(y)))
+  end
+end
+
 # #1697: pullbacks of code with branches are concretely typed, unless the type gets large
 branchy(x) = x > 0 ? sin(x) * x : cos(x)
 y, back = @test_inferred Zygote._pullback(Context(), branchy, 0.5)
@@ -80,6 +92,24 @@ y, back = @test_inferred Zygote._pullback(Context(), ternary, 100.0, 95.0, 0.02,
 @test gradient(ternary, 100.0, 95.0, 0.02, 0.5, false)[1:3] == (nothing, nothing, -0.0)
 @test Zygote.slottypes(Tuple{Float64, Tuple{Int, Union{Nothing,Float64}}}) == [Int, Zygote.Slot{Union{Nothing,Float64}}]
 @test Zygote.slottypes(Tuple{Float64, Tuple{Int, Union{Nothing,typeof(big)}}}) == [Int, Zygote.Slot{Any}]
+@test Zygote.slottypes(Tuple{Float64, Tuple{typeof(big), Union{Nothing,Float64}}}) == [typeof(big), Zygote.Slot{Union{Nothing,Float64}}]
+
+@testset "branch after a captured tuple map" begin
+  function weighted_sines(x, data, add)
+    y = sum(map((w, s) -> w * sin(x * s + data.offset), data.weights, data.scales))
+    return add ? y + x^2 : y - x^2
+  end
+  data = (offset = 0.1, weights = ntuple(i -> i / 10, 8), scales = ntuple(i -> i / 5, 8))
+  x = 0.9
+  for add in (true, false)
+    y, back = @inferred pullback(weighted_sines, x, data, add)
+    @test y == weighted_sines(x, data, add)
+    dx, ddata, dadd = @inferred back(1.0)
+    @test dx ≈ ForwardDiff.derivative(t -> weighted_sines(t, data, add), x)
+    @test ddata.weights == map(s -> sin(x * s + data.offset), data.scales)
+    @test dadd === nothing
+  end
+end
 
 # loops record into stacks typed after their values, which the backward pass picks up
 function looppow(x, n)

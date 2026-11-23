@@ -26,10 +26,7 @@ typenodes(T::Union) = typenodes(T.a) + typenodes(T.b)
 typenodes(T::UnionAll) = typenodes(Base.unwrap_unionall(T))
 typenodes(_) = 1
 
-# Pullbacks of multi-block code nest the types of their callees' pullbacks, so a concrete type is
-# only worth its compile time while it stays small (#1697). The record of branch-only code types the
-# pullbacks of all its blocks, a few hundred nodes for a small scalar kernel (#1754), and a callee
-# called on two branches doubles the size of its type, which the limit stops.
+# Limit type growth from nested control flow (#1697, #1754).
 const MAX_BRANCHY_PULLBACK_NODES = 1000
 
 # Code with loops records its stacks in `StackRef`s, whose element types only show at runtime: the
@@ -51,14 +48,14 @@ unslot(x) = x
 unslot(s::Slot) = s.x
 
 # The types of the entries of the record of branch-only code, from `R`, the inferred return type of
-# `_pullback_record`. Those that aren't concrete go in a `Slot`, which is untyped, as a stack would
-# be, if typing them all makes too large a type.
+# `_pullback_record`. Budget the slots, since a callee recorded on both branches can double the
+# type size. A concrete field already has the same type on every path.
 function slottypes(R)
   R isa DataType && R <: Tuple && length(R.parameters) == 2 || return nothing
   T = R.parameters[2]
   T isa DataType && T <: Tuple && !any(Base.isvarargtype, T.parameters) || return nothing
   S = Any[isconcretetype(U) ? U : Slot{U} for U in T.parameters]
-  typenodes(Tuple{S...}) <= MAX_BRANCHY_PULLBACK_NODES && return S
+  sum(typenodes, (U for U in S if U <: Slot); init = 0) <= MAX_BRANCHY_PULLBACK_NODES && return S
   return Any[isconcretetype(U) ? U : Slot{Any} for U in T.parameters]
 end
 

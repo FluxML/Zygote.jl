@@ -136,7 +136,7 @@ function typed_record!(forw, T)
   sig = push!(b, xcall(Core, :apply_type, Tuple, cx, T.parameters...))
   R = push!(b, xcall(Core.Compiler, :return_type, GlobalRef(Zygote, :_pullback_record), sig))
   xs = [push!(b, xcall(Zygote, :slot, R, Val(i), x)) for (i, x) in enumerate(forw[rec].expr.args[2:end])]
-  pb = push!(b, xcall(Zygote, :branchy_pullback, T, push!(b, xtuple(xs...)), Val(false)))
+  pb = push!(b, Expr(:call, Pullback{T}, push!(b, xtuple(xs...))))
   branches(b)[end].args[1] = push!(b, xtuple(y, pb))
   return forw
 end
