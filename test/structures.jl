@@ -1,3 +1,5 @@
+using ChainRulesCore: MutableTangent, NoTangent, Tangent
+using LinearAlgebra: norm
 using Zygote: bufferfrom
 using Base.Threads: @spawn
 
@@ -44,6 +46,37 @@ tasks5(x) = fetch(schedule(Task(() -> x^2)))
 end
 
 @test Zygote.pullback(Array, [1f0])[1] == [1f0]
+
+@testset "Gradient of a mutable callable" begin
+  mutable struct InverseDistanceSurrogate{X,Y,L,U,P}
+    x::X
+    y::Y
+    lb::L
+    ub::U
+    p::P
+  end
+
+  function (surrogate::InverseDistanceSurrogate)(point)
+    p = surrogate.p
+    d = [norm(point .- surrogate.x[i]) for i in eachindex(surrogate.x)]
+    d_min = minimum(d)
+    w = (d ./ d_min) .^ (-p)
+    return sum(w[i] * surrogate.y[i] for i in eachindex(w)) / sum(w)
+  end
+
+  x = collect(range(0.0, 10.0; length = 1000))
+  surrogate = InverseDistanceSurrogate(x, x .^ 2, 0.0, 10.0, 1.4)
+  @test isapprox(only(gradient(surrogate, 5.0)), 14.000000000001783; rtol = 1e-9)
+end
+
+@testset "ChainRules translation of mutable cotangents" begin
+  tangent = MutableTangent{Base.RefValue{ComplexF64}}(;
+    x = Tangent{ComplexF64}(; re = 2.0, im = NoTangent()),
+  )
+  @test Zygote.wrap_chainrules_output(tangent) === (; x = (; re = 2.0, im = nothing))
+  zero = MutableTangent{Base.RefValue{Float64}}(; x = NoTangent())
+  @test Zygote.wrap_chainrules_output(zero) === (; x = nothing)
+end
 
 # NOTE: implicit-params test "#300" lives in test/deprecated.jl
 
